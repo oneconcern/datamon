@@ -1,0 +1,21 @@
+version: '3.4'
+services:
+  dynamodb:
+    image: "casualjim/dynamodb-local"
+    volumes:
+      - type: volume
+        source: dynamodata
+        target: /opt/dynamodb
+        volume:
+          nocopy: true
+  app:
+    image: casualjim/devenv
+    stdin_open: true
+    tty: true
+    command: /bin/zsh
+    volumes:
+      - ".:/go/src/github.com/oneconcern/trumpet"
+    depends_on:
+      - dynamodb
+volumes:
+  dynamodata:
