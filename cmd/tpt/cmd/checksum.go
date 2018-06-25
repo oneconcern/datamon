@@ -48,6 +48,6 @@ func init() {
 	fls.Var(&checksumOpts.LeafSize, "leaf-size", "Leaf size in bytes for tree mode")
 
 	for i := 1; i < 10; i++ {
-		fileCmd.MarkZshCompPositionalArgumentFile(i)
+		checksumCmd.MarkZshCompPositionalArgumentFile(i, "*")
 	}
 }

@@ -9,6 +9,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"log"
 )
 
 var cfgFile string
@@ -18,13 +19,13 @@ var rootCmd = &cobra.Command{
 	Use:   "tpt",
 	Short: "Trumpet helps building ML pipelines",
 	Long: `Trumpet helps building ML pipelines by adding versioning, auditing and security to existing tools.
-	
-	This is not a replacement for existing tools, but rather a way to manage their inputs and outputs.
 
-	Trumpet works by providing a git like interface to manage data efficiently. 
-	It executes pipelines by scheduling the processors as serverless functions on either AWS lambda or on kubeless.
+This is not a replacement for existing tools, but rather a way to manage their inputs and outputs.
 
-	`,
+Trumpet works by providing a git like interface to manage data efficiently. 
+It executes pipelines by scheduling the processors as serverless functions on either AWS lambda or on kubeless.
+
+`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -40,6 +41,7 @@ func Execute() {
 }
 
 func init() {
+	log.SetFlags(0)
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.trumpet.yaml)")
 }

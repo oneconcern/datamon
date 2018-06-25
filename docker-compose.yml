@@ -1,21 +1,43 @@
 version: '3.4'
 services:
-  dynamodb:
+  dynamodb.local:
     image: "casualjim/dynamodb-local"
+    ports: 
+      - "8000:8000"
     volumes:
       - type: volume
         source: dynamodata
         target: /opt/dynamodb
         volume:
           nocopy: true
+  
+  s3.local:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+    environment: 
+      MINIO_ACCESS_KEY: access-key
+      MINIO_SECRET_KEY: secret-key-thing
+      MINIO_BROWSER: "off"
+      MINIO_DOMAIN: s3.local
+    volumes:
+      - type: volume
+        source: miniodata
+        target: /opt/minio
+        volume:
+          nocopy: true
+    command: server /opt/minio
+
   app:
     image: casualjim/devenv
     stdin_open: true
     tty: true
     command: /bin/zsh
     volumes:
-      - ".:/go/src/github.com/oneconcern/trumpet"
+      - ".:/home/ivan/go/src/github.com/oneconcern/trumpet"
     depends_on:
-      - dynamodb
+      - dynamodb.local
+      - s3.local
 volumes:
   dynamodata:
+  miniodata:

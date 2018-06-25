@@ -1,0 +1,44 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+usage() {
+  >&2 echo "Usage: $0 BINNAME NAMESPACE NEWCOMMAND"
+  exit 1
+}
+
+if [ "$#" -ne 3  ]; then
+  >&2 echo "invalid number of arguments"
+  usage
+fi
+
+# find current dir in an arbitrarily nested symlinked path
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )/.." && pwd )"
+
+echo "checking $DIR/cmd/$1"
+if [ ! -d "$DIR/cmd/$1" ]; then
+  >&2 echo "invalid command name: $1, valid options are: $(ls -1m "$DIR/cmd")"
+  usage
+fi
+
+if [ ! -f "$DIR/cmd/$1/cmd/${2}.go" ]; then
+  >&2 echo "unknown subcommand $2"
+  usage
+fi
+
+if [ -f "$DIR/cmd/$1/cmd/${2,,}_${3,,}.go" ]; then
+  >&2 echo "command already exists"
+  exit
+fi
+
+cd "$DIR/cmd/$1"
+
+cobra add -p "${2}Cmd" "$3"
+mv ./cmd/"${3}.go" ./cmd/"${2,,}_${3,,}.go"

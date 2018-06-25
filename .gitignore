@@ -87,3 +87,4 @@ tags
 /.idea/
 /.vscode/
 *.iml
+data/

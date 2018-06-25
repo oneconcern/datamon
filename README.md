@@ -105,6 +105,8 @@ The [repo-name].json file contains the metadata that describes a repo. At a very
 
 This is collated in a single file because it helps to keep that lookup operation a single network round trip and allows for subscriptions so local caches can be maintained.
 
+A repository 
+
 ### Bundle
 
 A bundle represent a single changeset. It contains the delta of the file system between the previous bundle and this one.

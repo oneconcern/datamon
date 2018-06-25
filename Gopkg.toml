@@ -34,3 +34,7 @@
   name = "github.com/spf13/cobra"
   branch = "zsh-completion"
   source = "github.com/babysnakes/cobra"
+
+[[constraint]]
+  name = "github.com/teris-io/shortid"
+  version = "1.0.0"
