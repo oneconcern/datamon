@@ -145,7 +145,7 @@ To enable fast access to files in a geographical location we run a sync server w
 ### Archiving
 
 Once we detect files are no longer in use and have gone stale after some configurable amount of time we move these files to cold storage (glacier).
-To detect files that are in use we inspect all the inputs of the runs
+To detect files that are in use we inspect all the inputs of the runs and find all the commit ids for a given data repository that no longer occur.
 
 ### Execution
 

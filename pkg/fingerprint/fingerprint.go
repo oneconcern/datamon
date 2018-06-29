@@ -5,8 +5,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime"
 	"sync"
 
+	units "github.com/docker/go-units"
 	blake2b "github.com/minio/blake2b-simd"
 )
 
@@ -23,10 +25,43 @@ type chunkOutput struct {
 	part   int
 }
 
+type Option func(*Maker)
+
+func LeafSize(sz int64) Option {
+	return func(m *Maker) {
+		m.leafSize = uint32(sz)
+	}
+}
+
+func numberOfWorkers(no int) Option {
+	return func(m *Maker) {
+		m.numberOfWorkers = no
+	}
+}
+
+func Size(sz uint8) Option {
+	return func(m *Maker) {
+		m.size = sz
+	}
+}
+
+func New(opts ...Option) *Maker {
+	m := &Maker{
+		leafSize:        uint32(5 * units.MB),
+		numberOfWorkers: runtime.NumCPU(),
+		size:            64,
+	}
+
+	for _, apply := range opts {
+		apply(m)
+	}
+	return m
+}
+
 type Maker struct {
-	Size            uint8
-	LeafSize        uint32
-	NumberOfWorkers int
+	size            uint8
+	leafSize        uint32
+	numberOfWorkers int
 }
 
 func (m *Maker) Process(path string) (digest []byte, err error) {
@@ -38,7 +73,7 @@ func (m *Maker) Process(path string) (digest []byte, err error) {
 	chunks := make(chan chunkInput)
 	results := make(chan chunkOutput)
 
-	for i := 0; i < m.NumberOfWorkers; i++ {
+	for i := 0; i < m.numberOfWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -48,7 +83,7 @@ func (m *Maker) Process(path string) (digest []byte, err error) {
 
 	go func() {
 		for part, totalSize := 0, int64(0); ; part++ {
-			partBuffer := make([]byte, m.LeafSize)
+			partBuffer := make([]byte, m.leafSize)
 			n, err := r.Read(partBuffer)
 			if err != nil {
 				if err == io.EOF {
@@ -59,9 +94,9 @@ func (m *Maker) Process(path string) (digest []byte, err error) {
 			partBuffer = partBuffer[:n]
 
 			totalSize += int64(n)
-			lastChunk := uint32(n) < m.LeafSize || uint32(n) == m.LeafSize && totalSize == size
+			lastChunk := uint32(n) < m.leafSize || uint32(n) == m.leafSize && totalSize == size
 
-			chunks <- chunkInput{part: part, partBuffer: partBuffer, lastChunk: lastChunk, leafSize: m.LeafSize, level: 0}
+			chunks <- chunkInput{part: part, partBuffer: partBuffer, lastChunk: lastChunk, leafSize: m.leafSize, level: 0}
 
 			if lastChunk {
 				break
@@ -86,7 +121,7 @@ func (m *Maker) Process(path string) (digest []byte, err error) {
 	}
 
 	// Concatenate digests of chunks
-	sz := int(m.Size)
+	sz := int(m.size)
 	b := make([]byte, len(digestHash)*sz)
 	for index, val := range digestHash {
 		offset := sz * index
@@ -98,10 +133,10 @@ func (m *Maker) Process(path string) (digest []byte, err error) {
 		Tree: &blake2b.Tree{
 			Fanout:        0,
 			MaxDepth:      2,
-			LeafSize:      m.LeafSize,
+			LeafSize:      m.leafSize,
 			NodeOffset:    0,
 			NodeDepth:     1,
-			InnerHashSize: m.Size,
+			InnerHashSize: m.size,
 			IsLastNode:    true,
 		},
 	})
@@ -145,12 +180,12 @@ func (m *Maker) processChunk(rx <-chan chunkInput, tx chan<- chunkOutput) {
 				LeafSize:      uint32(c.leafSize),
 				NodeOffset:    uint64(c.part),
 				NodeDepth:     0,
-				InnerHashSize: m.Size,
+				InnerHashSize: m.size,
 				IsLastNode:    c.lastChunk,
 			},
 		})
 		if err != nil {
-			log.Panic("Failing to create algorithm: ", err)
+			log.Println("Failing to create algorithm: ", err)
 			return
 		}
 

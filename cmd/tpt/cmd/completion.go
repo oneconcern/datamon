@@ -26,6 +26,7 @@ var completionCmd = &cobra.Command{
 	`,
 	ValidArgs: []string{"bash", "zsh"},
 	Args:      cobra.OnlyValidArgs,
+
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			// #nosec

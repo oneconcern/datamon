@@ -3,10 +3,11 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/oneconcern/trumpet/pkg/store/localfs"
 	"log"
+
+	"github.com/oneconcern/trumpet"
 	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/spf13/cobra"
 )
 
 // createCmd represents the create command
@@ -18,19 +19,21 @@ var createCmd = &cobra.Command{
 The description field can use markdown formatting.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		repodb := localfs.New()
-		if err := repodb.Initialize(); err != nil {
+		tpt, err := trumpet.New("")
+		if err != nil {
 			log.Fatalln(err)
 		}
 
-		var repo store.Repo
-		repo.Name = repoOptions.Name
-		repo.Description = repoOptions.Description
-
-		if err := repodb.Create(&repo); err != nil && err != localfs.RepoAlreadyExists {
+		repo, err := tpt.CreateRepo(repoOptions.Name, repoOptions.Description)
+		if err != nil && err != store.RepoAlreadyExists {
 			log.Fatalln(err)
 		}
-		log.Printf("%s has been created", repoOptions.Name)
+
+		if err == store.RepoAlreadyExists {
+			log.Printf("%s already existed, no action taken", repo.Name)
+		} else {
+			log.Printf("%s has been created", repo.Name)
+		}
 	},
 }
 

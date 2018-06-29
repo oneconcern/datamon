@@ -1,6 +1,27 @@
 package store
 
-import "io"
+type errorString string
+
+func (e errorString) Error() string {
+	return string(e)
+}
+
+const (
+	// NameIsRequired error whenever a name is expected but not provided
+	NameIsRequired errorString = "name is required"
+
+	// RepoAlreadyExists is returned when a repo is expected to not exist yet
+	RepoAlreadyExists errorString = "repo already exists"
+
+	// ObjectAlreadyExists is returned when a repo is expected to not exist yet
+	ObjectAlreadyExists errorString = "object already exists"
+
+	// RepoNotFound when a repository is not found
+	RepoNotFound errorString = "repo not found"
+
+	// ObjectNotFound when a repository is not found
+	ObjectNotFound errorString = "object not found"
+)
 
 // A RepoStore manages repositories in a storage mechanism
 type RepoStore interface {
@@ -12,21 +33,18 @@ type RepoStore interface {
 	Create(*Repo) error
 	Update(*Repo) error
 	Delete(string) error
-
 	//Bundles(string) (BundleStore, error)
 }
 
-// A BundleStore manages bundles within a repository
-type BundleStore interface {
-	//List() ([]Bundle, error)
-	//Save(*Bundle) error
-	//Delete(string) error
-}
+// An ObjectMeta store manages the indices for file paths to
+// hashes and the file info meta data
+type ObjectMeta interface {
+	Initialize() error
+	Close() error
 
-// A BlobStore is a content addressable file system
-type BlobStore interface {
-	Get(string) (io.Reader, error)
-	Put(string, io.Reader) error
-	Delete(string) error
-	Keys() ([]string, error)
+	Add(Entry) error
+	Remove(string) error
+	Get(string) (Entry, error)
+	HashFor(string) (string, error)
+	Clear() error
 }

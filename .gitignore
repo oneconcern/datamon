@@ -87,4 +87,6 @@ tags
 /.idea/
 /.vscode/
 *.iml
-data/
+
+# Trumpet related settings
+.trumpet

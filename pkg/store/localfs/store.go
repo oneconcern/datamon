@@ -7,30 +7,17 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dgraph-io/badger"
 	"github.com/json-iterator/go"
 	"github.com/oneconcern/trumpet/pkg/store"
 	"github.com/spf13/afero"
 	"github.com/teris-io/shortid"
 )
 
-type errorString string
-
-func (e errorString) Error() string {
-	return string(e)
-}
-
 const (
 	repoDb   = "repos"
 	blobsDb  = "blobs"
 	modelsDb = "models"
 	runsDb   = "runs"
-
-	// NameIsRequired error whenever a name is expected but not provided
-	NameIsRequired = errorString("name is required")
-	// RepoAlreadyExists is returned when a repo is expected to not exist yet
-	RepoAlreadyExists = errorString("repo already exists")
-	RepoNotFound      = errorString("repo not found")
 )
 
 var (
@@ -53,7 +40,7 @@ type Option func(fs *localFsStore)
 
 func New(opts ...Option) *localFsStore {
 	fs := &localFsStore{
-		baseDir: "./data",
+		baseDir: ".trumpet",
 		fs:      afero.NewOsFs(),
 	}
 	for _, configure := range opts {
@@ -67,14 +54,6 @@ type localFsStore struct {
 	repos
 	fs   afero.Fs
 	once sync.Once
-}
-
-func makeBadgerDb(dir string) (*badger.DB, error) {
-	bopts := badger.DefaultOptions
-	bopts.Dir = dir
-	bopts.ValueDir = dir
-
-	return badger.Open(bopts)
 }
 
 func (fs *localFsStore) Initialize() error {
@@ -131,7 +110,7 @@ func (r *repos) repoPath(name string) string {
 func (r *repos) Get(name string) (*store.Repo, error) {
 	rPath := r.repoPath(name)
 	if !dbExists(rPath) {
-		return nil, fmt.Errorf("%v: %q", RepoNotFound, name)
+		return nil, fmt.Errorf("%v: %q", store.RepoNotFound, name)
 	}
 
 	fi, err := r.fs.Open(rPath)
@@ -154,12 +133,12 @@ func (r *repos) Get(name string) (*store.Repo, error) {
 
 func (r *repos) Create(repo *store.Repo) error {
 	if strings.TrimSpace(repo.Name) == "" {
-		return NameIsRequired
+		return store.NameIsRequired
 	}
 
 	rPath := r.repoPath(repo.Name)
 	if dbExists(rPath) {
-		return fmt.Errorf("%v: %q", RepoAlreadyExists, repo.Name)
+		return fmt.Errorf("%v: %q", store.RepoAlreadyExists, repo.Name)
 	}
 
 	return r.writeRepo(repo.Name, repo)
@@ -182,7 +161,7 @@ func (r *repos) writeRepo(fname string, repo *store.Repo) error {
 
 func (r *repos) Update(repo *store.Repo) error {
 	if !dbExists(r.repoPath(repo.Name)) {
-		return fmt.Errorf("%v: %s", RepoNotFound, repo.Name)
+		return fmt.Errorf("%v: %s", store.RepoNotFound, repo.Name)
 	}
 	id, err := shortid.Generate()
 	if err != nil {

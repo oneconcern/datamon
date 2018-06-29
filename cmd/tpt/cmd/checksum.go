@@ -5,7 +5,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"runtime"
 
 	"github.com/oneconcern/trumpet/pkg/cflags"
 	"github.com/oneconcern/trumpet/pkg/fingerprint"
@@ -24,13 +23,13 @@ var checksumCmd = &cobra.Command{
 	Use:   "checksum",
 	Short: "Create a blake2b checksum for a file or a tree of files",
 	Long:  ``,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		maker := &fingerprint.Maker{
-			Size:            uint8(int64(checksumOpts.Size)),
-			LeafSize:        uint32(checksumOpts.LeafSize),
-			NumberOfWorkers: runtime.NumCPU(),
-		}
-		fp, err := maker.Process(args[0])
+		fp, err := fingerprint.New(
+			fingerprint.Size(uint8(int64(checksumOpts.Size))),
+			fingerprint.LeafSize(int64(checksumOpts.LeafSize)),
+		).Process(args[0])
+
 		if err != nil {
 			log.Fatalln(err)
 		}
