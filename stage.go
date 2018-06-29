@@ -160,3 +160,7 @@ func (s *Stage) Clear() error {
 	}
 	return s.objects.Clear()
 }
+
+func (s *Stage) Status() ([]store.Entry, error) {
+	return s.meta.List()
+}

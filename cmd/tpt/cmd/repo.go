@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"github.com/oneconcern/trumpet"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +27,19 @@ func init() {
 
 }
 
+func initNamedRepo() (*trumpet.Runtime, *trumpet.Repo, error) {
+	tpt, err := trumpet.New("")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	repo, err := tpt.GetRepo(repoOptions.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tpt, repo, nil
+}
+
 func addRepoOptions(cmd *cobra.Command) error {
 	fls := cmd.Flags()
 	if err := addRepoNameOption(cmd); err != nil {
@@ -39,4 +53,9 @@ func addRepoNameOption(cmd *cobra.Command) error {
 	fls := cmd.Flags()
 	fls.StringVar(&repoOptions.Name, "name", "", "The name of this repository")
 	return cmd.MarkFlagRequired("name")
+}
+
+func addRepoFlag(cmd *cobra.Command) error {
+	cmd.Flags().StringVar(&repoOptions.Name, "repo", "", "The name of the repository this command applies to")
+	return cmd.MarkFlagRequired("repo")
 }

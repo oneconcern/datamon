@@ -44,6 +44,7 @@ type ObjectMeta interface {
 
 	Add(Entry) error
 	Remove(string) error
+	List() ([]Entry, error)
 	Get(string) (Entry, error)
 	HashFor(string) (string, error)
 	Clear() error

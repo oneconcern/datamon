@@ -145,6 +145,10 @@ func (o *objectMetaStore) Remove(key string) error {
 	})
 }
 
+func (o *objectMetaStore) List() ([]store.Entry, error) {
+	return o.findByPrefix(string(hashPref[:]), false)
+}
+
 func (o *objectMetaStore) Get(key string) (store.Entry, error) {
 	var entry store.Entry
 	berr := o.db.View(func(tx *badger.Txn) error {
@@ -201,6 +205,48 @@ func (o *objectMetaStore) HashFor(path string) (string, error) {
 
 	if berr != nil {
 		return "", berr
+	}
+	return result, nil
+}
+
+func (o *objectMetaStore) findByPrefix(prefix string, keysOnly bool) ([]store.Entry, error) {
+	var result []store.Entry
+	verr := o.db.View(func(tx *badger.Txn) error {
+		pref := store.UnsafeStringToBytes(prefix)
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = !keysOnly
+
+		it := tx.NewIterator(opts)
+
+		for it.Seek(pref); it.ValidForPrefix(pref); it.Next() {
+			item := it.Item()
+			k := store.UnsafeBytesToString(item.Key())
+			if keysOnly {
+				result = append(result, store.Entry{
+					Hash: k[5:],
+				})
+				continue
+			}
+
+			v, err := item.Value()
+			if err != nil {
+				it.Close()
+				return badgerRewriteObjectError(err)
+			}
+
+			var entry store.Entry
+			if err := jsoniter.Unmarshal(v, &entry); err != nil {
+				it.Close()
+				return badgerRewriteObjectError(err)
+			}
+			result = append(result, entry)
+		}
+		it.Close()
+		return nil
+	})
+
+	if verr != nil {
+		return nil, verr
 	}
 	return result, nil
 }

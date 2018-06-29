@@ -15,4 +15,8 @@ DIR="$( cd -P "$( dirname "$SOURCE" )/.." && pwd )"
 go install ./cmd/tpt
 tpt completion zsh > ~/.local/share/zsh/site-functions/_tpt
 rm -f ~/.zcompdump
-exec autoload -Uz compinit && compinit -C
+exec eval '
+autoload -Uz compinit
+compinit -C
+'
+# rm -f ~/.zcompdump && autoload -Uz compinit && compinit -C

@@ -20,17 +20,14 @@ This command supports providing one or more glob patterns
 `,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := trumpet.New("")
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		repo, err := tpt.GetRepo("hello-there")
+		_, repo, err := initNamedRepo()
 		if err != nil {
 			log.Fatalln(err)
 		}
 
 		for _, arg := range args {
+			// TODO: validate that the files that are being added are
+			// underneath the base directory for the repository.
 			pths, err := filepath.Glob(arg)
 			if err != nil {
 				log.Fatalln(err)
@@ -54,8 +51,9 @@ This command supports providing one or more glob patterns
 
 func init() {
 	bundleCmd.AddCommand(addCmd)
+	addRepoFlag(addCmd)
+
 	for i := 1; i < 100; i++ {
 		addCmd.MarkZshCompPositionalArgumentFile(i, "*")
 	}
-	addRepoNameOption(addCmd)
 }
