@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/oneconcern/trumpet/pkg/store"
-	"github.com/oneconcern/trumpet/pkg/store/bdgr"
+	"github.com/oneconcern/trumpet/pkg/store/localfs"
 )
 
 const (
@@ -22,7 +22,7 @@ func New(baseDir string) (*Runtime, error) {
 	if baseDir == "" {
 		baseDir = ".trumpet"
 	}
-	repos := bdgr.NewRepos(baseDir)
+	repos := localfs.NewRepos(baseDir)
 	if err := repos.Initialize(); err != nil {
 		return nil, err
 	}

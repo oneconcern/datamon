@@ -38,7 +38,3 @@
 [[constraint]]
   name = "github.com/teris-io/shortid"
   version = "1.0.0"
-
-[[constraint]]
-  name = "github.com/djherbis/times"
-  version = "1.0.1"

@@ -1,4 +1,4 @@
-package bdgr
+package localfs
 
 import (
 	"encoding/json"

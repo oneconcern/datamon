@@ -10,7 +10,7 @@ import (
 	"github.com/oneconcern/trumpet/pkg/blob"
 	"github.com/oneconcern/trumpet/pkg/fingerprint"
 	"github.com/oneconcern/trumpet/pkg/store"
-	"github.com/oneconcern/trumpet/pkg/store/bdgr"
+	"github.com/oneconcern/trumpet/pkg/store/localfs"
 )
 
 // NewStage creates a new stage instance
@@ -19,7 +19,7 @@ func newStage(baseDir string) (*Stage, error) {
 		baseDir = ".trumpet/stage"
 	}
 
-	meta := bdgr.NewObjectMeta(baseDir)
+	meta := localfs.NewObjectMeta(baseDir)
 	if err := meta.Initialize(); err != nil {
 		return nil, err
 	}
