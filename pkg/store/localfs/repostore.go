@@ -14,12 +14,6 @@ import (
 	"github.com/oneconcern/trumpet/pkg/store"
 )
 
-const (
-	repoDb   = "repos"
-	modelsDb = "models"
-	runsDb   = "runs"
-)
-
 func makeBadgerDb(dir string) (*badger.DB, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		log.Println("mkdir -p", dir, err)

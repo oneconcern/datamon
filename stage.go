@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/oneconcern/trumpet/pkg/blob"
@@ -14,18 +13,15 @@ import (
 )
 
 // NewStage creates a new stage instance
-func newStage(baseDir string) (*Stage, error) {
-	if baseDir == "" {
-		baseDir = ".trumpet/stage"
-	}
-
+func newStage(baseDir string, bundles store.BundleStore) (*Stage, error) {
 	meta := localfs.NewObjectMeta(baseDir)
 	if err := meta.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return &Stage{
-		objects: blob.LocalFS(filepath.Join(baseDir, "objects")),
+		bundles: bundles,
+		objects: blob.LocalFS(baseDir),
 		meta:    meta,
 		hasher:  fingerprint.New(),
 	}, nil
@@ -96,8 +92,9 @@ func (a *AddBlob) Close() error {
 
 // Stage contains the information to manage staged changes
 type Stage struct {
+	bundles store.BundleStore
 	objects blob.Store
-	meta    store.ObjectMeta
+	meta    store.StageMeta
 	hasher  *fingerprint.Maker
 }
 
@@ -141,6 +138,14 @@ func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
 
 // Remove a file from the stage
 func (s *Stage) Remove(path string) error {
+	// TODO: also look up hash in the committed bundles
+	// when there is a hash found in the committed bundles
+	// then instead of deleting we'll mark it for delete on the stage
+	entry, err := s.bundles.GetObjectForPath(path)
+	if err == nil {
+		return s.meta.MarkDelete(&entry)
+	}
+
 	hash, err := s.meta.HashFor(path)
 	if err != nil {
 		return err
@@ -161,6 +166,7 @@ func (s *Stage) Clear() error {
 	return s.objects.Clear()
 }
 
-func (s *Stage) Status() ([]store.Entry, error) {
+// Status of the stage, returns a changeset
+func (s *Stage) Status() (store.ChangeSet, error) {
 	return s.meta.List()
 }

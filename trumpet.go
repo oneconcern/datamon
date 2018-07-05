@@ -71,21 +71,27 @@ func (r *Runtime) makeRepo(name, description, branch string) (*Repo, error) {
 		return nil, store.NameIsRequired
 	}
 
-	stage, err := newStage(filepath.Join(r.baseDir, name, stage))
-	if err != nil {
+	if branch == "" {
+		branch = DefaultBranch
+	}
+
+	bs := localfs.NewBundleStore(filepath.Join(r.baseDir, name, "bundles"))
+	if err := bs.Initialize(); err != nil {
 		return nil, err
 	}
 
-	if branch == "" {
-		branch = DefaultBranch
+	stage, err := newStage(filepath.Join(r.baseDir, name, stage), bs)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Repo{
 		Name:          name,
 		Description:   description,
 		CurrentBranch: branch,
-		baseDir:       r.baseDir,
+		baseDir:       filepath.Join(r.baseDir, name),
 		stage:         stage,
+		bundles:       bs,
 	}, nil
 }
 

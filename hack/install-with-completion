@@ -12,8 +12,13 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )/.." && pwd )"
 
+zshsitef=/usr/local
+if [ $(uname) = 'Linux' ]; then
+  zshsitef=$HOME/.local
+fi
+
 go install ./cmd/tpt
-tpt completion zsh > ~/.local/share/zsh/site-functions/_tpt
+tpt completion zsh > $zshsitef/share/zsh/site-functions/_tpt
 rm -f ~/.zcompdump
 exec eval '
 autoload -Uz compinit

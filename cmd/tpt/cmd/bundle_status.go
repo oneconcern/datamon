@@ -30,16 +30,21 @@ So you see each file that's enlisted with its status (added, updated, removed).
 			log.Fatalln(err)
 		}
 
-		for _, entry := range entries {
+		for _, entry := range entries.Added {
 			// TODO: do something less braindead than printing the path
 			// stuff like A/M/D or +/x/- come to mind to indicate changes
-			fmt.Println(entry.Path)
+			fmt.Println("  Added: ", entry.Path)
 		}
+		for _, entry := range entries.Deleted {
+			// TODO: do something less braindead than printing the path
+			// stuff like A/M/D or +/x/- come to mind to indicate changes
+			fmt.Println("Removed: ", entry.Path)
+		}
+
 	},
 }
 
 func init() {
 	bundleCmd.AddCommand(statusCmd)
 	addRepoFlag(statusCmd)
-
 }

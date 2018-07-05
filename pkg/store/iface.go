@@ -21,6 +21,12 @@ const (
 
 	// ObjectNotFound when a repository is not found
 	ObjectNotFound errorString = "object not found"
+
+	// BundleNotFound when a bundle is not found
+	BundleNotFound errorString = "bundle not found"
+
+	// BlobNotFound when a bundle is not found
+	BlobNotFound errorString = "blob not found"
 )
 
 // A RepoStore manages repositories in a storage mechanism
@@ -36,15 +42,29 @@ type RepoStore interface {
 	//Bundles(string) (BundleStore, error)
 }
 
-// An ObjectMeta store manages the indices for file paths to
+type BundleStore interface {
+	Initialize() error
+	Close() error
+
+	ListTopLevel() ([]Bundle, error)
+	ListTopLevelIDs() ([]string, error)
+	Create(message, branch, snapshot string, parents []string, changes ChangeSet) (string, bool, error)
+	GetObject(string) (Entry, error)
+	GetObjectForPath(string) (Entry, error)
+
+	HashForPath(path string) (string, error)
+}
+
+// An StageMeta store manages the indices for file paths to
 // hashes and the file info meta data
-type ObjectMeta interface {
+type StageMeta interface {
 	Initialize() error
 	Close() error
 
 	Add(Entry) error
 	Remove(string) error
-	List() ([]Entry, error)
+	List() (ChangeSet, error)
+	MarkDelete(*Entry) error
 	Get(string) (Entry, error)
 	HashFor(string) (string, error)
 	Clear() error

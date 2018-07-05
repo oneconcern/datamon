@@ -11,7 +11,7 @@ import (
 
 // Store implementations know how to write entries to a K/V store.Store.
 //
-// Typically this is something file system-like. Examples are S3, local FS, NFS, ...Store
+// Typically this is something file system-like. Examples are S3, local FS, NFS, ...
 // Implementations of this interface are assumed to be fairly simple.
 type Store interface {
 	Get(string) (io.ReadCloser, error)
@@ -24,7 +24,7 @@ type Store interface {
 // LocalFS creates a new local file system backed blob store
 func LocalFS(baseDir string) Store {
 	return &localFS{
-		baseDir: baseDir,
+		baseDir: filepath.Join(baseDir, "objects"),
 		fs:      afero.NewOsFs(),
 	}
 }
