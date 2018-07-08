@@ -194,6 +194,27 @@ func (l *localBundleStore) Create(message, branch, snapshot string, parents []st
 	return key, false, nil
 }
 
+func (l *localBundleStore) CreateBranch(parent, name string) error {
+	return l.db.Update(func(tx *badger.Txn) error {
+		val := []byte("empty")
+		if parent != "" {
+			pkey, err := valueBytesFor(tx, branchKey(parent))
+			if err != nil {
+				return err
+			}
+			val = pkey
+		}
+		bk := branchKey(name)
+		if _, err := tx.Get(bk); err == nil || err.Error() != badger.ErrKeyNotFound.Error() {
+			if err == nil {
+				return store.BranchAlreadyExists
+			}
+			return err
+		}
+		return tx.Set(bk, val)
+	})
+}
+
 func (l *localBundleStore) HashForPath(path string) (string, error) {
 	return l.hashFor(pathKey(path))
 }
@@ -202,14 +223,18 @@ func (l *localBundleStore) HashForBranch(branch string) (string, error) {
 	return l.hashFor(branchKey(branch))
 }
 
+func valueBytesFor(tx *badger.Txn, key []byte) ([]byte, error) {
+	item, err := tx.Get(key)
+	if err != nil {
+		return nil, badgerRewriteObjectError(err)
+	}
+	return item.Value()
+}
+
 func (l *localBundleStore) hashFor(key []byte) (string, error) {
 	var result string
 	berr := l.db.View(func(tx *badger.Txn) error {
-		item, err := tx.Get(key)
-		if err != nil {
-			return badgerRewriteObjectError(err)
-		}
-		b, err := item.Value()
+		b, err := valueBytesFor(tx, key)
 		if err != nil {
 			return badgerRewriteObjectError(err)
 		}

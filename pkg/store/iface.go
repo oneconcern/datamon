@@ -30,6 +30,9 @@ const (
 
 	// SnapshotNotFound when a bundle is not found
 	SnapshotNotFound errorString = "snapshot not found"
+
+	// BranchAlreadyExists is returned when a branch is expected to not exist yet
+	BranchAlreadyExists errorString = "branch already exists"
 )
 
 // A RepoStore manages repositories in a storage mechanism
@@ -53,7 +56,10 @@ type BundleStore interface {
 	ListTopLevel() ([]Bundle, error)
 	ListTopLevelIDs() ([]string, error)
 	ListBranches() ([]string, error)
+
+	CreateBranch(string, string) error
 	Create(message, branch, snapshot string, parents []string, changes ChangeSet) (string, bool, error)
+
 	Get(string) (*Bundle, error)
 
 	GetObject(string) (Entry, error)

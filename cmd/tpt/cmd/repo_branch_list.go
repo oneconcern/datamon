@@ -33,7 +33,6 @@ var branchListCmd = &cobra.Command{
 
 func init() {
 	branchCmd.AddCommand(branchListCmd)
-	addRepoNameOption(branchListCmd)
 	addFormatFlag(branchListCmd, "list", map[string]Formatter{
 		"list": branchListFormatter(),
 	})

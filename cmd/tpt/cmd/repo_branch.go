@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -16,9 +18,12 @@ A branch is a named pointer to a history.
 This can be a completely new line of history or it can start from a common ancestor.
 
 This means that the head commit of a branch is always the version dependent repositories see.
-	`,
+`,
 }
 
 func init() {
 	repoCmd.AddCommand(branchCmd)
+	if err := addPersistentRepoFlag(branchCmd); err != nil {
+		log.Panic(err)
+	}
 }

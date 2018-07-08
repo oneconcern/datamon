@@ -1,6 +1,7 @@
 package trumpet
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,7 @@ func (r *Repo) Stage() *Stage {
 	return r.stage
 }
 
+// ListBranches returns the list of known branches for a given repo
 func (r *Repo) ListBranches() ([]string, error) {
 	return r.bundles.ListBranches()
 }
@@ -112,6 +114,7 @@ func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 	return result, nil
 }
 
+// Checkout gets the working directory layout
 func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
 	var err error
 	if branch == "" {
@@ -123,12 +126,27 @@ func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
 		if err != nil {
 			return nil, err
 		}
+		log.Printf("inferred commit for branch (%s): %s", branch, commit)
+		if commit == "empty" {
+			return &store.Snapshot{}, nil
+		}
 	}
 
 	b, err := r.bundles.Get(commit)
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("bundle: %#v", b)
 
 	return r.snapshots.GetForBundle(b.ID)
+}
+
+// CreateBranch with the given name, when top level is true
+// the branch will be created without a bundle attached to it
+func (r *Repo) CreateBranch(name string, topLevel bool) error {
+	parent := r.CurrentBranch
+	if topLevel {
+		parent = ""
+	}
+	return r.bundles.CreateBranch(parent, name)
 }
