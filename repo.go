@@ -10,16 +10,25 @@ import (
 	"github.com/oneconcern/trumpet/pkg/store"
 )
 
+// NewBundle contains the information about a newly created bundle
+type NewBundle struct {
+	ID       string `json:"id" yaml:"id"`
+	Snapshot string `json:"snapshot" yaml:"snapshot"`
+	Branch   string `json:"branch" yaml:"branch"`
+	IsEmpty  bool   `json:"is_empty" yaml:"is_empty"`
+}
+
 // Repo is the object that manages repositories
 type Repo struct {
-	Name          string
-	Description   string
-	CurrentBranch string
+	Name          string `json:"name" yaml:"name"`
+	Description   string `json:"description" yaml:"description"`
+	CurrentBranch string `json:"branch" yaml:"branch"`
 
-	baseDir string
-	stage   *Stage
-	bundles store.BundleStore
-	objects stg.Store
+	baseDir   string
+	stage     *Stage
+	bundles   store.BundleStore
+	snapshots store.SnapshotStore
+	objects   stg.Store
 }
 
 // Stage to record pending changes into
@@ -33,31 +42,47 @@ func (r *Repo) ListCommits() ([]store.Bundle, error) {
 }
 
 // CreateCommit the content of the stage to permanent storage
-func (r *Repo) CreateCommit(message, branch string) (hash string, empty bool, err error) {
+func (r *Repo) CreateCommit(message, branch string) (result NewBundle, err error) {
 	if strings.TrimSpace(branch) == "" {
 		branch = r.CurrentBranch
 	}
-	return r.commit(message, branch, "")
+	return r.commit(message, branch)
 }
 
-func (r *Repo) commit(message, branch, snapshot string) (hash string, empty bool, err error) {
+func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
+	result.Branch = branch
+	result.IsEmpty = true
+
 	parents, err := r.bundles.ListTopLevelIDs()
 	if err != nil {
-		return "", true, err
+		return result, err
 	}
 
 	changes, err := r.Stage().Status()
 	if err != nil {
-		return "", true, err
+		return result, err
 	}
 
-	hash, empty, err = r.bundles.Create(message, branch, snapshot, parents, changes)
+	hash, empty, err := r.bundles.Create(message, branch, "", parents, changes)
 	if err != nil {
-		return "", true, err
+		return result, err
 	}
 	if empty {
-		return "", true, nil
+		return result, nil
 	}
+	result.IsEmpty = false
+
+	bundle, err := r.bundles.Get(hash)
+	if err != nil {
+		return result, err
+	}
+	result.ID = bundle.ID
+
+	snapshot, err := r.snapshots.Create(bundle)
+	if err != nil {
+		return result, err
+	}
+	result.Snapshot = snapshot.ID
 
 	tgtDir := filepath.Join(r.baseDir, "bundles", "objects")
 	srcDir := filepath.Join(r.baseDir, "stage", "objects")
@@ -77,8 +102,29 @@ func (r *Repo) commit(message, branch, snapshot string) (hash string, empty bool
 	})
 
 	if err = r.Stage().Clear(); err != nil {
-		return "", false, err
+		return result, err
 	}
 
-	return hash, false, nil
+	return result, nil
+}
+
+func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
+	var err error
+	if branch == "" {
+		branch = r.CurrentBranch
+	}
+
+	if commit == "" {
+		commit, err = r.bundles.HashForBranch(branch)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	b, err := r.bundles.Get(commit)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.snapshots.GetForBundle(b.ID)
 }

@@ -1,7 +1,6 @@
 package localfs
 
 import (
-	"fmt"
 	"time"
 
 	"path/filepath"
@@ -11,34 +10,6 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/oneconcern/trumpet/pkg/store"
 )
-
-func badgerRewriteBundleError(err error) error {
-	switch err {
-	case badger.ErrKeyNotFound:
-		return store.BundleNotFound
-	case badger.ErrEmptyKey:
-		return store.NameIsRequired
-	default:
-		return err
-	}
-}
-
-func badgerRewriteBundleItemError(value *badger.Item, err error) (store.Bundle, error) {
-	if err != nil {
-		return store.Bundle{}, badgerRewriteObjectError(err)
-	}
-
-	data, err := value.Value()
-	if err != nil {
-		return store.Bundle{}, badgerRewriteObjectError(err)
-	}
-
-	var result store.Bundle
-	if e := jsoniter.Unmarshal(data, &result); e != nil {
-		return store.Bundle{}, fmt.Errorf("json unmarshal failed: %v", e)
-	}
-	return result, nil
-}
 
 // NewBundleStore creates a localfs backed bundle store.
 func NewBundleStore(baseDir string) store.BundleStore {
@@ -101,6 +72,22 @@ func (l *localBundleStore) ListTopLevelIDs() ([]string, error) {
 	return result, nil
 }
 
+func (l *localBundleStore) Get(hash string) (*store.Bundle, error) {
+	var bundle *store.Bundle
+	berr := l.db.View(func(tx *badger.Txn) error {
+		b, err := badgerRewriteBundleItemError(tx.Get(commitKey(hash)))
+		if err != nil {
+			return err
+		}
+		bundle = &b
+		return nil
+	})
+	if berr != nil {
+		return nil, berr
+	}
+	return bundle, nil
+}
+
 func (l *localBundleStore) GetObject(hash string) (store.Entry, error) {
 	var entry store.Entry
 	verr := l.db.View(func(tx *badger.Txn) error {
@@ -154,24 +141,29 @@ func (l *localBundleStore) Create(message, branch, snapshot string, parents []st
 		},
 	}
 	serr := l.db.Update(func(tx *badger.Txn) error {
-		data, err := jsoniter.Marshal(b)
-		if err != nil {
-			return err
+		data, err1 := jsoniter.Marshal(b)
+		if err1 != nil {
+			return err1
 		}
 		for _, a := range changes.Added {
-			bb, err := jsoniter.Marshal(a)
-			if err != nil {
-				return err
+			bb, err2 := jsoniter.Marshal(a)
+			if err2 != nil {
+				return err2
 			}
 			hb := store.UnsafeStringToBytes(a.Hash)
-			if err = tx.Set(objectKeyBytes(hb), bb); err != nil {
-				return err
+			if err2 = tx.Set(objectKeyBytes(hb), bb); err2 != nil {
+				return err2
 			}
-			if err = tx.Set(pathKey(a.Path), hb); err != nil {
-				return err
+			if err2 = tx.Set(pathKey(a.Path), hb); err2 != nil {
+				return err2
 			}
 		}
-		return tx.Set(commitKey(key), data)
+
+		kb := store.UnsafeStringToBytes(key)
+		if err = tx.Set(commitKeyBytes(kb), data); err != nil {
+			return err
+		}
+		return tx.Set(branchKey(branch), kb)
 	})
 	if serr != nil {
 		return "", true, serr
@@ -180,9 +172,17 @@ func (l *localBundleStore) Create(message, branch, snapshot string, parents []st
 }
 
 func (l *localBundleStore) HashForPath(path string) (string, error) {
+	return l.hashFor(pathKey(path))
+}
+
+func (l *localBundleStore) HashForBranch(branch string) (string, error) {
+	return l.hashFor(branchKey(branch))
+}
+
+func (l *localBundleStore) hashFor(key []byte) (string, error) {
 	var result string
 	berr := l.db.View(func(tx *badger.Txn) error {
-		item, err := tx.Get(pathKey(path))
+		item, err := tx.Get(key)
 		if err != nil {
 			return badgerRewriteObjectError(err)
 		}

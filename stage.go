@@ -64,6 +64,9 @@ func UnstagedFile(f *os.File) (AddBlob, error) {
 
 // UnstagedStream as blob to add to stage
 func UnstagedStream(path string, reader io.Reader, mtime time.Time, mode os.FileMode) AddBlob {
+	if mtime.IsZero() {
+		mtime = time.Now()
+	}
 	return AddBlob{
 		Path:   path,
 		Stream: reader,
@@ -127,7 +130,7 @@ func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
 		Path:  addBlob.Path,
 		Hash:  hash,
 		Mtime: addBlob.Mtime,
-		Mode:  addBlob.Mode,
+		Mode:  store.FileMode(addBlob.Mode),
 	})
 	if err != nil {
 		return "", false, err
@@ -138,7 +141,7 @@ func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
 
 // Remove a file from the stage
 func (s *Stage) Remove(path string) error {
-	// TODO: also look up hash in the committed bundles
+	// also look up hash in the committed bundles
 	// when there is a hash found in the committed bundles
 	// then instead of deleting we'll mark it for delete on the stage
 	entry, err := s.bundles.GetObjectForPath(path)

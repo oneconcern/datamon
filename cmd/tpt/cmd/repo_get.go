@@ -3,13 +3,11 @@
 package cmd
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/oneconcern/trumpet"
 	"github.com/oneconcern/trumpet/pkg/store"
 	"github.com/spf13/cobra"
-	yaml "gopkg.in/yaml.v2"
 )
 
 type DataRepo struct {
@@ -32,15 +30,15 @@ var repoGetCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		b, err := yaml.Marshal(repo)
-		if err != nil {
+
+		if err := print(repo); err != nil {
 			log.Fatalln(err)
 		}
-		fmt.Println(string(b))
 	},
 }
 
 func init() {
 	repoCmd.AddCommand(repoGetCmd)
 	addRepoNameOption(repoGetCmd)
+	addFormatFlag(repoGetCmd, "")
 }

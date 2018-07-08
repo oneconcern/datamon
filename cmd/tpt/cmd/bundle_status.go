@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// statusCmd represents the status command
-var statusCmd = &cobra.Command{
+// bundleStatusCmd represents the status command
+var bundleStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Get the status of a bundle",
 	Long: `Get the status of a bundle.
@@ -45,6 +45,6 @@ So you see each file that's enlisted with its status (added, updated, removed).
 }
 
 func init() {
-	bundleCmd.AddCommand(statusCmd)
-	addRepoFlag(statusCmd)
+	bundleCmd.AddCommand(bundleStatusCmd)
+	addRepoFlag(bundleStatusCmd)
 }

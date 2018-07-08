@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// removeCmd represents the remove command
-var removeCmd = &cobra.Command{
+// bundleRemoveCmd represents the remove command
+var bundleRemoveCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "Remove a file from a bundle",
 	Long: `Remove a file from a bundle.
@@ -35,11 +35,11 @@ When this file was newly added, it will be removed from the staging area.
 }
 
 func init() {
-	bundleCmd.AddCommand(removeCmd)
-	addRepoFlag(removeCmd)
+	bundleCmd.AddCommand(bundleRemoveCmd)
+	addRepoFlag(bundleRemoveCmd)
 
 	for i := 1; i < 100; i++ {
-		removeCmd.MarkZshCompPositionalArgumentFile(i, "*")
+		bundleRemoveCmd.MarkZshCompPositionalArgumentFile(i, "*")
 	}
 
 }

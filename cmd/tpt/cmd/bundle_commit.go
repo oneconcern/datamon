@@ -16,8 +16,8 @@ var (
 	branch  string
 )
 
-// commitCmd represents the commit command
-var commitCmd = &cobra.Command{
+// bundleCommitCmd represents the commit command
+var bundleCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Create a commit with the currently staged files",
 	Long: `Create a commit with the currently staged files.
@@ -30,22 +30,23 @@ This won't yet make changes in the'`,
 			log.Fatalln(err)
 		}
 
-		hash, empty, err := repo.CreateCommit(message, "")
+		bundle, err := repo.CreateCommit(message, "")
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if empty {
+		if bundle.IsEmpty {
 			log.Println("commit empty, skipping")
 		}
-		fmt.Println(hash)
+		fmt.Println(bundle.ID)
 	},
 }
 
 func init() {
-	bundleCmd.AddCommand(commitCmd)
-	addRepoFlag(commitCmd)
-	fls := commitCmd.Flags()
+	bundleCmd.AddCommand(bundleCommitCmd)
+	addRepoFlag(bundleCommitCmd)
+	fls := bundleCommitCmd.Flags()
+
 	fls.StringVarP(&message, "message", "m", "", "the commit message")
-	commitCmd.MarkFlagRequired("message")
+	bundleCommitCmd.MarkFlagRequired("message")
 	fls.StringVarP(&branch, "branch", "b", trumpet.DefaultBranch, "the branch to use")
 }

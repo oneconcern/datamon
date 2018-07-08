@@ -80,6 +80,11 @@ func (r *Runtime) makeRepo(name, description, branch string) (*Repo, error) {
 		return nil, err
 	}
 
+	snapshots := localfs.NewSnapshotStore(filepath.Join(r.baseDir, name, "bundles"))
+	if err := snapshots.Initialize(); err != nil {
+		return nil, err
+	}
+
 	stage, err := newStage(filepath.Join(r.baseDir, name, stage), bs)
 	if err != nil {
 		return nil, err
@@ -91,6 +96,7 @@ func (r *Runtime) makeRepo(name, description, branch string) (*Repo, error) {
 		CurrentBranch: branch,
 		baseDir:       filepath.Join(r.baseDir, name),
 		stage:         stage,
+		snapshots:     snapshots,
 		bundles:       bs,
 	}, nil
 }

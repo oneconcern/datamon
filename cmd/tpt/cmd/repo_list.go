@@ -4,8 +4,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"log"
 
+	"github.com/fatih/color"
 	"github.com/oneconcern/trumpet"
 
 	"github.com/spf13/cobra"
@@ -28,23 +30,19 @@ var repoListCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 
-		log.Println("found", len(repos), "repos")
-		for _, repo := range repos {
-			fmt.Println(repo.Name)
-		}
+		print(repos)
 	},
 }
 
 func init() {
 	repoCmd.AddCommand(repoListCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// repoListCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// repoListCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	addFormatFlag(repoListCmd, "list", map[string]Formatter{
+		"list": FormatterFunc(func(w io.Writer, data interface{}) error {
+			repos := data.([]trumpet.Repo)
+			for _, repo := range repos {
+				fmt.Fprintf(w, "%s\t%s\n", repo.Name, color.HiBlackString(repo.Description))
+			}
+			return nil
+		}),
+	})
 }

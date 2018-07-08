@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// resetCmd represents the reset command
-var resetCmd = &cobra.Command{
+// bundleResetCmd represents the reset command
+var bundleResetCmd = &cobra.Command{
 	Use:   "reset",
 	Short: "Reset the bundle to the last commit",
 	Long: `Reset the bundle to the last commit.
@@ -31,6 +31,6 @@ This command will clear the stage for a bundle
 }
 
 func init() {
-	bundleCmd.AddCommand(resetCmd)
-	addRepoFlag(resetCmd)
+	bundleCmd.AddCommand(bundleResetCmd)
+	addRepoFlag(bundleResetCmd)
 }

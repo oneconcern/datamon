@@ -1,7 +1,6 @@
 package localfs
 
 import (
-	"fmt"
 	"path/filepath"
 	"sync"
 
@@ -10,34 +9,6 @@ import (
 	"github.com/dgraph-io/badger"
 	"github.com/oneconcern/trumpet/pkg/store"
 )
-
-func badgerRewriteObjectError(err error) error {
-	switch err {
-	case badger.ErrKeyNotFound:
-		return store.ObjectNotFound
-	case badger.ErrEmptyKey:
-		return store.NameIsRequired
-	default:
-		return err
-	}
-}
-
-func badgerRewriteEntryError(value *badger.Item, err error) (store.Entry, error) {
-	if err != nil {
-		return store.Entry{}, badgerRewriteObjectError(err)
-	}
-
-	data, err := value.Value()
-	if err != nil {
-		return store.Entry{}, badgerRewriteObjectError(err)
-	}
-
-	var result store.Entry
-	if e := jsoniter.Unmarshal(data, &result); e != nil {
-		return store.Entry{}, fmt.Errorf("json unmarshal failed: %v", e)
-	}
-	return result, nil
-}
 
 // NewObjectMeta creates a badger based object metadata store
 func NewObjectMeta(baseDir string) store.StageMeta {

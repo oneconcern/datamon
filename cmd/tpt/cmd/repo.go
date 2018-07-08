@@ -24,7 +24,6 @@ Repositories don't carry much content until a commit is made.
 
 func init() {
 	rootCmd.AddCommand(repoCmd)
-
 }
 
 func initNamedRepo() (*trumpet.Runtime, *trumpet.Repo, error) {

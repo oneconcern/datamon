@@ -2,9 +2,6 @@ package localfs
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
-	"os"
 	"path/filepath"
 	"sync"
 
@@ -13,44 +10,6 @@ import (
 	"github.com/dgraph-io/badger"
 	"github.com/oneconcern/trumpet/pkg/store"
 )
-
-func makeBadgerDb(dir string) (*badger.DB, error) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		log.Println("mkdir -p", dir, err)
-	}
-	bopts := badger.DefaultOptions
-	bopts.Dir = dir
-	bopts.ValueDir = dir
-
-	return badger.Open(bopts)
-}
-
-func badgerRewriteRepoError(err error) error {
-	switch err {
-	case badger.ErrKeyNotFound:
-		return store.RepoNotFound
-	case badger.ErrEmptyKey:
-		return store.NameIsRequired
-	default:
-		return err
-	}
-}
-
-func badgerRewriteRepoItemError(value *badger.Item, err error) (store.Repo, error) {
-	if err != nil {
-		return store.Repo{}, badgerRewriteRepoError(err)
-	}
-	data, err := value.Value()
-	if err != nil {
-		return store.Repo{}, badgerRewriteRepoError(err)
-	}
-
-	var result store.Repo
-	if e := jsoniter.Unmarshal(data, &result); e != nil {
-		return store.Repo{}, fmt.Errorf("json unmarshal failed: %v", e)
-	}
-	return result, nil
-}
 
 // NewRepos creates a new repo store instance
 func NewRepos(baseDir string) store.RepoStore {

@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// addCmd represents the add command
-var addCmd = &cobra.Command{
+// bundleAddCmd represents the add command
+var bundleAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a file to a bundle for commit",
 	Long: `Add a file or group of files to a bundle for commit.
@@ -26,8 +26,7 @@ This command supports providing one or more glob patterns
 		}
 
 		for _, arg := range args {
-			// TODO: validate that the files that are being added are
-			// underneath the base directory for the repository.
+			// TODO: validate that the files that are being added are underneath the base directory for the repository.
 			pths, err := filepath.Glob(arg)
 			if err != nil {
 				log.Fatalln(err)
@@ -50,10 +49,10 @@ This command supports providing one or more glob patterns
 }
 
 func init() {
-	bundleCmd.AddCommand(addCmd)
-	addRepoFlag(addCmd)
+	bundleCmd.AddCommand(bundleAddCmd)
+	addRepoFlag(bundleAddCmd)
 
 	for i := 1; i < 100; i++ {
-		addCmd.MarkZshCompPositionalArgumentFile(i, "*")
+		bundleAddCmd.MarkZshCompPositionalArgumentFile(i, "*")
 	}
 }

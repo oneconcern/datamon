@@ -4,7 +4,11 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
+
+	"github.com/json-iterator/go"
+	yaml "gopkg.in/yaml.v2"
 
 	"log"
 
@@ -12,7 +16,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgFile string
+	format  string
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -58,4 +65,105 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func print(data interface{}) error {
+	return formatters[format].Format(os.Stdout, data)
+}
+
+func printe(data interface{}) error {
+	return formatters[format].Format(os.Stderr, data)
+}
+
+// A Formatter is used to render output. They take an interface and output a byte array
+//
+// This byte array should be suitable for writing to a stream directly.
+type Formatter interface {
+	Format(io.Writer, interface{}) error
+}
+
+// FormatterFunc provides a way to use functions as a formatter interface
+type FormatterFunc func(io.Writer, interface{}) error
+
+// Format the data with the function
+func (f FormatterFunc) Format(w io.Writer, data interface{}) error {
+	return f(w, data)
+}
+
+// JSONFormatter for printing as pretified json
+func JSONFormatter() FormatterFunc {
+	return func(w io.Writer, data interface{}) error {
+		enc := jsoniter.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(data)
+	}
+}
+
+// CompactJSONFormatter for priting as compact json
+func CompactJSONFormatter() FormatterFunc {
+	return func(w io.Writer, data interface{}) error {
+		return jsoniter.NewEncoder(w).Encode(data)
+	}
+}
+
+// YAMLFormatter for printing as yaml
+func YAMLFormatter() FormatterFunc {
+	return func(w io.Writer, data interface{}) error {
+		enc := yaml.NewEncoder(w)
+		defer enc.Close()
+		if err := enc.Encode(data); err != nil {
+			return err
+		}
+		return enc.Close()
+	}
+}
+
+var formatters map[string]Formatter
+
+func initDefaultFormatters() {
+	if formatters == nil {
+		formatters = make(map[string]Formatter)
+		formatters["json"] = JSONFormatter()
+		formatters["compactjson"] = CompactJSONFormatter()
+		formatters["yaml"] = YAMLFormatter()
+	}
+}
+
+func knownFormatters() []string {
+	res := make([]string, len(formatters))
+	var i int
+	for k := range formatters {
+		res[i] = k
+		i++
+	}
+	return res
+}
+
+func addFormatFlag(cmd *cobra.Command, defaultValue string, extraFormatters ...map[string]Formatter) error {
+	initDefaultFormatters()
+	if defaultValue == "" {
+		defaultValue = "yaml"
+	}
+	cmd.Flags().StringVarP(&format, "output", "o", "", "the output format to use")
+	prevPreRunE := cmd.PreRunE
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if format == "" {
+			format = defaultValue
+		}
+		for _, ef := range extraFormatters {
+			for k, v := range ef {
+				formatters[k] = v
+			}
+		}
+		if prevPreRunE != nil {
+			if err := prevPreRunE(cmd, args); err != nil {
+				return err
+			}
+		}
+		if _, ok := formatters[format]; !ok {
+			return fmt.Errorf("%q is not a known output format, use one of: %v", format, knownFormatters())
+		}
+		return nil
+	}
+	return nil
 }

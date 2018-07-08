@@ -10,6 +10,9 @@ const (
 	// NameIsRequired error whenever a name is expected but not provided
 	NameIsRequired errorString = "name is required"
 
+	// IDIsRequired error whenever a name is expected but not provided
+	IDIsRequired errorString = "id is required"
+
 	// RepoAlreadyExists is returned when a repo is expected to not exist yet
 	RepoAlreadyExists errorString = "repo already exists"
 
@@ -25,8 +28,8 @@ const (
 	// BundleNotFound when a bundle is not found
 	BundleNotFound errorString = "bundle not found"
 
-	// BlobNotFound when a bundle is not found
-	BlobNotFound errorString = "blob not found"
+	// SnapshotNotFound when a bundle is not found
+	SnapshotNotFound errorString = "snapshot not found"
 )
 
 // A RepoStore manages repositories in a storage mechanism
@@ -42,6 +45,7 @@ type RepoStore interface {
 	//Bundles(string) (BundleStore, error)
 }
 
+// A BundleStore manages persistence for bundle related data
 type BundleStore interface {
 	Initialize() error
 	Close() error
@@ -49,10 +53,12 @@ type BundleStore interface {
 	ListTopLevel() ([]Bundle, error)
 	ListTopLevelIDs() ([]string, error)
 	Create(message, branch, snapshot string, parents []string, changes ChangeSet) (string, bool, error)
+	Get(string) (*Bundle, error)
+
 	GetObject(string) (Entry, error)
 	GetObjectForPath(string) (Entry, error)
-
 	HashForPath(path string) (string, error)
+	HashForBranch(branch string) (string, error)
 }
 
 // An StageMeta store manages the indices for file paths to
@@ -68,4 +74,14 @@ type StageMeta interface {
 	Get(string) (Entry, error)
 	HashFor(string) (string, error)
 	Clear() error
+}
+
+// A SnapshotStore manages persistence for snapshot data
+type SnapshotStore interface {
+	Initialize() error
+	Close() error
+
+	Create(*Bundle) (*Snapshot, error)
+	Get(string) (*Snapshot, error)
+	GetForBundle(string) (*Snapshot, error)
 }
