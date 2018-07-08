@@ -1,6 +1,7 @@
 package trumpet
 
 import (
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -149,4 +150,14 @@ func (r *Repo) CreateBranch(name string, topLevel bool) error {
 		parent = ""
 	}
 	return r.bundles.CreateBranch(parent, name)
+}
+
+func (r *Repo) DeleteBranch(name string) error {
+	if name == "" {
+		return errors.New("branch name is required for deleting")
+	}
+	if name == r.CurrentBranch {
+		return errors.New("can't delete the current branch")
+	}
+	return r.bundles.DeleteBranch(name)
 }

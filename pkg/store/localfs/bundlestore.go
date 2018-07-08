@@ -215,6 +215,17 @@ func (l *localBundleStore) CreateBranch(parent, name string) error {
 	})
 }
 
+func (l *localBundleStore) DeleteBranch(name string) error {
+	return l.db.Update(func(tx *badger.Txn) error {
+		bk := branchKey(name)
+		_, err := tx.Get(bk)
+		if err != nil && err.Error() != badger.ErrKeyNotFound.Error() {
+			return badgerRewriteBundleError(err)
+		}
+		return badgerRewriteBundleError(tx.Delete(bk))
+	})
+}
+
 func (l *localBundleStore) HashForPath(path string) (string, error) {
 	return l.hashFor(pathKey(path))
 }

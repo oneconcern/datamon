@@ -58,6 +58,7 @@ type BundleStore interface {
 	ListBranches() ([]string, error)
 
 	CreateBranch(string, string) error
+	DeleteBranch(string) error
 	Create(message, branch, snapshot string, parents []string, changes ChangeSet) (string, bool, error)
 
 	Get(string) (*Bundle, error)

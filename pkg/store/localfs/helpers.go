@@ -22,10 +22,13 @@ func makeBadgerDb(dir string) (*badger.DB, error) {
 }
 
 func badgerRewriteRepoError(err error) error {
-	switch err {
-	case badger.ErrKeyNotFound:
+	if err == nil {
+		return nil
+	}
+	switch err.Error() {
+	case badger.ErrKeyNotFound.Error():
 		return store.RepoNotFound
-	case badger.ErrEmptyKey:
+	case badger.ErrEmptyKey.Error():
 		return store.NameIsRequired
 	default:
 		return err
@@ -49,10 +52,13 @@ func badgerRewriteRepoItemError(value *badger.Item, err error) (store.Repo, erro
 }
 
 func badgerRewriteBundleError(err error) error {
-	switch err {
-	case badger.ErrKeyNotFound:
+	if err == nil {
+		return nil
+	}
+	switch err.Error() {
+	case badger.ErrKeyNotFound.Error():
 		return store.BundleNotFound
-	case badger.ErrEmptyKey:
+	case badger.ErrEmptyKey.Error():
 		return store.NameIsRequired
 	default:
 		return err
@@ -77,10 +83,13 @@ func badgerRewriteBundleItemError(value *badger.Item, err error) (store.Bundle, 
 }
 
 func badgerRewriteObjectError(err error) error {
-	switch err {
-	case badger.ErrKeyNotFound:
+	if err == nil {
+		return nil
+	}
+	switch err.Error() {
+	case badger.ErrKeyNotFound.Error():
 		return store.ObjectNotFound
-	case badger.ErrEmptyKey:
+	case badger.ErrEmptyKey.Error():
 		return store.NameIsRequired
 	default:
 		return err
@@ -105,10 +114,13 @@ func badgerRewriteEntryError(value *badger.Item, err error) (store.Entry, error)
 }
 
 func badgerRewriteSnapshotError(err error) error {
-	switch err {
-	case badger.ErrKeyNotFound:
+	if err == nil {
+		return nil
+	}
+	switch err.Error() {
+	case badger.ErrKeyNotFound.Error():
 		return store.SnapshotNotFound
-	case badger.ErrEmptyKey:
+	case badger.ErrEmptyKey.Error():
 		return store.IDIsRequired
 	default:
 		return err

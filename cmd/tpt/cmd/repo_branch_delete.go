@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -11,28 +11,29 @@ import (
 // branchDeleteCmd represents the delete command
 var branchDeleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Delete a branch from a repository",
+	Long: `Deleting a branch from a repository erases the commits for this timeline.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Eventually this means that all the unreferenced objects will be removed from the data store.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("delete called")
+		_, repo, err := initNamedRepo()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		if err := repo.DeleteBranch(name); err != nil {
+			log.Fatalln(err)
+		}
+		log.Printf("branch %q deleted", name)
 	},
 }
 
 func init() {
 	branchCmd.AddCommand(branchDeleteCmd)
+	addFormatFlag(branchDeleteCmd, "")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// branchDeleteCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// branchDeleteCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	fls := branchDeleteCmd.Flags()
+	fls.StringVar(&name, "name", "", "name for the branch to delete")
+	branchCheckoutCmd.MarkFlagRequired("name")
 }
