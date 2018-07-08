@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"time"
 
 	"github.com/fatih/color"
@@ -30,7 +29,7 @@ var bundleLogCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 
-		if err := formatters[format].Format(os.Stdout, commits); err != nil {
+		if err := print(commits); err != nil {
 			log.Fatalln(err)
 		}
 	},

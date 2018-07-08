@@ -55,6 +55,29 @@ func (l *localBundleStore) Close() error {
 	return err
 }
 
+func (l *localBundleStore) ListBranches() ([]string, error) {
+	var result []string
+	verr := l.db.View(func(tx *badger.Txn) error {
+		pref := branchKey("")
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = true
+
+		it := tx.NewIterator(opts)
+		for it.Seek(pref); it.ValidForPrefix(pref); it.Next() {
+			item := it.Item()
+			k := store.UnsafeBytesToString(item.Key()[len(pref):])
+			result = append(result, k)
+		}
+		it.Close()
+		return nil
+	})
+
+	if verr != nil {
+		return nil, verr
+	}
+	return result, nil
+}
+
 func (l *localBundleStore) ListTopLevel() ([]store.Bundle, error) {
 	return l.findCommitsByPrefix("", false)
 }

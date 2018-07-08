@@ -52,6 +52,7 @@ type BundleStore interface {
 
 	ListTopLevel() ([]Bundle, error)
 	ListTopLevelIDs() ([]string, error)
+	ListBranches() ([]string, error)
 	Create(message, branch, snapshot string, parents []string, changes ChangeSet) (string, bool, error)
 	Get(string) (*Bundle, error)
 

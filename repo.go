@@ -36,6 +36,10 @@ func (r *Repo) Stage() *Stage {
 	return r.stage
 }
 
+func (r *Repo) ListBranches() ([]string, error) {
+	return r.bundles.ListBranches()
+}
+
 // ListCommits gets the bundles associated with the top level commits
 func (r *Repo) ListCommits() ([]store.Bundle, error) {
 	return r.bundles.ListTopLevel()
