@@ -52,6 +52,16 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/gosuri/uitable"
+  packages = [
+    ".",
+    "util/strutil",
+    "util/wordwrap"
+  ]
+  revision = "36ee7e946282a3fb1cfecd476ddc9b35d8847e42"
+
+[[projects]]
+  branch = "master"
   name = "github.com/hashicorp/hcl"
   packages = [
     ".",
@@ -96,6 +106,12 @@
   packages = ["."]
   revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
   version = "v0.0.3"
+
+[[projects]]
+  name = "github.com/mattn/go-runewidth"
+  packages = ["."]
+  revision = "9e777a8366cce605130a531d2cd6363d07ad7317"
+  version = "v0.0.2"
 
 [[projects]]
   branch = "master"
@@ -211,6 +227,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0e47d23d945696cd655d526b9dca16f2f686531345230e40407ef8a1882e0b09"
+  inputs-digest = "20a57e4e271dc2c916b7a5c65f4dd29823b9617a1a551c4b12b0f18aee293063"
   solver-name = "gps-cdcl"
   solver-version = 1

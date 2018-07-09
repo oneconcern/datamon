@@ -37,3 +37,7 @@
 #[[constraint]]
 #  name = "github.com/teris-io/shortid"
 #  version = "1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/gosuri/uitable"
