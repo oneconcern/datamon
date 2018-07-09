@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -15,11 +15,11 @@ var tagCmd = &cobra.Command{
 	Long: `Tags are meant to be fairly static, once assigned to a commit they are unlikely to change in the future.
 
 You can look at tags as being a named point in time for a repository.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("tags called")
-	},
 }
 
 func init() {
 	repoCmd.AddCommand(tagCmd)
+	if err := addPersistentRepoFlag(tagCmd); err != nil {
+		log.Panic(err)
+	}
 }

@@ -17,6 +17,7 @@ var (
 	branchPref    = [7]byte{'b', 'r', 'a', 'n', 'c', 'h', ':'}
 	snapshotPref  = [9]byte{'s', 'n', 'a', 'p', 's', 'h', 'o', 't', ':'}
 	bsnapshotPref = [5]byte{'s', 'n', 'c', 'o', ':'}
+	tagPref       = [4]byte{'t', 'a', 'g', ':'}
 )
 
 func objectKey(key string) []byte {
@@ -45,6 +46,10 @@ func commitKeyBytes(key []byte) []byte {
 
 func branchKey(key string) []byte {
 	return append(branchPref[:], store.UnsafeStringToBytes(key)...)
+}
+
+func tagKey(key string) []byte {
+	return append(tagPref[:], store.UnsafeStringToBytes(key)...)
 }
 
 func snapshotKey(key string) []byte {

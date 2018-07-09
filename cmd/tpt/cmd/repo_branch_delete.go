@@ -31,9 +31,7 @@ Eventually this means that all the unreferenced objects will be removed from the
 
 func init() {
 	branchCmd.AddCommand(branchDeleteCmd)
-	addFormatFlag(branchDeleteCmd, "")
-
 	fls := branchDeleteCmd.Flags()
 	fls.StringVar(&name, "name", "", "name for the branch to delete")
-	branchCheckoutCmd.MarkFlagRequired("name")
+	branchDeleteCmd.MarkFlagRequired("name")
 }

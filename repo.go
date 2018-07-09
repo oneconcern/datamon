@@ -2,7 +2,6 @@ package trumpet
 
 import (
 	"errors"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +40,11 @@ func (r *Repo) Stage() *Stage {
 // ListBranches returns the list of known branches for a given repo
 func (r *Repo) ListBranches() ([]string, error) {
 	return r.bundles.ListBranches()
+}
+
+// ListTags returns the list of known branches for a given repo
+func (r *Repo) ListTags() ([]string, error) {
+	return r.bundles.ListTags()
 }
 
 // ListCommits gets the bundles associated with the top level commits
@@ -125,9 +129,14 @@ func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
 	if commit == "" {
 		commit, err = r.bundles.HashForBranch(branch)
 		if err != nil {
-			return nil, err
+			if !strings.Contains(err.Error(), "not found") {
+				return nil, err
+			}
+			commit, err = r.bundles.HashForTag(branch)
+			if err != nil {
+				return nil, err
+			}
 		}
-		log.Printf("inferred commit for branch (%s): %s", branch, commit)
 		if commit == "empty" {
 			return &store.Snapshot{}, nil
 		}
@@ -137,7 +146,6 @@ func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("bundle: %#v", b)
 
 	return r.snapshots.GetForBundle(b.ID)
 }
@@ -152,6 +160,8 @@ func (r *Repo) CreateBranch(name string, topLevel bool) error {
 	return r.bundles.CreateBranch(parent, name)
 }
 
+// DeleteBranch with the given name.
+// This will remove all the orphaned data as well as the branch itself
 func (r *Repo) DeleteBranch(name string) error {
 	if name == "" {
 		return errors.New("branch name is required for deleting")
@@ -160,4 +170,17 @@ func (r *Repo) DeleteBranch(name string) error {
 		return errors.New("can't delete the current branch")
 	}
 	return r.bundles.DeleteBranch(name)
+}
+
+// CreateTag with the given name
+func (r *Repo) CreateTag(name string) error {
+	return r.bundles.CreateTag(r.CurrentBranch, name)
+}
+
+// DeleteTag with the given name.
+func (r *Repo) DeleteTag(name string) error {
+	if name == "" {
+		return errors.New("tag name is required for deleting")
+	}
+	return r.bundles.DeleteTag(name)
 }

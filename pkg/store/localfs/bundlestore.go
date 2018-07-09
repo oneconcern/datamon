@@ -55,29 +55,6 @@ func (l *localBundleStore) Close() error {
 	return err
 }
 
-func (l *localBundleStore) ListBranches() ([]string, error) {
-	var result []string
-	verr := l.db.View(func(tx *badger.Txn) error {
-		pref := branchKey("")
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = true
-
-		it := tx.NewIterator(opts)
-		for it.Seek(pref); it.ValidForPrefix(pref); it.Next() {
-			item := it.Item()
-			k := store.UnsafeBytesToString(item.Key()[len(pref):])
-			result = append(result, k)
-		}
-		it.Close()
-		return nil
-	})
-
-	if verr != nil {
-		return nil, verr
-	}
-	return result, nil
-}
-
 func (l *localBundleStore) ListTopLevel() ([]store.Bundle, error) {
 	return l.findCommitsByPrefix("", false)
 }
@@ -194,6 +171,72 @@ func (l *localBundleStore) Create(message, branch, snapshot string, parents []st
 	return key, false, nil
 }
 
+func (l *localBundleStore) ListTags() ([]string, error) {
+	return l.listKeys(tagKey(""))
+}
+
+func (l *localBundleStore) HashForTag(tag string) (string, error) {
+	return l.hashFor(tagKey(tag))
+}
+
+func (l *localBundleStore) CreateTag(branch, tag string) error {
+	return l.db.Update(func(tx *badger.Txn) error {
+		if branch == "" {
+			return store.IDIsRequired
+		}
+		if tag == "" {
+			return store.NameIsRequired
+		}
+
+		pkey, err := valueBytesFor(tx, branchKey(branch))
+		if err != nil {
+			return err
+		}
+
+		return tx.Set(tagKey(tag), pkey)
+	})
+}
+
+func (l *localBundleStore) DeleteTag(tag string) error {
+	return l.db.Update(func(tx *badger.Txn) error {
+		bk := tagKey(tag)
+		_, err := tx.Get(bk)
+		if err != nil {
+			if err.Error() == badger.ErrKeyNotFound.Error() {
+				return nil
+			}
+			return badgerRewriteBundleError(err)
+		}
+		return badgerRewriteBundleError(tx.Delete(bk))
+	})
+}
+
+func (l *localBundleStore) ListBranches() ([]string, error) {
+	return l.listKeys(branchKey(""))
+}
+
+func (l *localBundleStore) listKeys(pref []byte) ([]string, error) {
+	var result []string
+	verr := l.db.View(func(tx *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = true
+
+		it := tx.NewIterator(opts)
+		for it.Seek(pref); it.ValidForPrefix(pref); it.Next() {
+			item := it.Item()
+			k := store.UnsafeBytesToString(item.Key()[len(pref):])
+			result = append(result, k)
+		}
+		it.Close()
+		return nil
+	})
+
+	if verr != nil {
+		return nil, verr
+	}
+	return result, nil
+}
+
 func (l *localBundleStore) CreateBranch(parent, name string) error {
 	return l.db.Update(func(tx *badger.Txn) error {
 		val := []byte("empty")
@@ -215,6 +258,10 @@ func (l *localBundleStore) CreateBranch(parent, name string) error {
 	})
 }
 
+func (l *localBundleStore) HashForBranch(branch string) (string, error) {
+	return l.hashFor(branchKey(branch))
+}
+
 func (l *localBundleStore) DeleteBranch(name string) error {
 	return l.db.Update(func(tx *badger.Txn) error {
 		bk := branchKey(name)
@@ -228,10 +275,6 @@ func (l *localBundleStore) DeleteBranch(name string) error {
 
 func (l *localBundleStore) HashForPath(path string) (string, error) {
 	return l.hashFor(pathKey(path))
-}
-
-func (l *localBundleStore) HashForBranch(branch string) (string, error) {
-	return l.hashFor(branchKey(branch))
 }
 
 func valueBytesFor(tx *badger.Txn, key []byte) ([]byte, error) {

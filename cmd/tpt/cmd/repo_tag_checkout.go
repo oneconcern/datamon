@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -11,28 +11,29 @@ import (
 // tagCheckoutCmd represents the checkout command
 var tagCheckoutCmd = &cobra.Command{
 	Use:   "checkout",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Checkout the files for the given branch",
+	Long:  `Checkout the files for the specified branch and switch to the branch`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("checkout called")
+		_, repo, err := initNamedRepo()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		sn, err := repo.Checkout(name, "")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if sn.ID == "" {
+			log.Println("checked out empty branch, workspace is cleared")
+		}
+		print(sn)
 	},
 }
 
 func init() {
 	tagCmd.AddCommand(tagCheckoutCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// tagCheckoutCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// tagCheckoutCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	fls := tagCheckoutCmd.Flags()
+	fls.StringVar(&name, "name", "", "name for the tag to checkout")
+	tagCheckoutCmd.MarkFlagRequired("name")
+	addFormatFlag(tagCheckoutCmd, "")
 }

@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -11,28 +11,28 @@ import (
 // tagCreateCmd represents the create command
 var tagCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Create a tag based of the current branch",
+	Long: `Create a tag based of the current branch.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+A tag represents an immutable anchor as a named commit.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("create called")
+		_, repo, err := initNamedRepo()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		if err := repo.CreateTag(name); err != nil {
+			log.Fatalln(err)
+		}
+
+		log.Printf("tag %q created", name)
 	},
 }
 
 func init() {
 	tagCmd.AddCommand(tagCreateCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// tagCreateCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// tagCreateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	fls := tagCreateCmd.Flags()
+	fls.StringVar(&name, "name", "", "name for the tag to create")
+	tagCreateCmd.MarkFlagRequired("name")
 }
