@@ -1,0 +1,7 @@
+# Default values
+image:
+  repository: reg.onec.co/flexvoldrivers
+  tag: master
+  pullPolicy: Always
+flexVolume:
+  pluginDir: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/

@@ -59,6 +59,7 @@ func UnstagedFile(f *os.File) (AddBlob, error) {
 		Stream: f,
 		Mtime:  fi.ModTime(),
 		Mode:   fi.Mode(),
+		Size:   fi.Size(),
 	}, nil
 }
 
@@ -81,6 +82,7 @@ type AddBlob struct {
 	Stream io.Reader
 	Mtime  time.Time
 	Mode   os.FileMode
+	Size   int64
 
 	_ struct{} // avoid unkeyed usage
 }

@@ -1,0 +1,44 @@
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: ivan-goofys-dbg
+  name: ivan-goofys-dbg
+spec:
+  selector:
+    matchLabels:
+      app: ivan-goofys-dbg
+  template:
+
+    metadata:
+      labels:
+        app: ivan-goofys-dbg
+    spec:
+      containers:
+      - image: casualjim/zsh
+        imagePullPolicy: IfNotPresent
+        name: dbg
+        stdin: true
+        tty: true
+        args:
+        - /bin/zsh
+        volumeMounts:
+          - name: shared
+            mountPath: /mnt
+          - name: aws-creds
+            mountPath: /home/ivan/.aws
+
+      volumes:
+      - name: aws-creds
+        secret:
+          secretName: aws-creds
+      - name: shared
+        flexVolume:
+          driver: "oneconcern/flexgoofys"
+          options:
+            bucket: oneconcern-k8s-cluster-store
+            dirMode: "0755"
+            fileMode: "0644"
+
+

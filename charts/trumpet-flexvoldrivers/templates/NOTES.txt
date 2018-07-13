@@ -1,0 +1,5 @@
+A flexvolume plugin of type oneconcern.com/trumpet-flexvol has been registered!
+
+To check it's state, run:
+
+  helm status {{.Release.Name}}

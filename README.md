@@ -16,6 +16,112 @@ The general idea behind the pipeline execution is that all pipelines are always 
 Events triggers are idempotent, this means when the content of the inputs change the graph executes all the nodes in the graph are
 dependent on that result. 
 
+A processor in the pipeline is configured with a yaml or json document.
+
+```yaml
+name: the-processor-name
+branch: "develop"
+runtime: "reg.onec.co/flood_ml:develop"
+# when the job needs to run on with access to a gpu
+gpu: true
+# if the job can run on the same compute resources as other processors of the same type
+can_colocate: true
+# define scaling limits
+concurrency:
+  min: 1
+  max: 5
+  condition: queue_depth >= 10
+# optional hints for resource requirements
+resources:
+  cpu:
+    min: 100Mi
+    max: 500Mi
+  mem:
+    min: 200MB
+    max: 2GB
+# each entry is a glob pattern to select files you want included
+# the paths will be preserved
+content:
+  - vendor/*
+  - scripts/*
+  - bin/*
+  - requirements.txt
+  - app.py
+# the command to run
+command:
+  - python
+  - app.py
+secrets:
+  - name: database-creds
+    path: /etc/oneconcern/database-creds
+configmaps:
+  - name: flood-ml-config
+    path: /etc/oneconcern/config
+input:
+  - type: repo
+    # the name of the data repository
+    name: flood-nldas-data
+    # a branch name, tag name or commit id, when none is specified it defaults to master
+    version: develop
+    # the task will only see these files in /trumpet/input/flood-nldas-data
+    filter: /huc2/huc8/**/*.grib
+trigger:
+  - type: repo
+    # the name of the data repository
+    name: flood-nldas-data
+    # the task will only see these files
+    selector: /huc2/huc8/*
+  - type: cron # when cron is specified no other triggers can be specified
+    schedule: "*/5 * * * *"
+```
+
+### Usage examples
+
+There are different use objects that can be created with trumpet.
+
+### Repositories
+
+You can create, delete and list repositories. 
+
+```sh
+tpt repo list
+tpt repo get --name hello-there
+tpt repo create --name hello-there --description 'First repo in trumpet'
+tpt repo delete --name hello-there
+```
+
+You can manage branches in repositories.
+
+```sh
+tpt repo branch list --repo hello-there
+tpt repo branch create --repo hello-there --name new-branch
+tpt repo branch delete --repo hello-there --name new-branch
+tpt repo branch checkout --repo hello-there --name new-branch
+```
+
+You can add files to a branch.
+
+```sh
+curl -OL'#' https://some.site.domain/very-large-file.zip
+tpt bundle add --repo hello-there very-large-file.zip
+tpt bundle seal --repo hello-there --message 'first commit'
+tpt bundle checkout --repo hello-there
+```
+
+You can also tag bundles
+
+``` sh
+tpt repo tag list --repo hello-there
+tpt repo tag create --repo hello-there --name v0.1.0 --message "$(cat notes/v0.1.0.md)"
+tpt repo tag delete --repo hello-there --name v0.1.0
+tpt repo tag checkout --repo hello-there --name v0.1.0
+```
+
+### Tunes
+
+Tunes are the tasks that can be executed with trumpet.
+You can box a 
+
 ## Data Management
 
 The data management provides a content addressable filesystem which can import data from a variety of sources.
@@ -138,9 +244,9 @@ The inputs are all read-only mounts into the container, one possible way to achi
 A pipeline is essentially a single path through our continously executing DAG.
 There can't be any cyclic dependencies in this graph, one way to verify this is by running the [tarjan algorithm](https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm).
 
-### Fast access in handlers
+### File access in handlers
 
-To enable fast access to files in a geographical location we run a sync server which synchronizes the S3 files onto a high performance network file system (EFS in AWS).
+To access files in handlers we make them available via a fuse filesystem, this is a customization of goofys which applies the filters defined in the manifest for a handler.
 
 ### Archiving
 
