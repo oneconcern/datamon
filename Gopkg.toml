@@ -41,7 +41,3 @@
 [[constraint]]
   branch = "master"
   name = "github.com/gosuri/uitable"
-
-[[constraint]]
-  name = "github.com/kahing/goofys"
-  version = "0.19.0"
