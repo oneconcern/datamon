@@ -1,0 +1,220 @@
+"""
+Top-Level query object as entry point to the graphq query
+"""
+type Query {
+  """
+  List the repositories known by trumpet
+  """
+  repositories: [Repository]!
+  """
+  Get a repository by name
+  """
+  repository(name: String): Repository
+}
+
+"""
+All the available methods for creating, updating and deleting data.
+"""
+type Mutation {
+  createRepository(repo: RepositoryInput!): Repository
+}
+
+"""
+A repository contains a group of files that are versioned over time.
+
+Repositories can contain several different diverging timelines. It's helpful to think about repositories as topics.
+"""
+type Repository {
+
+  """
+  Name of the repository, this needs to be a DNS safe name.
+  """
+  name: String!
+
+  """
+  A description of what the repository is about.
+
+  This field accepts github flavored markdown.
+  """
+  description: String
+
+  """
+  Tagged commits, if any of the repository.
+
+  A tag represents a fixed point in history for a repository.
+  Tags are expected to be stable and never change once they've been published.
+
+  For consumers of a tag it is important that they can depend on the tag always being the same.
+  """
+  tags: [BundleRef|]
+
+  """
+  Branches, if any of the repository.
+
+  A branch represents a pointer to the top of a particular timeline.
+  Branches can be seen as alternative timelines for a particular topic.
+  """
+  branches: [BundleRef!]
+}
+
+"""
+Input required to create a new, empty repository
+"""
+input RepositoryInput {
+
+  """
+  A unique name for the repository, this needs to be a DNS safe name
+
+  So no longer than 53 characters and [a-zA-Z0-9-]+
+  """
+  name: String!
+
+  """
+  An optional description of what the repository is about.
+
+  This field accepts github flavored markdown.
+  """
+  description: String
+}
+
+"""
+The possible types a name can be for
+"""
+enum NameType {
+  """
+  Detached for when a bundle ref refers to an unnamed commit
+  """
+  Detached
+  """
+  Branch for when the name refers to a branch
+  """
+  Branch
+  """
+  Tag for when the name refers to a tag
+  """
+  Tag
+}
+
+"""
+A name for bundle refs
+"""
+type Named {
+  """
+  The name of ref
+  """
+  name: String
+
+  """
+  The type of the name
+  """
+  type: NameType
+}
+
+"""
+A bundle reference is a pointer to a bundle id, with an optional name
+"""
+type BundleRef {
+  """
+  The id of the bundle
+  """
+  id: ID!
+  """
+  The name of the commit, when provided
+  """
+  name: Nameds
+}
+
+"""
+A bundle represents a change set with some metadata about how created it
+and where it's located in the timeline
+"""
+type Bundle {
+  """
+  The ID of the bundle.
+
+  This is created from the timestamp, the parent hashes,
+  the root hash of the change set and the message.
+  """
+  id: ID!
+
+  """
+  The commit message that describes what went in this commit.
+  """
+  message: String
+
+  """
+  The parents to this commit.
+  """
+  parents: [Bundle]
+
+  """
+  The changes to the repository in this commit
+  """
+  changes: ChangeSet!
+
+  """
+  The timestamp for when this commit was made
+  """
+  timestamp: Time!
+}
+
+"""
+A versioned object. This is identified by the hash of its content.
+"""
+type VersionedObject {
+
+  """
+  The hash of the content that should appear at the given path
+  """
+  id: ID!
+
+  """
+  The path of the file within the workspace
+  """
+  path: String!
+
+  """
+  The time this file was last modified
+  """
+  mtime: Time!
+
+  """
+  The unix file permissions (eg: 0644)
+  """
+  mode: String
+}
+
+"""
+Captures the changes made to the file tree of a snapshot
+"""
+type ChangeSet {
+  """
+  Added files, so newly created ones
+  """
+  added: [VersionedObject!]
+  """
+  Deleted files, so files that dissappeared
+  """
+  deleted: [VersionedObject!]
+}
+
+"""
+A contributor to an element in Trumpet
+
+Both fields are required so that we always know who made the changes to the files
+"""
+type Contributor {
+  """
+  Name of the contributor
+  """
+  name: String!
+  """
+  Email address of the contributor
+  """
+  email: String!
+}
+
+"""
+Represents an ISO-8601 date
+"""
+scalar Time
