@@ -9,11 +9,14 @@ import (
 	"github.com/oneconcern/pipelines/pkg/cli/envk"
 	"github.com/oneconcern/pipelines/pkg/log"
 	"github.com/oneconcern/pipelines/pkg/tracing"
+	"github.com/oneconcern/trumpet/pkg/engine"
+	"github.com/oneconcern/trumpet/pkg/graphapi"
 	"github.com/oneconcern/trumpet/pkg/httpd"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	jprom "github.com/uber/jaeger-lib/metrics/prometheus"
+	gqlhandler "github.com/vektah/gqlgen/handler"
 	"go.uber.org/zap"
 )
 
@@ -46,10 +49,11 @@ func (z *zapLogger) Fatalf(format string, args ...interface{}) {
 func main() {
 	pflag.Parse()
 
-	lc := zap.NewDevelopmentConfig()
-	lc.DisableStacktrace = true
+	lc := zap.NewProductionConfig()
+	lc.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	zlg, err := lc.Build()
 	if err != nil {
+		//#nosec
 		fmt.Fprintf(os.Stderr, "%v", err)
 		os.Exit(1)
 	}
@@ -62,7 +66,16 @@ func main() {
 		tr = &opentracing.NoopTracer{}
 	}
 
+	eng, err := engine.New(".")
+	if err != nil {
+		logger.Bg().Fatal("initializing engine", zap.Error(err))
+	}
+
 	mux := http.NewServeMux()
+	mux.Handle("/", gqlhandler.Playground("Trumpet Server", "/query"))
+	mux.Handle("/query", gqlhandler.GraphQL(
+		graphapi.NewExecutableSchema(graphapi.NewResolvers(eng)),
+	))
 	mux.Handle("/metrics", promhttp.Handler())
 
 	handler := alice.New(
@@ -70,8 +83,8 @@ func main() {
 	).Then(mux)
 
 	server := httpd.New(
-		httpd.Logger(&zapLogger{lg: logger.Bg()}),
-		httpd.RequestHandler(handler),
+		httpd.LogsWith(&zapLogger{lg: logger.Bg()}),
+		httpd.HandlesRequestsWith(handler),
 	)
 
 	if err := server.Listen(); err != nil {

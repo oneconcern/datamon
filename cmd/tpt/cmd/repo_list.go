@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/fatih/color"
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/pkg/engine"
 
 	"github.com/spf13/cobra"
 )
@@ -20,7 +20,7 @@ var repoListCmd = &cobra.Command{
 	Long:    `List the known data repositories`,
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := trumpet.New("")
+		tpt, err := engine.New("")
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -38,7 +38,7 @@ func init() {
 	repoCmd.AddCommand(repoListCmd)
 	addFormatFlag(repoListCmd, "list", map[string]Formatter{
 		"list": FormatterFunc(func(w io.Writer, data interface{}) error {
-			repos := data.([]trumpet.Repo)
+			repos := data.([]engine.Repo)
 			for _, repo := range repos {
 				fmt.Fprintf(w, "%s\t%s\n", repo.Name, color.HiBlackString(repo.Description))
 			}

@@ -6,7 +6,7 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ This command supports providing one or more glob patterns
 				log.Fatalln(err)
 			}
 			for _, pth := range pths {
-				addBlob, err := trumpet.UnstagedFilePath(pth)
+				addBlob, err := engine.UnstagedFilePath(pth)
 				if err != nil {
 					log.Fatalln(err)
 				}

@@ -5,7 +5,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/oneconcern/trumpet/pkg/store"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +19,7 @@ var createCmd = &cobra.Command{
 The description field can use markdown formatting.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := trumpet.New("")
+		tpt, err := engine.New("")
 		if err != nil {
 			log.Fatalln(err)
 		}

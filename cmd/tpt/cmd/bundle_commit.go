@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/oneconcern/trumpet"
-
+	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -48,5 +47,5 @@ func init() {
 
 	fls.StringVarP(&message, "message", "m", "", "the commit message")
 	bundleCommitCmd.MarkFlagRequired("message")
-	fls.StringVarP(&branch, "branch", "b", trumpet.DefaultBranch, "the branch to use")
+	fls.StringVarP(&branch, "branch", "b", engine.DefaultBranch, "the branch to use")
 }

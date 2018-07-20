@@ -150,6 +150,32 @@ func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
 	return r.snapshots.GetForBundle(b.ID)
 }
 
+// GetBundle for the specified commit id or name
+func (r *Repo) GetBundle(commit string) (*store.Bundle, error) {
+	var err error
+	branch := commit
+	if commit == "" {
+		branch = r.CurrentBranch
+	}
+	commit, err = r.bundles.HashForBranch(branch)
+	if err != nil {
+		if !strings.Contains(err.Error(), "not found") {
+			return nil, err
+		}
+
+		commit, err = r.bundles.HashForTag(branch)
+		if err != nil {
+			if !strings.Contains(err.Error(), "not found") {
+				return nil, err
+			}
+		}
+		if commit == "empty" {
+			return &store.Bundle{}, nil
+		}
+	}
+	return r.bundles.Get(commit)
+}
+
 // CreateBranch with the given name, when top level is true
 // the branch will be created without a bundle attached to it
 func (r *Repo) CreateBranch(name string, topLevel bool) error {

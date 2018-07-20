@@ -68,6 +68,10 @@ func (f FileMode) MarshalJSON() ([]byte, error) {
 	return jsoniter.Marshal(strconv.FormatUint(uint64(uint32(f)), 8))
 }
 
+func (f FileMode) String() string {
+	return strconv.FormatUint(uint64(uint32(f)), 8)
+}
+
 // UnmarshalJSON implements json.Unmarshaller
 func (f *FileMode) UnmarshalJSON(data []byte) error {
 	var str string

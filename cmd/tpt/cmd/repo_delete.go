@@ -5,7 +5,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ var deleteCmd = &cobra.Command{
 	Long:    `Delete a data repository. This will only succeed when the repository is an orphan`,
 	Aliases: []string{"del", "rm"},
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := trumpet.New("")
+		tpt, err := engine.New("")
 		if err != nil {
 			log.Fatalln(err)
 		}

@@ -30,3 +30,7 @@ There are no tests for any of this.
 ## client/server
 
 As initial POC this is implemented as a CLI application that uses the local fs as a backing store.
+
+## Index of commit to repository mapping
+
+The repository store needs to track all the known commits with their repository names

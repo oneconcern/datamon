@@ -1,0 +1,25 @@
+schema: schema.graphql
+
+# Let gqlgen know where to put the generated server
+exec:
+  filename: pkg/graphapi/generated.go
+  package: graphapi
+
+# Let gqlgen know where to the generated models (if any)
+model:
+  filename: pkg/graphapi/models.go
+  package: graphapi
+
+# Tell gqlgen about any existing models you want to reuse for
+# graphql. These normally come from the db or a remote api.
+models:
+  Repository:
+    fields:
+      tags:
+        resolver: true
+      branches:
+        resolver: true
+      bundle:
+        resolver: true
+      snapshot:
+        resolver: true

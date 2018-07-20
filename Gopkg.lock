@@ -97,6 +97,14 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:43dd08a10854b2056e615d1b1d22ac94559d822e1f8b6fcc92c1a1057e85188e"
+  name = "github.com/gorilla/websocket"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "ea4d1f681babbce9545c9c5f3d5194a789c89f5b"
+  version = "v1.2.0"
+
+[[projects]]
   branch = "master"
   digest = "1:cfff48546cb55d9bfcb60078c1bb27b0cb8fbf403d8d481d7244a920359c8d7b"
   name = "github.com/gosuri/uitable"
@@ -169,7 +177,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7a259d4e4da6adc969dc948121ddce023eae8e38ca152ea97ea51123dc8ac0d4"
+  digest = "1:5b72b1ecd55362284f97c4fc2aaed58602edff19c22d509f05ed724a68147b38"
   name = "github.com/mailru/easyjson"
   packages = [
     "buffer",
@@ -177,7 +185,7 @@
     "jwriter",
   ]
   pruneopts = "UT"
-  revision = "3fdea8d05856a0c8df22ed4bc71b3219245e4485"
+  revision = "efc7eb8984d6655c26b5c9d2e65c024e5767c37c"
 
 [[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
@@ -425,6 +433,23 @@
   version = "v1.5.0"
 
 [[projects]]
+  digest = "1:eab957401876e949db82999e5b0e6fcc2e98b47dc0118961343cc8f3874f2619"
+  name = "github.com/vektah/gqlgen"
+  packages = [
+    "graphql",
+    "handler",
+    "neelance/common",
+    "neelance/errors",
+    "neelance/introspection",
+    "neelance/query",
+    "neelance/schema",
+    "neelance/validation",
+  ]
+  pruneopts = "UT"
+  revision = "381b34691fd93829e50ba8821412dc3467ec4821"
+  version = "0.3.0"
+
+[[projects]]
   digest = "1:3c1a69cdae3501bf75e76d0d86dc6f2b0a7421bc205c0cb7b96b19eed464a34d"
   name = "go.uber.org/atomic"
   packages = ["."]
@@ -441,7 +466,7 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:e6d865f90ef1178c14bdb49ea9f244bfcb28c06ea9773dc077492032632de0b8"
+  digest = "1:460b7b5d45569fa85bc34c0a9aa1498577afee6f24dac2d66a0d53d3737d29ab"
   name = "go.uber.org/zap"
   packages = [
     ".",
@@ -452,8 +477,8 @@
     "zapcore",
   ]
   pruneopts = "UT"
-  revision = "eeedf312bc6c57391d84767a4cd413f02a917974"
-  version = "v1.8.0"
+  revision = "4d45f9617f7d90f7a663ff21c7a4321dbe78098b"
+  version = "v1.9.0"
 
 [[projects]]
   branch = "master"
@@ -466,7 +491,7 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "d0887baf81f4598189d4e12a37c6da86f0bba4d0"
+  revision = "a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1"
 
 [[projects]]
   branch = "master"
@@ -523,6 +548,11 @@
     "github.com/spf13/pflag",
     "github.com/spf13/viper",
     "github.com/uber/jaeger-lib/metrics/prometheus",
+    "github.com/vektah/gqlgen/graphql",
+    "github.com/vektah/gqlgen/handler",
+    "github.com/vektah/gqlgen/neelance/introspection",
+    "github.com/vektah/gqlgen/neelance/query",
+    "github.com/vektah/gqlgen/neelance/schema",
     "go.uber.org/zap",
     "golang.org/x/net/netutil",
     "gopkg.in/yaml.v2",

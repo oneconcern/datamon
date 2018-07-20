@@ -5,7 +5,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/oneconcern/trumpet/pkg/store"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +21,7 @@ var repoGetCmd = &cobra.Command{
 	Short: "get the details for a repository",
 	Long:  `get the details for a repository as json`,
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := trumpet.New("")
+		tpt, err := engine.New("")
 		if err != nil {
 			log.Fatalln(err)
 		}

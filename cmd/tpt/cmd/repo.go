@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -26,8 +26,8 @@ func init() {
 	rootCmd.AddCommand(repoCmd)
 }
 
-func initNamedRepo() (*trumpet.Runtime, *trumpet.Repo, error) {
-	tpt, err := trumpet.New("")
+func initNamedRepo() (*engine.Runtime, *engine.Repo, error) {
+	tpt, err := engine.New("")
 	if err != nil {
 		return nil, nil, err
 	}
