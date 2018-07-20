@@ -22,10 +22,14 @@ A processor in the pipeline is configured with a yaml or json document.
 name: the-processor-name
 branch: "develop"
 runtime: "reg.onec.co/flood_ml:develop"
-# when the job needs to run on with access to a gpu
-gpu: true
-# if the job can run on the same compute resources as other processors of the same type
-can_colocate: true
+# hints for where to place the 
+nodeSelector:
+  # when the job needs to run on with access to a gpu
+  gpu: "required"
+  # if the job can run on the same compute resources as other processors of the same type
+  # the possible values are: host, zone, region
+  antiAffinity: "host"
+  
 # define scaling limits
 concurrency:
   min: 1

@@ -17,9 +17,10 @@ type Bundle struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 type BundleInput struct {
-	Branch  *string         `json:"branch"`
-	Message string          `json:"message"`
-	Changes *ChangeSetInput `json:"changes"`
+	Repository string          `json:"repository"`
+	Branch     *string         `json:"branch"`
+	Message    string          `json:"message"`
+	Changes    *ChangeSetInput `json:"changes"`
 }
 type BundleRef struct {
 	ID   string `json:"id"`

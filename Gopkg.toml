@@ -41,3 +41,8 @@
 [[constraint]]
   branch = "master"
   name = "github.com/gosuri/uitable"
+
+[[override]]
+  source = "github.com/casualjim/go-stdlib"
+  branch = "flushing-writer"
+  name = "github.com/opentracing-contrib/go-stdlib"

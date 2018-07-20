@@ -266,7 +266,6 @@ type defaultServer struct {
 	shuttingDown int32
 	interrupted  bool
 	interrupt    chan os.Signal
-	chanLock     sync.RWMutex
 	callbacks    Hook
 	logger       Logging
 	onShutdown   func()
@@ -323,7 +322,7 @@ func (s *defaultServer) Serve() (err error) {
 			domainSocket.IdleTimeout = s.CleanupTimeout
 		}
 
-		s.configureListener(domainSocket, "unix", string(s.SocketPath))
+		s.configureListener(domainSocket, "unix", s.SocketPath)
 
 		wg.Add(1)
 		s.logger.Printf("Serving at unix://%s", s.SocketPath)
@@ -388,13 +387,19 @@ func (s *defaultServer) Serve() (err error) {
 			PreferServerCipherSuites: true,
 			// Only use curves which have assembly implementations
 			// https://github.com/golang/go/tree/master/src/crypto/elliptic
-			CurvePreferences: []tls.CurveID{tls.CurveP256},
-			// Use modern tls mode https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility
+			CurvePreferences: []tls.CurveID{
+				tls.CurveP256,
+				tls.X25519,
+			},
 			NextProtos: []string{"http/1.1", "h2"},
 			// https://www.owasp.org/index.php/Transport_Layer_Protection_Cheat_Sheet#Rule_-_Only_Support_Strong_Protocols
 			MinVersion: tls.VersionTLS12,
+			// Use modern tls mode https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility
+			// See security linter code: https://github.com/securego/gosec/blob/master/rules/tls_config.go#L11
 			// These ciphersuites support Forward Secrecy: https://en.wikipedia.org/wiki/Forward_secrecy
 			CipherSuites: []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
 				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
 				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
@@ -486,7 +491,7 @@ func (s *defaultServer) Listen() error {
 	}
 
 	if s.hasScheme(schemeUnix) {
-		domSockListener, err := net.Listen("unix", string(s.SocketPath))
+		domSockListener, err := net.Listen("unix", s.SocketPath)
 		if err != nil {
 			return err
 		}

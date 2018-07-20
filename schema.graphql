@@ -107,7 +107,10 @@ type BundleRef {
 
 # Input parameters for creating a new bundle
 input BundleInput {
-  # the branch to create the bundle for
+  # The repository to create the bundle in
+  repository: ID!
+
+  # The branch to create the bundle for
   branch: ID
 
   # The message that describes the changes for this bundle

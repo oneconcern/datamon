@@ -60,6 +60,40 @@ func (r *Repo) CreateCommit(message, branch string) (result NewBundle, err error
 	return r.commit(message, branch)
 }
 
+func (r *Repo) CommitFromChangeSet(message, branch string, changes store.ChangeSet) (result NewBundle, err error) {
+	result.Branch = branch
+	result.IsEmpty = true
+
+	parents, err := r.bundles.ListTopLevelIDs()
+	if err != nil {
+		return result, err
+	}
+
+	hash, empty, err := r.bundles.Create(message, branch, "", parents, changes)
+	if err != nil {
+		return result, err
+	}
+	if empty {
+		return result, nil
+	}
+	result.IsEmpty = false
+
+	bundle, err := r.bundles.Get(hash)
+	if err != nil {
+		return result, err
+	}
+	result.ID = bundle.ID
+
+	snapshot, err := r.snapshots.Create(bundle)
+	if err != nil {
+		return result, err
+	}
+	result.Snapshot = snapshot.ID
+
+	// TODO: actually upload the files prior to returnin
+	return result, nil
+}
+
 func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 	result.Branch = branch
 	result.IsEmpty = true

@@ -265,11 +265,11 @@
 
 [[projects]]
   branch = "flushing-writer"
-  digest = "1:aec0eed44e44d9caabf02cefa6c4e3ce619e446490818620e61f0ad2e9739996"
+  digest = "1:a16bc0b468af376a65bf1a462c792cc768728e43d3ccf186282a3b0c47016326"
   name = "github.com/opentracing-contrib/go-stdlib"
   packages = ["nethttp"]
   pruneopts = "UT"
-  revision = "c748b20c369cccddf235c0ae703f5f1825bd6202"
+  revision = "01dbd36a3f2121dc8b29b4cc160a09c50227156c"
   source = "github.com/casualjim/go-stdlib"
 
 [[projects]]
@@ -433,7 +433,7 @@
   version = "v1.5.0"
 
 [[projects]]
-  digest = "1:eab957401876e949db82999e5b0e6fcc2e98b47dc0118961343cc8f3874f2619"
+  digest = "1:1e4173d6831169c64763d45fa2c2f987a8cd4dfa25ab635be392d587db6cc8f8"
   name = "github.com/vektah/gqlgen"
   packages = [
     "graphql",
@@ -444,6 +444,7 @@
     "neelance/query",
     "neelance/schema",
     "neelance/validation",
+    "opentracing",
   ]
   pruneopts = "UT"
   revision = "381b34691fd93829e50ba8821412dc3467ec4821"
@@ -553,6 +554,7 @@
     "github.com/vektah/gqlgen/neelance/introspection",
     "github.com/vektah/gqlgen/neelance/query",
     "github.com/vektah/gqlgen/neelance/schema",
+    "github.com/vektah/gqlgen/opentracing",
     "go.uber.org/zap",
     "golang.org/x/net/netutil",
     "gopkg.in/yaml.v2",

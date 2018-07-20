@@ -17,11 +17,13 @@ import (
 	"github.com/spf13/pflag"
 	jprom "github.com/uber/jaeger-lib/metrics/prometheus"
 	gqlhandler "github.com/vektah/gqlgen/handler"
+	gqltracing "github.com/vektah/gqlgen/opentracing"
 	"go.uber.org/zap"
 )
 
 var (
 	jAgentHostPort string
+	baseDir        string
 )
 
 func init() {
@@ -32,6 +34,7 @@ func init() {
 		envk.StringOrDefault("JAEGER_HOST", "jaeger-agent:6831"),
 		"String representing jaeger-agent host:port",
 	)
+	pflag.StringVar(&baseDir, "base-dir", ".trumpet", "the base directory for the database")
 }
 
 type zapLogger struct {
@@ -66,7 +69,7 @@ func main() {
 		tr = &opentracing.NoopTracer{}
 	}
 
-	eng, err := engine.New(".")
+	eng, err := engine.New(baseDir)
 	if err != nil {
 		logger.Bg().Fatal("initializing engine", zap.Error(err))
 	}
@@ -75,6 +78,8 @@ func main() {
 	mux.Handle("/", gqlhandler.Playground("Trumpet Server", "/query"))
 	mux.Handle("/query", gqlhandler.GraphQL(
 		graphapi.NewExecutableSchema(graphapi.NewResolvers(eng)),
+		gqlhandler.RequestMiddleware(gqltracing.RequestMiddleware()),
+		gqlhandler.ResolverMiddleware(gqltracing.ResolverMiddleware()),
 	))
 	mux.Handle("/metrics", promhttp.Handler())
 

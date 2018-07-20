@@ -1993,6 +1993,12 @@ func UnmarshalBundleInput(v interface{}) (BundleInput, error) {
 
 	for k, v := range asMap {
 		switch k {
+		case "repository":
+			var err error
+			it.Repository, err = graphql.UnmarshalID(v)
+			if err != nil {
+				return it, err
+			}
 		case "branch":
 			var err error
 			var ptr1 string
@@ -2260,7 +2266,10 @@ type BundleRef {
 
 # Input parameters for creating a new bundle
 input BundleInput {
-  # the branch to create the bundle for
+  # The repository to create the bundle in
+  repository: ID!
+
+  # The branch to create the bundle for
   branch: ID
 
   # The message that describes the changes for this bundle

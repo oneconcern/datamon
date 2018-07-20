@@ -3,6 +3,7 @@ package graphapi
 import (
 	context "context"
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/go-openapi/swag"
@@ -93,7 +94,71 @@ func (m *mutationResolver) CreateRepository(ctx context.Context, repo Repository
 }
 
 func (m *mutationResolver) CreateBundle(ctx context.Context, params BundleInput) (*Bundle, error) {
-	return nil, nil
+	repo, err := m.engine.GetRepo(params.Repository)
+	if err != nil {
+		return nil, err
+	}
+
+	changes, err := readInputChangeSet(params.Changes)
+	if err != nil {
+		return nil, err
+	}
+
+	nb, err := repo.CommitFromChangeSet(params.Message, swag.StringValue(params.Branch), changes)
+	if err != nil {
+		return nil, err
+	}
+
+	sb, err := repo.GetBundle(nb.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := convertBundle(sb)
+	return &res, nil
+}
+
+func readInputChangeSet(c *ChangeSetInput) (result store.ChangeSet, err error) {
+	result.Added = make([]store.Entry, len(c.Added))
+	for i, o := range c.Added {
+		e, err := readInputObject(&o)
+		if err != nil {
+			return store.ChangeSet{}, err
+		}
+		result.Added[i] = e
+	}
+	result.Deleted = make([]store.Entry, len(c.Deleted))
+	for i, o := range c.Deleted {
+		e, err := readInputObject(&o)
+		if err != nil {
+			return store.ChangeSet{}, err
+		}
+		result.Deleted[i] = e
+	}
+	return
+}
+
+func readInputObject(o *ObjectInput) (result store.Entry, err error) {
+	m, err := readMode(swag.StringValue(o.Mode))
+	if err != nil {
+		return result, err
+	}
+	result.Hash = o.ID
+	result.Path = o.Path
+	result.Mode = m
+	result.Mtime = o.Mtime
+	return
+}
+
+func readMode(m string) (store.FileMode, error) {
+	if m == "" {
+		m = "0600"
+	}
+	res, err := strconv.ParseUint(m, 8, 32)
+	if err != nil {
+		return 0, err
+	}
+	return store.FileMode(uint32(res)), nil
 }
 
 func (m *mutationResolver) DeleteRepository(ctx context.Context, id string) (*Repository, error) {
@@ -170,12 +235,8 @@ func (r *repositoryResolver) Bundle(ctx context.Context, obj *Repository, id str
 		return nil, err
 	}
 
-	return &Bundle{
-		ID:        b.ID,
-		Message:   &b.Message,
-		Timestamp: b.Timestamp,
-		Changes:   convertChangeSet(&b.Changes),
-	}, nil
+	res := convertBundle(b)
+	return &res, nil
 }
 
 func (r *repositoryResolver) Snapshot(ctx context.Context, obj *Repository, id string) (*Snapshot, error) {
@@ -229,6 +290,16 @@ func convertChangeSet(cs *store.ChangeSet) (ncs ChangeSet) {
 	}
 
 	return
+}
+
+func convertBundle(b *store.Bundle) Bundle {
+
+	return Bundle{
+		ID:        b.ID,
+		Message:   &b.Message,
+		Timestamp: b.Timestamp,
+		Changes:   convertChangeSet(&b.Changes),
+	}
 }
 
 func convertEntry(et *store.Entry) (o VersionedObject) {
