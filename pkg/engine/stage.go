@@ -21,7 +21,7 @@ func newStage(baseDir string, bundles store.BundleStore) (*Stage, error) {
 
 	return &Stage{
 		bundles: bundles,
-		objects: blob.LocalFS(baseDir),
+		objects: blob.LocalFS(blob.BaseDir(baseDir)),
 		meta:    meta,
 		hasher:  fingerprint.New(),
 	}, nil

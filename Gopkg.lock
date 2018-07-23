@@ -253,15 +253,16 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1cccaa09098fe2e4a22d77d805fae9c88bade339cb2755c1cf50b90f1bf068a5"
+  digest = "1:788b863ad535dc35f650cda7e03afc70b5787cc7ed722cba645bc6ffb2f5a281"
   name = "github.com/oneconcern/pipelines"
   packages = [
     "pkg/cli/envk",
+    "pkg/httpd",
     "pkg/log",
     "pkg/tracing",
   ]
   pruneopts = "UT"
-  revision = "b69e908b3c95fa0caafc734012398866ea10ee68"
+  revision = "bd3460e33fefbd7530ec659ae379f9e8f7d7ad30"
 
 [[projects]]
   branch = "flushing-writer"
@@ -532,7 +533,6 @@
     "github.com/dgraph-io/badger",
     "github.com/docker/go-units",
     "github.com/fatih/color",
-    "github.com/go-openapi/runtime/flagext",
     "github.com/go-openapi/swag",
     "github.com/gosuri/uitable",
     "github.com/json-iterator/go",
@@ -540,6 +540,7 @@
     "github.com/kardianos/osext",
     "github.com/minio/blake2b-simd",
     "github.com/oneconcern/pipelines/pkg/cli/envk",
+    "github.com/oneconcern/pipelines/pkg/httpd",
     "github.com/oneconcern/pipelines/pkg/log",
     "github.com/oneconcern/pipelines/pkg/tracing",
     "github.com/opentracing/opentracing-go",
@@ -556,7 +557,6 @@
     "github.com/vektah/gqlgen/neelance/schema",
     "github.com/vektah/gqlgen/opentracing",
     "go.uber.org/zap",
-    "golang.org/x/net/netutil",
     "gopkg.in/yaml.v2",
   ]
   solver-name = "gps-cdcl"

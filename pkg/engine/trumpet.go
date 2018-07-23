@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/oneconcern/trumpet/pkg/blob"
+
 	"github.com/oneconcern/trumpet/pkg/store"
 	"github.com/oneconcern/trumpet/pkg/store/localfs"
 )
@@ -98,6 +100,7 @@ func (r *Runtime) makeRepo(name, description, branch string) (*Repo, error) {
 		stage:         stage,
 		snapshots:     snapshots,
 		bundles:       bs,
+		objects:       blob.LocalFS(blob.BaseDir(filepath.Join(r.baseDir, "objects"))),
 	}, nil
 }
 

@@ -129,7 +129,7 @@ func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 	}
 	result.Snapshot = snapshot.ID
 
-	tgtDir := filepath.Join(r.baseDir, "bundles", "objects")
+	// TODO: make this a batch job
 	srcDir := filepath.Join(r.baseDir, "stage", "objects")
 	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
@@ -140,10 +140,16 @@ func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 			return err
 		}
 
-		tgtPth := filepath.Join(tgtDir, rp)
+		f, err := os.Open(info.Name())
+		if err != nil {
+			return err
+		}
+		defer f.Close()
 
-		os.MkdirAll(filepath.Dir(tgtPth), 0700)
-		return os.Rename(path, tgtPth)
+		if err := r.objects.Put(rp, f); err != nil {
+			return err
+		}
+		return f.Close()
 	})
 
 	if err = r.Stage().Clear(); err != nil {

@@ -4,13 +4,19 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/dgraph-io/badger"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/oneconcern/trumpet/pkg/store"
 )
 
+var dbs sync.Map
+
 func makeBadgerDb(dir string) (*badger.DB, error) {
+	if v, ok := dbs.Load(dir); ok {
+		return v.(*badger.DB), nil
+	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		log.Println("mkdir -p", dir, err)
 	}
@@ -18,7 +24,12 @@ func makeBadgerDb(dir string) (*badger.DB, error) {
 	bopts.Dir = dir
 	bopts.ValueDir = dir
 
-	return badger.Open(bopts)
+	v, err := badger.Open(bopts)
+	if err != nil {
+		return nil, err
+	}
+	dbs.Store(dir, v)
+	return v, nil
 }
 
 func badgerRewriteRepoError(err error) error {

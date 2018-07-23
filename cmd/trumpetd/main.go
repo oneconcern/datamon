@@ -7,11 +7,11 @@ import (
 
 	"github.com/justinas/alice"
 	"github.com/oneconcern/pipelines/pkg/cli/envk"
+	"github.com/oneconcern/pipelines/pkg/httpd"
 	"github.com/oneconcern/pipelines/pkg/log"
 	"github.com/oneconcern/pipelines/pkg/tracing"
 	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/oneconcern/trumpet/pkg/graphapi"
-	"github.com/oneconcern/trumpet/pkg/httpd"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
