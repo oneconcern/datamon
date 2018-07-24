@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/oneconcern/trumpet/pkg/blob"
+	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
 	"github.com/oneconcern/trumpet/pkg/fingerprint"
 	"github.com/oneconcern/trumpet/pkg/store"
 	"github.com/oneconcern/trumpet/pkg/store/localfs"
+	"github.com/spf13/afero"
 )
 
 // NewStage creates a new stage instance
@@ -21,7 +23,7 @@ func newStage(baseDir string, bundles store.BundleStore) (*Stage, error) {
 
 	return &Stage{
 		bundles: bundles,
-		objects: blob.LocalFS(blob.BaseDir(baseDir)),
+		objects: bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), baseDir)),
 		meta:    meta,
 		hasher:  fingerprint.New(),
 	}, nil

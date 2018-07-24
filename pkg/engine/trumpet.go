@@ -5,7 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/oneconcern/trumpet/pkg/blob"
+	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
+	"github.com/spf13/afero"
 
 	"github.com/oneconcern/trumpet/pkg/store"
 	"github.com/oneconcern/trumpet/pkg/store/localfs"
@@ -100,7 +101,7 @@ func (r *Runtime) makeRepo(name, description, branch string) (*Repo, error) {
 		stage:         stage,
 		snapshots:     snapshots,
 		bundles:       bs,
-		objects:       blob.LocalFS(blob.BaseDir(filepath.Join(r.baseDir, "objects"))),
+		objects:       bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(r.baseDir, "objects"))),
 	}, nil
 }
 
