@@ -1,6 +1,7 @@
 package localfs
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -29,7 +30,7 @@ func (l *localFS) fpath(key string) string {
 	return filepath.Join(key[:2], key[2:4], key[4:])
 }
 
-func (l *localFS) Has(key string) (bool, error) {
+func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
 	fp := l.fpath(key)
 
 	fi, err := l.fs.Stat(fp)
@@ -43,11 +44,11 @@ func (l *localFS) Has(key string) (bool, error) {
 	return !fi.IsDir(), nil
 }
 
-func (l *localFS) Get(key string) (io.ReadCloser, error) {
+func (l *localFS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return l.fs.Open(l.fpath(key))
 }
 
-func (l *localFS) Put(key string, rdr io.Reader) error {
+func (l *localFS) Put(ctx context.Context, key string, rdr io.Reader) error {
 	fp := l.fpath(key)
 	if err := l.fs.MkdirAll(filepath.Dir(fp), 0700); err != nil {
 		return fmt.Errorf("ensuring directories for %q: %v", key, err)
@@ -71,14 +72,14 @@ func (l *localFS) Put(key string, rdr io.Reader) error {
 	return l.fs.Rename(fi.Name(), fp)
 }
 
-func (l *localFS) Delete(key string) error {
+func (l *localFS) Delete(ctx context.Context, key string) error {
 	if err := l.fs.Remove(l.fpath(key)); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing %q: %v", key, err)
 	}
 	return nil
 }
 
-func (l *localFS) Keys() ([]string, error) {
+func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 	fis, err := afero.Glob(l.fs, "*/*/*")
 	if err != nil {
 		return nil, err
@@ -91,6 +92,6 @@ func (l *localFS) Keys() ([]string, error) {
 	return res, nil
 }
 
-func (l *localFS) Clear() error {
+func (l *localFS) Clear(ctx context.Context) error {
 	return l.fs.RemoveAll("/")
 }

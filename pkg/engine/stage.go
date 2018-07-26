@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -122,7 +123,7 @@ func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
 
 	if isNew {
 		defer addBlob.Close()
-		if err = s.objects.Put(hash, addBlob.Stream); err != nil {
+		if err = s.objects.Put(context.TODO(), hash, addBlob.Stream); err != nil {
 			return "", false, err
 		}
 		if err = addBlob.Close(); err != nil {
@@ -162,7 +163,7 @@ func (s *Stage) Remove(path string) error {
 		return err
 	}
 
-	return s.objects.Delete(hash)
+	return s.objects.Delete(context.TODO(), hash)
 }
 
 // Clear the stage
@@ -170,7 +171,7 @@ func (s *Stage) Clear() error {
 	if err := s.meta.Clear(); err != nil {
 		return err
 	}
-	return s.objects.Clear()
+	return s.objects.Clear(context.TODO())
 }
 
 // Status of the stage, returns a changeset

@@ -1,13 +1,19 @@
-package localfs
+package sthree
 
 import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"runtime"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/oneconcern/trumpet"
 	"github.com/oneconcern/trumpet/pkg/blob"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,18 +102,51 @@ func TestPut(t *testing.T) {
 func setupStore(t testing.TB) (blob.Store, func()) {
 	t.Helper()
 
-	fs := afero.NewMemMapFs()
-	f, err := fs.Create("si/xt/eentons")
-	require.NoError(t, err)
-	_, err = f.WriteString("this is the text")
-	require.NoError(t, err)
-	f.Close()
+	bid := trumpet.RandStringBytesMaskImprSrc(15)
+	bucket := aws.String(bid)
 
-	ff, err := fs.Create("se/ve/nteentons")
-	require.NoError(t, err)
-	_, err = ff.WriteString("this is the text for another thing")
-	require.NoError(t, err)
-	ff.Close()
+	minioConfig := &aws.Config{
+		Credentials:      credentials.NewStaticCredentials("access-key", "secret-key-thing", ""),
+		Region:           aws.String("us-west-2"),
+		Endpoint:         aws.String("http://127.0.0.1:9000"),
+		S3ForcePathStyle: aws.Bool(true),
+	}
+	sess, err := session.NewSession(minioConfig)
+	if err != nil {
+		t.Skipf("minio is not running")
+		runtime.Goexit()
+	}
+	cl := s3.New(sess)
+	cl.CreateBucket(&s3.CreateBucketInput{
+		Bucket: bucket,
+		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+			LocationConstraint: aws.String("us-west-2"),
+		},
+	})
 
-	return New(fs), func() {}
+	cleanup := func() {
+		cl.DeleteBucket(&s3.DeleteBucketInput{
+			Bucket: bucket,
+		})
+	}
+
+	out, err := cl.ListBuckets(nil)
+	require.NoError(t, err)
+	t.Log(out.Buckets)
+
+	up := s3manager.NewUploader(sess)
+	_, err = up.UploadWithContext(aws.BackgroundContext(), &s3manager.UploadInput{
+		Body:   bytes.NewBufferString("this is the text"),
+		Bucket: bucket,
+		Key:    aws.String("sixteentons"),
+	})
+	require.NoError(t, err)
+
+	_, err = up.UploadWithContext(aws.BackgroundContext(), &s3manager.UploadInput{
+		Body:   bytes.NewBufferString("this is the text for another thing"),
+		Bucket: bucket,
+		Key:    aws.String("seventeentons"),
+	})
+	require.NoError(t, err)
+	return New(Bucket(*bucket), AWSConfig(minioConfig)), cleanup
 }

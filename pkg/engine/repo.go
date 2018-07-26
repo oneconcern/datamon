@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -146,7 +147,7 @@ func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 		}
 		defer f.Close()
 
-		if err := r.objects.Put(rp, f); err != nil {
+		if err := r.objects.Put(context.TODO(), rp, f); err != nil {
 			return err
 		}
 		return f.Close()
