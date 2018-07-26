@@ -10,6 +10,48 @@
   revision = "28f7e881ca57bc00e028f9ede9f0d9104cfeef5e"
 
 [[projects]]
+  digest = "1:cec847b9e245348c70b9e281bb4c3b3eb83fe7873ad01d80d97142cedba7d2f3"
+  name = "github.com/aws/aws-sdk-go"
+  packages = [
+    "aws",
+    "aws/awserr",
+    "aws/awsutil",
+    "aws/client",
+    "aws/client/metadata",
+    "aws/corehandlers",
+    "aws/credentials",
+    "aws/credentials/ec2rolecreds",
+    "aws/credentials/endpointcreds",
+    "aws/credentials/stscreds",
+    "aws/csm",
+    "aws/defaults",
+    "aws/ec2metadata",
+    "aws/endpoints",
+    "aws/request",
+    "aws/session",
+    "aws/signer/v4",
+    "internal/sdkio",
+    "internal/sdkrand",
+    "internal/sdkuri",
+    "internal/shareddefaults",
+    "private/protocol",
+    "private/protocol/eventstream",
+    "private/protocol/eventstream/eventstreamapi",
+    "private/protocol/query",
+    "private/protocol/query/queryutil",
+    "private/protocol/rest",
+    "private/protocol/restxml",
+    "private/protocol/xml/xmlutil",
+    "service/s3",
+    "service/s3/s3iface",
+    "service/s3/s3manager",
+    "service/sts",
+  ]
+  pruneopts = "UT"
+  revision = "96313df4b1ba47ade3de7b2b90d69c02a81ddaa4"
+  version = "v1.14.33"
+
+[[projects]]
   branch = "master"
   digest = "1:d6afaeed1502aa28e80a4ed0981d570ad91b2579193404256ce672ed0a609e0d"
   name = "github.com/beorn7/perks"
@@ -81,12 +123,12 @@
   version = "v1.4.7"
 
 [[projects]]
-  digest = "1:5c2eb00f49a9b6177402ee0753b3e8a1a6b89cde1332ed22ce87de12681348ed"
-  name = "github.com/go-openapi/runtime"
-  packages = ["flagext"]
+  digest = "1:fe8a03a8222d5b913f256972933d26d24ad7c8286692a42943bc01633cc8fce3"
+  name = "github.com/go-ini/ini"
+  packages = ["."]
   pruneopts = "UT"
-  revision = "9a3091f566c0811ef4d54b535179bc0fc484a11f"
-  version = "0.15.0"
+  revision = "358ee7663966325963d4e8b2e1fbd570c5195153"
+  version = "v1.38.1"
 
 [[projects]]
   digest = "1:731022b436cdb9b4b2a53be2ead693467a1474b8b873d4f90cb424fffdc3d0ff"
@@ -95,6 +137,18 @@
   pruneopts = "UT"
   revision = "2b0bd4f193d011c203529df626a65d63cb8a79e8"
   version = "0.15.0"
+
+[[projects]]
+  digest = "1:0cff52d4289e3d31494fb4e63d00c93be0f9d07ad1e3447d1dc300add4e32224"
+  name = "github.com/gogo/protobuf"
+  packages = [
+    "gogoproto",
+    "proto",
+    "protoc-gen-gogo/descriptor",
+  ]
+  pruneopts = "UT"
+  revision = "636bf0302bc95575d69441b25a2603156ffdddf1"
+  version = "v1.1.1"
 
 [[projects]]
   digest = "1:15042ad3498153684d09f393bbaec6b216c8eec6d61f63dff711de7d64ed8861"
@@ -152,20 +206,19 @@
   version = "v1.0"
 
 [[projects]]
+  digest = "1:e22af8c7518e1eab6f2eab2b7d7558927f816262586cd6ed9f349c97a6c285c4"
+  name = "github.com/jmespath/go-jmespath"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "0b12d6b5"
+
+[[projects]]
   digest = "1:eaefc85d32c03e5f0c2b88ea2f79fce3d993e2c78316d21319575dd4ea9153ca"
   name = "github.com/json-iterator/go"
   packages = ["."]
   pruneopts = "UT"
   revision = "ab8a2e0c74be9d3be70b3184d9acc634935ded82"
   version = "1.1.4"
-
-[[projects]]
-  branch = "master"
-  digest = "1:e74fa8e635591eb1ad79e8e711bff8bea4e12e9737563daf12af325c6ea206e4"
-  name = "github.com/justinas/alice"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "03f45bd4b7dad4734bc4620e46a35789349abb20"
 
 [[projects]]
   branch = "master"
@@ -260,17 +313,49 @@
   version = "1.0.1"
 
 [[projects]]
+  digest = "1:74c649d20cc3ad55e67963e51a333d5abb5e91a2d53964241d42e4fbb25d0786"
+  name = "github.com/nats-io/go-nats"
+  packages = [
+    ".",
+    "encoders/builtin",
+    "util",
+  ]
+  pruneopts = "UT"
+  revision = "062418ea1c2181f52dc0f954f6204370519a868b"
+  version = "v1.5.0"
+
+[[projects]]
+  digest = "1:bc776a63eac2acac7d35b02f9ae71d0486797394a673b0a1327160a0ec42c5d9"
+  name = "github.com/nats-io/go-nats-streaming"
+  packages = [
+    ".",
+    "pb",
+  ]
+  pruneopts = "UT"
+  revision = "6e620057a207bd61e992c1c5b6a2de7b6a4cb010"
+  version = "v0.3.4"
+
+[[projects]]
+  digest = "1:c3cd663f2f30b92536b9f290ac85c6310dae36a14cb8961553ae9ccf0d85ae41"
+  name = "github.com/nats-io/nuid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "289cccf02c178dc782430d534e3c1f5b72af807f"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
-  digest = "1:788b863ad535dc35f650cda7e03afc70b5787cc7ed722cba645bc6ffb2f5a281"
+  digest = "1:e369d026cda9dc931514f3b8c9605f6d122663216cbbad87c6f161f7bbe2180e"
   name = "github.com/oneconcern/pipelines"
   packages = [
+    "pkg/cli/cflags",
     "pkg/cli/envk",
     "pkg/httpd",
     "pkg/log",
     "pkg/tracing",
   ]
   pruneopts = "UT"
-  revision = "ff5fde35b4204d95db1c3ca1b1306f7c7c0fc531"
+  revision = "21130412548c1b61ac18ec74017c314cb09b9489"
 
 [[projects]]
   branch = "flushing-writer"
@@ -350,7 +435,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:55d7449d6987dabf272b4e81b2f9c449f05b17415c939b68d1e82f57e3374b7f"
+  digest = "1:a37c98f4b7a66bb5c539c0539f0915a74ef1c8e0b3b6f45735289d94cae92bfd"
   name = "github.com/prometheus/procfs"
   packages = [
     ".",
@@ -359,7 +444,7 @@
     "xfs",
   ]
   pruneopts = "UT"
-  revision = "ae68e2d4c00fed4943b5f6698d504a5fe083da8a"
+  revision = "05ee40e3a273f7245e8777337fc7b46e533a9a92"
 
 [[projects]]
   digest = "1:37ace7f35375adec11634126944bdc45a673415e2fcc07382d03b75ec76ea94c"
@@ -520,15 +605,15 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1"
+  revision = "3673e40ba22529d22c3fd7c93e97b0ce50fa7bdd"
 
 [[projects]]
   branch = "master"
-  digest = "1:d773e525476aefa22ea944a5425a9bfb99819b2e67eeb9b1966454fd57522bbf"
+  digest = "1:dbe2ad3afac439a4bfd3e1b0352c4869dc26aae52662dcab72355408776ed5d5"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "ac767d655b305d4e9612f5f6e33120b9176c4ad4"
+  revision = "e072cadbbdc8dd3d3ffa82b8b4b9304c261d9311"
 
 [[projects]]
   digest = "1:038003d098ffc345c4c5c6d47bcc6920b2649ee0c0d557162e54e75c76cadf8b"
@@ -557,13 +642,18 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/awserr",
+    "github.com/aws/aws-sdk-go/aws/credentials",
+    "github.com/aws/aws-sdk-go/aws/session",
+    "github.com/aws/aws-sdk-go/service/s3",
+    "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/dgraph-io/badger",
     "github.com/docker/go-units",
     "github.com/fatih/color",
     "github.com/go-openapi/swag",
     "github.com/gosuri/uitable",
     "github.com/json-iterator/go",
-    "github.com/justinas/alice",
     "github.com/kardianos/osext",
     "github.com/minio/blake2b-simd",
     "github.com/oneconcern/pipelines/pkg/cli/envk",

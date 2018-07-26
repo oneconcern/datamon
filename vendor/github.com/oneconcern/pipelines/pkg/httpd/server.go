@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-openapi/runtime/flagext"
 	"github.com/go-openapi/swag"
+	"github.com/oneconcern/pipelines/pkg/cli/cflags"
 	flag "github.com/spf13/pflag"
 	"golang.org/x/net/netutil"
 )
@@ -46,7 +46,7 @@ type Hook interface {
 var (
 	enabledListeners []string
 	cleanupTimout    time.Duration
-	maxHeaderSize    flagext.ByteSize
+	maxHeaderSize    cflags.ByteSize
 
 	socketPath string
 
@@ -69,7 +69,7 @@ var (
 )
 
 func init() {
-	maxHeaderSize = flagext.ByteSize(1000000)
+	maxHeaderSize = cflags.ByteSize(1000000)
 	host = stringEnvOverride(host, "localhost", "HOST")
 	port = intEnvOverride(port, 0, "PORT")
 	tlsHost = stringEnvOverride(tlsHost, host, "TLS_HOST", "HOST")
@@ -236,7 +236,7 @@ func New(opts ...Option) Server {
 type defaultServer struct {
 	EnabledListeners []string
 	CleanupTimeout   time.Duration
-	MaxHeaderSize    flagext.ByteSize
+	MaxHeaderSize    cflags.ByteSize
 
 	SocketPath    string
 	domainSocketL net.Listener

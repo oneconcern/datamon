@@ -117,3 +117,7 @@ func (s *s3FS) Clear(ctx context.Context) error {
 	del := s3manager.NewBatchDeleteWithClient(s.s3)
 	return del.Delete(ctx, s3manager.NewDeleteListIterator(s.s3, params))
 }
+
+func (s *s3FS) String() string {
+	return "s3@" + s.bucket
+}

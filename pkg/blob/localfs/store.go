@@ -32,7 +32,6 @@ func (l *localFS) fpath(key string) string {
 
 func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
 	fp := l.fpath(key)
-
 	fi, err := l.fs.Stat(fp)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -94,4 +93,8 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 
 func (l *localFS) Clear(ctx context.Context) error {
 	return l.fs.RemoveAll("/")
+}
+
+func (l *localFS) String() string {
+	return "localfs"
 }

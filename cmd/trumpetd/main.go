@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/justinas/alice"
 	"github.com/oneconcern/pipelines/pkg/cli/envk"
 	"github.com/oneconcern/pipelines/pkg/httpd"
 	"github.com/oneconcern/pipelines/pkg/log"
@@ -65,7 +64,7 @@ func main() {
 
 	tr, err := tracing.Init("trumpetd", jprom.New(), logger, jAgentHostPort)
 	if err != nil {
-		logger.Bg().Warn("failed to initialize tracing, falling back to noop tracer", zap.Error(err))
+		logger.Bg().Info("failed to initialize tracing, falling back to noop tracer", zap.Error(err))
 		tr = &opentracing.NoopTracer{}
 	}
 
@@ -74,18 +73,19 @@ func main() {
 		logger.Bg().Fatal("initializing engine", zap.Error(err))
 	}
 
-	mux := http.NewServeMux()
+	mux := tracing.NewServeMux(tr)
 	mux.Handle("/", gqlhandler.Playground("Trumpet Server", "/query"))
 	mux.Handle("/query", gqlhandler.GraphQL(
 		graphapi.NewExecutableSchema(graphapi.NewResolvers(eng)),
 		gqlhandler.RequestMiddleware(gqltracing.RequestMiddleware()),
 		gqlhandler.ResolverMiddleware(gqltracing.ResolverMiddleware()),
 	))
-	mux.Handle("/metrics", promhttp.Handler())
 
-	handler := alice.New(
-		requestTracing(tr),
-	).Then(mux)
+	handler := http.NewServeMux()
+	handler.Handle("/metrics", promhttp.Handler())
+	handler.HandleFunc("/healthz", healthzEndpoint)
+	handler.HandleFunc("/readyz", readyzEndpoint)
+	handler.Handle("/", mux)
 
 	server := httpd.New(
 		httpd.LogsWith(&zapLogger{lg: logger.Bg()}),
@@ -101,8 +101,10 @@ func main() {
 	}
 }
 
-func requestTracing(tracer opentracing.Tracer) alice.Constructor {
-	return func(next http.Handler) http.Handler {
-		return tracing.NewMiddleware(tracer, next)
-	}
+func healthzEndpoint(rw http.ResponseWriter, r *http.Request) {
+	rw.Write([]byte("OK"))
+}
+
+func readyzEndpoint(rw http.ResponseWriter, r *http.Request) {
+	rw.Write([]byte("OK"))
 }
