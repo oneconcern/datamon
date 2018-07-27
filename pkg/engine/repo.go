@@ -131,7 +131,7 @@ func (r *Repo) commit(ctx context.Context, message, branch string) (result NewBu
 	result.Snapshot = snapshot.ID
 
 	// TODO: make this a batch job
-	srcDir := filepath.Join(r.baseDir, "stage", "objects")
+	srcDir := filepath.Join(r.baseDir, stage, objects)
 	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
@@ -178,7 +178,7 @@ func (r *Repo) Checkout(ctx context.Context, branch, commit string) (*store.Snap
 				return nil, err
 			}
 		}
-		if commit == "empty" {
+		if commit == empty {
 			return &store.Snapshot{}, nil
 		}
 	}
@@ -210,7 +210,7 @@ func (r *Repo) GetBundle(ctx context.Context, commit string) (*store.Bundle, err
 				return nil, err
 			}
 		}
-		if commit == "empty" {
+		if commit == empty {
 			return &store.Bundle{}, nil
 		}
 	}

@@ -6,10 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/oneconcern/trumpet/pkg/blob"
+
 	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/afero"
 
 	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/trumpet/pkg/store/instrumented"
 	"github.com/oneconcern/trumpet/pkg/store/localfs"
 )
 
@@ -18,15 +22,17 @@ const (
 	DefaultBranch = "master"
 	// repos         = "repos"
 	stage   = "stage"
+	objects = "objects"
+	empty   = "empty"
 	bundles = "bundles"
 )
 
 // New initializes a new runtime for trumpet
-func New(baseDir string) (*Runtime, error) {
+func New(tr opentracing.Tracer, baseDir string) (*Runtime, error) {
 	if baseDir == "" {
 		baseDir = ".trumpet"
 	}
-	repos := localfs.NewRepos(baseDir)
+	repos := instrumented.NewRepos(tr, localfs.NewRepos(baseDir))
 	if err := repos.Initialize(); err != nil {
 		return nil, err
 	}
@@ -40,6 +46,7 @@ func New(baseDir string) (*Runtime, error) {
 type Runtime struct {
 	baseDir string
 	repos   store.RepoStore
+	tracer  opentracing.Tracer
 }
 
 // ListRepo known in the trumpet database
@@ -70,7 +77,7 @@ func (r *Runtime) GetRepo(ctx context.Context, name string) (*Repo, error) {
 	return r.makeRepo(ctx, rr.Name, rr.Description, "")
 }
 
-func (r *Runtime) makeRepo(ctx context.Context, name, description, branch string) (*Repo, error) {
+func (r *Runtime) makeRepo(_ context.Context, name, description, branch string) (*Repo, error) {
 	if name == "" {
 		return nil, store.NameIsRequired
 	}
@@ -79,20 +86,33 @@ func (r *Runtime) makeRepo(ctx context.Context, name, description, branch string
 		branch = DefaultBranch
 	}
 
-	bs := localfs.NewBundleStore(filepath.Join(r.baseDir, name, "bundles"))
+	bs := instrumented.NewBundleStore(
+		name,
+		r.tracer,
+		localfs.NewBundleStore(filepath.Join(r.baseDir, name, bundles)))
 	if err := bs.Initialize(); err != nil {
 		return nil, err
 	}
 
-	snapshots := localfs.NewSnapshotStore(filepath.Join(r.baseDir, name, "bundles"))
+	snapshots := instrumented.NewSnapshotStore(
+		name,
+		r.tracer,
+		localfs.NewSnapshotStore(filepath.Join(r.baseDir, name, bundles)),
+	)
 	if err := snapshots.Initialize(); err != nil {
 		return nil, err
 	}
 
-	stage, err := newStage(filepath.Join(r.baseDir, name, stage), bs)
+	stageDir := filepath.Join(r.baseDir, name, stage)
+	stage, err := newStage(name, stageDir, r.tracer, bs)
 	if err != nil {
 		return nil, err
 	}
+
+	blobs := blob.Instrument(
+		r.tracer,
+		bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(r.baseDir, objects))),
+	)
 
 	return &Repo{
 		Name:          name,
@@ -102,7 +122,7 @@ func (r *Runtime) makeRepo(ctx context.Context, name, description, branch string
 		stage:         stage,
 		snapshots:     snapshots,
 		bundles:       bs,
-		objects:       bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(r.baseDir, "objects"))),
+		objects:       blobs,
 	}, nil
 }
 

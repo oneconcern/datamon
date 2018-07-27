@@ -3,13 +3,13 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
 
 	"github.com/fatih/color"
 	"github.com/oneconcern/trumpet/pkg/engine"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	"github.com/spf13/cobra"
 )
@@ -21,12 +21,13 @@ var repoListCmd = &cobra.Command{
 	Long:    `List the known data repositories`,
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := engine.New("")
+		ctx := initContext()
+		tpt, err := engine.New(&opentracing.NoopTracer{}, "")
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		repos, err := tpt.ListRepo(context.Background())
+		repos, err := tpt.ListRepo(ctx)
 		if err != nil {
 			log.Fatalln(err)
 		}

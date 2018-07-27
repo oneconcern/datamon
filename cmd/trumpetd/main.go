@@ -62,13 +62,16 @@ func main() {
 
 	logger := log.NewFactory(zlg.With(zap.String("service", "trumpetd")))
 
-	tr, err := tracing.Init("trumpetd", jprom.New(), logger, jAgentHostPort)
+	tr, closer, err := tracing.Init("trumpetd", jprom.New(), logger, jAgentHostPort)
 	if err != nil {
 		logger.Bg().Info("failed to initialize tracing, falling back to noop tracer", zap.Error(err))
 		tr = &opentracing.NoopTracer{}
 	}
+	if closer != nil {
+		defer closer.Close()
+	}
 
-	eng, err := engine.New(baseDir)
+	eng, err := engine.New(tr, baseDir)
 	if err != nil {
 		logger.Bg().Fatal("initializing engine", zap.Error(err))
 	}

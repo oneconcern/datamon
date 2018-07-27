@@ -11,6 +11,19 @@ import (
 	"github.com/oneconcern/trumpet/pkg/store"
 )
 
+// type badgerDB interface {
+// 	Close() error
+// 	View(func(txn *badger.Txn) error) error
+// 	Update(func(txn *badger.Txn) error) error
+// }
+
+// type instrumentedBadgerDB struct {
+// 	db *badger.DB
+// 	pref string
+// }
+
+// func (i *instrumentedBadgerDB)
+
 var dbs sync.Map
 
 func makeBadgerDb(dir string) (*badger.DB, error) {

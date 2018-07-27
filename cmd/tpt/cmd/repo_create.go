@@ -3,11 +3,11 @@
 package cmd
 
 import (
-	"context"
 	"log"
 
 	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/oneconcern/trumpet/pkg/store"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 )
 
@@ -20,12 +20,13 @@ var createCmd = &cobra.Command{
 The description field can use markdown formatting.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := engine.New("")
+		ctx := initContext()
+		tpt, err := engine.New(&opentracing.NoopTracer{}, "")
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		repo, err := tpt.CreateRepo(context.Background(), repoOptions.Name, repoOptions.Description)
+		repo, err := tpt.CreateRepo(ctx, repoOptions.Name, repoOptions.Description)
 		if err != nil && err != store.RepoAlreadyExists {
 			log.Fatalln(err)
 		}

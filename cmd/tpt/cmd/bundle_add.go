@@ -51,9 +51,11 @@ This command supports providing one or more glob patterns
 
 func init() {
 	bundleCmd.AddCommand(bundleAddCmd)
+	//#nosec
 	addRepoFlag(bundleAddCmd)
 
 	for i := 1; i < 100; i++ {
+		//#nosec
 		bundleAddCmd.MarkZshCompPositionalArgumentFile(i, "*")
 	}
 }

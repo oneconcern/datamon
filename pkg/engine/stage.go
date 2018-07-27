@@ -7,6 +7,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/oneconcern/trumpet/pkg/store/instrumented"
+	opentracing "github.com/opentracing/opentracing-go"
+
 	"github.com/oneconcern/trumpet/pkg/blob"
 	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
 	"github.com/oneconcern/trumpet/pkg/fingerprint"
@@ -16,15 +19,15 @@ import (
 )
 
 // NewStage creates a new stage instance
-func newStage(baseDir string, bundles store.BundleStore) (*Stage, error) {
-	meta := localfs.NewObjectMeta(baseDir)
+func newStage(repo, baseDir string, tr opentracing.Tracer, bundles store.BundleStore) (*Stage, error) {
+	meta := instrumented.NewObjectMeta(repo, tr, localfs.NewObjectMeta(baseDir))
 	if err := meta.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return &Stage{
 		bundles: bundles,
-		objects: bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), baseDir)),
+		objects: blob.Instrument(tr, bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), baseDir))),
 		meta:    meta,
 		hasher:  fingerprint.New(),
 	}, nil

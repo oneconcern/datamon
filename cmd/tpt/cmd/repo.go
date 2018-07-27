@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/oneconcern/trumpet/pkg/engine"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 )
 
@@ -29,11 +30,12 @@ func init() {
 }
 
 func initContext() context.Context {
-	return context.TODO()
+	sp := opentracing.StartSpan("entrypoint").SetTag("service", "tptcli")
+	return opentracing.ContextWithSpan(context.Background(), sp)
 }
 
 func initNamedRepo(ctx context.Context) (*engine.Runtime, *engine.Repo, error) {
-	tpt, err := engine.New("")
+	tpt, err := engine.New(&opentracing.NoopTracer{}, "")
 	if err != nil {
 		return nil, nil, err
 	}

@@ -3,10 +3,10 @@
 package cmd
 
 import (
-	"context"
 	"log"
 
 	"github.com/oneconcern/trumpet/pkg/engine"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 )
 
@@ -17,12 +17,13 @@ var deleteCmd = &cobra.Command{
 	Long:    `Delete a data repository. This will only succeed when the repository is an orphan`,
 	Aliases: []string{"del", "rm"},
 	Run: func(cmd *cobra.Command, args []string) {
-		tpt, err := engine.New("")
+		ctx := initContext()
+		tpt, err := engine.New(&opentracing.NoopTracer{}, "")
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		if err := tpt.DeleteRepo(context.Background(), repoOptions.Name); err != nil {
+		if err := tpt.DeleteRepo(ctx, repoOptions.Name); err != nil {
 			log.Fatalln(err)
 		}
 		log.Printf("%s has been deleted", repoOptions.Name)

@@ -41,7 +41,7 @@ type queryResolver struct {
 }
 
 func (q *queryResolver) Repositories(ctx context.Context) ([]Repository, error) {
-	lst, err := q.engine.ListRepo()
+	lst, err := q.engine.ListRepo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -54,18 +54,18 @@ func (q *queryResolver) Repositories(ctx context.Context) ([]Repository, error) 
 }
 
 func (q *queryResolver) Repository(ctx context.Context, name string) (*Repository, error) {
-	repo, err := q.engine.GetRepo(name)
+	repo, err := q.engine.GetRepo(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
 	res := convertRepo(repo)
-	tags, err := loadTags(repo)
+	tags, err := loadTags(ctx, repo)
 	if err != nil {
 		return nil, err
 	}
 
-	branches, err := loadBranches(repo)
+	branches, err := loadBranches(ctx, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (m *mutationResolver) CreateRepository(ctx context.Context, repo Repository
 		return nil, errors.New("name is required")
 	}
 
-	rep, err := m.engine.CreateRepo(repo.Name, swag.StringValue(repo.Description))
+	rep, err := m.engine.CreateRepo(ctx, repo.Name, swag.StringValue(repo.Description))
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (m *mutationResolver) CreateRepository(ctx context.Context, repo Repository
 }
 
 func (m *mutationResolver) CreateBundle(ctx context.Context, params BundleInput) (*Bundle, error) {
-	repo, err := m.engine.GetRepo(params.Repository)
+	repo, err := m.engine.GetRepo(ctx, params.Repository)
 	if err != nil {
 		return nil, err
 	}
@@ -104,12 +104,12 @@ func (m *mutationResolver) CreateBundle(ctx context.Context, params BundleInput)
 		return nil, err
 	}
 
-	nb, err := repo.CommitFromChangeSet(params.Message, swag.StringValue(params.Branch), changes)
+	nb, err := repo.CommitFromChangeSet(ctx, params.Message, swag.StringValue(params.Branch), changes)
 	if err != nil {
 		return nil, err
 	}
 
-	sb, err := repo.GetBundle(nb.ID)
+	sb, err := repo.GetBundle(ctx, nb.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,33 +162,33 @@ func readMode(m string) (store.FileMode, error) {
 }
 
 func (m *mutationResolver) DeleteRepository(ctx context.Context, id string) (*Repository, error) {
-	repo, err := m.engine.GetRepo(id)
+	repo, err := m.engine.GetRepo(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, m.engine.DeleteRepo(repo.Name)
+	return nil, m.engine.DeleteRepo(ctx, repo.Name)
 }
 
 func (m *mutationResolver) DeleteBranch(ctx context.Context, repository string, branch string) (*string, error) {
-	repo, err := m.engine.GetRepo(repository)
+	repo, err := m.engine.GetRepo(ctx, repository)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := repo.DeleteBranch(branch); err != nil {
+	if err := repo.DeleteBranch(ctx, branch); err != nil {
 		return nil, err
 	}
 	return &branch, nil
 }
 
 func (m *mutationResolver) DeleteTag(ctx context.Context, repository string, tag string) (*string, error) {
-	repo, err := m.engine.GetRepo(repository)
+	repo, err := m.engine.GetRepo(ctx, repository)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := repo.DeleteTag(tag); err != nil {
+	if err := repo.DeleteTag(ctx, tag); err != nil {
 		return nil, err
 	}
 	return &tag, nil
@@ -203,12 +203,12 @@ func (r *repositoryResolver) Tags(ctx context.Context, obj *Repository) ([]Bundl
 		return obj.Tags, nil
 	}
 
-	repo, err := r.engine.GetRepo(obj.Name)
+	repo, err := r.engine.GetRepo(ctx, obj.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	return loadTags(repo)
+	return loadTags(ctx, repo)
 }
 
 func (r *repositoryResolver) Branches(ctx context.Context, obj *Repository) ([]BundleRef, error) {
@@ -216,21 +216,21 @@ func (r *repositoryResolver) Branches(ctx context.Context, obj *Repository) ([]B
 		return obj.Branches, nil
 	}
 
-	repo, err := r.engine.GetRepo(obj.Name)
+	repo, err := r.engine.GetRepo(ctx, obj.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	return loadBranches(repo)
+	return loadBranches(ctx, repo)
 }
 
 func (r *repositoryResolver) Bundle(ctx context.Context, obj *Repository, id string) (*Bundle, error) {
-	repo, err := r.engine.GetRepo(obj.Name)
+	repo, err := r.engine.GetRepo(ctx, obj.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	b, err := repo.GetBundle(id)
+	b, err := repo.GetBundle(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -240,12 +240,12 @@ func (r *repositoryResolver) Bundle(ctx context.Context, obj *Repository, id str
 }
 
 func (r *repositoryResolver) Snapshot(ctx context.Context, obj *Repository, id string) (*Snapshot, error) {
-	repo, err := r.engine.GetRepo(obj.Name)
+	repo, err := r.engine.GetRepo(ctx, obj.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	sn, err := repo.Checkout("", id)
+	sn, err := repo.Checkout(ctx, "", id)
 	if err != nil {
 		return nil, err
 	}
@@ -262,20 +262,20 @@ func convertRepo(r *engine.Repo) Repository {
 	}
 }
 
-func loadTags(r *engine.Repo) ([]BundleRef, error) {
-	tags, err := r.ListTags()
+func loadTags(ctx context.Context, r *engine.Repo) ([]BundleRef, error) {
+	tags, err := r.ListTags(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return bundlesForCommits(r, NameTypeTag, tags)
+	return bundlesForCommits(ctx, r, NameTypeTag, tags)
 }
 
-func loadBranches(r *engine.Repo) ([]BundleRef, error) {
-	branches, err := r.ListBranches()
+func loadBranches(ctx context.Context, r *engine.Repo) ([]BundleRef, error) {
+	branches, err := r.ListBranches(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return bundlesForCommits(r, NameTypeBranch, branches)
+	return bundlesForCommits(ctx, r, NameTypeBranch, branches)
 }
 
 func convertChangeSet(cs *store.ChangeSet) (ncs ChangeSet) {
@@ -326,10 +326,10 @@ func convertSnapshot(sn *store.Snapshot) Snapshot {
 	}
 }
 
-func bundlesForCommits(repo *engine.Repo, tpe NameType, names []string) ([]BundleRef, error) {
+func bundlesForCommits(ctx context.Context, repo *engine.Repo, tpe NameType, names []string) ([]BundleRef, error) {
 	result := make([]BundleRef, len(names))
 	for i, name := range names {
-		b, err := repo.GetBundle(name)
+		b, err := repo.GetBundle(ctx, name)
 		if err != nil {
 			return nil, err
 		}
