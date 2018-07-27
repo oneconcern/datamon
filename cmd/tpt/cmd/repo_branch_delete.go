@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/spf13/cobra"
@@ -17,12 +18,12 @@ var branchDeleteCmd = &cobra.Command{
 Eventually this means that all the unreferenced objects will be removed from the data store.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		if err := repo.DeleteBranch(name); err != nil {
+		if err := repo.DeleteBranch(context.Background(), name); err != nil {
 			log.Fatalln(err)
 		}
 		log.Printf("branch %q deleted", name)

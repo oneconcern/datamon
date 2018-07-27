@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -25,7 +26,7 @@ var repoListCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 
-		repos, err := tpt.ListRepo()
+		repos, err := tpt.ListRepo(context.Background())
 		if err != nil {
 			log.Fatalln(err)
 		}

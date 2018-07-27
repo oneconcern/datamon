@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/oneconcern/trumpet/pkg/engine"
@@ -24,7 +25,7 @@ The description field can use markdown formatting.`,
 			log.Fatalln(err)
 		}
 
-		repo, err := tpt.CreateRepo(repoOptions.Name, repoOptions.Description)
+		repo, err := tpt.CreateRepo(context.Background(), repoOptions.Name, repoOptions.Description)
 		if err != nil && err != store.RepoAlreadyExists {
 			log.Fatalln(err)
 		}

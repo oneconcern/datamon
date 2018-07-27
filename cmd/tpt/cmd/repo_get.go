@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/oneconcern/trumpet/pkg/engine"
@@ -26,7 +27,7 @@ var repoGetCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 
-		repo, err := tpt.GetRepo(repoOptions.Name)
+		repo, err := tpt.GetRepo(context.Background(), repoOptions.Name)
 		if err != nil {
 			log.Fatalln(err)
 		}

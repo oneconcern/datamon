@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/spf13/cobra"
 )
@@ -26,13 +28,17 @@ func init() {
 	rootCmd.AddCommand(repoCmd)
 }
 
-func initNamedRepo() (*engine.Runtime, *engine.Repo, error) {
+func initContext() context.Context {
+	return context.TODO()
+}
+
+func initNamedRepo(ctx context.Context) (*engine.Runtime, *engine.Repo, error) {
 	tpt, err := engine.New("")
 	if err != nil {
 		return nil, nil, err
 	}
 
-	repo, err := tpt.GetRepo(repoOptions.Name)
+	repo, err := tpt.GetRepo(ctx, repoOptions.Name)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -39,38 +39,38 @@ func (r *Repo) Stage() *Stage {
 }
 
 // ListBranches returns the list of known branches for a given repo
-func (r *Repo) ListBranches() ([]string, error) {
-	return r.bundles.ListBranches()
+func (r *Repo) ListBranches(ctx context.Context) ([]string, error) {
+	return r.bundles.ListBranches(ctx)
 }
 
 // ListTags returns the list of known branches for a given repo
-func (r *Repo) ListTags() ([]string, error) {
-	return r.bundles.ListTags()
+func (r *Repo) ListTags(ctx context.Context) ([]string, error) {
+	return r.bundles.ListTags(ctx)
 }
 
 // ListCommits gets the bundles associated with the top level commits
-func (r *Repo) ListCommits() ([]store.Bundle, error) {
-	return r.bundles.ListTopLevel()
+func (r *Repo) ListCommits(ctx context.Context) ([]store.Bundle, error) {
+	return r.bundles.ListTopLevel(ctx)
 }
 
 // CreateCommit the content of the stage to permanent storage
-func (r *Repo) CreateCommit(message, branch string) (result NewBundle, err error) {
+func (r *Repo) CreateCommit(ctx context.Context, message, branch string) (result NewBundle, err error) {
 	if strings.TrimSpace(branch) == "" {
 		branch = r.CurrentBranch
 	}
-	return r.commit(message, branch)
+	return r.commit(ctx, message, branch)
 }
 
-func (r *Repo) CommitFromChangeSet(message, branch string, changes store.ChangeSet) (result NewBundle, err error) {
+func (r *Repo) CommitFromChangeSet(ctx context.Context, message, branch string, changes store.ChangeSet) (result NewBundle, err error) {
 	result.Branch = branch
 	result.IsEmpty = true
 
-	parents, err := r.bundles.ListTopLevelIDs()
+	parents, err := r.bundles.ListTopLevelIDs(ctx)
 	if err != nil {
 		return result, err
 	}
 
-	hash, empty, err := r.bundles.Create(message, branch, "", parents, changes)
+	hash, empty, err := r.bundles.Create(ctx, message, branch, "", parents, changes)
 	if err != nil {
 		return result, err
 	}
@@ -79,13 +79,13 @@ func (r *Repo) CommitFromChangeSet(message, branch string, changes store.ChangeS
 	}
 	result.IsEmpty = false
 
-	bundle, err := r.bundles.Get(hash)
+	bundle, err := r.bundles.Get(ctx, hash)
 	if err != nil {
 		return result, err
 	}
 	result.ID = bundle.ID
 
-	snapshot, err := r.snapshots.Create(bundle)
+	snapshot, err := r.snapshots.Create(ctx, bundle)
 	if err != nil {
 		return result, err
 	}
@@ -95,21 +95,21 @@ func (r *Repo) CommitFromChangeSet(message, branch string, changes store.ChangeS
 	return result, nil
 }
 
-func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
+func (r *Repo) commit(ctx context.Context, message, branch string) (result NewBundle, err error) {
 	result.Branch = branch
 	result.IsEmpty = true
 
-	parents, err := r.bundles.ListTopLevelIDs()
+	parents, err := r.bundles.ListTopLevelIDs(ctx)
 	if err != nil {
 		return result, err
 	}
 
-	changes, err := r.Stage().Status()
+	changes, err := r.Stage().Status(ctx)
 	if err != nil {
 		return result, err
 	}
 
-	hash, empty, err := r.bundles.Create(message, branch, "", parents, changes)
+	hash, empty, err := r.bundles.Create(ctx, message, branch, "", parents, changes)
 	if err != nil {
 		return result, err
 	}
@@ -118,13 +118,13 @@ func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 	}
 	result.IsEmpty = false
 
-	bundle, err := r.bundles.Get(hash)
+	bundle, err := r.bundles.Get(ctx, hash)
 	if err != nil {
 		return result, err
 	}
 	result.ID = bundle.ID
 
-	snapshot, err := r.snapshots.Create(bundle)
+	snapshot, err := r.snapshots.Create(ctx, bundle)
 	if err != nil {
 		return result, err
 	}
@@ -147,13 +147,13 @@ func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 		}
 		defer f.Close()
 
-		if err := r.objects.Put(context.TODO(), rp, f); err != nil {
+		if err := r.objects.Put(ctx, rp, f); err != nil {
 			return err
 		}
 		return f.Close()
 	})
 
-	if err = r.Stage().Clear(); err != nil {
+	if err = r.Stage().Clear(ctx); err != nil {
 		return result, err
 	}
 
@@ -161,19 +161,19 @@ func (r *Repo) commit(message, branch string) (result NewBundle, err error) {
 }
 
 // Checkout gets the working directory layout
-func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
+func (r *Repo) Checkout(ctx context.Context, branch, commit string) (*store.Snapshot, error) {
 	var err error
 	if branch == "" {
 		branch = r.CurrentBranch
 	}
 
 	if commit == "" {
-		commit, err = r.bundles.HashForBranch(branch)
+		commit, err = r.bundles.HashForBranch(ctx, branch)
 		if err != nil {
 			if !strings.Contains(err.Error(), "not found") {
 				return nil, err
 			}
-			commit, err = r.bundles.HashForTag(branch)
+			commit, err = r.bundles.HashForTag(ctx, branch)
 			if err != nil {
 				return nil, err
 			}
@@ -183,28 +183,28 @@ func (r *Repo) Checkout(branch, commit string) (*store.Snapshot, error) {
 		}
 	}
 
-	b, err := r.bundles.Get(commit)
+	b, err := r.bundles.Get(ctx, commit)
 	if err != nil {
 		return nil, err
 	}
 
-	return r.snapshots.GetForBundle(b.ID)
+	return r.snapshots.GetForBundle(ctx, b.ID)
 }
 
 // GetBundle for the specified commit id or name
-func (r *Repo) GetBundle(commit string) (*store.Bundle, error) {
+func (r *Repo) GetBundle(ctx context.Context, commit string) (*store.Bundle, error) {
 	var err error
 	branch := commit
 	if commit == "" {
 		branch = r.CurrentBranch
 	}
-	commit, err = r.bundles.HashForBranch(branch)
+	commit, err = r.bundles.HashForBranch(ctx, branch)
 	if err != nil {
 		if !strings.Contains(err.Error(), "not found") {
 			return nil, err
 		}
 
-		commit, err = r.bundles.HashForTag(branch)
+		commit, err = r.bundles.HashForTag(ctx, branch)
 		if err != nil {
 			if !strings.Contains(err.Error(), "not found") {
 				return nil, err
@@ -214,40 +214,40 @@ func (r *Repo) GetBundle(commit string) (*store.Bundle, error) {
 			return &store.Bundle{}, nil
 		}
 	}
-	return r.bundles.Get(commit)
+	return r.bundles.Get(ctx, commit)
 }
 
 // CreateBranch with the given name, when top level is true
 // the branch will be created without a bundle attached to it
-func (r *Repo) CreateBranch(name string, topLevel bool) error {
+func (r *Repo) CreateBranch(ctx context.Context, name string, topLevel bool) error {
 	parent := r.CurrentBranch
 	if topLevel {
 		parent = ""
 	}
-	return r.bundles.CreateBranch(parent, name)
+	return r.bundles.CreateBranch(ctx, parent, name)
 }
 
 // DeleteBranch with the given name.
 // This will remove all the orphaned data as well as the branch itself
-func (r *Repo) DeleteBranch(name string) error {
+func (r *Repo) DeleteBranch(ctx context.Context, name string) error {
 	if name == "" {
 		return errors.New("branch name is required for deleting")
 	}
 	if name == r.CurrentBranch {
 		return errors.New("can't delete the current branch")
 	}
-	return r.bundles.DeleteBranch(name)
+	return r.bundles.DeleteBranch(ctx, name)
 }
 
 // CreateTag with the given name
-func (r *Repo) CreateTag(name string) error {
-	return r.bundles.CreateTag(r.CurrentBranch, name)
+func (r *Repo) CreateTag(ctx context.Context, name string) error {
+	return r.bundles.CreateTag(ctx, r.CurrentBranch, name)
 }
 
 // DeleteTag with the given name.
-func (r *Repo) DeleteTag(name string) error {
+func (r *Repo) DeleteTag(ctx context.Context, name string) error {
 	if name == "" {
 		return errors.New("tag name is required for deleting")
 	}
-	return r.bundles.DeleteTag(name)
+	return r.bundles.DeleteTag(ctx, name)
 }

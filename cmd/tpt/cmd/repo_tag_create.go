@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/spf13/cobra"
@@ -17,12 +18,12 @@ var tagCreateCmd = &cobra.Command{
 A tag represents an immutable anchor as a named commit.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		if err := repo.CreateTag(name); err != nil {
+		if err := repo.CreateTag(context.Background(), name); err != nil {
 			log.Fatalln(err)
 		}
 

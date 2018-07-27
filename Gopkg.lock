@@ -10,7 +10,7 @@
   revision = "28f7e881ca57bc00e028f9ede9f0d9104cfeef5e"
 
 [[projects]]
-  digest = "1:cec847b9e245348c70b9e281bb4c3b3eb83fe7873ad01d80d97142cedba7d2f3"
+  digest = "1:eb21ecabbe5f5c371f72a0efa000d6b0805c784ef90fd80600a674a3c9e69cc0"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -48,8 +48,8 @@
     "service/sts",
   ]
   pruneopts = "UT"
-  revision = "96313df4b1ba47ade3de7b2b90d69c02a81ddaa4"
-  version = "v1.14.33"
+  revision = "8475c414b1bd58b8cc214873a8854e3a621e67d7"
+  version = "v1.15.0"
 
 [[projects]]
   branch = "master"
@@ -345,7 +345,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e369d026cda9dc931514f3b8c9605f6d122663216cbbad87c6f161f7bbe2180e"
+  digest = "1:5a3618fbe561e03f1b52f7a1c9a0b106ab73e8ec3f78dc89024e956669a19f23"
   name = "github.com/oneconcern/pipelines"
   packages = [
     "pkg/cli/cflags",
@@ -355,7 +355,7 @@
     "pkg/tracing",
   ]
   pruneopts = "UT"
-  revision = "21130412548c1b61ac18ec74017c314cb09b9489"
+  revision = "811e547c651638942c1e918f3a98fff6ce558147"
 
 [[projects]]
   branch = "flushing-writer"
@@ -656,6 +656,7 @@
     "github.com/json-iterator/go",
     "github.com/kardianos/osext",
     "github.com/minio/blake2b-simd",
+    "github.com/oneconcern/pipelines/pkg/cli/cflags",
     "github.com/oneconcern/pipelines/pkg/cli/envk",
     "github.com/oneconcern/pipelines/pkg/httpd",
     "github.com/oneconcern/pipelines/pkg/log",

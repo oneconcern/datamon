@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -16,12 +17,12 @@ var tagListCmd = &cobra.Command{
 	Short: "List the known tags for this repo",
 	Long:  `List the known tags for this repository.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		ls, err := repo.ListTags()
+		ls, err := repo.ListTags(context.Background())
 		if err != nil {
 			log.Fatalln(err)
 		}

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/oneconcern/trumpet/pkg/cflags"
+	"github.com/oneconcern/pipelines/pkg/cli/cflags"
 	"github.com/oneconcern/trumpet/pkg/fingerprint"
 	"github.com/spf13/cobra"
 )

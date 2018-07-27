@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,15 +43,15 @@ type Runtime struct {
 }
 
 // ListRepo known in the trumpet database
-func (r *Runtime) ListRepo() ([]Repo, error) {
-	rr, err := r.repos.List()
+func (r *Runtime) ListRepo(ctx context.Context) ([]Repo, error) {
+	rr, err := r.repos.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	repos := make([]Repo, len(rr))
 	for i, name := range rr {
-		repo, err := r.GetRepo(name)
+		repo, err := r.GetRepo(ctx, name)
 		if err != nil {
 			return nil, err
 		}
@@ -60,16 +61,16 @@ func (r *Runtime) ListRepo() ([]Repo, error) {
 }
 
 // GetRepo from trumpet database
-func (r *Runtime) GetRepo(name string) (*Repo, error) {
-	rr, err := r.repos.Get(name)
+func (r *Runtime) GetRepo(ctx context.Context, name string) (*Repo, error) {
+	rr, err := r.repos.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return r.makeRepo(rr.Name, rr.Description, "")
+	return r.makeRepo(ctx, rr.Name, rr.Description, "")
 }
 
-func (r *Runtime) makeRepo(name, description, branch string) (*Repo, error) {
+func (r *Runtime) makeRepo(ctx context.Context, name, description, branch string) (*Repo, error) {
 	if name == "" {
 		return nil, store.NameIsRequired
 	}
@@ -106,13 +107,13 @@ func (r *Runtime) makeRepo(name, description, branch string) (*Repo, error) {
 }
 
 // CreateRepo creates a repository in the database
-func (r *Runtime) CreateRepo(name, description string) (*Repo, error) {
-	repo, err := r.makeRepo(name, description, "")
+func (r *Runtime) CreateRepo(ctx context.Context, name, description string) (*Repo, error) {
+	repo, err := r.makeRepo(ctx, name, description, "")
 	if err != nil {
 		return nil, fmt.Errorf("create repo: %v", err)
 	}
 
-	err = r.repos.Create(&store.Repo{
+	err = r.repos.Create(ctx, &store.Repo{
 		Name:        name,
 		Description: description,
 	})
@@ -123,9 +124,9 @@ func (r *Runtime) CreateRepo(name, description string) (*Repo, error) {
 }
 
 // DeleteRepo removes a repository from trumpet
-func (r *Runtime) DeleteRepo(name string) error {
+func (r *Runtime) DeleteRepo(ctx context.Context, name string) error {
 	if err := os.RemoveAll(filepath.Join(r.baseDir, name)); err != nil {
 		return err
 	}
-	return r.repos.Delete(name)
+	return r.repos.Delete(ctx, name)
 }

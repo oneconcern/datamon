@@ -9,10 +9,10 @@ const (
 )
 
 var (
-	pathPref      = [5]byte{'p', 'a', 't', 'h', ':'}
-	commitPref    = [7]byte{'c', 'o', 'm', 'm', 'i', 't', ':'}
-	objectPref    = [7]byte{'o', 'b', 'j', 'e', 'c', 't', ':'}
-	treePref      = [5]byte{'t', 'r', 'e', 'e', ':'}
+	pathPref   = [5]byte{'p', 'a', 't', 'h', ':'}
+	commitPref = [7]byte{'c', 'o', 'm', 'm', 'i', 't', ':'}
+	objectPref = [7]byte{'o', 'b', 'j', 'e', 'c', 't', ':'}
+	// treePref      = [5]byte{'t', 'r', 'e', 'e', ':'}
 	deletedPref   = [8]byte{'d', 'e', 'l', 'e', 't', 'e', 'd', ':'}
 	branchPref    = [7]byte{'b', 'r', 'a', 'n', 'c', 'h', ':'}
 	snapshotPref  = [9]byte{'s', 'n', 'a', 'p', 's', 'h', 'o', 't', ':'}

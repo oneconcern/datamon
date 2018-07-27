@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 	"path/filepath"
 
@@ -20,7 +21,7 @@ This command supports providing one or more glob patterns
 `,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -37,7 +38,7 @@ This command supports providing one or more glob patterns
 					log.Fatalln(err)
 				}
 
-				hash, isNew, err := repo.Stage().Add(addBlob)
+				hash, isNew, err := repo.Stage().Add(context.Background(), addBlob)
 				if err != nil {
 					log.Fatalln(err)
 				}

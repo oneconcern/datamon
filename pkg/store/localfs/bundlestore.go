@@ -1,6 +1,7 @@
 package localfs
 
 import (
+	"context"
 	"time"
 
 	"path/filepath"
@@ -55,11 +56,11 @@ func (l *localBundleStore) Close() error {
 	return err
 }
 
-func (l *localBundleStore) ListTopLevel() ([]store.Bundle, error) {
+func (l *localBundleStore) ListTopLevel(ctx context.Context) ([]store.Bundle, error) {
 	return l.findCommitsByPrefix("", false)
 }
 
-func (l *localBundleStore) ListTopLevelIDs() ([]string, error) {
+func (l *localBundleStore) ListTopLevelIDs(ctx context.Context) ([]string, error) {
 	res, err := l.findCommitsByPrefix("", true)
 	if err != nil {
 		return nil, err
@@ -72,10 +73,10 @@ func (l *localBundleStore) ListTopLevelIDs() ([]string, error) {
 	return result, nil
 }
 
-func (l *localBundleStore) Get(hash string) (*store.Bundle, error) {
+func (l *localBundleStore) Get(ctx context.Context, hash string) (*store.Bundle, error) {
 	var bundle *store.Bundle
 	berr := l.db.View(func(tx *badger.Txn) error {
-		b, err := badgerRewriteBundleItemError(tx.Get(commitKey(hash)))
+		b, err := mapBundleItemError(tx.Get(commitKey(hash)))
 		if err != nil {
 			return err
 		}
@@ -88,11 +89,11 @@ func (l *localBundleStore) Get(hash string) (*store.Bundle, error) {
 	return bundle, nil
 }
 
-func (l *localBundleStore) GetObject(hash string) (store.Entry, error) {
+func (l *localBundleStore) GetObject(ctx context.Context, hash string) (store.Entry, error) {
 	var entry store.Entry
 	verr := l.db.View(func(tx *badger.Txn) error {
 		var err error
-		entry, err = badgerRewriteEntryError(tx.Get(objectKey(hash)))
+		entry, err = mapEntryError(tx.Get(objectKey(hash)))
 		return err
 	})
 	if verr != nil {
@@ -102,18 +103,18 @@ func (l *localBundleStore) GetObject(hash string) (store.Entry, error) {
 	return entry, nil
 }
 
-func (l *localBundleStore) GetObjectForPath(path string) (store.Entry, error) {
+func (l *localBundleStore) GetObjectForPath(ctx context.Context, path string) (store.Entry, error) {
 	var entry store.Entry
 	verr := l.db.View(func(tx *badger.Txn) error {
 		item, err := tx.Get(pathKey(path))
 		if err != nil {
-			return badgerRewriteObjectError(err)
+			return mapObjectError(err)
 		}
 		vb, err := item.Value()
 		if err != nil {
-			return badgerRewriteObjectError(err)
+			return mapObjectError(err)
 		}
-		entry, err = badgerRewriteEntryError(tx.Get(objectKeyBytes(vb)))
+		entry, err = mapEntryError(tx.Get(objectKeyBytes(vb)))
 		return err
 	})
 	if verr != nil {
@@ -123,7 +124,7 @@ func (l *localBundleStore) GetObjectForPath(path string) (store.Entry, error) {
 	return entry, nil
 }
 
-func (l *localBundleStore) Create(message, branch, snapshot string, parents []string, changes store.ChangeSet) (string, bool, error) {
+func (l *localBundleStore) Create(ctx context.Context, message, branch, snapshot string, parents []string, changes store.ChangeSet) (string, bool, error) {
 	key, err := changes.Hash()
 	if err != nil {
 		return "", true, err
@@ -171,15 +172,15 @@ func (l *localBundleStore) Create(message, branch, snapshot string, parents []st
 	return key, false, nil
 }
 
-func (l *localBundleStore) ListTags() ([]string, error) {
+func (l *localBundleStore) ListTags(ctx context.Context) ([]string, error) {
 	return l.listKeys(tagKey(""))
 }
 
-func (l *localBundleStore) HashForTag(tag string) (string, error) {
+func (l *localBundleStore) HashForTag(ctx context.Context, tag string) (string, error) {
 	return l.hashFor(tagKey(tag))
 }
 
-func (l *localBundleStore) CreateTag(branch, tag string) error {
+func (l *localBundleStore) CreateTag(ctx context.Context, branch, tag string) error {
 	return l.db.Update(func(tx *badger.Txn) error {
 		if branch == "" {
 			return store.IDIsRequired
@@ -197,7 +198,7 @@ func (l *localBundleStore) CreateTag(branch, tag string) error {
 	})
 }
 
-func (l *localBundleStore) DeleteTag(tag string) error {
+func (l *localBundleStore) DeleteTag(ctx context.Context, tag string) error {
 	return l.db.Update(func(tx *badger.Txn) error {
 		bk := tagKey(tag)
 		_, err := tx.Get(bk)
@@ -205,13 +206,13 @@ func (l *localBundleStore) DeleteTag(tag string) error {
 			if err.Error() == badger.ErrKeyNotFound.Error() {
 				return nil
 			}
-			return badgerRewriteBundleError(err)
+			return mapBundleError(err)
 		}
-		return badgerRewriteBundleError(tx.Delete(bk))
+		return mapBundleError(tx.Delete(bk))
 	})
 }
 
-func (l *localBundleStore) ListBranches() ([]string, error) {
+func (l *localBundleStore) ListBranches(ctx context.Context) ([]string, error) {
 	return l.listKeys(branchKey(""))
 }
 
@@ -237,7 +238,7 @@ func (l *localBundleStore) listKeys(pref []byte) ([]string, error) {
 	return result, nil
 }
 
-func (l *localBundleStore) CreateBranch(parent, name string) error {
+func (l *localBundleStore) CreateBranch(ctx context.Context, parent, name string) error {
 	return l.db.Update(func(tx *badger.Txn) error {
 		val := []byte("empty")
 		if parent != "" {
@@ -258,29 +259,29 @@ func (l *localBundleStore) CreateBranch(parent, name string) error {
 	})
 }
 
-func (l *localBundleStore) HashForBranch(branch string) (string, error) {
+func (l *localBundleStore) HashForBranch(ctx context.Context, branch string) (string, error) {
 	return l.hashFor(branchKey(branch))
 }
 
-func (l *localBundleStore) DeleteBranch(name string) error {
+func (l *localBundleStore) DeleteBranch(ctx context.Context, name string) error {
 	return l.db.Update(func(tx *badger.Txn) error {
 		bk := branchKey(name)
 		_, err := tx.Get(bk)
 		if err != nil && err.Error() != badger.ErrKeyNotFound.Error() {
-			return badgerRewriteBundleError(err)
+			return mapBundleError(err)
 		}
-		return badgerRewriteBundleError(tx.Delete(bk))
+		return mapBundleError(tx.Delete(bk))
 	})
 }
 
-func (l *localBundleStore) HashForPath(path string) (string, error) {
+func (l *localBundleStore) HashForPath(ctx context.Context, path string) (string, error) {
 	return l.hashFor(pathKey(path))
 }
 
 func valueBytesFor(tx *badger.Txn, key []byte) ([]byte, error) {
 	item, err := tx.Get(key)
 	if err != nil {
-		return nil, badgerRewriteObjectError(err)
+		return nil, mapObjectError(err)
 	}
 	return item.Value()
 }
@@ -290,7 +291,7 @@ func (l *localBundleStore) hashFor(key []byte) (string, error) {
 	berr := l.db.View(func(tx *badger.Txn) error {
 		b, err := valueBytesFor(tx, key)
 		if err != nil {
-			return badgerRewriteObjectError(err)
+			return mapObjectError(err)
 		}
 		result = store.UnsafeBytesToString(b)
 		return nil
@@ -321,7 +322,7 @@ func (l *localBundleStore) findCommitsByPrefix(prefix string, keysOnly bool) ([]
 				continue
 			}
 
-			bundle, err := badgerRewriteBundleItemError(item, nil)
+			bundle, err := mapBundleItemError(item, nil)
 			if err != nil {
 				it.Close()
 				return err

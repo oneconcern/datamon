@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -21,12 +22,12 @@ var bundleLogCmd = &cobra.Command{
 	Short: "Get commit history",
 	Long:  `Displays a list of commits with their messages`,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		commits, err := repo.ListCommits()
+		commits, err := repo.ListCommits(context.Background())
 		if err != nil {
 			log.Fatalln(err)
 		}

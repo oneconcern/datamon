@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/spf13/cobra"
@@ -14,12 +15,12 @@ var tagCheckoutCmd = &cobra.Command{
 	Short: "Checkout the files for the given branch",
 	Long:  `Checkout the files for the specified branch and switch to the branch`,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		sn, err := repo.Checkout(name, "")
+		sn, err := repo.Checkout(context.Background(), name, "")
 		if err != nil {
 			log.Fatalln(err)
 		}

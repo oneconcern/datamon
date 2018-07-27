@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -24,12 +25,12 @@ var bundleCommitCmd = &cobra.Command{
 This won't yet make changes in the'`,
 	Aliases: []string{"ci"},
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		bundle, err := repo.CreateCommit(message, "")
+		bundle, err := repo.CreateCommit(context.Background(), message, "")
 		if err != nil {
 			log.Fatalln(err)
 		}

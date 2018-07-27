@@ -1,5 +1,7 @@
 package store
 
+import "context"
+
 type errorString string
 
 func (e errorString) Error() string {
@@ -45,36 +47,35 @@ type Store interface {
 type RepoStore interface {
 	Store
 
-	List() ([]string, error)
-	Get(string) (*Repo, error)
-	Create(*Repo) error
-	Update(*Repo) error
-	Delete(string) error
-	//Bundles(string) (BundleStore, error)
+	List(context.Context) ([]string, error)
+	Get(context.Context, string) (*Repo, error)
+	Create(context.Context, *Repo) error
+	Update(context.Context, *Repo) error
+	Delete(context.Context, string) error
 }
 
 // A BundleStore manages persistence for bundle related data
 type BundleStore interface {
 	Store
 
-	ListTopLevel() ([]Bundle, error)
-	ListTopLevelIDs() ([]string, error)
+	ListTopLevel(context.Context) ([]Bundle, error)
+	ListTopLevelIDs(context.Context) ([]string, error)
 
-	ListBranches() ([]string, error)
-	HashForBranch(branch string) (string, error)
-	CreateBranch(string, string) error
-	DeleteBranch(string) error
+	ListBranches(context.Context) ([]string, error)
+	HashForBranch(context.Context, string) (string, error)
+	CreateBranch(context.Context, string, string) error
+	DeleteBranch(context.Context, string) error
 
-	ListTags() ([]string, error)
-	HashForTag(string) (string, error)
-	CreateTag(string, string) error
-	DeleteTag(string) error
+	ListTags(context.Context) ([]string, error)
+	HashForTag(context.Context, string) (string, error)
+	CreateTag(context.Context, string, string) error
+	DeleteTag(context.Context, string) error
 
-	Create(message, branch, snapshot string, parents []string, changes ChangeSet) (string, bool, error)
-	Get(string) (*Bundle, error)
-	GetObject(string) (Entry, error)
-	GetObjectForPath(string) (Entry, error)
-	HashForPath(path string) (string, error)
+	Create(context.Context, string, string, string, []string, ChangeSet) (string, bool, error)
+	Get(context.Context, string) (*Bundle, error)
+	GetObject(context.Context, string) (Entry, error)
+	GetObjectForPath(context.Context, string) (Entry, error)
+	HashForPath(context.Context, string) (string, error)
 }
 
 // An StageMeta store manages the indices for file paths to
@@ -82,20 +83,20 @@ type BundleStore interface {
 type StageMeta interface {
 	Store
 
-	Add(Entry) error
-	Remove(string) error
-	List() (ChangeSet, error)
-	MarkDelete(*Entry) error
-	Get(string) (Entry, error)
-	HashFor(string) (string, error)
-	Clear() error
+	Add(context.Context, Entry) error
+	Remove(context.Context, string) error
+	List(context.Context) (ChangeSet, error)
+	MarkDelete(context.Context, *Entry) error
+	Get(context.Context, string) (Entry, error)
+	HashFor(context.Context, string) (string, error)
+	Clear(context.Context) error
 }
 
 // A SnapshotStore manages persistence for snapshot data
 type SnapshotStore interface {
 	Store
 
-	Create(*Bundle) (*Snapshot, error)
-	Get(string) (*Snapshot, error)
-	GetForBundle(string) (*Snapshot, error)
+	Create(context.Context, *Bundle) (*Snapshot, error)
+	Get(context.Context, string) (*Snapshot, error)
+	GetForBundle(context.Context, string) (*Snapshot, error)
 }

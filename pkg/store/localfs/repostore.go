@@ -1,6 +1,7 @@
 package localfs
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"sync"
@@ -55,7 +56,7 @@ func (r *repoStore) Close() error {
 	return err
 }
 
-func (r *repoStore) List() ([]string, error) {
+func (r *repoStore) List(ctx context.Context) ([]string, error) {
 	res, err := r.findByPrefix("", true)
 	if err != nil {
 		return nil, err
@@ -67,11 +68,11 @@ func (r *repoStore) List() ([]string, error) {
 	return result, nil
 }
 
-func (r *repoStore) Get(name string) (*store.Repo, error) {
+func (r *repoStore) Get(ctx context.Context, name string) (*store.Repo, error) {
 	keyb := store.UnsafeStringToBytes(name)
 	var value store.Repo
 	verr := r.db.View(func(txn *badger.Txn) error {
-		item, err := badgerRewriteRepoItemError(txn.Get(keyb))
+		item, err := mapRepoItemError(txn.Get(keyb))
 		if err != nil {
 			return err
 		}
@@ -81,17 +82,17 @@ func (r *repoStore) Get(name string) (*store.Repo, error) {
 	return &value, verr
 }
 
-func (r *repoStore) Create(repo *store.Repo) error {
+func (r *repoStore) Create(ctx context.Context, repo *store.Repo) error {
 	return r.put(repo, true)
 }
 
-func (r *repoStore) Update(repo *store.Repo) error {
+func (r *repoStore) Update(ctx context.Context, repo *store.Repo) error {
 	return r.put(repo, false)
 }
 
-func (r *repoStore) Delete(name string) error {
+func (r *repoStore) Delete(ctx context.Context, name string) error {
 	return r.db.Update(func(txn *badger.Txn) error {
-		return badgerRewriteRepoError(txn.Delete(store.UnsafeStringToBytes(name)))
+		return mapRepoError(txn.Delete(store.UnsafeStringToBytes(name)))
 	})
 }
 
@@ -120,7 +121,7 @@ func (r *repoStore) findByPrefix(prefix string, keysOnly bool) ([]keyValue, erro
 			v, err := item.Value()
 			if err != nil {
 				it.Close()
-				return badgerRewriteRepoError(err)
+				return mapRepoError(err)
 			}
 
 			result = append(result, keyValue{Key: k, Value: v})
@@ -139,7 +140,7 @@ func (r *repoStore) put(repo *store.Repo, create bool) error {
 	// need this to be 0 when this is a new entry
 	keyb := store.UnsafeStringToBytes(repo.Name)
 	return r.db.Update(func(txn *badger.Txn) error {
-		_, err := badgerRewriteRepoItemError(txn.Get(keyb))
+		_, err := mapRepoItemError(txn.Get(keyb))
 		if err != store.RepoNotFound {
 			return err
 		}

@@ -107,7 +107,7 @@ type Stage struct {
 }
 
 // Add a file to stage
-func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
+func (s *Stage) Add(ctx context.Context, addBlob AddBlob) (string, bool, error) {
 	// TODO: encode and write file in a single pass
 	fp, err := s.hasher.Process(addBlob.Path)
 	if err != nil {
@@ -116,14 +116,14 @@ func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
 	hash := fmt.Sprintf("%x", fp)
 
 	var isNew bool
-	_, err = s.meta.Get(hash)
+	_, err = s.meta.Get(ctx, hash)
 	if err == store.ObjectNotFound {
 		isNew = true
 	}
 
 	if isNew {
 		defer addBlob.Close()
-		if err = s.objects.Put(context.TODO(), hash, addBlob.Stream); err != nil {
+		if err = s.objects.Put(ctx, hash, addBlob.Stream); err != nil {
 			return "", false, err
 		}
 		if err = addBlob.Close(); err != nil {
@@ -131,7 +131,7 @@ func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
 		}
 	}
 
-	err = s.meta.Add(store.Entry{
+	err = s.meta.Add(ctx, store.Entry{
 		Path:  addBlob.Path,
 		Hash:  hash,
 		Mtime: addBlob.Mtime,
@@ -145,36 +145,36 @@ func (s *Stage) Add(addBlob AddBlob) (string, bool, error) {
 }
 
 // Remove a file from the stage
-func (s *Stage) Remove(path string) error {
+func (s *Stage) Remove(ctx context.Context, path string) error {
 	// also look up hash in the committed bundles
 	// when there is a hash found in the committed bundles
 	// then instead of deleting we'll mark it for delete on the stage
-	entry, err := s.bundles.GetObjectForPath(path)
+	entry, err := s.bundles.GetObjectForPath(ctx, path)
 	if err == nil {
-		return s.meta.MarkDelete(&entry)
+		return s.meta.MarkDelete(ctx, &entry)
 	}
 
-	hash, err := s.meta.HashFor(path)
+	hash, err := s.meta.HashFor(ctx, path)
 	if err != nil {
 		return err
 	}
 
-	if err := s.meta.Remove(hash); err != nil {
+	if err := s.meta.Remove(ctx, hash); err != nil {
 		return err
 	}
 
-	return s.objects.Delete(context.TODO(), hash)
+	return s.objects.Delete(ctx, hash)
 }
 
 // Clear the stage
-func (s *Stage) Clear() error {
-	if err := s.meta.Clear(); err != nil {
+func (s *Stage) Clear(ctx context.Context) error {
+	if err := s.meta.Clear(ctx); err != nil {
 		return err
 	}
-	return s.objects.Clear(context.TODO())
+	return s.objects.Clear(ctx)
 }
 
 // Status of the stage, returns a changeset
-func (s *Stage) Status() (store.ChangeSet, error) {
-	return s.meta.List()
+func (s *Stage) Status(ctx context.Context) (store.ChangeSet, error) {
+	return s.meta.List(ctx)
 }

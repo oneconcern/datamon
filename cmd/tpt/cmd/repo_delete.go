@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/oneconcern/trumpet/pkg/engine"
@@ -21,7 +22,7 @@ var deleteCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 
-		if err := tpt.DeleteRepo(repoOptions.Name); err != nil {
+		if err := tpt.DeleteRepo(context.Background(), repoOptions.Name); err != nil {
 			log.Fatalln(err)
 		}
 		log.Printf("%s has been deleted", repoOptions.Name)

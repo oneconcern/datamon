@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/spf13/cobra"
@@ -21,12 +22,12 @@ When this file was newly added, it will be removed from the staging area.
 `,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		if err := repo.Stage().Remove(args[0]); err != nil {
+		if err := repo.Stage().Remove(context.Background(), args[0]); err != nil {
 			log.Fatalln(err)
 		}
 

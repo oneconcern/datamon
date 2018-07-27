@@ -32,7 +32,7 @@ func makeBadgerDb(dir string) (*badger.DB, error) {
 	return v, nil
 }
 
-func badgerRewriteRepoError(err error) error {
+func mapRepoError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -46,13 +46,13 @@ func badgerRewriteRepoError(err error) error {
 	}
 }
 
-func badgerRewriteRepoItemError(value *badger.Item, err error) (store.Repo, error) {
+func mapRepoItemError(value *badger.Item, err error) (store.Repo, error) {
 	if err != nil {
-		return store.Repo{}, badgerRewriteRepoError(err)
+		return store.Repo{}, mapRepoError(err)
 	}
 	data, err := value.Value()
 	if err != nil {
-		return store.Repo{}, badgerRewriteRepoError(err)
+		return store.Repo{}, mapRepoError(err)
 	}
 
 	var result store.Repo
@@ -62,7 +62,7 @@ func badgerRewriteRepoItemError(value *badger.Item, err error) (store.Repo, erro
 	return result, nil
 }
 
-func badgerRewriteBundleError(err error) error {
+func mapBundleError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -76,14 +76,14 @@ func badgerRewriteBundleError(err error) error {
 	}
 }
 
-func badgerRewriteBundleItemError(value *badger.Item, err error) (store.Bundle, error) {
+func mapBundleItemError(value *badger.Item, err error) (store.Bundle, error) {
 	if err != nil {
-		return store.Bundle{}, badgerRewriteObjectError(err)
+		return store.Bundle{}, mapObjectError(err)
 	}
 
 	data, err := value.Value()
 	if err != nil {
-		return store.Bundle{}, badgerRewriteObjectError(err)
+		return store.Bundle{}, mapObjectError(err)
 	}
 
 	var result store.Bundle
@@ -93,7 +93,7 @@ func badgerRewriteBundleItemError(value *badger.Item, err error) (store.Bundle, 
 	return result, nil
 }
 
-func badgerRewriteObjectError(err error) error {
+func mapObjectError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -107,14 +107,14 @@ func badgerRewriteObjectError(err error) error {
 	}
 }
 
-func badgerRewriteEntryError(value *badger.Item, err error) (store.Entry, error) {
+func mapEntryError(value *badger.Item, err error) (store.Entry, error) {
 	if err != nil {
-		return store.Entry{}, badgerRewriteObjectError(err)
+		return store.Entry{}, mapObjectError(err)
 	}
 
 	data, err := value.Value()
 	if err != nil {
-		return store.Entry{}, badgerRewriteObjectError(err)
+		return store.Entry{}, mapObjectError(err)
 	}
 
 	var result store.Entry
@@ -124,7 +124,7 @@ func badgerRewriteEntryError(value *badger.Item, err error) (store.Entry, error)
 	return result, nil
 }
 
-func badgerRewriteSnapshotError(err error) error {
+func mapSnapshotError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -138,14 +138,14 @@ func badgerRewriteSnapshotError(err error) error {
 	}
 }
 
-func badgerRewriteSnapshotItemError(value *badger.Item, err error) (store.Snapshot, error) {
+func mapSnapshotItemError(value *badger.Item, err error) (store.Snapshot, error) {
 	if err != nil {
-		return store.Snapshot{}, badgerRewriteSnapshotError(err)
+		return store.Snapshot{}, mapSnapshotError(err)
 	}
 
 	data, err := value.Value()
 	if err != nil {
-		return store.Snapshot{}, badgerRewriteSnapshotError(err)
+		return store.Snapshot{}, mapSnapshotError(err)
 	}
 
 	var result store.Snapshot

@@ -1,6 +1,7 @@
 package localfs
 
 import (
+	"context"
 	"path/filepath"
 	"sync"
 
@@ -55,7 +56,7 @@ func (o *objectMetaStore) Close() error {
 	return err
 }
 
-func (o *objectMetaStore) MarkDelete(entry *store.Entry) error {
+func (o *objectMetaStore) MarkDelete(ctx context.Context, entry *store.Entry) error {
 	verr := o.db.Update(func(tx *badger.Txn) error {
 		data, err := jsoniter.Marshal(entry)
 		if err != nil {
@@ -66,11 +67,11 @@ func (o *objectMetaStore) MarkDelete(entry *store.Entry) error {
 	return verr
 }
 
-func (o *objectMetaStore) Add(entry store.Entry) error {
+func (o *objectMetaStore) Add(ctx context.Context, entry store.Entry) error {
 	return o.db.Update(func(txn *badger.Txn) error {
 		hv := store.UnsafeStringToBytes(entry.Hash)
 		hk := objectKeyBytes(hv)
-		_, err := badgerRewriteEntryError(txn.Get(hk))
+		_, err := mapEntryError(txn.Get(hk))
 		if err != store.ObjectNotFound {
 			return err
 		}
@@ -86,11 +87,11 @@ func (o *objectMetaStore) Add(entry store.Entry) error {
 	})
 }
 
-func (o *objectMetaStore) Remove(key string) error {
+func (o *objectMetaStore) Remove(ctx context.Context, key string) error {
 	return o.db.Update(func(tx *badger.Txn) error {
 		hk := objectKey(key)
 
-		entry, err := badgerRewriteEntryError(tx.Get(hk))
+		entry, err := mapEntryError(tx.Get(hk))
 		if err != nil {
 			if err == store.ObjectNotFound {
 				return nil
@@ -98,9 +99,9 @@ func (o *objectMetaStore) Remove(key string) error {
 			return err
 		}
 
-		if err := badgerRewriteObjectError(tx.Delete(hk)); err != nil {
+		if err := mapObjectError(tx.Delete(hk)); err != nil {
 			if err == store.ObjectNotFound {
-				err2 := badgerRewriteObjectError(tx.Delete(pathKey(entry.Path)))
+				err2 := mapObjectError(tx.Delete(pathKey(entry.Path)))
 				if err2 == store.ObjectNotFound {
 					return nil
 				}
@@ -112,7 +113,7 @@ func (o *objectMetaStore) Remove(key string) error {
 	})
 }
 
-func (o *objectMetaStore) List() (store.ChangeSet, error) {
+func (o *objectMetaStore) List(ctx context.Context) (store.ChangeSet, error) {
 	added, err := o.findByPrefix(string(objectPref[:]), false)
 	if err != nil {
 		return store.ChangeSet{}, err
@@ -128,10 +129,10 @@ func (o *objectMetaStore) List() (store.ChangeSet, error) {
 	}, nil
 }
 
-func (o *objectMetaStore) Get(key string) (store.Entry, error) {
+func (o *objectMetaStore) Get(ctx context.Context, key string) (store.Entry, error) {
 	var entry store.Entry
 	berr := o.db.View(func(tx *badger.Txn) error {
-		item, err := badgerRewriteEntryError(tx.Get(objectKey(key)))
+		item, err := mapEntryError(tx.Get(objectKey(key)))
 		if err != nil {
 			return err
 		}
@@ -145,7 +146,7 @@ func (o *objectMetaStore) Get(key string) (store.Entry, error) {
 	return entry, nil
 }
 
-func (o *objectMetaStore) Clear() error {
+func (o *objectMetaStore) Clear(ctx context.Context) error {
 	berr := o.db.Update(func(tx *badger.Txn) error {
 		opts := badger.IteratorOptions{
 			PrefetchValues: false,
@@ -167,16 +168,16 @@ func (o *objectMetaStore) Clear() error {
 	return berr
 }
 
-func (o *objectMetaStore) HashFor(path string) (string, error) {
+func (o *objectMetaStore) HashFor(ctx context.Context, path string) (string, error) {
 	var result string
 	berr := o.db.View(func(tx *badger.Txn) error {
 		item, err := tx.Get(pathKey(path))
 		if err != nil {
-			return badgerRewriteObjectError(err)
+			return mapObjectError(err)
 		}
 		b, err := item.Value()
 		if err != nil {
-			return badgerRewriteObjectError(err)
+			return mapObjectError(err)
 		}
 		result = store.UnsafeBytesToString(b)
 		return nil
@@ -210,13 +211,13 @@ func (o *objectMetaStore) findByPrefix(prefix string, keysOnly bool) ([]store.En
 			v, err := item.Value()
 			if err != nil {
 				it.Close()
-				return badgerRewriteObjectError(err)
+				return mapObjectError(err)
 			}
 
 			var entry store.Entry
 			if err := jsoniter.Unmarshal(v, &entry); err != nil {
 				it.Close()
-				return badgerRewriteObjectError(err)
+				return mapObjectError(err)
 			}
 			result = append(result, entry)
 		}

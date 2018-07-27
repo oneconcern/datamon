@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -20,12 +21,12 @@ So you see each file that's enlisted with its status (added, updated, removed).
 `,
 	Aliases: []string{"st"},
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		entries, err := repo.Stage().Status()
+		entries, err := repo.Stage().Status(context.Background())
 		if err != nil {
 			log.Fatalln(err)
 		}

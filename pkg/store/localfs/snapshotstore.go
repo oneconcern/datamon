@@ -2,6 +2,7 @@ package localfs
 
 import (
 	"container/heap"
+	"context"
 	"log"
 	"path/filepath"
 	"sync"
@@ -56,10 +57,10 @@ func (l *localSnapshotStore) Close() error {
 	return err
 }
 
-func (l *localSnapshotStore) Get(hash string) (*store.Snapshot, error) {
+func (l *localSnapshotStore) Get(ctx context.Context, hash string) (*store.Snapshot, error) {
 	var result *store.Snapshot
 	berr := l.db.View(func(tx *badger.Txn) error {
-		sn, err := badgerRewriteSnapshotItemError(tx.Get(snapshotKey(hash)))
+		sn, err := mapSnapshotItemError(tx.Get(snapshotKey(hash)))
 		if err != nil {
 			return err
 		}
@@ -73,7 +74,7 @@ func (l *localSnapshotStore) Get(hash string) (*store.Snapshot, error) {
 	return result, nil
 }
 
-func (l *localSnapshotStore) GetForBundle(hash string) (*store.Snapshot, error) {
+func (l *localSnapshotStore) GetForBundle(ctx context.Context, hash string) (*store.Snapshot, error) {
 	var result *store.Snapshot
 	berr := l.db.View(func(tx *badger.Txn) error {
 		bn, err := tx.Get(bundleSnapshotKey(hash))
@@ -84,7 +85,7 @@ func (l *localSnapshotStore) GetForBundle(hash string) (*store.Snapshot, error) 
 		if err != nil {
 			return err
 		}
-		sn, err := badgerRewriteSnapshotItemError(tx.Get(snapshotKeyBytes(bk)))
+		sn, err := mapSnapshotItemError(tx.Get(snapshotKeyBytes(bk)))
 		if err != nil {
 			return err
 		}
@@ -98,7 +99,7 @@ func (l *localSnapshotStore) GetForBundle(hash string) (*store.Snapshot, error) 
 	return result, nil
 }
 
-func (l *localSnapshotStore) Create(bundle *store.Bundle) (*store.Snapshot, error) {
+func (l *localSnapshotStore) Create(ctx context.Context, bundle *store.Bundle) (*store.Snapshot, error) {
 	var result *store.Snapshot
 	berr := l.db.Update(func(txn *badger.Txn) error {
 		var snapshots store.Snapshots
@@ -116,7 +117,7 @@ func (l *localSnapshotStore) Create(bundle *store.Bundle) (*store.Snapshot, erro
 				return err
 			}
 
-			snapshot, err := badgerRewriteSnapshotItemError(txn.Get(snapshotKeyBytes(vb)))
+			snapshot, err := mapSnapshotItemError(txn.Get(snapshotKeyBytes(vb)))
 			if err != nil {
 				if err == store.SnapshotNotFound {
 					log.Printf("skipping %s because: %v", vb, err)

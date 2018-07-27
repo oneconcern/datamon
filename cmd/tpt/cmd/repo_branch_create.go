@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/spf13/cobra"
@@ -23,18 +24,18 @@ var branchCreateCmd = &cobra.Command{
 A branch represents an alternative timeline for data to evolve.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		if err := repo.CreateBranch(name, topLevel); err != nil {
+		if err := repo.CreateBranch(context.Background(), name, topLevel); err != nil {
 			log.Fatalln(err)
 		}
 
 		log.Printf("branch %q created", name)
 		if checkout {
-			sn, err := repo.Checkout(name, "")
+			sn, err := repo.Checkout(context.Background(), name, "")
 			if err != nil {
 				log.Fatalln(err)
 			}

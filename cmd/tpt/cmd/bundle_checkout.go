@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/spf13/cobra"
@@ -14,11 +15,11 @@ var bundleCheckoutCmd = &cobra.Command{
 	Short: "Checkout the files that belong to a certain bundleman",
 	Long:  `Updates files in the working tree to match the version in the index`,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, repo, err := initNamedRepo()
+		_, repo, err := initNamedRepo(initContext())
 		if err != nil {
 			log.Fatalln(err)
 		}
-		snapshot, err := repo.Checkout(repo.CurrentBranch, "")
+		snapshot, err := repo.Checkout(context.Background(), repo.CurrentBranch, "")
 		if err != nil {
 			log.Fatalln(err)
 		}
