@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/oneconcern/pipelines/pkg/log"
 	"github.com/oneconcern/trumpet/pkg/store/instrumented"
 	opentracing "github.com/opentracing/opentracing-go"
 
@@ -19,15 +20,16 @@ import (
 )
 
 // NewStage creates a new stage instance
-func newStage(repo, baseDir string, tr opentracing.Tracer, bundles store.BundleStore) (*Stage, error) {
+func newStage(repo, baseDir string, tr opentracing.Tracer, logs log.Factory, bundles store.BundleStore) (*Stage, error) {
 	meta := instrumented.NewObjectMeta(repo, tr, localfs.NewObjectMeta(baseDir))
 	if err := meta.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return &Stage{
+		logs:    logs,
 		bundles: bundles,
-		objects: blob.Instrument(tr, bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), baseDir))),
+		objects: blob.Instrument(tr, logs, bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), baseDir))),
 		meta:    meta,
 		hasher:  fingerprint.New(),
 	}, nil
@@ -103,6 +105,7 @@ func (a *AddBlob) Close() error {
 
 // Stage contains the information to manage staged changes
 type Stage struct {
+	logs    log.Factory
 	bundles store.BundleStore
 	objects blob.Store
 	meta    store.StageMeta

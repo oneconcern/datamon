@@ -33,10 +33,12 @@ func New(tr opentracing.Tracer, logs log.Factory, baseDir string) (*Runtime, err
 	if baseDir == "" {
 		baseDir = ".trumpet"
 	}
+
 	repos := instrumented.NewRepos(tr, localfs.NewRepos(baseDir))
 	if err := repos.Initialize(); err != nil {
 		return nil, err
 	}
+
 	return &Runtime{
 		baseDir: baseDir,
 		repos:   repos,
@@ -108,13 +110,14 @@ func (r *Runtime) makeRepo(_ context.Context, name, description, branch string) 
 	}
 
 	stageDir := filepath.Join(r.baseDir, name, stage)
-	stage, err := newStage(name, stageDir, r.tracer, bs)
+	stage, err := newStage(name, stageDir, r.tracer, r.logs, bs)
 	if err != nil {
 		return nil, err
 	}
 
 	blobs := blob.Instrument(
 		r.tracer,
+		r.logs,
 		bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(r.baseDir, objects))),
 	)
 

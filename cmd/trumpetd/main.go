@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,11 +13,14 @@ import (
 	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/oneconcern/trumpet/pkg/graphapi"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	tracelog "github.com/opentracing/opentracing-go/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	jprom "github.com/uber/jaeger-lib/metrics/prometheus"
+	"github.com/vektah/gqlgen/graphql"
 	gqlhandler "github.com/vektah/gqlgen/handler"
-	gqltracing "github.com/vektah/gqlgen/opentracing"
+	// gqltracing "github.com/vektah/gqlgen/opentracing"
 	"go.uber.org/zap"
 )
 
@@ -53,7 +57,7 @@ func main() {
 
 	lc := zap.NewProductionConfig()
 	lc.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
-	zlg, err := lc.Build()
+	zlg, err := lc.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		//#nosec
 		fmt.Fprintf(os.Stderr, "%v", err)
@@ -77,11 +81,39 @@ func main() {
 	}
 
 	mux := tracing.NewServeMux(tr)
+	// mux := http.NewServeMux()
 	mux.Handle("/", gqlhandler.Playground("Trumpet Server", "/query"))
 	mux.Handle("/query", gqlhandler.GraphQL(
 		graphapi.NewExecutableSchema(graphapi.NewResolvers(eng)),
-		gqlhandler.RequestMiddleware(gqltracing.RequestMiddleware()),
-		gqlhandler.ResolverMiddleware(gqltracing.ResolverMiddleware()),
+		gqlhandler.ResolverMiddleware(func(ctx context.Context, next graphql.Resolver) (res interface{}, err error) {
+			rc := graphql.GetResolverContext(ctx)
+
+			parent := opentracing.SpanFromContext(ctx)
+			spanOpts := []opentracing.StartSpanOption{
+				opentracing.Tag{Key: "resolver.object", Value: rc.Object},
+				opentracing.Tag{Key: "resolver.field", Value: rc.Field.Name},
+			}
+			if parent != nil {
+				spanOpts = append(spanOpts, opentracing.ChildOf(parent.Context()))
+			}
+
+			span := tr.StartSpan("GQL "+rc.Object+"  "+rc.Field.Name, spanOpts...)
+			defer span.Finish()
+
+			ext.SpanKind.Set(span, "server")
+			ext.Component.Set(span, "gqlgen")
+
+			res, err = next(ctx)
+			if err != nil {
+				ext.Error.Set(span, true)
+				span.LogFields(
+					tracelog.String("event", "error"),
+					tracelog.String("message", err.Error()),
+					tracelog.String("error.kind", fmt.Sprintf("%T", err)),
+				)
+			}
+			return res, err
+		}),
 	))
 
 	handler := http.NewServeMux()

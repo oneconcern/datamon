@@ -32,16 +32,20 @@ Repositories don't carry much content until a commit is made.
 
 func init() {
 	rootCmd.AddCommand(repoCmd)
-	l, err := zap.NewProduction()
-	if err != nil {
-		panic(err)
-	}
-	logger = log.NewFactory(l)
+	// l, err := zap.NewProduction()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// logger = log.NewFactory(l)
+	logger = log.NewFactory(zap.NewNop())
+
 }
 
 func initContext() context.Context {
 	sp := opentracing.StartSpan("entrypoint").SetTag("service", "tptcli")
-	return opentracing.ContextWithSpan(context.Background(), sp)
+	return opentracing.ContextWithSpan(
+		context.Background(),
+		sp)
 }
 
 func initNamedRepo(ctx context.Context) (*engine.Runtime, *engine.Repo, error) {
@@ -64,6 +68,8 @@ func addRepoOptions(cmd *cobra.Command) error {
 	}
 	fls.StringVar(&repoOptions.Description, "description", "", "A description of this repository")
 	return nil
+	// fls.StringVar(&repoOptions.Workspace, "workspace", "", "The directory to create the repo.")
+	// return cmd.MarkFlagRequired("workspace")
 }
 
 func addRepoNameOption(cmd *cobra.Command) error {

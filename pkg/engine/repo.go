@@ -133,7 +133,7 @@ func (r *Repo) commit(ctx context.Context, message, branch string) (result NewBu
 	// TODO: make this a batch job
 	srcDir := filepath.Join(r.baseDir, stage, objects)
 	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
+		if info == nil || info.IsDir() {
 			return nil
 		}
 		rp, err := filepath.Rel(srcDir, path)

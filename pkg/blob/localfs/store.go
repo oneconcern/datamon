@@ -96,5 +96,15 @@ func (l *localFS) Clear(ctx context.Context) error {
 }
 
 func (l *localFS) String() string {
-	return "localfs"
+	const localfs = "localfs"
+	switch fs := l.fs.(type) {
+	case *afero.BasePathFs:
+		pp, err := fs.RealPath("")
+		if err != nil {
+			return localfs
+		}
+		return localfs + "@" + pp
+	default:
+		return localfs
+	}
 }
