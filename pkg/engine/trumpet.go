@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/oneconcern/pipelines/pkg/log"
 	"github.com/oneconcern/trumpet/pkg/blob"
 
 	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
@@ -28,7 +29,7 @@ const (
 )
 
 // New initializes a new runtime for trumpet
-func New(tr opentracing.Tracer, baseDir string) (*Runtime, error) {
+func New(tr opentracing.Tracer, logs log.Factory, baseDir string) (*Runtime, error) {
 	if baseDir == "" {
 		baseDir = ".trumpet"
 	}
@@ -39,6 +40,8 @@ func New(tr opentracing.Tracer, baseDir string) (*Runtime, error) {
 	return &Runtime{
 		baseDir: baseDir,
 		repos:   repos,
+		tracer:  tr,
+		logs:    logs,
 	}, nil
 }
 
@@ -47,6 +50,7 @@ type Runtime struct {
 	baseDir string
 	repos   store.RepoStore
 	tracer  opentracing.Tracer
+	logs    log.Factory
 }
 
 // ListRepo known in the trumpet database

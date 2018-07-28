@@ -23,7 +23,7 @@ var repoGetCmd = &cobra.Command{
 	Long:  `get the details for a repository as json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := initContext()
-		tpt, err := engine.New(&opentracing.NoopTracer{}, "")
+		tpt, err := engine.New(&opentracing.NoopTracer{}, logger, "")
 		if err != nil {
 			log.Fatalln(err)
 		}

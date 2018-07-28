@@ -21,7 +21,7 @@ The description field can use markdown formatting.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := initContext()
-		tpt, err := engine.New(&opentracing.NoopTracer{}, "")
+		tpt, err := engine.New(&opentracing.NoopTracer{}, logger, "")
 		if err != nil {
 			log.Fatalln(err)
 		}

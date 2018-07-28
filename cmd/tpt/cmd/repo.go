@@ -5,12 +5,17 @@ package cmd
 import (
 	"context"
 
+	"github.com/oneconcern/pipelines/pkg/log"
+	"go.uber.org/zap"
+
 	"github.com/oneconcern/trumpet/pkg/engine"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 )
 
+var logger log.Factory
 var repoOptions struct {
+	Workspace   string
 	Name        string
 	Description string
 }
@@ -27,6 +32,11 @@ Repositories don't carry much content until a commit is made.
 
 func init() {
 	rootCmd.AddCommand(repoCmd)
+	l, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	logger = log.NewFactory(l)
 }
 
 func initContext() context.Context {
@@ -35,7 +45,7 @@ func initContext() context.Context {
 }
 
 func initNamedRepo(ctx context.Context) (*engine.Runtime, *engine.Repo, error) {
-	tpt, err := engine.New(&opentracing.NoopTracer{}, "")
+	tpt, err := engine.New(&opentracing.NoopTracer{}, logger, "")
 	if err != nil {
 		return nil, nil, err
 	}

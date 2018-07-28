@@ -71,7 +71,7 @@ func main() {
 		defer closer.Close()
 	}
 
-	eng, err := engine.New(tr, baseDir)
+	eng, err := engine.New(tr, logger, baseDir)
 	if err != nil {
 		logger.Bg().Fatal("initializing engine", zap.Error(err))
 	}
