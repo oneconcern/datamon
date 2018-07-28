@@ -345,7 +345,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5a3618fbe561e03f1b52f7a1c9a0b106ab73e8ec3f78dc89024e956669a19f23"
+  digest = "1:fbf3129084ab38b6017bfc4f356d2027299b90bf3e30ab16851f00c00c4bf21c"
   name = "github.com/oneconcern/pipelines"
   packages = [
     "pkg/cli/cflags",
@@ -355,7 +355,7 @@
     "pkg/tracing",
   ]
   pruneopts = "UT"
-  revision = "811e547c651638942c1e918f3a98fff6ce558147"
+  revision = "971d98d408cb6717b8ff84c1a24c0ac023e0f500"
 
 [[projects]]
   branch = "flushing-writer"
@@ -546,7 +546,7 @@
   version = "v1.5.0"
 
 [[projects]]
-  digest = "1:1e4173d6831169c64763d45fa2c2f987a8cd4dfa25ab635be392d587db6cc8f8"
+  digest = "1:eab957401876e949db82999e5b0e6fcc2e98b47dc0118961343cc8f3874f2619"
   name = "github.com/vektah/gqlgen"
   packages = [
     "graphql",
@@ -557,7 +557,6 @@
     "neelance/query",
     "neelance/schema",
     "neelance/validation",
-    "opentracing",
   ]
   pruneopts = "UT"
   revision = "381b34691fd93829e50ba8821412dc3467ec4821"
@@ -609,11 +608,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:dbe2ad3afac439a4bfd3e1b0352c4869dc26aae52662dcab72355408776ed5d5"
+  digest = "1:8466957fb2af510f68b13aec64ccad13e9e756dc1da3ea28c422f8ac410e56f0"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "e072cadbbdc8dd3d3ffa82b8b4b9304c261d9311"
+  revision = "bd9dbc187b6e1dacfdd2722a87e83093c2d7bd6e"
 
 [[projects]]
   digest = "1:038003d098ffc345c4c5c6d47bcc6920b2649ee0c0d557162e54e75c76cadf8b"
@@ -662,6 +661,8 @@
     "github.com/oneconcern/pipelines/pkg/log",
     "github.com/oneconcern/pipelines/pkg/tracing",
     "github.com/opentracing/opentracing-go",
+    "github.com/opentracing/opentracing-go/ext",
+    "github.com/opentracing/opentracing-go/log",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/spf13/afero",
     "github.com/spf13/cobra",
@@ -675,7 +676,6 @@
     "github.com/vektah/gqlgen/neelance/introspection",
     "github.com/vektah/gqlgen/neelance/query",
     "github.com/vektah/gqlgen/neelance/schema",
-    "github.com/vektah/gqlgen/opentracing",
     "go.uber.org/zap",
     "gopkg.in/yaml.v2",
   ]
