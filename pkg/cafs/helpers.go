@@ -2,11 +2,13 @@ package cafs
 
 import (
 	"bytes"
-	"encoding/hex"
+	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 
 	blake2b "github.com/minio/blake2b-simd"
+	"github.com/oneconcern/trumpet/pkg/blob"
 )
 
 func RootHash(leaves []Key, leafSize uint32) (Key, error) {
@@ -42,22 +44,29 @@ func RootHash(leaves []Key, leafSize uint32) (Key, error) {
 	return k, nil
 }
 
-func LeafKeys(hash string, data []byte, leafSize uint32) ([]Key, error) {
-	vb, err := hex.DecodeString(hash)
+func LeafsForHash(blobs blob.Store, hash Key, leafSize uint32) ([]Key, error) {
+	rdr, err := blobs.Get(context.Background(), hash.String())
 	if err != nil {
 		return nil, err
 	}
+	defer rdr.Close()
 
-	verify, err := NewKey(vb)
+	b, err := ioutil.ReadAll(rdr)
 	if err != nil {
 		return nil, err
 	}
+	if err = rdr.Close(); err != nil {
+		return nil, err
+	}
 
+	return LeafKeys(hash, b, leafSize)
+}
+
+func LeafKeys(verify Key, data []byte, leafSize uint32) ([]Key, error) {
 	if !bytes.Equal(data[len(data)-KeySize:], verify[:]) {
 		return nil, errors.New("the last hash in the file is not the checksum")
 	}
 
-	// keys := make([]Key, 0, len(data[:len(data)-KeySize])/KeySize)
 	keys := make([]Key, 0, len(data)/KeySize-1)
 	for i := 0; i < len(data)-KeySize; i += KeySize {
 		key, kerr := NewKey(data[i : i+KeySize])

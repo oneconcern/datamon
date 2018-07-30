@@ -24,6 +24,26 @@ func LeafSize(sz uint32) Option {
 	}
 }
 
+type HasOption func(*hasOpts)
+
+func HasOnlyRoots() HasOption {
+	return func(opts *hasOpts) {
+		opts.OnlyRoots = true
+	}
+}
+
+func HasGatherIncomplete() HasOption {
+	return func(opts *hasOpts) {
+		opts.OnlyRoots = true
+		opts.GatherIncomplete = true
+	}
+}
+
+type hasOpts struct {
+	OnlyRoots, GatherIncomplete bool
+	_                           struct{} // disallow unkeyed usage
+}
+
 // Option to configure content addressable FS components
 type Option func(*defaultFs)
 
@@ -31,6 +51,11 @@ type Option func(*defaultFs)
 type Fs interface {
 	Get(context.Context, Key) (io.ReadCloser, error)
 	Put(context.Context, io.Reader) (Key, error)
+	Delete(context.Context, Key) error
+	Clear(context.Context) error
+	Keys(context.Context) ([]Key, error)
+	RootKeys(context.Context) ([]Key, error)
+	Has(context.Context, Key, ...HasOption) (bool, []Key, error)
 }
 
 // New creates a new file system operations instance for a repository
@@ -76,7 +101,7 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (Key, error) {
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
-	return newReader(d.fs, hash.String(), d.leafSize)
+	return newReader(d.fs, hash, d.leafSize)
 }
 
 func (d *defaultFs) writer() Writer {
@@ -85,4 +110,102 @@ func (d *defaultFs) writer() Writer {
 		leafSize: d.leafSize,
 		buf:      make([]byte, d.leafSize),
 	}
+}
+
+func (d *defaultFs) Delete(ctx context.Context, hash Key) error {
+	keys, err := LeafsForHash(d.fs, hash, d.leafSize)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err = d.fs.Delete(ctx, key.String()); err != nil {
+			return err
+		}
+	}
+
+	return d.fs.Delete(ctx, hash.String())
+}
+
+func (d *defaultFs) Clear(ctx context.Context) error {
+	return d.fs.Clear(ctx)
+}
+
+func (d *defaultFs) Keys(ctx context.Context) ([]Key, error) {
+	return d.keys(ctx, matchAnyKey)
+}
+
+func (d *defaultFs) keys(ctx context.Context, matches func(Key) bool) ([]Key, error) {
+	v, err := d.fs.Keys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Key, 0, len(v))
+	for _, k := range v {
+		kk, err := KeyFromString(k)
+		if err != nil {
+			return nil, err
+		}
+
+		if matches(kk) {
+			result = append(result, kk)
+		}
+	}
+	return result, nil
+}
+
+func (d *defaultFs) RootKeys(ctx context.Context) ([]Key, error) {
+	return d.keys(ctx, d.matchOnlyObjectRoots)
+}
+
+func (d *defaultFs) matchOnlyObjectRoots(key Key) bool {
+	return IsRootKey(d.fs, key, d.leafSize)
+}
+
+func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, []Key, error) {
+	var opts hasOpts
+	for _, apply := range cfgs {
+		apply(&opts)
+	}
+
+	has, err := d.fs.Has(ctx, key.String())
+	if err != nil {
+		return false, nil, err
+	}
+
+	if !has {
+		return false, nil, nil
+	}
+
+	if !opts.GatherIncomplete && !opts.OnlyRoots {
+		return has, nil, nil
+	}
+
+	ks, err := LeafsForHash(d.fs, key, d.leafSize)
+	if err != nil {
+		return false, nil, nil
+	}
+	if len(ks) == 0 {
+		return false, nil, nil
+	}
+
+	var keys []Key
+	if opts.GatherIncomplete {
+		for _, k := range ks {
+			if ok, err := d.fs.Has(ctx, k.String()); err != nil || !ok {
+				keys = append(keys, k)
+			}
+		}
+	}
+	return true, keys, nil
+}
+
+func matchAnyKey(_ Key) bool { return true }
+
+func IsRootKey(fs blob.Store, key Key, leafSize uint32) bool {
+	keys, err := LeafsForHash(fs, key, leafSize)
+	if err != nil {
+		return false
+	}
+	return len(keys) > 0
 }

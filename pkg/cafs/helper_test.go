@@ -6,13 +6,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/oneconcern/trumpet/pkg/blob"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/internal"
 	"github.com/oneconcern/trumpet/pkg/blob/localfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -38,72 +37,70 @@ type testFile struct {
 	Size     int
 }
 
-var testFiles = []testFile{
-	{
-		Original: filepath.Join(destDir, "original", "small"),
-		RootHash: filepath.Join(destDir, "roots", "small"),
-		Parts:    1,
-		Size:     int(leafSize - 512),
-	},
-	{
-		Original: filepath.Join(destDir, "original", "twoparts"),
-		RootHash: filepath.Join(destDir, "roots", "twoparts"),
-		Parts:    2,
-		Size:     int(leafSize + leafSize/2),
-	},
-	{
-		Original: filepath.Join(destDir, "original", "fourparts"),
-		RootHash: filepath.Join(destDir, "roots", "fourparts"),
-		Parts:    4,
-		Size:     int(3*leafSize + leafSize/2),
-	},
-	{
-		Original: filepath.Join(destDir, "original", "tenparts"),
-		RootHash: filepath.Join(destDir, "roots", "tenparts"),
-		Parts:    11,
-		Size:     int(10*leafSize - 512),
-	},
-	{
-		Original: filepath.Join(destDir, "original", "onetwoeigth-not-tree-root"),
-		RootHash: filepath.Join(destDir, "roots", "onetwoeigth-not-tree-root"),
-		Parts:    1,
-		Size:     128,
-	},
-	{
-		Original: filepath.Join(destDir, "original", "fivetwelve-not-tree-root"),
-		RootHash: filepath.Join(destDir, "roots", "fivetwelve-not-tree-root"),
-		Parts:    1,
-		Size:     512,
-	},
+func testFiles(destDir string) []testFile {
+	return []testFile{
+		{
+			Original: filepath.Join(destDir, "original", "small"),
+			RootHash: filepath.Join(destDir, "roots", "small"),
+			Parts:    1,
+			Size:     int(leafSize - 512),
+		},
+		{
+			Original: filepath.Join(destDir, "original", "twoparts"),
+			RootHash: filepath.Join(destDir, "roots", "twoparts"),
+			Parts:    2,
+			Size:     int(leafSize + leafSize/2),
+		},
+		{
+			Original: filepath.Join(destDir, "original", "fourparts"),
+			RootHash: filepath.Join(destDir, "roots", "fourparts"),
+			Parts:    4,
+			Size:     int(3*leafSize + leafSize/2),
+		},
+		{
+			Original: filepath.Join(destDir, "original", "tenparts"),
+			RootHash: filepath.Join(destDir, "roots", "tenparts"),
+			Parts:    11,
+			Size:     int(10*leafSize - 512),
+		},
+		{
+			Original: filepath.Join(destDir, "original", "onetwoeigth-not-tree-root"),
+			RootHash: filepath.Join(destDir, "roots", "onetwoeigth-not-tree-root"),
+			Parts:    1,
+			Size:     128,
+		},
+		{
+			Original: filepath.Join(destDir, "original", "fivetwelve-not-tree-root"),
+			RootHash: filepath.Join(destDir, "roots", "fivetwelve-not-tree-root"),
+			Parts:    1,
+			Size:     512,
+		},
+	}
 }
 
 func TestMain(m *testing.M) {
-	if _, _, _, err := setupTestData(destDir, testFiles); err != nil {
-		log.Fatalln(err)
-	}
-	if err := exec.Command("sync").Run(); err != nil {
+	if _, _, _, err := setupTestData(destDir, testFiles(destDir)); err != nil {
 		log.Fatalln(err)
 	}
 	os.Exit(m.Run())
 }
 
-func setupTestData(dir string, files []testFile) (string, blob.Store, Fs, error) {
+func setupTestData(dir string, files []testFile) (*testDataGenerator, blob.Store, Fs, error) {
 	os.RemoveAll(dir)
-
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(dir, "cafs")))
 	fs, err := New(
 		LeafSize(leafSize),
 		Backend(blobs),
 	)
 	if err != nil {
-		return "", nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	g := &testDataGenerator{destDir: dir, leafSize: leafSize, fs: fs}
 	if err = g.Initialize(); err != nil {
-		return "", nil, nil, err
+		return nil, nil, nil, err
 	}
-	return destDir, blobs, fs, g.Generate(files)
+	return g, blobs, fs, g.Generate(files)
 }
 
 type testDataGenerator struct {
@@ -113,15 +110,15 @@ type testDataGenerator struct {
 }
 
 func (t *testDataGenerator) Initialize() error {
-	if err := os.MkdirAll(filepath.Join(destDir, "original"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(t.destDir, "original"), 0700); err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Join(destDir, "cafs"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(t.destDir, "cafs"), 0700); err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Join(destDir, "roots"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(t.destDir, "roots"), 0700); err != nil {
 		return err
 	}
 	return nil
@@ -135,7 +132,7 @@ func (t *testDataGenerator) generateFile(tgt string, size int) error {
 	defer f.Close()
 
 	if size <= int(leafSize) { // small single chunk file
-		_, err := f.WriteString(trumpet.RandStringBytesMaskImprSrc(size))
+		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(size))
 		if err != nil {
 			return err
 		}
@@ -144,14 +141,14 @@ func (t *testDataGenerator) generateFile(tgt string, size int) error {
 
 	var parts = size / int(t.leafSize)
 	for i := 0; i < parts; i++ {
-		_, err := f.WriteString(trumpet.RandStringBytesMaskImprSrc(int(t.leafSize)))
+		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(int(t.leafSize)))
 		if err != nil {
 			return err
 		}
 	}
 	remaining := size - (parts * int(t.leafSize))
 	if remaining > 0 {
-		_, err := f.WriteString(trumpet.RandStringBytesMaskImprSrc(remaining))
+		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(remaining))
 		if err != nil {
 			return err
 		}
@@ -189,7 +186,7 @@ func (t *testDataGenerator) Generate(files []testFile) error {
 
 func TestLeafHashes_Single(t *testing.T) {
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(destDir, "cafs")))
-	for _, tf := range testFiles {
+	for _, tf := range testFiles(destDir) {
 		if tf.Parts > 1 {
 			continue
 		}
@@ -210,15 +207,18 @@ func TestLeafHashes_Single(t *testing.T) {
 		require.Equal(t, (tf.Parts+1)*KeySize, len(cafsb))
 		require.Equal(t, rb, cafsb[tf.Parts*KeySize:])
 
-		cafsbk := hex.EncodeToString(cafsb[:KeySize])
-		lrdr, err := blobs.Get(context.Background(), cafsbk)
+		cafsbk, err := NewKey(cafsb[:KeySize])
+		require.NoError(t, err)
+		lrdr, err := blobs.Get(context.Background(), cafsbk.String())
 		require.NoError(t, err)
 		cafslb, err := ioutil.ReadAll(lrdr)
 		lrdr.Close()
 		require.NoError(t, err)
 		require.Equal(t, orig, cafslb)
 
-		keys, err := LeafKeys(string(rhash), cafsb, leafSize)
+		rkey, err := KeyFromString(string(rhash))
+		require.NoError(t, err)
+		keys, err := LeafKeys(rkey, cafsb, leafSize)
 		require.NoError(t, err)
 		require.Len(t, keys, 1)
 
@@ -230,17 +230,19 @@ func TestLeafHashes_Single(t *testing.T) {
 
 func TestLeafHashes_Multi(t *testing.T) {
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(destDir, "cafs")))
-	for _, tf := range testFiles {
+	for _, tf := range testFiles(destDir) {
 
 		rhash := readTextFile(t, tf.RootHash)
 		rrdr, err := blobs.Get(context.Background(), rhash)
+		require.NoError(t, err)
+		rkey, err := KeyFromString(rhash)
 		require.NoError(t, err)
 
 		b, err := ioutil.ReadAll(rrdr)
 		require.NoError(t, err)
 		rrdr.Close()
 
-		keys, err := LeafKeys(rhash, b, leafSize)
+		keys, err := LeafKeys(rkey, b, leafSize)
 		require.NoError(t, err)
 		require.Len(t, keys, tf.Parts)
 		for i, key := range keys {
@@ -261,6 +263,7 @@ func TestLeafHashes_Constants(t *testing.T) {
 
 	var (
 		leaf    = mustBytes(hex.DecodeString(leafHash))
+		root    = mustBytes(hex.DecodeString(rootHash))
 		wrong   = []byte("ffahncyloc4ws8a3fu6je52qoynhi9vselmyxnusrrg6m2yv2mg3np0puazh2xql")
 		correct = mustBytes(hex.DecodeString(leafHash + rootHash))
 	)
@@ -268,11 +271,11 @@ func TestLeafHashes_Constants(t *testing.T) {
 	_, err := RootHash([]Key{MustNewKey(leaf)}, leafSize)
 	require.NoError(t, err)
 
-	_, err = LeafKeys(rootHash, leaf, leafSize)
+	_, err = LeafKeys(MustNewKey(root), leaf, leafSize)
 	require.Error(t, err)
-	_, err = LeafKeys(leafHash, wrong, leafSize)
+	_, err = LeafKeys(MustNewKey(leaf), wrong, leafSize)
 	require.Error(t, err)
-	keys, err := LeafKeys(rootHash, correct, leafSize)
+	keys, err := LeafKeys(MustNewKey(root), correct, leafSize)
 	require.NoError(t, err)
 	require.Equal(t, MustNewKey(leaf), keys[0])
 }

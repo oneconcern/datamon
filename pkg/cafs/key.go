@@ -13,6 +13,14 @@ const (
 	KeySizeHex = 66
 )
 
+func KeyFromString(kv string) (Key, error) {
+	vb, err := hex.DecodeString(kv)
+	if err != nil {
+		return Key{}, err
+	}
+	return NewKey(vb)
+}
+
 // NewKey creates a new key from data
 func NewKey(data []byte) (Key, error) {
 	var k Key

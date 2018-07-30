@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/trumpet/internal"
 	"github.com/oneconcern/trumpet/pkg/blob"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,7 +102,7 @@ func TestPut(t *testing.T) {
 func setupStore(t testing.TB) (blob.Store, func()) {
 	t.Helper()
 
-	bid := trumpet.RandStringBytesMaskImprSrc(15)
+	bid := internal.RandStringBytesMaskImprSrc(15)
 	bucket := aws.String(bid)
 
 	minioConfig := &aws.Config{

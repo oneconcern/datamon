@@ -11,6 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func keyFromFile(t testing.TB, pth string) Key {
+	rhash := readTextFile(t, pth)
+	rkey, err := KeyFromString(rhash)
+	require.NoError(t, err)
+	return rkey
+}
+
 func readTextFile(t testing.TB, pth string) string {
 	v, err := ioutil.ReadFile(pth)
 	if err != nil {
@@ -21,7 +28,7 @@ func readTextFile(t testing.TB, pth string) string {
 
 func TestChunkReader_SmallOnly(t *testing.T) {
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(destDir, "cafs")))
-	for _, tf := range testFiles {
+	for _, tf := range testFiles(destDir) {
 		if tf.Parts > 1 {
 			continue
 		}
@@ -30,9 +37,9 @@ func TestChunkReader_SmallOnly(t *testing.T) {
 }
 
 func verifyChunkReader(t testing.TB, blobs blob.Store, tf testFile) {
-	rhash := readTextFile(t, tf.RootHash)
+	rkey := keyFromFile(t, tf.RootHash)
 
-	rdr, err := newReader(blobs, rhash, leafSize)
+	rdr, err := newReader(blobs, rkey, leafSize)
 	require.NoError(t, err)
 	defer rdr.Close()
 
@@ -47,7 +54,7 @@ func verifyChunkReader(t testing.TB, blobs blob.Store, tf testFile) {
 
 func TestChunkReader_All(t *testing.T) {
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(destDir, "cafs")))
-	for _, tf := range testFiles {
+	for _, tf := range testFiles(destDir) {
 		verifyChunkReader(t, blobs, tf)
 	}
 }

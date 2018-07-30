@@ -3,31 +3,15 @@ package cafs
 import (
 	"context"
 	"io"
-	"io/ioutil"
 
 	"github.com/oneconcern/trumpet/pkg/blob"
 )
 
-func newReader(blobs blob.Store, hash string, leafSize uint32) (io.ReadCloser, error) {
-	rdr, err := blobs.Get(context.Background(), hash)
+func newReader(blobs blob.Store, hash Key, leafSize uint32) (io.ReadCloser, error) {
+	keys, err := LeafsForHash(blobs, hash, leafSize)
 	if err != nil {
 		return nil, err
 	}
-	defer rdr.Close()
-
-	b, err := ioutil.ReadAll(rdr)
-	if err != nil {
-		return nil, err
-	}
-	if err = rdr.Close(); err != nil {
-		return nil, err
-	}
-
-	keys, err := LeafKeys(hash, b, leafSize)
-	if err != nil {
-		return nil, err
-	}
-
 	return &chunkReader{
 		fs:       blobs,
 		hash:     hash,
@@ -40,7 +24,7 @@ type chunkReader struct {
 	fs       blob.Store
 	leafSize uint32
 
-	hash string
+	hash Key
 
 	keys []Key
 	idx  int
