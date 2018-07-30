@@ -3,6 +3,7 @@ package localfs
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"path/filepath"
 	"sync"
 
@@ -137,11 +138,15 @@ func (r *repoStore) findByPrefix(prefix string, keysOnly bool) ([]keyValue, erro
 }
 
 func (r *repoStore) put(repo *store.Repo, create bool) error {
+	log.Println("put", repo.Name, "create:", create)
 	// need this to be 0 when this is a new entry
 	keyb := store.UnsafeStringToBytes(repo.Name)
 	return r.db.Update(func(txn *badger.Txn) error {
 		_, err := mapRepoItemError(txn.Get(keyb))
 		if err != store.RepoNotFound {
+			if err == nil && create {
+				return store.RepoAlreadyExists
+			}
 			return err
 		}
 		if err == store.RepoNotFound && !create {

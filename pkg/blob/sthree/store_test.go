@@ -130,9 +130,9 @@ func setupStore(t testing.TB) (blob.Store, func()) {
 		})
 	}
 
-	out, err := cl.ListBuckets(nil)
+	_, err = cl.ListBuckets(nil)
 	require.NoError(t, err)
-	t.Log(out.Buckets)
+	// t.Log(out.Buckets)
 
 	up := s3manager.NewUploader(sess)
 	_, err = up.UploadWithContext(aws.BackgroundContext(), &s3manager.UploadInput{

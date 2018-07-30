@@ -33,7 +33,7 @@ func LeafSize(sz int64) Option {
 	}
 }
 
-func numberOfWorkers(no int) Option {
+func NumberOfWorkers(no int) Option {
 	return func(m *Maker) {
 		m.numberOfWorkers = no
 	}
