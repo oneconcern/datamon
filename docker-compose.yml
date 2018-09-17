@@ -53,7 +53,7 @@ services:
     tty: true
     command: /bin/zsh
     volumes:
-      - ".:/home/ivan/go/src/github.com/oneconcern/trumpet"
+      - ".:/home/ivan/trumpet"
     depends_on:
       - prometheus.local
       # - dynamodb.local

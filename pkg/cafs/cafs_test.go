@@ -61,7 +61,7 @@ func TestCAFS_Put(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	rk, err := fs.Put(context.Background(), f)
+	rk, _, err := fs.Put(context.Background(), f)
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 

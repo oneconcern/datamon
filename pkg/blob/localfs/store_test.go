@@ -97,13 +97,13 @@ func setupStore(t testing.TB) (blob.Store, func()) {
 	t.Helper()
 
 	fs := afero.NewMemMapFs()
-	f, err := fs.Create("si/xt/eentons")
+	f, err := fs.Create("sixteentons")
 	require.NoError(t, err)
 	_, err = f.WriteString("this is the text")
 	require.NoError(t, err)
 	f.Close()
 
-	ff, err := fs.Create("se/ve/nteentons")
+	ff, err := fs.Create("seventeentons")
 	require.NoError(t, err)
 	_, err = ff.WriteString("this is the text for another thing")
 	require.NoError(t, err)

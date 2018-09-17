@@ -5,9 +5,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/oneconcern/trumpet/pkg/store"
-	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +21,7 @@ var repoGetCmd = &cobra.Command{
 	Long:  `get the details for a repository as json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := initContext()
-		tpt, err := engine.New(&opentracing.NoopTracer{}, logger, "")
+		tpt, err := initEngine()
 		if err != nil {
 			log.Fatalln(err)
 		}

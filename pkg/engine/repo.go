@@ -91,7 +91,7 @@ func (r *Repo) CommitFromChangeSet(ctx context.Context, message, branch string, 
 	}
 	result.Snapshot = snapshot.ID
 
-	// TODO: actually upload the files prior to returnin
+	// TODO: actually upload the files prior to returning
 	return result, nil
 }
 

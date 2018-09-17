@@ -50,7 +50,7 @@ type Option func(*defaultFs)
 // Fs implementations provide content-addressable filesystem operations
 type Fs interface {
 	Get(context.Context, Key) (io.ReadCloser, error)
-	Put(context.Context, io.Reader) (Key, error)
+	Put(context.Context, io.Reader) (Key, []byte, error)
 	Delete(context.Context, Key) error
 	Clear(context.Context) error
 	Keys(context.Context) ([]Key, error)
@@ -76,28 +76,28 @@ type defaultFs struct {
 	leafSize uint32
 }
 
-func (d *defaultFs) Put(ctx context.Context, src io.Reader) (Key, error) {
+func (d *defaultFs) Put(ctx context.Context, src io.Reader) (Key, []byte, error) {
 	w := d.writer()
 	defer w.Close()
 
 	_, err := io.Copy(w, src)
 	if err != nil {
-		return Key{}, err
+		return Key{}, nil, err
 	}
 
 	key, keys, err := w.Flush()
 	if err != nil {
-		return Key{}, err
+		return Key{}, nil, err
 	}
 	if err = w.Close(); err != nil {
-		return Key{}, err
+		return Key{}, nil, err
 	}
 
 	if err := d.fs.Put(ctx, key.String(), bytes.NewReader(append(keys, key[:]...))); err != nil {
-		return Key{}, err
+		return Key{}, nil, err
 	}
 
-	return key, nil
+	return key, keys, nil
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {

@@ -2,15 +2,15 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/oneconcern/pipelines/pkg/log"
+	"github.com/oneconcern/trumpet"
 	"github.com/oneconcern/trumpet/pkg/blob"
 
 	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
-	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/afero"
 
 	"github.com/oneconcern/trumpet/pkg/store"
@@ -29,12 +29,17 @@ const (
 )
 
 // New initializes a new runtime for trumpet
-func New(tr opentracing.Tracer, logs log.Factory, baseDir string) (*Runtime, error) {
-	if baseDir == "" {
-		baseDir = ".trumpet"
+func New(cfg *trumpet.Config) (*Runtime, error) {
+	if cfg == nil {
+		return nil, errors.New("config property is required")
 	}
 
-	repos := instrumented.NewRepos(tr, localfs.NewRepos(baseDir))
+	baseDir := cfg.Metadata
+	if baseDir == "" {
+		baseDir = ".trumpet/global"
+	}
+
+	repos := instrumented.NewRepos(cfg.Tracer(), localfs.NewRepos(baseDir))
 	if err := repos.Initialize(); err != nil {
 		return nil, err
 	}
@@ -42,8 +47,7 @@ func New(tr opentracing.Tracer, logs log.Factory, baseDir string) (*Runtime, err
 	return &Runtime{
 		baseDir: baseDir,
 		repos:   repos,
-		tracer:  tr,
-		logs:    logs,
+		config:  cfg,
 	}, nil
 }
 
@@ -51,8 +55,7 @@ func New(tr opentracing.Tracer, logs log.Factory, baseDir string) (*Runtime, err
 type Runtime struct {
 	baseDir string
 	repos   store.RepoStore
-	tracer  opentracing.Tracer
-	logs    log.Factory
+	config  *trumpet.Config
 }
 
 // ListRepo known in the trumpet database
@@ -94,7 +97,7 @@ func (r *Runtime) makeRepo(_ context.Context, name, description, branch string) 
 
 	bs := instrumented.NewBundleStore(
 		name,
-		r.tracer,
+		r.config.Tracer(),
 		localfs.NewBundleStore(filepath.Join(r.baseDir, name, bundles)))
 	if err := bs.Initialize(); err != nil {
 		return nil, err
@@ -102,7 +105,7 @@ func (r *Runtime) makeRepo(_ context.Context, name, description, branch string) 
 
 	snapshots := instrumented.NewSnapshotStore(
 		name,
-		r.tracer,
+		r.config.Tracer(),
 		localfs.NewSnapshotStore(filepath.Join(r.baseDir, name, bundles)),
 	)
 	if err := snapshots.Initialize(); err != nil {
@@ -110,14 +113,14 @@ func (r *Runtime) makeRepo(_ context.Context, name, description, branch string) 
 	}
 
 	stageDir := filepath.Join(r.baseDir, name, stage)
-	stage, err := newStage(name, stageDir, r.tracer, r.logs, bs)
+	stage, err := newStage(name, stageDir, r.config.Tracer(), r.config.Logger(), bs)
 	if err != nil {
 		return nil, err
 	}
 
 	blobs := blob.Instrument(
-		r.tracer,
-		r.logs,
+		r.config.Tracer(),
+		r.config.Logger(),
 		bloblocalfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(r.baseDir, objects))),
 	)
 

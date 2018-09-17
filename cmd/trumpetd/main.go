@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/oneconcern/trumpet"
+
 	"github.com/oneconcern/pipelines/pkg/cli/envk"
 	"github.com/oneconcern/pipelines/pkg/httpd"
 	"github.com/oneconcern/pipelines/pkg/log"
@@ -20,6 +22,7 @@ import (
 	jprom "github.com/uber/jaeger-lib/metrics/prometheus"
 	"github.com/vektah/gqlgen/graphql"
 	gqlhandler "github.com/vektah/gqlgen/handler"
+
 	// gqltracing "github.com/vektah/gqlgen/opentracing"
 	"go.uber.org/zap"
 )
@@ -75,7 +78,9 @@ func main() {
 		defer closer.Close()
 	}
 
-	eng, err := engine.New(tr, logger, baseDir)
+	cfg := trumpet.NewConfig(tr, logger)
+	cfg.Metadata = baseDir
+	eng, err := engine.New(cfg)
 	if err != nil {
 		logger.Bg().Fatal("initializing engine", zap.Error(err))
 	}

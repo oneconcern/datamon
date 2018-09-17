@@ -1,0 +1,7 @@
+metadata: .trumpet/global
+blobs: .trumpet/objects
+repositories:
+  dir: ./repos
+  default: hello-there
+  overrides:
+    hello-there: data/hello-there

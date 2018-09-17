@@ -9,7 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/oneconcern/trumpet/pkg/engine"
-	opentracing "github.com/opentracing/opentracing-go"
 
 	"github.com/spf13/cobra"
 )
@@ -22,7 +21,7 @@ var repoListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := initContext()
-		tpt, err := engine.New(&opentracing.NoopTracer{}, logger, "")
+		tpt, err := initEngine()
 		if err != nil {
 			log.Fatalln(err)
 		}

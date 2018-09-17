@@ -26,13 +26,9 @@ type localFS struct {
 	fs afero.Fs
 }
 
-func (l *localFS) fpath(key string) string {
-	return filepath.Join(key[:2], key[2:4], key[4:])
-}
-
 func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
-	fp := l.fpath(key)
-	fi, err := l.fs.Stat(fp)
+
+	fi, err := l.fs.Stat(key)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -44,16 +40,20 @@ func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
 }
 
 func (l *localFS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	return l.fs.Open(l.fpath(key))
+	return l.fs.Open(key)
 }
 
 func (l *localFS) Put(ctx context.Context, key string, rdr io.Reader) error {
-	fp := l.fpath(key)
-	if err := l.fs.MkdirAll(filepath.Dir(fp), 0700); err != nil {
-		return fmt.Errorf("ensuring directories for %q: %v", key, err)
+	dir := filepath.Dir(key)
+	if dir != "" {
+		if err := l.fs.MkdirAll(filepath.Dir(key), 0700); err != nil {
+			return fmt.Errorf("ensuring directories for %q: %v", key, err)
+		}
+	} else {
+		dir = "."
 	}
 
-	fi, err := afero.TempFile(l.fs, filepath.Dir(fp), "tpt-put")
+	fi, err := afero.TempFile(l.fs, dir, "tpt-put")
 	if err != nil {
 		return fmt.Errorf("create record for %q: %v", key, err)
 	}
@@ -68,25 +68,37 @@ func (l *localFS) Put(ctx context.Context, key string, rdr io.Reader) error {
 		return err
 	}
 
-	return l.fs.Rename(fi.Name(), fp)
+	return l.fs.Rename(fi.Name(), filepath.Base(key))
 }
 
 func (l *localFS) Delete(ctx context.Context, key string) error {
-	if err := l.fs.Remove(l.fpath(key)); err != nil && !os.IsNotExist(err) {
+	if err := l.fs.Remove(key); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing %q: %v", key, err)
 	}
 	return nil
 }
 
 func (l *localFS) Keys(ctx context.Context) ([]string, error) {
-	fis, err := afero.Glob(l.fs, "*/*/*")
-	if err != nil {
-		return nil, err
-	}
+	const root = "."
+	var res []string
+	e := afero.Walk(l.fs, root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == root {
+			return nil
+		}
+		pth := strings.Split(path, "/")
+		if len(pth) == 3 && len(pth[0]) == 3 {
+			res = append(res, strings.Join(pth, ""))
+		} else {
+			res = append(res, path)
+		}
 
-	res := make([]string, len(fis))
-	for i, v := range fis {
-		res[i] = strings.Join(strings.Split(v, "/"), "")
+		return nil
+	})
+	if e != nil {
+		return nil, e
 	}
 	return res, nil
 }

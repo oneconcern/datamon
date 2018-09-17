@@ -5,26 +5,10 @@ package nethttp
 import (
 	"net/http"
 
+	"github.com/felixge/httpsnoop"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
-
-type statusCodeTracker struct {
-	http.ResponseWriter
-	http.Hijacker
-	status int
-}
-
-func (w *statusCodeTracker) WriteHeader(status int) {
-	w.status = status
-	w.ResponseWriter.WriteHeader(status)
-}
-
-func (w *statusCodeTracker) Flush() {
-	if f, ok := w.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
-}
 
 type mwOptions struct {
 	opNameFunc    func(r *http.Request) string
@@ -82,6 +66,15 @@ func MWSpanObserver(f func(span opentracing.Span, r *http.Request)) MWOption {
 //		}),
 //   )
 func Middleware(tr opentracing.Tracer, h http.Handler, options ...MWOption) http.Handler {
+	return MiddlewareFunc(tr, h.ServeHTTP, options...)
+}
+
+// MiddlewareFunc wraps an http.HandlerFunc and traces incoming requests.
+// It behaves identically to the Middleware function above.
+//
+// Example:
+//   http.ListenAndServe("localhost:80", nethttp.MiddlewareFunc(tracer, MyHandler))
+func MiddlewareFunc(tr opentracing.Tracer, h http.HandlerFunc, options ...MWOption) http.HandlerFunc {
 	opts := mwOptions{
 		opNameFunc: func(r *http.Request) string {
 			return "HTTP " + r.Method
@@ -105,16 +98,20 @@ func Middleware(tr opentracing.Tracer, h http.Handler, options ...MWOption) http
 		}
 		ext.Component.Set(sp, componentName)
 
-		w = &statusCodeTracker{
-			ResponseWriter: w,
-			Hijacker:       w.(http.Hijacker),
-			status:         200,
-		}
+		status := http.StatusOK
+		w = httpsnoop.Wrap(w, httpsnoop.Hooks{
+			WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
+				return func(code int) {
+					status = code
+					next(code)
+				}
+			},
+		})
 		r = r.WithContext(opentracing.ContextWithSpan(r.Context(), sp))
 
-		h.ServeHTTP(w, r)
+		h(w, r)
 
-		ext.HTTPStatusCode.Set(sp, uint16(w.(*statusCodeTracker).status))
+		ext.HTTPStatusCode.Set(sp, uint16(status))
 		sp.Finish()
 	}
 	return http.HandlerFunc(fn)

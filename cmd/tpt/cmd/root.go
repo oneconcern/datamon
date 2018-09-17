@@ -47,7 +47,7 @@ func Execute() {
 func init() {
 	log.SetFlags(0)
 	cobra.OnInitialize(initConfig)
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.trumpet.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is .trumpet.yaml)")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -57,13 +57,15 @@ func initConfig() {
 		viper.SetConfigFile(os.Getenv("TRUMPET_CONFIG"))
 	} else {
 		viper.AddConfigPath(".")
+		viper.AddConfigPath("$HOME/.trumpet")
+		viper.AddConfigPath("/etc/trumpet")
 		viper.SetConfigName(".trumpet")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+		log.Println("Using config file:", viper.ConfigFileUsed())
 	}
 }
 

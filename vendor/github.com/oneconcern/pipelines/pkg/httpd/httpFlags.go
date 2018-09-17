@@ -27,12 +27,12 @@ type HTTPFlags struct {
 
 func (h *HTTPFlags) RegisterFlags(fs *flag.FlagSet) {
 	prefixed := prefixer(h.Prefix)
-	fs.StringVar(&h.Host, prefixed("tls-host"), h.Host, "the IP to listen on")
-	fs.IntVar(&h.Port, prefixed("tls-port"), h.Port, "the port to listen on for secure connections, defaults to a random value")
-	fs.IntVar(&h.ListenLimit, prefixed("tls-listen-limit"), 0, "limit the number of outstanding requests")
-	fs.DurationVar(&h.KeepAlive, prefixed("tls-keep-alive"), 3*time.Minute, "sets the TCP keep-alive timeouts on accepted connections. It prunes dead TCP connections ( e.g. closing laptop mid-download)")
-	fs.DurationVar(&h.ReadTimeout, prefixed("tls-read-timeout"), 30*time.Second, "maximum duration before timing out read of the request")
-	fs.DurationVar(&h.WriteTimeout, prefixed("tls-write-timeout"), 30*time.Second, "maximum duration before timing out write of the response")
+	fs.StringVar(&h.Host, prefixed("host"), h.Host, "the IP to listen on")
+	fs.IntVar(&h.Port, prefixed("port"), h.Port, "the port to listen on for http connections, defaults to a random value")
+	fs.IntVar(&h.ListenLimit, prefixed("listen-limit"), 0, "limit the number of outstanding requests")
+	fs.DurationVar(&h.KeepAlive, prefixed("keep-alive"), 3*time.Minute, "sets the TCP keep-alive timeouts on accepted connections. It prunes dead TCP connections ( e.g. closing laptop mid-download)")
+	fs.DurationVar(&h.ReadTimeout, prefixed("read-timeout"), 30*time.Second, "maximum duration before timing out read of the request")
+	fs.DurationVar(&h.WriteTimeout, prefixed("write-timeout"), 30*time.Second, "maximum duration before timing out write of the response")
 }
 
 func (h *HTTPFlags) Listener() (net.Listener, error) {

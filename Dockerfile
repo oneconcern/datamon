@@ -21,3 +21,4 @@ COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip
 ENTRYPOINT [ "tpt" ]
 CMD ["--help"]
+

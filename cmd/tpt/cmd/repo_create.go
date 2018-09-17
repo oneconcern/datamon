@@ -5,9 +5,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/oneconcern/trumpet/pkg/engine"
 	"github.com/oneconcern/trumpet/pkg/store"
-	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +19,7 @@ The description field can use markdown formatting.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := initContext()
-		tpt, err := engine.New(&opentracing.NoopTracer{}, logger, "")
+		tpt, err := initEngine()
 		if err != nil {
 			log.Fatalln(err)
 		}

@@ -163,7 +163,7 @@ func (t *testDataGenerator) generateCAFSFile(src string) error {
 	}
 	defer fsrc.Close()
 
-	key, err := t.fs.Put(context.Background(), fsrc)
+	key, _, err := t.fs.Put(context.Background(), fsrc)
 	if err != nil {
 		return err
 	}

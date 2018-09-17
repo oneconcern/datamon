@@ -49,10 +49,9 @@ func (c *Contributor) String() string {
 
 // ChangeSet captures the data for a change set in a bundle
 type ChangeSet struct {
-	Added   Entries  `json:"added,omitempty" yaml:"added,omitempty"`
-	Deleted Entries  `json:"deleted,omitempty" yaml:"deleted,omitempty"`
-	Updated Entries  `json:"updated,omitempty" yaml:"updated,omitempty"`
-	_       struct{} `json:"-" yaml:"-"`
+	Added   Entries `json:"added,omitempty" yaml:"added,omitempty"`
+	Deleted Entries `json:"deleted,omitempty" yaml:"deleted,omitempty"`
+	Updated Entries `json:"updated,omitempty" yaml:"updated,omitempty"`
 }
 
 // Hash the added files

@@ -5,12 +5,15 @@ package cmd
 import (
 	"context"
 
+	"github.com/oneconcern/trumpet"
+
 	"github.com/oneconcern/pipelines/pkg/log"
 	"go.uber.org/zap"
 
 	"github.com/oneconcern/trumpet/pkg/engine"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var logger log.Factory
@@ -48,12 +51,27 @@ func initContext() context.Context {
 		sp)
 }
 
+func unmarshalConfig() (*trumpet.Config, error) {
+	var cfg trumpet.Config
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func initEngine() (*engine.Runtime, error) {
+	cfg, err := unmarshalConfig()
+	if err != nil {
+		return nil, err
+	}
+	return engine.New(cfg)
+}
+
 func initNamedRepo(ctx context.Context) (*engine.Runtime, *engine.Repo, error) {
-	tpt, err := engine.New(&opentracing.NoopTracer{}, logger, "")
+	tpt, err := initEngine()
 	if err != nil {
 		return nil, nil, err
 	}
-
 	repo, err := tpt.GetRepo(ctx, repoOptions.Name)
 	if err != nil {
 		return nil, nil, err

@@ -5,11 +5,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"strings"
 
 	blake2b "github.com/minio/blake2b-simd"
 	"github.com/oneconcern/trumpet/pkg/blob"
 )
+
+func CopyPaddedJSON(w io.Writer, buf *bytes.Buffer) {
+	paddingLength := KeySize - (buf.Len() % KeySize)
+
+	fmt.Fprint(w, string(buf.Bytes()[:buf.Len()-3]))
+	fmt.Fprint(w, strings.Repeat("0", paddingLength))
+	fmt.Fprint(w, string(buf.Bytes()[buf.Len()-3:]))
+}
 
 func RootHash(leaves []Key, leafSize uint32) (Key, error) {
 	// Compute hash of level 1 root key
