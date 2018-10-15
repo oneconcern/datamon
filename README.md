@@ -1,292 +1,279 @@
 # Datamon
 
-Datamon is a datascience tool that helps managing data at scale.
-It's main goals are to version data and models together with the results they produce. 
-A secondary goal to managing the data might be that it provides a scheduler to run jobs on top of a kubernetes cluster
-or with a serverless framework.
+Datamon is the data and model management and monitoring engine for OneConcern.
 
+Datamon can be used by
+1. Developers for their dev sandboxes to run experiments
+2. Operations for production data ingest and processing,
+3. Developers and Operations for tracking the data and model provenance that impacts the health of the over all AI platform
 
-## Design
+Datamon can be used as a standalone tool with S3 as a backing store.
+Datamon also tightly integrates with kubernetes to allow for defining and executing elaborate pipelines of data
+processing.
 
-There are a few major parts to this framework.  At the core there is the data management solution, which is expanded upon 
-by the pipeline execution engine. 
+Datamon has access control built in with integration with identity management.
 
-The general idea behind the pipeline execution is that all pipelines are always executing and always waiting for new events to arrive.
-Events triggers are idempotent, this means when the content of the inputs change the graph executes all the nodes in the graph are
-dependent on that result. 
+Datamon backend can span multiple regions and will serve as the backend to make One Concern's  service is highly available.
 
-A processor in the pipeline is configured with a yaml or json document.
+# Immediate goals
 
-```yaml
-name: the-processor-name
-branch: "develop"
-runtime: "reg.onec.co/flood_ml:develop"
-# hints for where to place the 
-nodeSelector:
-  # when the job needs to run on with access to a gpu
-  gpu: "required"
-  # if the job can run on the same compute resources as other processors of the same type
-  # the possible values are: host, zone, region
-  antiAffinity: "host"
-  
-# define scaling limits
-concurrency:
-  min: 1
-  max: 5
-  condition: queue_depth >= 10
-# optional hints for resource requirements
-resources:
-  cpu:
-    min: 100Mi
-    max: 500Mi
-  mem:
-    min: 200MB
-    max: 2GB
-# each entry is a glob pattern to select files you want included
-# the paths will be preserved
-content:
-  - vendor/*
-  - scripts/*
-  - bin/*
-  - requirements.txt
-  - app.py
-# the command to run
-command:
-  - python
-  - app.py
-secrets:
-  - name: database-creds
-    path: /etc/oneconcern/database-creds
-configmaps:
-  - name: flood-ml-config
-    path: /etc/oneconcern/config
-input:
-  - type: repo
-    # the name of the data repository
-    name: flood-nldas-data
-    # a branch name, tag name or commit id, when none is specified it defaults to master
-    version: develop
-    # the task will only see these files in /datamon/input/flood-nldas-data
-    filter: /huc2/huc8/**/*.grib
-trigger:
-  - type: repo
-    # the name of the data repository
-    name: flood-nldas-data
-    # the task will only see these files
-    selector: /huc2/huc8/*
-  - type: cron # when cron is specified no other triggers can be specified
-    schedule: "*/5 * * * *"
-```
+1. Enable teams to transition their workloads to Datamon.
+   1. Containers can describe the data they need and it will be made available as a read only folder in the k8s runtime
+   2. Containers are given a outgoing folder where all data written will be committed to Datamon as a new version along
+      with metadata of the overall execution of the container.
+2. Relation between input data, container and output data is captured and be read and queried.
+   1. Input data is versioned
+   2. Container/Compute version is mapped to a git commit.
+   3. Output data is versioned and is coupled to the Input data and Compute version.
+   4. Output data can be used as an Input for a compute run.
+3. Developers can pull and push data to Datamon and use it for their personal sandboxes
+   1. Developers can fork a dataset and make changes
+4. Collect performance metrics for pipeline
+5. Measure cost for all aspects of the pipeline
+   1. Ex: Measure the benefits of de-duplication
 
-### Usage examples
+# Post Immediate goals
 
-There are different use objects that can be created with datamon.
+0. Integrate with identity management and implement access control
+1. Reduce the end to end pipeline execution
+   1. Example: Include a Fuse layer to reduce the time taken to make data available and improve cashing efficiency.
+2. Reduce the cost of execution
+   1. Measure the code on S3 side, deduplication
 
-### Repositories
+# Summary and design.
 
-You can create, delete and list repositories. 
+Datamon hosts repos that consist of data that share a common lifecycle. Each repo is a collection of branches, bundles and tags.
+
+Bundle: A bundle is a snapshot of the data in the repo. Two bundles can be compared for files that differ.
+Branch: Branch is reflects a linear sequence of bundle updates and points to the most recent bundle in that linear sequence
+Tag: Tag is a named label attached to a bundle.
+
+You can create, delete and list repositories.
 
 ```sh
-tpt repo list
-tpt repo get --name hello-there
-tpt repo create --name hello-there --description 'First repo in datamon'
-tpt repo delete --name hello-there
+datamon repo list
+datamon repo get <repo name>
+datamon repo create <repo name> --description 'My first repo'
+datamon repo delete <repo name>
+datamon sync
 ```
 
 You can manage branches in repositories.
 
 ```sh
-tpt repo branch list --repo hello-there
-tpt repo branch create --repo hello-there --name new-branch
-tpt repo branch delete --repo hello-there --name new-branch
-tpt repo branch checkout --repo hello-there --name new-branch
+cd <repo name>
+datamon branch list
+datamon branch create <branch name>
+datamon branch delete <branch name>
+datamon branch checkout <branch name>
+datamon sync
 ```
 
 You can add files to a branch.
 
 ```sh
+cd <repo name>
 curl -OL'#' https://some.site.domain/very-large-file.zip
-tpt bundle add --repo hello-there very-large-file.zip
-tpt bundle seal --repo hello-there --message 'first commit'
-tpt bundle checkout --repo hello-there
+datamon bundle add very-large-file.zip
+datamon bundle seal --message 'first commit'
+datamon bundle checkout
+datamon sync
 ```
 
 You can also tag bundles
 
 ``` sh
-tpt repo tag list --repo hello-there
-tpt repo tag create --repo hello-there --name v0.1.0 --message "$(cat notes/v0.1.0.md)"
-tpt repo tag delete --repo hello-there --name v0.1.0
-tpt repo tag checkout --repo hello-there --name v0.1.0
+cd <repo name>
+datamon tag list
+datamon tag create --name v0.1.0 --message "$(cat notes/v0.1.0.md)"
+datamon tag delete --name v0.1.0
+datamon tag checkout --name v0.1.0
+datamon sync
 ```
 
-### Tunes
+## Defining a pipeline
 
-Tunes are the tasks that can be executed with datamon.
-You can box a 
+Datamon engine understands individual events and stages that depend on it. A pipeline is constructed by defining events
+and which stages are dependent on it.
 
-## Data Management
+A stage is
+1. A set of input data defined as ```<repo:branch>``` or ```<repo:tag>```
+2. A single model ```repo:branch``` or ```repo:tag```
+3. A set of output data defined as ```<repo:branch>```
 
-The data management provides a content addressable filesystem which can import data from a variety of sources.
-Initially it can import data from Local files, S3, HTTP and NFS.
+There is no upfront definition of a pipeline. Each stage in the pipeline is defined to be triggered on a named event.
+Thus, stages can be associated with an event in an ad-hoc fashion.
+Events can be one
+1. A new bundle uploaded to a branch
+2. A new version of a model is available
+3. A new joint release of a data and model is available.
 
-Data is organized as a series of repositories, which are conceptually similar to a git repo.
-A repo is a pointer to a list of bundles. Each bundle contains a filesystem subtree and some metadata to describe
-the content of the bundle.
+While orchestrating a pipeline care must be taken to name pipes and dependencies.
 
-### Storage layout
+TODO: Add how an end developer describes the yaml/cmd line for form a pipeline
 
-The storage is laid out in a way that allows S3 to efficiently store it and is similar to the way git builds its indices.
-Because we use hex hashes for the file names S3's backend can optimize the storage because it provides a decent 
-distribution for [partitioning on prefixes](https://docs.aws.amazon.com/AmazonS3/latest/dev/request-rate-perf-considerations.html#workloads-with-mix-request-types).
+## S3 Layout
 
-It will look something like this:
+A single instance of Datamon sits on top of a single bucket in which the data is organized using prefixes and delimiters.
+
+The motivation for using a single bucket is due to
+1. A single entity that needs to be managed for the entire company
+2. Deduplication benefits.
 
 ```text
+# Test within <> brackets is user/runtime defined.
 .
 ├── blobs
-│   ├── hash-1
-│   ├── hash-2
-│   ├── hash-3
-│   ├── hash-4
-│   ├── hash-5
-│   ├── hash-6
-│   └── hash-7
-├── bundles
-│   ├── bundle-1
-│   │   ├── hash-1.json
-│   │   ├── hash-2.json
-│   │   └── hash-3.json
-│   ├── bundle-2
-│   │   ├── hash-1.json
-│   │   ├── hash-2.json
-│   │   └── hash-3.json
-│   ├── bundle-3
-│   │   ├── hash-1.json
-│   │   ├── hash-2.json
-│   │   └── hash-3.json
-│   ├── bundle-1.json
-│   ├── bundle-2.json
-│   └── bundle-3.json
-├── models
-│   ├── model-1
-│   │   ├── hash-1.json
-│   │   ├── hash-2.json
-│   │   └── hash-3.json
-│   ├── model-2
-│   │   ├── hash-1.json
-│   │   ├── hash-2.json
-│   │   └── hash-3.json
-│   ├── model-3
-│   │   ├── hash-1.json
-│   │   ├── hash-2.json
-│   │   └── hash-3.json
-│   ├── model-1.json
-│   ├── model-2.json
-│   └── model-3.json
-└── runs
-    ├── hash-1.json
-    ├── hash-1.log
-    ├── hash-2.json
-    ├── hash-2.log
-    ├── hash-3.json
-    └── hash-3.log
+│   ├── <hash-name>
+├── <repo>-bundles
+│   ├── <bundle-1>
+│   │   ├── bundle-files-1.json # Files json
+│   │   ├── bundle-files-2.json
+│   │   ├── bundle-files-3.json
+│   │   └── bundle-1.json       # Descriptor json
+│   ├── <bundle-2>
+│   │   ├── bundle-files-1.json
+│   │   ├── bundle-files-2.json
+│   │   ├── bundle-files-3.json
+│   │   └── bundle-2.json
+│   ├── <bundle-3>
+│       ├── bundle-files-1.json
+│       ├── bundle-files-2.json
+│       ├── bundle-files-3.json
+│       └── bundle-3.json
+├── <repo>-models
+│   ├── <models-1>
+│   │   ├── models-files-1.json
+│   │   ├── models-files-2.json
+│   │   ├── models-files-3.json
+│   │   └── models-1.json
+│   ├── <models-2>
+│   │   ├── models-files-1.json
+│   │   ├── models-files-2.json
+│   │   ├── models-files-3.json
+│   │   └── models-2.json
+└── <repo>-runs
+│   ├── <run-1>.json
+│   ├── <run-2>.json
+│   └── <run-3>.json
+└── repos
+    ├── <repo-1>.json
+    ├── <repo-2>.json
+    └── <repo-3>.json
 ```
 
-In our implementation all the json files will actually be entries in a global encrypted bucket in dynamodb.
-The blobs will be stored as a flat list in a dedicated multi-region replicated, encrypted S3 bucket.
-The *.log files will be retrieved from the kubernetes api server or through an elasticsearch query.
+### Blobs
 
-### Repository
+Blobs store the raw data that is chunked named with a hash based on it's content. This is based on Blake2.
+Blobs are a flat namespace across all data within Datamon and thus identical across repos and bundles will be deduplicated.
+This, should allow cheap ($ cost) branching of large data sets by developers.
 
-A data repository is conceptually very similar to a git repository. It has a linked list of commits (bundles).
-Each commit is a [merkle tree](https://en.wikipedia.org/wiki/Merkle_tree).
+Post MVP we need to come up with a scheme to garbage collect unreferenced blobs.
 
-Each bundle is a directory named as hex representation of the merkle root hash. At the same level there is a metadata file.
-For now the metadata file is a json file so that it can be read by humans and machines alike.
+### Bundles
 
-The [repo-name].json file contains the metadata that describes a repo. At a very minimum it contains:
+Bundles contain
+1. List of all files and their top level blob hash
+2. Unique user assigned name
+3. Unique Datamon generated hash (KSUID)
+4. Computation metadata that generated it (optional)
+5. Input data (< set of repo:bundle>) information that was fed to the computation that generated the bundle (optional)
 
-* a mapping for tags and branch names to bundle ids
-* a mapping of bundle ids to known branches and tags
-* a description
-* a mapping of teams or users and their permissions
 
-This is collated in a single file because it helps to keep that lookup operation a single network round trip and allows for subscriptions so local caches can be maintained.
+#### List of files
 
-A repository 
+The list of files are split across multiple sortable json files, the list of files is sorted depth first. The list is split
+into json files to allow for parallel population of the bundle locally on the client side.
+The list of files also captures the unix attributes and extended attributes for a file.
 
-### Bundle
+### Models
 
-A bundle represent a single changeset. It contains the delta of the file system between the previous bundle and this one.
-Initially this works as a blob store with no diffing for binary files.
+TODO
 
-The [hash].json file contains the metadata that describes a commit. At a minimum this is:
+### Repos
 
-* The list of parent bundles
-* An ordered mapping of file path to content hash with mode flags.
-* A list of authors that contributed to the bundle
-* A timestamp for when the bundle was created
-* Optionally a message describing the reason for the change
+Repos are a logical collection of data files that are meant to live together and be managed as a unit.
 
-Bundles are uploaded as a tar file in a single upload, this upload is resumable if the client supports it.
-The bundle tar file contains each file together with their blake2b checksum.
+### Runs
 
-### Files
+Runs is an index of the bundles that are generated from runs of computation. Each run includes information about the input
+data, the computation and the output data. Runs also include extensible attributes that can be used to populate the kubernetes
+pod information and overall Datamon pipeline information.
 
-The files are stored as content addressable blobs outside of metadata like bundles and repositories.
+## Order of updates
 
-## Handler definition
+1. Blobs written
+2. Bundle/Model information
+  1. Files json
+  2. Descriptor json (Write is complete)
+3. Run (Redundant with Bundle/Model)
+  1. Run metadata (subset of descriptor json information)
 
-A pipeline is never really given a name, instead pipelines are formed organically by registering more execution steps.
-The steps form a DAG where 1 step can either depend on a trigger like cron or webhook, or the outputs of another step.
+1. Put in S3 is atomic.
+2. Blake2 will generate unique hashes for blobs. Concurrent puts to the same hash should be safe
+3. Bundles/Models have unique names and their hashes are sortable (KSUID)
+4. Write is complete when the description of the bundle/Model is written to S3.
+5. Run index can be rebuilt if the client dies before writing the Run index.
+   1. Datamon Daemon can scan for bundles written after the last run that was written and generate the  missing run indexes
 
-For a pipeline the input data and output data are represented by a number of directories.
-The inputs are all read-only mounts into the container, one possible way to achieve this is by symlinking all the files on the EFS file system into a location
+## Layout of data on a node
+The following is describing the kubernetes integration, for a developer using Datamon the model is similar but simpler.
 
-A pipeline is essentially a single path through our continously executing DAG.
-There can't be any cyclic dependencies in this graph, one way to verify this is by running the [tarjan algorithm](https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm).
+Layout for a Repo:Bundle/Model is based on the filesystem view for the container consuming the data/
 
-### File access in handlers
+* Volume containing blob cache is mounted R/W into the init container within a Pod.
+* Blank volume is mounted R/W that will contain the filesystem view
 
-To access files in handlers we make them available via a fuse filesystem, this is a customization of goofys which applies the filters defined in the manifest for a handler.
 
-### Archiving
+1. Fetch the blobs needed for a file
+2. If the file is larger than a single blob concatenate the blobs and copy them in the spot in the filesystem they are expected.
+3. If the file is smaller than a single blob, link the file to the blob from the blob cache volume.
 
-Once we detect files are no longer in use and have gone stale after some configurable amount of time we move these files to cold storage (glacier).
-To detect files that are in use we inspect all the inputs of the runs and find all the commit ids for a given data repository that no longer occur.
 
-### Execution
+### Mutable view
 
-The handler can be executed as a serverless function. This allows us to be fairly efficient when functions are used frequently.
-It removes the burden of building a docker container because all that is packaged are the files that are required to update the runtime appropriately.
+The output volumes will be mounted to a model's pod at pre determined paths.
+At the end of a successful run, the volumes will be marked to have output data.
+The Daemon pod on the node will then commit the output bundle to the respective repo:branch.
 
-The handler will only see the data it subscribed to through a trigger.
+# Components of Datamon
 
-### Triggers
+```
 
-There are several ways in which a model can be triggered. Some of those can be combinations of others, these combinators 
+                    +----------------+          +------+
+                    | Datamon Service+----------+  S3  |
+                    +--------+-------+          +---+--+
+                             |                      |
+                             |                      |
+             +---------------+-------+              |
+             |   +-----------------+ |              |
+             |   | Datamon Core Lib| |              |
+             |   +-----------------+ +--------------+
+             |                       |
+             |  Datamon Client Lib   |
+             +-----------------------+
+                        +                                   +--------------------+
+          +-----+       |                           +------+|Datamon Kube Service|
+          | CLI +-------+                           |       +---------+----------+
+          +--+--+                                   |                 |
+             ++------------------------------+      |                 |
+      +------+---------------+          +----+------+-----+           |
+      |Datamon Init Container|          |Datamon Daemonset|           |
+      +--------+-------------+          +-----------------+           |
+               |                                                      |
+               +------------------------------------------------------+
+```
 
-#### A data repository or processor
+## Kubernetes integration
 
-A trigger from an external webhook
+To integrate Datamon with kubernetes the following pods will act in unison
+0. Datamon Daemon: Generate the yaml which ties the input data to the output data specification based on the compute being executed.
+Schedule is also responsible for orchestration which pods are ready to be run based on the data they depend on.
+1. Init Container: This container is responsible for copying the data into a pod where the compute
+is expected to be run.
+2. DaemonSet: This container is responsible for the commit and push of the output of the data from a compute execution and
+tie in the metadata for the input, compute and output.
 
-#### A CRON job
+# Query Datamon
 
-A trigger that produces data by running a processor on a schedule
-
-#### A kinesis stream
-
-A trigger from a kinesis stream, when a message is received the processor is executed
-
-#### A Webhook subscription from an external service
-
-A trigger by a webhook subscription, whenever the webhook is received the processor runs
-
-##### A github repository
-
-This is a specialization of the webhook trigger, that can subscribe to events in github.
-
-#### A HTTP stream / SSE / websocket connection
-
-In this case we subscribe to a remote streaming protocol
+Datamon supports querying the runs and the bundle metadata.
