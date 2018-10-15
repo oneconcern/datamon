@@ -87,7 +87,7 @@ func main() {
 
 	mux := tracing.NewServeMux(tr)
 	// mux := http.NewServeMux()
-	mux.Handle("/", gqlhandler.Playground("Trumpet Server", "/query"))
+	mux.Handle("/", gqlhandler.Playground("Datamon Server", "/query"))
 	mux.Handle("/query", gqlhandler.GraphQL(
 		graphapi.NewExecutableSchema(graphapi.NewResolvers(eng)),
 		gqlhandler.ResolverMiddleware(func(ctx context.Context, next graphql.Resolver) (res interface{}, err error) {
