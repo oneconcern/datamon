@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oneconcern/trumpet/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/blob"
 
-	"github.com/oneconcern/trumpet/internal"
-	"github.com/oneconcern/trumpet/pkg/blob/localfs"
+	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/pkg/blob/localfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )

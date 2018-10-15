@@ -9,16 +9,16 @@ RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
 WORKDIR /usr/share/zoneinfo
 RUN zip -r -0 /stage/zoneinfo.zip .
 
-ADD . /go/src/github.com/oneconcern/trumpet
-WORKDIR /go/src/github.com/oneconcern/trumpet
+ADD . /datamon
+WORKDIR /datamon
 
-RUN go build -o /stage/usr/bin/tpt --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/tpt
-RUN upx /stage/usr/bin/tpt
+RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/datamon
+RUN upx /stage/usr/bin/datamon
 
 # Build the dist image
 FROM scratch
 COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip
-ENTRYPOINT [ "tpt" ]
+ENTRYPOINT [ "datamon" ]
 CMD ["--help"]
 

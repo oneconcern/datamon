@@ -88,8 +88,8 @@ tags
 /.vscode/
 *.iml
 
-# Trumpet related settings
-.trumpet
+# Datamon related settings
+.datamon
 playground/
 testdata/
 data/repos/

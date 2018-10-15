@@ -1,11 +1,10 @@
-# Trumpet
+# Datamon
 
-Trumpet is a datascience tool that helps managing data at scale.
+Datamon is a datascience tool that helps managing data at scale.
 It's main goals are to version data and models together with the results they produce. 
 A secondary goal to managing the data might be that it provides a scheduler to run jobs on top of a kubernetes cluster
 or with a serverless framework.
 
-The name is a reference to [Torricelli's Trumpet](https://en.wikipedia.org/wiki/Gabriel%27s_Horn) aka [Gabriel's Horn](https://en.wikipedia.org/wiki/Gabriel%27s_Horn)
 
 ## Design
 
@@ -67,7 +66,7 @@ input:
     name: flood-nldas-data
     # a branch name, tag name or commit id, when none is specified it defaults to master
     version: develop
-    # the task will only see these files in /trumpet/input/flood-nldas-data
+    # the task will only see these files in /datamon/input/flood-nldas-data
     filter: /huc2/huc8/**/*.grib
 trigger:
   - type: repo
@@ -81,7 +80,7 @@ trigger:
 
 ### Usage examples
 
-There are different use objects that can be created with trumpet.
+There are different use objects that can be created with datamon.
 
 ### Repositories
 
@@ -90,7 +89,7 @@ You can create, delete and list repositories.
 ```sh
 tpt repo list
 tpt repo get --name hello-there
-tpt repo create --name hello-there --description 'First repo in trumpet'
+tpt repo create --name hello-there --description 'First repo in datamon'
 tpt repo delete --name hello-there
 ```
 
@@ -123,7 +122,7 @@ tpt repo tag checkout --repo hello-there --name v0.1.0
 
 ### Tunes
 
-Tunes are the tasks that can be executed with trumpet.
+Tunes are the tasks that can be executed with datamon.
 You can box a 
 
 ## Data Management

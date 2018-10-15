@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/oneconcern/trumpet/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/cafs"
 )
 
 func main() {

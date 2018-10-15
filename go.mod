@@ -1,4 +1,4 @@
-module github.com/oneconcern/trumpet
+module github.com/oneconcern/datamon
 
 require (
 	github.com/AndreasBriese/bbloom v0.0.0-20180913140656-343706a395b7

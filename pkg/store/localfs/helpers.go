@@ -8,7 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store"
 )
 
 // type badgerDB interface {

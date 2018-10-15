@@ -9,7 +9,7 @@ import (
 	"github.com/json-iterator/go"
 )
 
-// Repo represents a repository in the trumpet
+// Repo represents a repository in the datamon network
 type Repo struct {
 	Name        string            `json:"name" yaml:"name"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`

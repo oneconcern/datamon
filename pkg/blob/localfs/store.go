@@ -8,14 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/oneconcern/trumpet/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/blob"
 	"github.com/spf13/afero"
 )
 
 // New creates a new local file system backed blob store
 func New(fs afero.Fs) blob.Store {
 	if fs == nil {
-		fs = afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(".trumpet", "objects"))
+		fs = afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(".datamon", "objects"))
 	}
 	return &localFS{
 		fs: fs,

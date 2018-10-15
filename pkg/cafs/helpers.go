@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	blake2b "github.com/minio/blake2b-simd"
-	"github.com/oneconcern/trumpet/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/blob"
 )
 
 func CopyPaddedJSON(w io.Writer, buf *bytes.Buffer) {

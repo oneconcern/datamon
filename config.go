@@ -1,4 +1,4 @@
-package trumpet
+package datamon
 
 import (
 	"github.com/oneconcern/pipelines/pkg/log"

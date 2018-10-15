@@ -1,6 +1,6 @@
 # List of open todos
 
-This repo is currently a Proof Of Concept of how the trumpet tool would work.
+This repo is currently a Proof Of Concept of how the datamon tool would work.
 
 ## Garbage collection
 
@@ -21,7 +21,7 @@ With a workspace, anything that will get added to the repo has to be present in 
 
 ## Ignore file support
 
-A data repository should support a .trumpetignore file
+A data repository should support a .datamonignore file
 
 This seems like it would work: https://github.com/codeskyblue/dockerignore
 

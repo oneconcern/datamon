@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rootdir=/tmp/trumpetdata
+rootdir=/tmp/datamondata
 
 rm -rf "$rootdir"
 mkdir -p "$rootdir"

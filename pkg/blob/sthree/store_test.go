@@ -12,8 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/oneconcern/trumpet/internal"
-	"github.com/oneconcern/trumpet/pkg/blob"
+	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/pkg/blob"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
