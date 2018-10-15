@@ -28,7 +28,7 @@ func init() {
 		envk.StringOrDefault("JAEGER_HOST", "jaeger-agent:6831"),
 		"String representing jaeger-agent host:port",
 	)
-	pflag.StringVarP(&baseDir, "dir", "d", "/var/lib/trumpet", "the directory for the blobs to be stored")
+	pflag.StringVarP(&baseDir, "dir", "d", "/var/lib/datamon", "the directory for the blobs to be stored")
 }
 
 type zapLogger struct {

@@ -5,7 +5,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/datamon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -16,7 +16,7 @@ var dumpCmd = &cobra.Command{
 	Short: "Print the config used",
 	Long:  `Print the config used by the invocation of the tpt command`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var cfg trumpet.Config
+		var cfg datamon.Config
 		if err := viper.Unmarshal(&cfg); err != nil {
 			log.Fatalln(err)
 		}

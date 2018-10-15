@@ -5,15 +5,13 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/json-iterator/go"
-	yaml "gopkg.in/yaml.v2"
-
-	"log"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	yaml "gopkg.in/yaml.v2"
 )
 
 var (
@@ -23,13 +21,13 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "tpt",
-	Short: "Trumpet helps building ML pipelines",
-	Long: `Trumpet helps building ML pipelines by adding versioning, auditing and security to existing tools.
+	Use:   "datamon",
+	Short: "Datamon helps building ML pipelines",
+	Long: `Datamon helps building ML pipelines by adding versioning, auditing and security to existing tools.
 
 This is not a replacement for existing tools, but rather a way to manage their inputs and outputs.
 
-Trumpet works by providing a git like interface to manage data efficiently.
+Datamon works by providing a git like interface to manage data efficiently.
 It executes pipelines by scheduling the processors as serverless functions on either AWS lambda or on kubeless.
 
 `,
@@ -47,19 +45,19 @@ func Execute() {
 func init() {
 	log.SetFlags(0)
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is .trumpet.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is .datamon.yaml)")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if os.Getenv("TRUMPET_CONFIG") != "" {
+	if os.Getenv("DATAMON_CONFIG") != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(os.Getenv("TRUMPET_CONFIG"))
+		viper.SetConfigFile(os.Getenv("DATAMON_CONFIG"))
 	} else {
 		viper.AddConfigPath(".")
-		viper.AddConfigPath("$HOME/.trumpet")
-		viper.AddConfigPath("/etc/trumpet")
-		viper.SetConfigName(".trumpet")
+		viper.AddConfigPath("$HOME/.datamon")
+		viper.AddConfigPath("/etc/datamon")
+		viper.SetConfigName(".datamon")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

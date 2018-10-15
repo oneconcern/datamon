@@ -5,12 +5,12 @@ package cmd
 import (
 	"context"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/datamon"
 
 	"github.com/oneconcern/pipelines/pkg/log"
 	"go.uber.org/zap"
 
-	"github.com/oneconcern/trumpet/pkg/engine"
+	"github.com/oneconcern/datamon/pkg/engine"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,7 +27,7 @@ var repoOptions struct {
 var repoCmd = &cobra.Command{
 	Use:   "repo",
 	Short: "Data Repo management related operations",
-	Long: `Data repository management related operations for trumpet.
+	Long: `Data repository management related operations for datamon.
 
 Repositories don't carry much content until a commit is made.
 `,
@@ -51,8 +51,8 @@ func initContext() context.Context {
 		sp)
 }
 
-func unmarshalConfig() (*trumpet.Config, error) {
-	var cfg trumpet.Config
+func unmarshalConfig() (*datamon.Config, error) {
+	var cfg datamon.Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}

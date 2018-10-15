@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/oneconcern/trumpet"
+	"github.com/oneconcern/datamon"
 
 	"github.com/oneconcern/pipelines/pkg/cli/envk"
 	"github.com/oneconcern/pipelines/pkg/httpd"
 	"github.com/oneconcern/pipelines/pkg/log"
 	"github.com/oneconcern/pipelines/pkg/tracing"
-	"github.com/oneconcern/trumpet/pkg/engine"
-	"github.com/oneconcern/trumpet/pkg/graphapi"
+	"github.com/oneconcern/datamon/pkg/engine"
+	"github.com/oneconcern/datamon/pkg/graphapi"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	tracelog "github.com/opentracing/opentracing-go/log"
@@ -40,7 +40,7 @@ func init() {
 		envk.StringOrDefault("JAEGER_HOST", "jaeger-agent:6831"),
 		"String representing jaeger-agent host:port",
 	)
-	pflag.StringVar(&baseDir, "base-dir", ".trumpet", "the base directory for the database")
+	pflag.StringVar(&baseDir, "base-dir", ".datamon", "the base directory for the database")
 }
 
 type zapLogger struct {
@@ -67,9 +67,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := log.NewFactory(zlg.With(zap.String("service", "trumpetd")))
+	logger := log.NewFactory(zlg.With(zap.String("service", "datamond")))
 
-	tr, closer, err := tracing.Init("trumpetd", jprom.New(), logger, jAgentHostPort)
+	tr, closer, err := tracing.Init("datamond", jprom.New(), logger, jAgentHostPort)
 	if err != nil {
 		logger.Bg().Info("failed to initialize tracing, falling back to noop tracer", zap.Error(err))
 		tr = &opentracing.NoopTracer{}
@@ -78,7 +78,7 @@ func main() {
 		defer closer.Close()
 	}
 
-	cfg := trumpet.NewConfig(tr, logger)
+	cfg := datamon.NewConfig(tr, logger)
 	cfg.Metadata = baseDir
 	eng, err := engine.New(cfg)
 	if err != nil {

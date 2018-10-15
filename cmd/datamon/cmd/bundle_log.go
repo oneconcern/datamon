@@ -12,7 +12,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/gosuri/uitable"
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store"
 	"github.com/spf13/cobra"
 )
 

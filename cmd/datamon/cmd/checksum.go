@@ -7,7 +7,7 @@ import (
 	"log"
 
 	"github.com/oneconcern/pipelines/pkg/cli/cflags"
-	"github.com/oneconcern/trumpet/pkg/fingerprint"
+	"github.com/oneconcern/datamon/pkg/fingerprint"
 	"github.com/spf13/cobra"
 )
 
