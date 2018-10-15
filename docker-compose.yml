@@ -1,4 +1,4 @@
-version: '3.4'
+version: '3'
 services:
   jaeger.local:
     image: jaegertracing/all-in-one
@@ -53,7 +53,7 @@ services:
     tty: true
     command: /bin/zsh
     volumes:
-      - ".:/home/ivan/trumpet"
+      - ".:/home/ivan/datamon"
     depends_on:
       - prometheus.local
       # - dynamodb.local

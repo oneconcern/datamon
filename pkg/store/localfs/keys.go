@@ -1,6 +1,6 @@
 package localfs
 
-import "github.com/oneconcern/trumpet/pkg/store"
+import "github.com/oneconcern/datamon/pkg/store"
 
 const (
 	indexDb    = "index"

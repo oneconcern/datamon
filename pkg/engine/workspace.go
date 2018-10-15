@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/oneconcern/trumpet/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/cafs"
 
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store"
 	"github.com/spf13/afero"
 )
 

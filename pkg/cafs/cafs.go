@@ -5,8 +5,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/oneconcern/trumpet/pkg/blob"
-	"github.com/oneconcern/trumpet/pkg/blob/localfs"
+	"github.com/oneconcern/datamon/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/blob/localfs"
 
 	units "github.com/docker/go-units"
 )

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 tpt repo delete --name hello-there
-tpt repo create --name hello-there --description 'First repo in trumpet'
+tpt repo create --name hello-there --description 'First repo in datamon'
 tpt bundle add --repo hello-there ~/Downloads/FW_RT_AC5300_300438421045.zip
 tpt bundle commit --repo hello-there --message 'first commit'
 tpt bundle checkout --repo hello-there

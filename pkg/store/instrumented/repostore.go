@@ -3,7 +3,7 @@ package instrumented
 import (
 	"context"
 
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 

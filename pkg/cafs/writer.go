@@ -7,7 +7,7 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/oneconcern/trumpet/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/blob"
 
 	"github.com/minio/blake2b-simd"
 )

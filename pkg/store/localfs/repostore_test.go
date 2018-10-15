@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store"
 	"github.com/stretchr/testify/require"
 )
 

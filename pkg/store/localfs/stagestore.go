@@ -8,7 +8,7 @@ import (
 	"github.com/json-iterator/go"
 
 	"github.com/dgraph-io/badger"
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store"
 )
 
 // NewObjectMeta creates a badger based object metadata store

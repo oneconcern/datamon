@@ -1,0 +1,54 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  # This name uniquely identifies the Deployment
+  name: minio-deployment
+spec:
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        # Label is used as selector in the service.
+        app: minio
+    spec:
+      # Refer to the PVC created earlier
+      volumes:
+      - name: storage
+        emptyDir: {}
+      containers:
+      - name: minio
+        # Pulls the default Minio image from Docker Hub
+        image: minio/minio
+        args:
+        - server
+        - /storage
+        env:
+        # Minio access key and secret key
+        - name: MINIO_ACCESS_KEY
+          value: "access-key"
+        - name: MINIO_SECRET_KEY
+          value: "secret-key-thing"
+        - name: MINIO_BROWSER
+          value: "off"
+        - name: MINIO_DOMAIN
+          value: "s3.local"
+        ports:
+        - containerPort: 9000
+        # Mount the volume into the pod
+        volumeMounts:
+        - name: storage # must match the volume name, above
+          mountPath: "/storage"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+spec:
+  type: NodePort
+  ports:
+    - port: 9000
+      nodePort: 30900
+      protocol: TCP
+  selector:
+    app: minio

@@ -7,16 +7,15 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/json-iterator/go"
-
 	"github.com/dgraph-io/badger"
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/json-iterator/go"
+	"github.com/oneconcern/datamon/pkg/store"
 )
 
 // NewRepos creates a new repo store instance
 func NewRepos(baseDir string) store.RepoStore {
 	if baseDir == "" {
-		baseDir = ".trumpet"
+		baseDir = ".datamon"
 	}
 	return &repoStore{
 		baseDir: baseDir,

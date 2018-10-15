@@ -7,15 +7,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/oneconcern/trumpet"
-	"github.com/oneconcern/trumpet/pkg/blob"
+	"github.com/oneconcern/datamon"
+	"github.com/oneconcern/datamon/pkg/blob"
 
-	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
+	bloblocalfs "github.com/oneconcern/datamon/pkg/blob/localfs"
 	"github.com/spf13/afero"
 
-	"github.com/oneconcern/trumpet/pkg/store"
-	"github.com/oneconcern/trumpet/pkg/store/instrumented"
-	"github.com/oneconcern/trumpet/pkg/store/localfs"
+	"github.com/oneconcern/datamon/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store/instrumented"
+	"github.com/oneconcern/datamon/pkg/store/localfs"
 )
 
 const (
@@ -28,15 +28,15 @@ const (
 	bundles = "bundles"
 )
 
-// New initializes a new runtime for trumpet
-func New(cfg *trumpet.Config) (*Runtime, error) {
+// New initializes a new runtime for datamon
+func New(cfg *datamon.Config) (*Runtime, error) {
 	if cfg == nil {
 		return nil, errors.New("config property is required")
 	}
 
 	baseDir := cfg.Metadata
 	if baseDir == "" {
-		baseDir = ".trumpet/global"
+		baseDir = ".datamon/global"
 	}
 
 	repos := instrumented.NewRepos(cfg.Tracer(), localfs.NewRepos(baseDir))
@@ -51,14 +51,14 @@ func New(cfg *trumpet.Config) (*Runtime, error) {
 	}, nil
 }
 
-// Runtime for trumpet
+// Runtime for datamon
 type Runtime struct {
 	baseDir string
 	repos   store.RepoStore
-	config  *trumpet.Config
+	config  *datamon.Config
 }
 
-// ListRepo known in the trumpet database
+// ListRepo known in the datamon database
 func (r *Runtime) ListRepo(ctx context.Context) ([]Repo, error) {
 	rr, err := r.repos.List(ctx)
 	if err != nil {
@@ -76,7 +76,7 @@ func (r *Runtime) ListRepo(ctx context.Context) ([]Repo, error) {
 	return repos, nil
 }
 
-// GetRepo from trumpet database
+// GetRepo from datamon database
 func (r *Runtime) GetRepo(ctx context.Context, name string) (*Repo, error) {
 	rr, err := r.repos.Get(ctx, name)
 	if err != nil {
@@ -153,7 +153,7 @@ func (r *Runtime) CreateRepo(ctx context.Context, name, description string) (*Re
 	return repo, nil
 }
 
-// DeleteRepo removes a repository from trumpet
+// DeleteRepo removes a repository from datamon
 func (r *Runtime) DeleteRepo(ctx context.Context, name string) error {
 	if err := os.RemoveAll(filepath.Join(r.baseDir, name)); err != nil {
 		return err

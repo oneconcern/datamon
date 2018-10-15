@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/oneconcern/trumpet/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/blob"
 )
 
 func newReader(blobs blob.Store, hash Key, leafSize uint32) (io.ReadCloser, error) {

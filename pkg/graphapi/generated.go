@@ -2159,7 +2159,7 @@ func (ec *executionContext) introspectType(name string) *introspection.Type {
 
 var parsedSchema = schema.MustParse(`# Top-Level query object as entry point to the graphq query
 type Query {
-    # List the repositories known by trumpet
+    # List the repositories known by datamon
     repositories: [Repository!]!
     # Get a repository by name
     repository(name: String!): Repository
@@ -2373,7 +2373,7 @@ type ChangeSet {
     deleted: [VersionedObject!]
 }
 
-# A contributor to an element in Trumpet
+# A contributor to an element in Datamon
 #
 # Both fields are required so that we always know who made the changes to the files
 type Contributor {

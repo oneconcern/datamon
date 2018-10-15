@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	stg "github.com/oneconcern/trumpet/pkg/blob"
+	stg "github.com/oneconcern/datamon/pkg/blob"
 
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store"
 )
 
 // NewBundle contains the information about a newly created bundle

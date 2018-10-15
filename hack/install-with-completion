@@ -17,8 +17,8 @@ if [ $(uname) = 'Linux' ]; then
   zshsitef=$HOME/.local
 fi
 
-go install ./cmd/tpt
-tpt completion zsh > $zshsitef/share/zsh/site-functions/_tpt
+go install ./cmd/datamon
+tpt completion zsh > $zshsitef/share/zsh/site-functions/_datamon
 rm -f ~/.zcompdump
 exec eval '
 autoload -Uz compinit

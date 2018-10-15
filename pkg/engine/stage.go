@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/oneconcern/pipelines/pkg/log"
-	"github.com/oneconcern/trumpet/pkg/store/instrumented"
+	"github.com/oneconcern/datamon/pkg/store/instrumented"
 	opentracing "github.com/opentracing/opentracing-go"
 
-	"github.com/oneconcern/trumpet/pkg/blob"
-	bloblocalfs "github.com/oneconcern/trumpet/pkg/blob/localfs"
-	"github.com/oneconcern/trumpet/pkg/fingerprint"
-	"github.com/oneconcern/trumpet/pkg/store"
-	"github.com/oneconcern/trumpet/pkg/store/localfs"
+	"github.com/oneconcern/datamon/pkg/blob"
+	bloblocalfs "github.com/oneconcern/datamon/pkg/blob/localfs"
+	"github.com/oneconcern/datamon/pkg/fingerprint"
+	"github.com/oneconcern/datamon/pkg/store"
+	"github.com/oneconcern/datamon/pkg/store/localfs"
 	"github.com/spf13/afero"
 )
 

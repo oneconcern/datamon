@@ -10,8 +10,8 @@ import (
 
 func main() {
 	log.SetFlags(0)
-	tgtDir := ".trumpet/hello-there/bundles/objects"
-	srcDir := ".trumpet/hello-there/stage/objects"
+	tgtDir := ".datamon/hello-there/bundles/objects"
+	srcDir := ".datamon/hello-there/stage/objects"
 	filepath.Walk(srcDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err

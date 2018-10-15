@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/go-openapi/swag"
-	"github.com/oneconcern/trumpet/pkg/engine"
-	"github.com/oneconcern/trumpet/pkg/store"
+	"github.com/oneconcern/datamon/pkg/engine"
+	"github.com/oneconcern/datamon/pkg/store"
 )
 
 // NewResolvers creates a new resolver root implementation
