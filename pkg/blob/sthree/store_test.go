@@ -108,7 +108,7 @@ func setupStore(t testing.TB) (blob.Store, func()) {
 	minioConfig := &aws.Config{
 		Credentials:      credentials.NewStaticCredentials("access-key", "secret-key-thing", ""),
 		Region:           aws.String("us-west-2"),
-		Endpoint:         aws.String("http://127.0.0.1:9000"),
+		Endpoint:         aws.String("http://127.0.0.1:30900"),
 		S3ForcePathStyle: aws.Bool(true),
 	}
 	sess, err := session.NewSession(minioConfig)
