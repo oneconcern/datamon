@@ -1,9 +1,16 @@
+ifndef GITHUB_USER
+$(error "Must set GITHUB_USER") # this is a Make error
+endif
+ifndef GITHUB_TOKEN
+$(error "Must set GITHUB_TOKEN") # this is a Make error
+endif
 # COLORS
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+LOCAL_KUBECTX ?= "docker-for-desktop"
 
 TARGET_MAX_CHAR_NUM=25
 ## Show help
@@ -23,32 +30,30 @@ help:
 	} \
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
-.PHONY: build-tpt
-## Build tpt docker container (tpt)
-build-tpt:
-	@echo 'building ${YELLOW}tpt${RESET} container'
-	@docker build --pull -t reg.onec.co/tpt:$$(date '+%Y%m%d') -t reg.onec.co/tpt:$(subst /,_,$(GIT_BRANCH)) .
+.PHONY: build-datamon
+## Build datamon docker container (datamon)
+build-datamon:
+	@echo 'building ${YELLOW}datamon${RESET} container'
+	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec.co/datamon:$$(date '+%Y%m%d') -t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) .
 
-.PHONY: push-tpt
-## Push tpt docker container
-push-tpt:
-	@docker push reg.onec.co/tpt
-
-.PHONY: build-flexvoldrivers
-## Build flexvoldrivers docker container (flexvoldrivers)
-build-flexvoldrivers:
-	@echo 'building ${YELLOW}flexvoldrivers${RESET} container'
-	@docker build --pull -t reg.onec.co/flexvoldrivers:$$(date '+%Y%m%d') -t reg.onec.co/flexvoldrivers:$(subst /,_,$(GIT_BRANCH)) -f flexvoldrivers/Dockerfile .
-
-.PHONY: push-flexvoldrivers
-## Push flexvoldrivers docker container
-push-flexvoldrivers:
-	@docker push reg.onec.co/flexvoldrivers
+.PHONY: push-datamon
+## Push datamon docker container
+push-datamon:
+	@docker push reg.onec.co/datamon
 
 .PHONY: build-all
 ## Build all the containers
-build-all: build-tpt build-flexvoldrivers
+build-all: build-datamon
 
-.PHONE: push-all
+.PHONY: push-all
 ## Push all the containers
-push-all: push-tpt push-flexvoldrivers
+push-all: push-datamon
+
+.PHONY: setup
+## Setup for local development
+setup: install-minio
+
+.PHONY: install-minio
+## Install minio in local kubernetes
+install-minio:
+	kubectl --context $(LOCAL_KUBECTX) create -f ./k8s/minio.yaml

@@ -1,7 +1,16 @@
 FROM golang:alpine as base
 
+ARG github_user
+ARG github_token
+
+ENV GITHUB_USER ${github_user}
+ENV GITHUB_TOKEN ${github_token}
+
+ADD hack/create-netrc.sh /usr/bin/create-netrc
+
 RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
-  apk add --no-cache musl-dev gcc ca-certificates mailcap upx tzdata zip &&\
+  create-netrc &&\
+  apk add --no-cache musl-dev gcc ca-certificates mailcap upx tzdata zip git &&\
   update-ca-certificates &&\
   cp /etc/ssl/certs/ca-certificates.crt /stage/etc/ssl/certs/ca-certificates.crt &&\
   cp /etc/mime.types /stage/etc/mime.types
