@@ -2,11 +2,12 @@ module github.com/oneconcern/datamon
 
 require (
 	github.com/AndreasBriese/bbloom v0.0.0-20180913140656-343706a395b7
-	github.com/aws/aws-sdk-go v1.15.35
+	github.com/aws/aws-sdk-go v1.15.69
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
+	github.com/bmatcuk/doublestar v1.1.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dgraph-io/badger v1.5.3
+	github.com/dgraph-io/badger v1.5.4
 	github.com/dgryski/go-farm v0.0.0-20180109070241-2de33835d102
 	github.com/docker/go-units v0.3.3
 	github.com/fatih/color v1.7.0
@@ -57,7 +58,7 @@ require (
 	github.com/spf13/cobra v0.0.0-20180603190830-61ca3af7ef22
 	github.com/spf13/jwalterweatherman v1.0.0
 	github.com/spf13/pflag v1.0.2
-	github.com/spf13/viper v1.2.0
+	github.com/spf13/viper v1.2.1
 	github.com/stretchr/testify v1.2.2
 	github.com/uber/jaeger-client-go v2.14.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
