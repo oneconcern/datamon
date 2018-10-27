@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/oneconcern/datamon/pkg/config"
 	"github.com/oneconcern/datamon/pkg/kubeless"
 	"github.com/spf13/cobra"
