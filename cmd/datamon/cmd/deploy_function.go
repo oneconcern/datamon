@@ -9,22 +9,23 @@ import (
 	"log"
 )
 
-// branchCmd represents the branches command
-var functionCmd = &cobra.Command{
-	Use:   "function",
+// functionCmd represents the function create command
+var deployCmd = &cobra.Command{
+	Use:   "deploy",
 	Short: "Commands to deploy functions on Kubernetes.",
 	Long: `Commands to deploy functions on Kubernetes.
 `,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		configFile, err := cmd.Flags().GetString("from-file")
-		if configFile == "" {
-			 log.Fatal("from-file attribute is empty ")
-		}
-		log.Printf("File %v submitted by user ", configFile)
+		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.Fatalln(err)
 		}
+		if configFile == "" {
+			 log.Fatal("from-file attribute is empty ")
+		}
+		log.Printf("deploying using the %v config file ", configFile)
+
 
 		configFileBytes, err := ioutil.ReadFile(configFile)
 		if err != nil {
@@ -47,8 +48,7 @@ var functionCmd = &cobra.Command{
 }
 
 func init() {
-	deployCmd.AddCommand(functionCmd)
-	functionCmd.Flags().StringP("from-file", "f", "", "Specify config file ")
+	functionCmd.AddCommand(deployCmd)
 
 }
 
