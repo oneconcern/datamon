@@ -25,11 +25,7 @@ func ZipFile(content []string, target string) error {
 
 	for _, source := range content {
 
-		temp := strings.Split(source, "/*")
-		fmt.Println(temp)
-		if len(temp) > 0 {
-			source = temp[0]
-		}
+		source = globPatternCheck(source)
 		err = fileWalk(source, archive)
 		if err != nil{
 			return err
@@ -40,7 +36,7 @@ func ZipFile(content []string, target string) error {
 	return nil
 }
 
-func ReadFile(fileDir string) ([]byte, int64, string) {
+func ReadFile(fileDir string) ([]byte, string) {
 	file, err := os.Open(fileDir)
 	if err != nil {
 		log.Fatal(err)
@@ -58,7 +54,7 @@ func ReadFile(fileDir string) ([]byte, int64, string) {
 
 	file.Read(buffer)
 
-	return buffer, fileInfo.Size(), file.Name()
+	return buffer, file.Name()
 }
 
 //fileWalk walks the root directory, calling function on child directory and files and zip the files
@@ -123,3 +119,15 @@ func fileWalk(source string, archive *zip.Writer) error {
 	return nil
 
 }
+
+func globPatternCheck(source string) string  {
+	splitSourceFile := strings.Split(source, "/*")
+
+	if len(splitSourceFile) > 0 {
+		source = splitSourceFile[0]
+	}
+
+	return source
+}
+
+
