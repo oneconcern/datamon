@@ -2,7 +2,11 @@ package kubeless
 
 import (
 	"archive/zip"
+	"bytes"
+	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/oneconcern/datamon/pkg/blob/sthree"
 	"io"
 	"log"
 	"os"
@@ -10,12 +14,13 @@ import (
 	"strings"
 )
 
+const ZIP_EXTENSION  = ".zip"
 // Zip file method take list of directories or files from content attribute and
 // target name of zip file and zip input files.
 func ZipFile(content []string, target string) error {
-	zipfile, err := os.Create(target)
+	zipfile, err := os.Create(target + ZIP_EXTENSION)
 	if err != nil {
-		log.Printf("error creating zip file: %s, Error: %v ",target, err)
+		log.Printf("error creating zip file: %s, Error: %v ",target + ZIP_EXTENSION, err)
 		return err
 	}
 	defer zipfile.Close()
@@ -34,6 +39,25 @@ func ZipFile(content []string, target string) error {
 	}
 
 	return nil
+}
+
+func UploadFileToS3(fileName string)  error {
+	buffer, path := ReadFile(fileName + ZIP_EXTENSION)
+
+	fileBytes := bytes.NewReader(buffer)
+
+
+	awsConfig := aws.NewConfig().
+		WithRegion("us-west-2").
+		WithCredentialsChainVerboseErrors(true)
+
+	bucket := aws.String("oneconcern-datamon-dev")
+
+	bs := sthree.New(sthree.Bucket(*bucket), sthree.AWSConfig(awsConfig))
+	err := bs.Put(context.Background(), path, fileBytes )
+
+	return err
+
 }
 
 func ReadFile(fileDir string) ([]byte, string) {

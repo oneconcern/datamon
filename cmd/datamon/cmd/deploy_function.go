@@ -41,7 +41,16 @@ var deployCmd = &cobra.Command{
 		if len(processor.Content) == 0 {
 			log.Fatalf("content attribute is empty ")
 		}
-		err = kubeless.ZipFile(processor.Content, processor.Name + ".zip")
+		err = kubeless.ZipFile(processor.Content, processor.Name)
+		if err != nil {
+			log.Fatalf("file zip is failing")
+		}
+
+		err = kubeless.UploadFileToS3(processor.Name)
+		if err != nil {
+			log.Fatalf("file %v upload to s3 is failing ", processor.Name)
+		}
+
 
 
 	},
