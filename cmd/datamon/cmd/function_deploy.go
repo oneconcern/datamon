@@ -46,11 +46,12 @@ var deployCmd = &cobra.Command{
 			log.Fatalf("file zip is failing")
 		}
 
-		err = kubeless.UploadFileToS3(processor.Name)
+		bucketUrl, err := kubeless.UploadFileToS3(processor.Name)
 		if err != nil {
 			log.Fatalf("file %v upload to s3 is failing ", processor.Name)
 		}
 
+		kubeless.DeployFunction(processor, bucketUrl)
 
 
 	},

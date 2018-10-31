@@ -41,7 +41,7 @@ func ZipFile(content []string, target string) error {
 	return nil
 }
 
-func UploadFileToS3(fileName string)  error {
+func UploadFileToS3(fileName string) (string, error) {
 	buffer, path := ReadFile(fileName + ZIP_EXTENSION)
 
 	fileBytes := bytes.NewReader(buffer)
@@ -56,7 +56,10 @@ func UploadFileToS3(fileName string)  error {
 	bs := sthree.New(sthree.Bucket(*bucket), sthree.AWSConfig(awsConfig))
 	err := bs.Put(context.Background(), path, fileBytes )
 
-	return err
+	bucketUrl := fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", "us-west-2", *bucket, fileName + ZIP_EXTENSION)
+
+
+	return bucketUrl, err
 
 }
 

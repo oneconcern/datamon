@@ -6,7 +6,10 @@ type Processor struct {
 	Runtime 			string									`json:"runtime" yaml: "runtime"`
 	Resources			Resources								`json:"resources" yaml: "resources"`
 	Content 			[]string								`json:"content" yaml: "content"`
-	Command 			[]string								`json:"command" yaml: "command"`
+	Command 			string									`json:"command" yaml: "command"`
+	Dep 					string									`json:"dep" yaml: "dep"`
+	Port 					int32 									`json:"port" yaml: "port"`
+
 }
 
 type Resources struct {
