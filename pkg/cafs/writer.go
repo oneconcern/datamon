@@ -7,7 +7,7 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/oneconcern/datamon/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/storage"
 
 	"github.com/minio/blake2b-simd"
 )
@@ -19,7 +19,7 @@ type Writer interface {
 }
 
 type fsWriter struct {
-	fs       blob.Store
+	fs       storage.Store
 	leafSize uint32
 	leafs    []Key
 	buf      []byte

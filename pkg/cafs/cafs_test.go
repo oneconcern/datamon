@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oneconcern/datamon/pkg/blob/localfs"
+	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +55,7 @@ func TestCAFS_Put(t *testing.T) {
 	require.NoError(t, err)
 
 	orig := filepath.Join(td, "original", "test-cas-put")
-	require.NoError(t, g.generateFile(orig, 512*1024))
+	require.NoError(t, GenerateFile(orig, 512*1024, g.leafSize))
 
 	f, err := os.Open(orig)
 	require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestCAFS_Delete(t *testing.T) {
 	tf := files[3]
 	rkey := keyFromFile(t, tf.RootHash)
 
-	keys, err := LeafsForHash(blobs, rkey, leafSize)
+	keys, err := LeafsForHash(blobs, rkey, leafSize, "")
 	require.NoError(t, err)
 
 	for _, k := range keys {
@@ -122,7 +122,7 @@ func TestCAFS_Has_AllPresent(t *testing.T) {
 		rkeys[k] = struct{}{}
 		allKeys[k] = struct{}{}
 
-		keys, err := LeafsForHash(blobs, k, leafSize)
+		keys, err := LeafsForHash(blobs, k, leafSize, "")
 		require.NoError(t, err)
 		for _, kk := range keys {
 			allKeys[kk] = struct{}{}
@@ -199,7 +199,7 @@ func TestCAFS_Has_SomeMissing(t *testing.T) {
 			missing[k] = make(map[Key]struct{})
 		}
 
-		keys, err := LeafsForHash(blobs, k, leafSize)
+		keys, err := LeafsForHash(blobs, k, leafSize, "")
 		require.NoError(t, err)
 		for i, kk := range keys {
 			lkeys[kk] = struct{}{}
@@ -264,7 +264,7 @@ func TestCAFS_Keys(t *testing.T) {
 	for _, tf := range files {
 		k := keyFromFile(t, tf.RootHash)
 		allKeys[k] = struct{}{}
-		keys, e2 := LeafsForHash(blobs, k, leafSize)
+		keys, e2 := LeafsForHash(blobs, k, leafSize, "")
 		require.NoError(t, e2)
 		for _, kk := range keys {
 			allKeys[kk] = struct{}{}

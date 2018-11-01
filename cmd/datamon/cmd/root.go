@@ -44,8 +44,6 @@ func Execute() {
 
 func init() {
 	log.SetFlags(0)
-	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is .datamon.yaml)")
 }
 
 // initConfig reads in config file and ENV variables if set.
