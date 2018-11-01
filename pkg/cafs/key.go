@@ -47,6 +47,10 @@ func (k Key) String() string {
 	return hex.EncodeToString(k[:])
 }
 
+func (k Key) StringWithPrefix(prefix string) string {
+	return prefix + k.String()
+}
+
 // BadKeySize is an error that's returned when the key to create has an invalid size.
 type BadKeySize struct {
 	Key []byte

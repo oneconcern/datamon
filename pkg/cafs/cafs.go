@@ -5,13 +5,17 @@ import (
 	"context"
 	"io"
 
-	"github.com/oneconcern/datamon/pkg/blob"
-	"github.com/oneconcern/datamon/pkg/blob/localfs"
+	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/localfs"
 
-	units "github.com/docker/go-units"
+	"github.com/docker/go-units"
 )
 
-func Backend(store blob.Store) Option {
+const (
+	DefaultLeafSize = 2 * 1024 * 1024
+)
+
+func Backend(store storage.Store) Option {
 	return func(w *defaultFs) {
 		w.fs = store
 	}
@@ -36,6 +40,12 @@ func HasGatherIncomplete() HasOption {
 	return func(opts *hasOpts) {
 		opts.OnlyRoots = true
 		opts.GatherIncomplete = true
+	}
+}
+
+func Prefix(prefix string) Option {
+	return func(w *defaultFs) {
+		w.prefix = prefix
 	}
 }
 
@@ -72,8 +82,9 @@ func New(opts ...Option) (Fs, error) {
 }
 
 type defaultFs struct {
-	fs       blob.Store
+	fs       storage.Store
 	leafSize uint32
+	prefix   string
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (Key, []byte, error) {
@@ -101,7 +112,7 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (Key, []byte, error)
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
-	return newReader(d.fs, hash, d.leafSize)
+	return newReader(d.fs, hash, d.leafSize, d.prefix)
 }
 
 func (d *defaultFs) writer() Writer {
@@ -113,7 +124,7 @@ func (d *defaultFs) writer() Writer {
 }
 
 func (d *defaultFs) Delete(ctx context.Context, hash Key) error {
-	keys, err := LeafsForHash(d.fs, hash, d.leafSize)
+	keys, err := LeafsForHash(d.fs, hash, d.leafSize, d.prefix)
 	if err != nil {
 		return err
 	}
@@ -181,7 +192,7 @@ func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, 
 		return has, nil, nil
 	}
 
-	ks, err := LeafsForHash(d.fs, key, d.leafSize)
+	ks, err := LeafsForHash(d.fs, key, d.leafSize, d.prefix)
 	if err != nil {
 		return false, nil, nil
 	}
@@ -202,8 +213,8 @@ func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, 
 
 func matchAnyKey(_ Key) bool { return true }
 
-func IsRootKey(fs blob.Store, key Key, leafSize uint32) bool {
-	keys, err := LeafsForHash(fs, key, leafSize)
+func IsRootKey(fs storage.Store, key Key, leafSize uint32) bool {
+	keys, err := LeafsForHash(fs, key, leafSize, "")
 	if err != nil {
 		return false
 	}

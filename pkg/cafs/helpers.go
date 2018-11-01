@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	blake2b "github.com/minio/blake2b-simd"
-	"github.com/oneconcern/datamon/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 func CopyPaddedJSON(w io.Writer, buf *bytes.Buffer) {
@@ -54,8 +54,8 @@ func RootHash(leaves []Key, leafSize uint32) (Key, error) {
 	return k, nil
 }
 
-func LeafsForHash(blobs blob.Store, hash Key, leafSize uint32) ([]Key, error) {
-	rdr, err := blobs.Get(context.Background(), hash.String())
+func LeafsForHash(blobs storage.Store, hash Key, leafSize uint32, prefix string) ([]Key, error) {
+	rdr, err := blobs.Get(context.Background(), hash.StringWithPrefix(prefix))
 	if err != nil {
 		return nil, err
 	}

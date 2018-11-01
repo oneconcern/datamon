@@ -1,3 +1,4 @@
+# Needed to bring in private packages from GitHub
 ifndef GITHUB_USER
 $(error "Must set GITHUB_USER") # this is a Make error
 endif
@@ -11,7 +12,6 @@ WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 LOCAL_KUBECTX ?= "docker-for-desktop"
-
 TARGET_MAX_CHAR_NUM=25
 ## Show help
 help:
@@ -32,9 +32,9 @@ help:
 
 .PHONY: build-datamon
 ## Build datamon docker container (datamon)
-build-datamon:
+build-datamon: test
 	@echo 'building ${YELLOW}datamon${RESET} container'
-	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec.co/datamon:$$(date '+%Y%m%d') -t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) .
+	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') -t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) .
 
 .PHONY: push-datamon
 ## Push datamon docker container
@@ -43,17 +43,44 @@ push-datamon:
 
 .PHONY: build-all
 ## Build all the containers
-build-all: build-datamon
+build-all: clean build-datamon
 
 .PHONY: push-all
 ## Push all the containers
 push-all: push-datamon
 
 .PHONY: setup
-## Setup for local development
+## Setup for testing
 setup: install-minio
 
 .PHONY: install-minio
-## Install minio in local kubernetes
+## Run minio locally for tests
 install-minio:
+	@docker run --name minio-test -d \
+	-p 9000:9000  \
+	-e "MINIO_ACCESS_KEY=access-key" \
+	-e "MINIO_SECRET_KEY=secret-key-thing" \
+	-e "MINIO_BROWSER=off" \
+	-e "MINIO_DOMAIN=s3.local"  \
+	-e "MINIO_HTTP_TRACE=/tmp/minio.log" \
+	minio/minio server /data > /dev/null
+
+.PHONY: install-minio-k8s
+## Install minio in local kubernetes
+install-minio-k8s:
 	kubectl --context $(LOCAL_KUBECTX) create -f ./k8s/minio.yaml
+
+.SILENT: clean
+## Clean up post running tests
+clean:
+	-rm -rf testdata 2>&1 | true
+	-docker stop minio-test 2>&1 | true
+	-docker rm minio-test 2>&1 | true
+
+.PHONY: test
+## Setup, run all tests and clean
+test: setup runtests clean
+
+.PHONY: runtests
+runtests:
+	@go test ./...

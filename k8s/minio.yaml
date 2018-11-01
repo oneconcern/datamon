@@ -48,7 +48,7 @@ spec:
   type: NodePort
   ports:
     - port: 9000
-      nodePort: 30900
+      nodePort: 9000
       protocol: TCP
   selector:
     app: minio

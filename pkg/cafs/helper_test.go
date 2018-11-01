@@ -9,10 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oneconcern/datamon/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/storage"
 
-	"github.com/oneconcern/datamon/internal"
-	"github.com/oneconcern/datamon/pkg/blob/localfs"
+	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
@@ -85,7 +84,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func setupTestData(dir string, files []testFile) (*testDataGenerator, blob.Store, Fs, error) {
+func setupTestData(dir string, files []testFile) (*testDataGenerator, storage.Store, Fs, error) {
 	os.RemoveAll(dir)
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(dir, "cafs")))
 	fs, err := New(
@@ -124,60 +123,13 @@ func (t *testDataGenerator) Initialize() error {
 	return nil
 }
 
-func (t *testDataGenerator) generateFile(tgt string, size int) error {
-	f, err := os.Create(tgt)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if size <= int(leafSize) { // small single chunk file
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(size))
-		if err != nil {
-			return err
-		}
-		return f.Close()
-	}
-
-	var parts = size / int(t.leafSize)
-	for i := 0; i < parts; i++ {
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(int(t.leafSize)))
-		if err != nil {
-			return err
-		}
-	}
-	remaining := size - (parts * int(t.leafSize))
-	if remaining > 0 {
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(remaining))
-		if err != nil {
-			return err
-		}
-	}
-	return f.Close()
-}
-
-func (t *testDataGenerator) generateCAFSFile(src string) error {
-	fsrc, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer fsrc.Close()
-
-	key, _, err := t.fs.Put(context.Background(), fsrc)
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(filepath.Join(t.destDir, "roots", filepath.Base(src)), []byte(key.String()), 0600)
-}
-
 func (t *testDataGenerator) Generate(files []testFile) error {
 	for _, ps := range files {
-		if err := t.generateFile(ps.Original, ps.Size); err != nil {
+		if err := GenerateFile(ps.Original, ps.Size, t.leafSize); err != nil {
 			return err
 		}
 
-		if err := t.generateCAFSFile(ps.Original); err != nil {
+		if err := GenerateCAFSFile(ps.Original, t.fs, t.destDir); err != nil {
 			return err
 		}
 	}

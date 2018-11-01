@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oneconcern/datamon/pkg/blob"
-	"github.com/oneconcern/datamon/pkg/blob/localfs"
+	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
@@ -36,10 +36,10 @@ func TestChunkReader_SmallOnly(t *testing.T) {
 	}
 }
 
-func verifyChunkReader(t testing.TB, blobs blob.Store, tf testFile) {
+func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	rkey := keyFromFile(t, tf.RootHash)
 
-	rdr, err := newReader(blobs, rkey, leafSize)
+	rdr, err := newReader(blobs, rkey, leafSize, "")
 	require.NoError(t, err)
 	defer rdr.Close()
 

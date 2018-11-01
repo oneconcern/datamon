@@ -15,6 +15,7 @@ RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
   cp /etc/ssl/certs/ca-certificates.crt /stage/etc/ssl/certs/ca-certificates.crt &&\
   cp /etc/mime.types /stage/etc/mime.types
 
+# https://golang.org/src/time/zoneinfo.go Copy the zoneinfo installed by musl-dev
 WORKDIR /usr/share/zoneinfo
 RUN zip -r -0 /stage/zoneinfo.zip .
 

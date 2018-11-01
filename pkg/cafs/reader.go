@@ -4,11 +4,11 @@ import (
 	"context"
 	"io"
 
-	"github.com/oneconcern/datamon/pkg/blob"
+	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-func newReader(blobs blob.Store, hash Key, leafSize uint32) (io.ReadCloser, error) {
-	keys, err := LeafsForHash(blobs, hash, leafSize)
+func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string) (io.ReadCloser, error) {
+	keys, err := LeafsForHash(blobs, hash, leafSize, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -17,17 +17,17 @@ func newReader(blobs blob.Store, hash Key, leafSize uint32) (io.ReadCloser, erro
 		hash:     hash,
 		keys:     keys,
 		leafSize: leafSize,
+		prefix:   prefix,
 	}, nil
 }
 
 type chunkReader struct {
-	fs       blob.Store
+	fs       storage.Store
 	leafSize uint32
-
-	hash Key
-
-	keys []Key
-	idx  int
+	hash     Key
+	prefix   string
+	keys     []Key
+	idx      int
 
 	rdr       io.ReadCloser
 	readSoFar int
@@ -50,7 +50,7 @@ func (r *chunkReader) Read(data []byte) (int, error) {
 	for {
 		key := r.keys[r.idx]
 		if r.rdr == nil {
-			rdr, err := r.fs.Get(context.Background(), key.String())
+			rdr, err := r.fs.Get(context.Background(), key.StringWithPrefix(r.prefix))
 			if err != nil {
 				return r.readSoFar, err
 			}
