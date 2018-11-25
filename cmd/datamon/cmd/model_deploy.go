@@ -48,10 +48,10 @@ var deployCmd = &cobra.Command{
 		if len(processor.Content) == 0 {
 			log.Fatalf("content attribute is empty ")
 		}
-		zipfile := kubeless.ZipFile(processor.Content, processor.Name)
-		//if err != nil {
-		//	log.Fatalf("create zip: %v", err)
-		//}
+		zipfile, err := kubeless.ZipFile(processor.Content, processor.Name)
+		if err != nil {
+			log.Fatalf("create zip is failing. error: %v", err)
+		}
 
 		file, err := os.Open(zipfile)
 		if err != nil {
