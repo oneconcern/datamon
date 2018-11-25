@@ -2,6 +2,7 @@ package kubeless
 
 import (
 	"archive/zip"
+	"fmt"
 	"github.com/bmatcuk/doublestar"
 	"io"
 	"io/ioutil"
@@ -15,11 +16,10 @@ const (
 
 // Zip file method take list of directories or files from content attribute and
 // target name of zip file and zip input files.
-func ZipFile(content []string, target string) (string) {
+func ZipFile(content []string, target string) (string, error) {
 	zipfile, err := createZipFile(target)
 	if err != nil {
-		log.Fatalf("error creating zip file: %s, Error: %v ",zipfile.Name(), err)
-
+		return "", fmt.Errorf("creating %q: %v", zipfile.Name(), err)
 	}
 
 	archive := zip.NewWriter(zipfile)
@@ -27,40 +27,38 @@ func ZipFile(content []string, target string) (string) {
 	for _, source := range content {
 		matches, err := doublestar.Glob(source)
 		if err != nil  {
-			log.Fatalf("glob pattern is throwing err %v ", err)
+			return "", fmt.Errorf("glob pattern %q: %v", source, err)
 		}
 
 		for _, contentDir := range matches {
 			fileInfo, err := os.Stat(contentDir)
 			if err != nil {
-				log.Fatalf("error in getting content directory stats. content %s. error %v ", contentDir, err)
+				return "", fmt.Errorf("content directory stats %q: %v", contentDir, err)
 			}
 			if !fileInfo.IsDir() {
 				err = archiveContent(contentDir, archive)
 				if err != nil {
-					log.Fatalf("archiving content is failing. error %v ", err)
+					return "", fmt.Errorf("archiving failing %q: %v", contentDir, err)
 				}
 			}
 		}
 	}
 
 	if err := archive.Close(); err != nil {
-		log.Fatalf("error while closing zipwriter. error %v ", err)
+		return "", fmt.Errorf("archive close %v ", err)
 	}
 
 	if err := zipfile.Close(); err != nil {
-		log.Fatalf("error while closing zip file. file %s, error %v ", zipfile.Name(), err)
+		return "", fmt.Errorf("zipFile close %q : %v" , zipfile.Name(), err)
 	}
 
 	log.Printf("zip file created in directory location %s ", zipfile.Name())
-	return zipfile.Name()
+	return zipfile.Name(), nil
 }
 
 func createZipFile(target string)(*os.File, error)  {
 	zipfile, err := ioutil.TempFile("", target +"-*."+ ZipExtension)
 	if err != nil {
-		log.Fatal(err)
-
 		return nil, err
 	}
 
