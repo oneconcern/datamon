@@ -36,8 +36,7 @@ type Store interface {
 	Clear(context.Context) error
 }
 
-
-func ReadTee(ctx context.Context, sStore Store, source string,  dStore Store, destination string) ([]byte, error) {
+func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, destination string) ([]byte, error) {
 	reader, err := sStore.Get(ctx, source)
 	if err != nil {
 		return nil, err
@@ -47,7 +46,7 @@ func ReadTee(ctx context.Context, sStore Store, source string,  dStore Store, de
 	if err != nil {
 		return nil, err
 	}
-	err = dStore.Put(ctx,destination, bytes.NewReader(object))
+	err = dStore.Put(ctx, destination, bytes.NewReader(object))
 	if err != nil {
 		return nil, err
 	}

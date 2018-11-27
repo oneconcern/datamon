@@ -14,7 +14,7 @@ func unpackBundleDescriptor(ctx context.Context, archiveBundle *ArchiveBundle, c
 
 	bundleDescriptorBuffer, err := storage.ReadTee(ctx,
 		archiveBundle.store, model.GetArchivePathToBundle(archiveBundle.repoId, archiveBundle.bundleId),
-		consumableBundle.Store,  model.GetConsumablePathToBundle(archiveBundle.bundleId))
+		consumableBundle.Store, model.GetConsumablePathToBundle(archiveBundle.bundleId))
 	if err != nil {
 		return err
 	}

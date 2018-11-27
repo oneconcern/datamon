@@ -27,10 +27,9 @@ var deployCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if configFile == "" {
-			 log.Fatal("from-file attribute is empty ")
+			log.Fatal("from-file attribute is empty ")
 		}
 		log.Printf("deploying model using config file %s", configFile)
-
 
 		configFileBytes, err := ioutil.ReadFile(configFile)
 		if err != nil {
@@ -77,4 +76,3 @@ func init() {
 
 	modelCmd.AddCommand(deployCmd)
 }
-

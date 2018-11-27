@@ -18,8 +18,8 @@ Every bundle is an entry in the history of a repository at a point in time.
 }
 
 var bundleOptions struct {
-	Id        string
-	DataPath  string
+	Id       string
+	DataPath string
 }
 
 func init() {

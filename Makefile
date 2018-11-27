@@ -84,3 +84,8 @@ test: setup runtests clean
 .PHONY: runtests
 runtests:
 	@go test ./...
+
+.PHONY: gofmt
+## Run gofmt on the cmd and pkg packages
+gofmt:
+	@gofmt -s -w ./cmd ./pkg
