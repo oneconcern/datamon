@@ -84,9 +84,9 @@ func (m *Maker) Process(path string) (digest []byte, err error) {
 	go func() {
 		for part, totalSize := 0, int64(0); ; part++ {
 			partBuffer := make([]byte, m.leafSize)
-			n, err := r.Read(partBuffer)
-			if err != nil {
-				if err == io.EOF {
+			n, e := r.Read(partBuffer)
+			if e != nil {
+				if e == io.EOF {
 					break
 				}
 				return
@@ -125,7 +125,7 @@ func (m *Maker) Process(path string) (digest []byte, err error) {
 	b := make([]byte, len(digestHash)*sz)
 	for index, val := range digestHash {
 		offset := sz * index
-		copy(b[offset:offset+sz], val[:])
+		copy(b[offset:offset+sz], val)
 	}
 
 	rootBlake, err := blake2b.New(&blake2b.Config{
@@ -177,7 +177,7 @@ func (m *Maker) processChunk(rx <-chan chunkInput, tx chan<- chunkOutput) {
 			Tree: &blake2b.Tree{
 				Fanout:        0,
 				MaxDepth:      2,
-				LeafSize:      uint32(c.leafSize),
+				LeafSize:      c.leafSize,
 				NodeOffset:    uint64(c.part),
 				NodeDepth:     0,
 				InnerHashSize: m.size,

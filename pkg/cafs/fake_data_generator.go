@@ -2,7 +2,9 @@ package cafs
 
 import (
 	"context"
+
 	"github.com/oneconcern/datamon/internal"
+
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,7 +18,7 @@ func GenerateFile(tgt string, size int, leafSize uint32) error {
 	defer f.Close()
 
 	if size <= int(leafSize) { // small single chunk file
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(int(size)))
+		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(size))
 		if err != nil {
 			return err
 		}
@@ -33,7 +35,7 @@ func GenerateFile(tgt string, size int, leafSize uint32) error {
 	}
 	remaining := size - (parts * int(leafSize))
 	if remaining > 0 {
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(int(remaining)))
+		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(remaining))
 		if err != nil {
 			return err
 		}

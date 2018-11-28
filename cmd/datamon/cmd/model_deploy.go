@@ -3,12 +3,14 @@ package cmd
 import (
 	"bytes"
 	"context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/oneconcern/datamon/pkg/config"
 	"github.com/oneconcern/datamon/pkg/kubeless"
 	"github.com/oneconcern/datamon/pkg/storage/sthree"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
 	"io/ioutil"
 	"log"
 	"os"
@@ -36,7 +38,11 @@ var deployCmd = &cobra.Command{
 			log.Printf("Error while reading config file: %s", err)
 		}
 
-		viper.ReadConfig(bytes.NewBuffer(configFileBytes))
+		err = viper.ReadConfig(bytes.NewBuffer(configFileBytes))
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		processor := config.Processor{}
 
 		err = viper.Unmarshal(&processor)

@@ -4,10 +4,13 @@ package gcs
 
 import (
 	gcsStorage "cloud.google.com/go/storage"
+
 	"context"
 	"errors"
+
 	"github.com/oneconcern/datamon/pkg/storage"
 	"google.golang.org/api/option"
+
 	"io"
 )
 

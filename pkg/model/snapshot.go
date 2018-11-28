@@ -12,7 +12,7 @@ type Snapshot struct {
 	PreviousCommits []string  `json:"previous_commits,omitempty" yaml:"previous_commits,omitempty"`
 	Entries         Entries   `json:"entries,omitempty" yaml:"entries,omitempty"`
 	Timestamp       time.Time `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
-	_               struct{}  `json:"-" yaml:"-"`
+	_               struct{}
 }
 
 // Snapshots represents a collection of snapshots

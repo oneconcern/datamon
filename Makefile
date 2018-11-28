@@ -79,7 +79,7 @@ clean:
 
 .PHONY: test
 ## Setup, run all tests and clean
-test: setup runtests clean
+test: clean setup runtests clean
 
 .PHONY: runtests
 runtests:
@@ -89,3 +89,8 @@ runtests:
 ## Run gofmt on the cmd and pkg packages
 gofmt:
 	@gofmt -s -w ./cmd ./pkg
+
+.PHONY: check
+## Runs static code analysis checks (golangci-lint)
+check: gofmt
+	@golangci-lint run --max-same-issues 0 --verbose

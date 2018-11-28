@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -13,8 +14,8 @@ import (
 func unpackBundleDescriptor(ctx context.Context, archiveBundle *ArchiveBundle, consumableBundle ConsumableBundle) error {
 
 	bundleDescriptorBuffer, err := storage.ReadTee(ctx,
-		archiveBundle.store, model.GetArchivePathToBundle(archiveBundle.repoId, archiveBundle.bundleId),
-		consumableBundle.Store, model.GetConsumablePathToBundle(archiveBundle.bundleId))
+		archiveBundle.store, model.GetArchivePathToBundle(archiveBundle.repoID, archiveBundle.bundleID),
+		consumableBundle.Store, model.GetConsumablePathToBundle(archiveBundle.bundleID))
 	if err != nil {
 		return err
 	}
@@ -32,8 +33,8 @@ func unpackBundleFileList(ctx context.Context, archiveBundle *ArchiveBundle, con
 	var i int64
 	for i = 0; i < archiveBundle.bundleDescriptor.EntryFilesCount; i++ {
 		bundleEntriesBuffer, err := storage.ReadTee(ctx,
-			archiveBundle.store, model.GetArchivePathToBundleFileList(archiveBundle.repoId, archiveBundle.bundleId, i),
-			consumableBundle.Store, model.GetConsumablePathToBundleFileList(archiveBundle.bundleId, i))
+			archiveBundle.store, model.GetArchivePathToBundleFileList(archiveBundle.repoID, archiveBundle.bundleID, i),
+			consumableBundle.Store, model.GetConsumablePathToBundleFileList(archiveBundle.bundleID, i))
 		if err != nil {
 			return err
 		}
@@ -63,6 +64,9 @@ func unpackDataFiles(ctx context.Context, archiveBundle *ArchiveBundle, consumab
 			return err
 		}
 		reader, err := fs.Get(ctx, key)
+		if err != nil {
+			return err
+		}
 		err = consumableBundle.Store.Put(ctx, bundleEntry.NameWithPath, reader)
 		if err != nil {
 			return err

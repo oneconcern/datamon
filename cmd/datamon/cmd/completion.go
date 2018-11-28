@@ -9,22 +9,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const bash = "bash"
+const zsh = "zsh"
+
 // completionCmd represents the completion command
 var completionCmd = &cobra.Command{
 	Use:   "completion SHELL",
-	Short: "generate completions for the tpt command",
+	Short: "generate completions for the datamon command",
 	Long: `Generate completions for your shell
 
 	For bash add the following line to your ~/.bashrc
 
-		eval "$(tpt completion bash)"
+		eval "$(datamon completion bash)"
 
 	For zsh add generate a file:
 
-		tpt completion zsh > /usr/local/share/zsh/site-functions/_tpt
+		datamon completion zsh > /usr/local/share/zsh/site-functions/_datamon
 
 	`,
-	ValidArgs: []string{"bash", "zsh"},
+	ValidArgs: []string{bash, zsh},
 	Args:      cobra.OnlyValidArgs,
 
 	Run: func(cmd *cobra.Command, args []string) {
@@ -34,16 +37,18 @@ var completionCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		shell := args[0]
-		if shell != "bash" && shell != "zsh" {
+		if shell != bash && shell != zsh {
 			// #nosec
 			fmt.Fprintln(os.Stderr, "the only supported shells are bash and zsh")
 		}
-		if shell == "bash" {
-			rootCmd.GenBashCompletion(os.Stdout)
+		if shell == bash {
+			err := rootCmd.GenBashCompletion(os.Stdout)
+			fmt.Fprintln(os.Stderr, "failed to generate bash completion:", err)
 		}
 
-		if shell == "zsh" {
-			rootCmd.GenZshCompletion(os.Stdout)
+		if shell == zsh {
+			err := rootCmd.GenZshCompletion(os.Stdout)
+			fmt.Fprintln(os.Stderr, "failed to generate zsh completion:", err)
 		}
 	},
 }

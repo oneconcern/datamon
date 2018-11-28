@@ -3,6 +3,7 @@ package core_test
 import (
 	"bytes"
 	"context"
+
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -11,7 +12,9 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+
 	"gopkg.in/yaml.v2"
+
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -24,7 +27,7 @@ const (
 	entryFilesCount = 2
 	dataFilesCount  = 4
 	repo            = "bundle_test_repo"
-	bundleId        = "bundle123"
+	bundleID        = "bundle123"
 	testRoot        = "../../testdata/core"
 	sourceDir       = "../../testdata/core/bundle/source/"
 	destinationDir  = "../../testdata/core/bundle/destination/"
@@ -40,7 +43,7 @@ func TestDownloadBundle(t *testing.T) {
 	require.NoError(t, setup(t))
 	destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
-	archiveBundle, err := core.NewArchiveBundle(repo, bundleId, sourceStore)
+	archiveBundle, err := core.NewArchiveBundle(repo, bundleID, sourceStore)
 	require.NoError(t, err)
 	require.NoError(t,
 		core.Publish(context.Background(), archiveBundle, core.ConsumableBundle{Store: destinationStore}))
@@ -50,7 +53,7 @@ func TestDownloadBundle(t *testing.T) {
 
 func validatePublish(t *testing.T, store storage.Store) error {
 	// Check Bundle File
-	reader, err := store.Get(context.Background(), model.GetConsumablePathToBundle(bundleId))
+	reader, err := store.Get(context.Background(), model.GetConsumablePathToBundle(bundleID))
 	require.NoError(t, err)
 
 	bundleDescriptorBuffer, err := ioutil.ReadAll(reader)
@@ -76,7 +79,7 @@ func getTimeStamp() *time.Time {
 	return timeStamp
 }
 
-func generateDataFile(test *testing.T, store storage.Store) (model.BundleEntry, error) {
+func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
 	// Generate data files to compare post publish, write to internal folder
 	ksuid, err := ksuid.NewRandom()
 	require.NoError(test, err)
@@ -87,6 +90,7 @@ func generateDataFile(test *testing.T, store storage.Store) (model.BundleEntry, 
 		cafs.LeafSize(leafSize),
 		cafs.Backend(store),
 	)
+	require.NoError(test, err)
 	keys, err := cafs.GenerateCAFSChunks(internalDir+ksuid.String(), fs)
 	require.NoError(test, err)
 	// return the Bundle Entry
@@ -95,7 +99,7 @@ func generateDataFile(test *testing.T, store storage.Store) (model.BundleEntry, 
 		NameWithPath: dataDir + ksuid.String(),
 		FileMode:     0700,
 		Size:         uint(size),
-	}, nil
+	}
 }
 
 func setup(t *testing.T) error {
@@ -108,20 +112,18 @@ func setup(t *testing.T) error {
 
 	for i = 0; i < entryFilesCount; i++ {
 
-		bundleEntry, err := generateDataFile(t, blobStore)
-		require.NoError(t, err)
+		bundleEntry := generateDataFile(t, blobStore)
 
 		bundleFileList := model.BundleEntries{BundleEntries: []model.BundleEntry{bundleEntry}}
 
 		for j = 0; j < (dataFilesCount - 1); j++ {
-			bundleEntry, err = generateDataFile(t, blobStore)
-			require.NoError(t, err)
+			bundleEntry = generateDataFile(t, blobStore)
 			bundleFileList.BundleEntries = append(bundleFileList.BundleEntries, bundleEntry)
 		}
 
 		buffer, err := yaml.Marshal(bundleFileList)
 		require.NoError(t, err)
-		destinationPath := model.GetArchivePathToBundleFileList(repo, bundleId, i)
+		destinationPath := model.GetArchivePathToBundleFileList(repo, bundleID, i)
 		require.NoError(t,
 			sourceStore.Put(context.Background(), destinationPath, bytes.NewReader(buffer)))
 	}
@@ -132,13 +134,13 @@ func setup(t *testing.T) error {
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(destinationDir, 0700))
 
-	return sourceStore.Put(context.Background(), model.GetArchivePathToBundle(repo, bundleId), bytes.NewReader(buffer))
+	return sourceStore.Put(context.Background(), model.GetArchivePathToBundle(repo, bundleID), bytes.NewReader(buffer))
 }
 
 func generateBundleDescriptor() model.Bundle {
 	// Generate Bundle
 	return model.Bundle{
-		ID:              bundleId,
+		ID:              bundleID,
 		LeafSize:        leafSize,
 		Message:         "test bundle",
 		Timestamp:       *getTimeStamp(),

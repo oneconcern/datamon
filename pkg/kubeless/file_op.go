@@ -3,7 +3,9 @@ package kubeless
 import (
 	"archive/zip"
 	"fmt"
+
 	"github.com/bmatcuk/doublestar"
+
 	"io"
 	"io/ioutil"
 	"log"

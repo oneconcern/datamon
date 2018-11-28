@@ -117,15 +117,16 @@ func setupStore(t testing.TB) (storage.Store, func()) {
 		runtime.Goexit()
 	}
 	cl := s3.New(sess)
-	cl.CreateBucket(&s3.CreateBucketInput{
+	_, err = cl.CreateBucket(&s3.CreateBucketInput{
 		Bucket: bucket,
 		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
 			LocationConstraint: aws.String("us-west-2"),
 		},
 	})
+	require.NoError(t, err)
 
 	cleanup := func() {
-		cl.DeleteBucket(&s3.DeleteBucketInput{
+		_, _ = cl.DeleteBucket(&s3.DeleteBucketInput{
 			Bucket: bucket,
 		})
 	}

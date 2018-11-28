@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/json-iterator/go"
+
 	"os"
 	"strconv"
 )
@@ -12,7 +13,7 @@ type Repo struct {
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	TagsRef     map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	BranchRef   map[string]string `json:"branches,omitempty" yaml:"branches,omitempty"`
-	_           struct{}          `json:"-" yaml:"-"`
+	_           struct{}
 }
 
 // ChangeSet captures the data for a change set in a bundle

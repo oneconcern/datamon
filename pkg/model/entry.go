@@ -14,7 +14,7 @@ type Entry struct {
 	Hash  string    `json:"hash" yaml:"hash"`
 	Mtime time.Time `json:"mtime" yaml:"mtime"`
 	Mode  FileMode  `json:"mode" yaml:"mode"`
-	_     struct{}  `json:"-" yaml:"-"`
+	_     struct{}
 }
 
 // Entries represent a collectin of entries
@@ -42,7 +42,7 @@ func (entries Entries) Hash() (string, error) {
 	// Iterate over hashes of all underlying nodes
 	for _, leave := range entries {
 		//#nosec
-		hasher.Write(UnsafeStringToBytes(leave.Hash))
+		_, _ = hasher.Write(UnsafeStringToBytes(leave.Hash))
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
