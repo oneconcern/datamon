@@ -17,7 +17,7 @@ import (
 var downloadBundleCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Download a bundle",
-	Long: "Download a readonly, non-interactive view of the entire data that is part of a bundle",
+	Long:  "Download a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 
 		DieIfNotAccessible(bundleOptions.DataPath)

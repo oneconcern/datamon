@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	ZipExtension  = "zip"
+	ZipExtension = "zip"
 )
 
 // Zip file method take list of directories or files from content attribute and
@@ -26,7 +26,7 @@ func ZipFile(content []string, target string) (string, error) {
 
 	for _, source := range content {
 		matches, err := doublestar.Glob(source)
-		if err != nil  {
+		if err != nil {
 			return "", fmt.Errorf("glob pattern %q: %v", source, err)
 		}
 
@@ -49,15 +49,15 @@ func ZipFile(content []string, target string) (string, error) {
 	}
 
 	if err := zipfile.Close(); err != nil {
-		return "", fmt.Errorf("zipFile close %q : %v" , zipfile.Name(), err)
+		return "", fmt.Errorf("zipFile close %q : %v", zipfile.Name(), err)
 	}
 
 	log.Printf("zip file created in directory location %s ", zipfile.Name())
 	return zipfile.Name(), nil
 }
 
-func createZipFile(target string)(*os.File, error)  {
-	zipfile, err := ioutil.TempFile("", target +"-*."+ ZipExtension)
+func createZipFile(target string) (*os.File, error) {
+	zipfile, err := ioutil.TempFile("", target+"-*."+ZipExtension)
 	if err != nil {
 		return nil, err
 	}
@@ -98,5 +98,3 @@ func archiveContent(contentToZip string, archive *zip.Writer) error {
 
 	return zipfile.Close()
 }
-
-

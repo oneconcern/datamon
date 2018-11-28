@@ -98,7 +98,7 @@ func generateDataFile(test *testing.T, store storage.Store) (model.BundleEntry, 
 	}, nil
 }
 
-func setup(t *testing.T) (error) {
+func setup(t *testing.T) error {
 	cleanup()
 
 	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
@@ -142,7 +142,7 @@ func generateBundleDescriptor() model.Bundle {
 		LeafSize:        leafSize,
 		Message:         "test bundle",
 		Timestamp:       *getTimeStamp(),
-		Committers:      []model.Contributor{{Name: "dev", Email: "dev@dev.com"},},
+		Committers:      []model.Contributor{{Name: "dev", Email: "dev@dev.com"}},
 		EntryFilesCount: entryFilesCount,
 	}
 }
@@ -152,7 +152,7 @@ func validateBundleDescriptor(descriptor model.Bundle) bool {
 	return reflect.DeepEqual(descriptor, expectedBundle)
 }
 
-func validateDataFiles(t *testing.T, expectedDir string, actualDir string) (bool) {
+func validateDataFiles(t *testing.T, expectedDir string, actualDir string) bool {
 	// TODO: make this a general purpose diff 2 folders or reuse a package
 	fileListExpected, err := ioutil.ReadDir(expectedDir)
 	require.NoError(t, err)
