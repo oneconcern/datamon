@@ -4,12 +4,13 @@ package cmd
 
 import (
 	"context"
+	"log"
+
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"log"
 )
 
 // downloadBundleCmd is the command to download a specific bundle from Datamon and model it locally. The primary purpose
@@ -24,7 +25,7 @@ var downloadBundleCmd = &cobra.Command{
 
 		sourceStore := gcs.New(repoParams.Bucket)
 		destinationSource := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
-		archiveBundle, err := core.NewArchiveBundle(repoParams.RepoName, bundleOptions.Id, sourceStore)
+		archiveBundle, err := core.NewArchiveBundle(repoParams.RepoName, bundleOptions.ID, sourceStore)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -36,15 +37,23 @@ var downloadBundleCmd = &cobra.Command{
 }
 
 func init() {
+
 	// Source
-	addBucketNameFlag(downloadBundleCmd)
-	addRepoNameOptionFlag(downloadBundleCmd)
+	requiredFlags := []string{addBucketNameFlag(downloadBundleCmd)}
+	requiredFlags = append(requiredFlags, addRepoNameOptionFlag(downloadBundleCmd))
 
 	// Bundle to download
-	addBundleFlag(downloadBundleCmd)
+	requiredFlags = append(requiredFlags, addBundleFlag(downloadBundleCmd))
 
 	// Destination
-	addDataPathFlag(downloadBundleCmd)
+	requiredFlags = append(requiredFlags, addDataPathFlag(downloadBundleCmd))
+
+	for _, flag := range requiredFlags {
+		err := downloadBundleCmd.MarkFlagRequired(flag)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
 
 	bundleCmd.AddCommand(downloadBundleCmd)
 }

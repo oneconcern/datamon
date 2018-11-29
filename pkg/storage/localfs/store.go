@@ -51,8 +51,6 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader) error {
 		if err := l.fs.MkdirAll(filepath.Dir(key), 0700); err != nil {
 			return fmt.Errorf("ensuring directories for %q: %v", key, err)
 		}
-	} else {
-		dir = "."
 	}
 	target, err := l.fs.OpenFile(key, os.O_EXCL|os.O_CREATE|os.O_WRONLY|os.O_SYNC, 0600)
 	if err != nil {

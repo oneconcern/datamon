@@ -3,14 +3,15 @@ package core
 
 import (
 	"context"
+
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 // Represents the bundle in it's archive state
 type ArchiveBundle struct {
-	repoId           string
-	bundleId         string
+	repoID           string
+	bundleID         string
 	store            storage.Store
 	bundleDescriptor model.Bundle
 	bundleEntries    []model.BundleEntry
@@ -40,8 +41,8 @@ func Publish(ctx context.Context, archiveBundle *ArchiveBundle, consumableBundle
 
 func NewArchiveBundle(repo string, bundle string, store storage.Store) (*ArchiveBundle, error) {
 	return &ArchiveBundle{
-		repoId:   repo,
-		bundleId: bundle,
+		repoID:   repo,
+		bundleID: bundle,
 		store:    store,
 	}, nil
 }

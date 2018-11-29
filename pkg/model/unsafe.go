@@ -14,12 +14,6 @@ func UnsafeStringToBytes(s string) []byte {
 	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Len:  ln,
 		Cap:  ln,
-		Data: (*(*reflect.StringHeader)(unsafe.Pointer(&s))).Data,
+		Data: (*reflect.StringHeader)(unsafe.Pointer(&s)).Data,
 	}))
-}
-
-// UnsafeBytesToString converts []byte to string without a memcopy
-func UnsafeBytesToString(b []byte) string {
-	/* #nosec */
-	return *(*string)(unsafe.Pointer(&reflect.StringHeader{Data: uintptr(unsafe.Pointer(&b[0])), Len: len(b)}))
 }
