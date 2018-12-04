@@ -61,7 +61,10 @@ func TestCAFS_Put(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	rk, _, err := fs.Put(context.Background(), f)
+	written, rk, _, err := fs.Put(context.Background(), f)
+	fileInfo, err := f.Stat()
+	require.NoError(t, err)
+	require.Equal(t, fileInfo.Size(), written)
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 

@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	leafSize        = 1.5 * 1024 * 1024
+	leafSize        = cafs.DefaultLeafSize
 	entryFilesCount = 2
 	dataFilesCount  = 4
 	repo            = "bundle_test_repo"
@@ -31,6 +31,7 @@ const (
 	testRoot        = "../../testdata/core"
 	sourceDir       = "../../testdata/core/bundle/source/"
 	destinationDir  = "../../testdata/core/bundle/destination/"
+	destinationDir2 = "../../testdata/core/bundle/destination2/"
 	internalDir     = "../../testdata/core/internal/"
 	dataDir         = "dir/"
 )
@@ -39,16 +40,21 @@ var (
 	timeStamp *time.Time
 )
 
-func TestDownloadBundle(t *testing.T) {
+func TestBundle(t *testing.T) {
+	cleanup()
 	require.NoError(t, setup(t))
 	destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
-	archiveBundle, err := core.NewArchiveBundle(repo, bundleID, sourceStore)
-	require.NoError(t, err)
+	archiveBundle := core.NewBundle(repo, bundleID, sourceStore)
+	consumableBundle := core.NewBundle(repo, bundleID, destinationStore)
 	require.NoError(t,
-		core.Publish(context.Background(), archiveBundle, core.ConsumableBundle{Store: destinationStore}))
+		core.Publish(context.Background(), archiveBundle, consumableBundle))
 	require.NoError(t, validatePublish(t, destinationStore))
-	cleanup()
+	destinationStore2 := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir2))
+	archiveBundle2 := core.NewBundle(repo, "", destinationStore2)
+	require.NoError(t,
+		core.Upload(context.Background(), *consumableBundle, archiveBundle2))
+	require.True(t, validateUpload(t))
 }
 
 func validatePublish(t *testing.T, store storage.Store) error {
@@ -68,6 +74,13 @@ func validatePublish(t *testing.T, store storage.Store) error {
 	// Check Files
 	validateDataFiles(t, internalDir, destinationDir+dataDir)
 	return nil
+}
+
+func validateUpload(t *testing.T) bool {
+	// Check if the blobs are the same as download
+	require.True(t, validateDataFiles(t, sourceDir+"/blobs/", destinationDir2+"/blobs/"))
+	// Check if the bundle json and file list are what is expected.
+	return true
 }
 
 func getTimeStamp() *time.Time {
@@ -98,7 +111,7 @@ func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
 		Hash:         keys.String(),
 		NameWithPath: dataDir + ksuid.String(),
 		FileMode:     0700,
-		Size:         uint(size),
+		Size:         uint64(size),
 	}
 }
 
@@ -108,7 +121,7 @@ func setup(t *testing.T) error {
 	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir+"blobs"))
 	require.NoError(t, os.MkdirAll(internalDir, 0700))
-	var i, j int64
+	var i, j uint64
 
 	for i = 0; i < entryFilesCount; i++ {
 
@@ -140,12 +153,12 @@ func setup(t *testing.T) error {
 func generateBundleDescriptor() model.Bundle {
 	// Generate Bundle
 	return model.Bundle{
-		ID:              bundleID,
-		LeafSize:        leafSize,
-		Message:         "test bundle",
-		Timestamp:       *getTimeStamp(),
-		Committers:      []model.Contributor{{Name: "dev", Email: "dev@dev.com"}},
-		EntryFilesCount: entryFilesCount,
+		ID:                     bundleID,
+		LeafSize:               leafSize,
+		Message:                "test bundle",
+		Timestamp:              *getTimeStamp(),
+		Contributors:           []model.Contributor{{Name: "dev", Email: "dev@dev.com"}},
+		BundleEntriesFileCount: entryFilesCount,
 	}
 }
 
@@ -167,7 +180,7 @@ func validateDataFiles(t *testing.T, expectedDir string, actualDir string) bool 
 			if fileExpected.Name() == fileActual.Name() {
 				found = true
 				require.Equal(t, fileExpected.Size(), fileActual.Size())
-				// Issue #35
+				// TODO: Issue #35
 				// require.Equal(t, fileExpected.Mode(), fileActual.Mode())
 			}
 		}

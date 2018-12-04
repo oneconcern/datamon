@@ -11,11 +11,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func unpackBundleDescriptor(ctx context.Context, archiveBundle *ArchiveBundle, consumableBundle ConsumableBundle) error {
+func unpackBundleDescriptor(ctx context.Context, archiveBundle *Bundle, consumableBundle *Bundle) error {
 
 	bundleDescriptorBuffer, err := storage.ReadTee(ctx,
 		archiveBundle.store, model.GetArchivePathToBundle(archiveBundle.repoID, archiveBundle.bundleID),
-		consumableBundle.Store, model.GetConsumablePathToBundle(archiveBundle.bundleID))
+		consumableBundle.store, model.GetConsumablePathToBundle(archiveBundle.bundleID))
 	if err != nil {
 		return err
 	}
@@ -28,13 +28,13 @@ func unpackBundleDescriptor(ctx context.Context, archiveBundle *ArchiveBundle, c
 	return nil
 }
 
-func unpackBundleFileList(ctx context.Context, archiveBundle *ArchiveBundle, consumableBundle ConsumableBundle) error {
+func unpackBundleFileList(ctx context.Context, archiveBundle *Bundle, consumableBundle *Bundle) error {
 	// Download the files json
-	var i int64
-	for i = 0; i < archiveBundle.bundleDescriptor.EntryFilesCount; i++ {
+	var i uint64
+	for i = 0; i < archiveBundle.bundleDescriptor.BundleEntriesFileCount; i++ {
 		bundleEntriesBuffer, err := storage.ReadTee(ctx,
 			archiveBundle.store, model.GetArchivePathToBundleFileList(archiveBundle.repoID, archiveBundle.bundleID, i),
-			consumableBundle.Store, model.GetConsumablePathToBundleFileList(archiveBundle.bundleID, i))
+			consumableBundle.store, model.GetConsumablePathToBundleFileList(archiveBundle.bundleID, uint64(i)))
 		if err != nil {
 			return err
 		}
@@ -49,7 +49,7 @@ func unpackBundleFileList(ctx context.Context, archiveBundle *ArchiveBundle, con
 	return nil
 }
 
-func unpackDataFiles(ctx context.Context, archiveBundle *ArchiveBundle, consumableBundle ConsumableBundle) error {
+func unpackDataFiles(ctx context.Context, archiveBundle *Bundle, consumableBundle *Bundle) error {
 	fs, err := cafs.New(
 		cafs.LeafSize(archiveBundle.bundleDescriptor.LeafSize),
 		cafs.Backend(archiveBundle.store),
@@ -67,7 +67,7 @@ func unpackDataFiles(ctx context.Context, archiveBundle *ArchiveBundle, consumab
 		if err != nil {
 			return err
 		}
-		err = consumableBundle.Store.Put(ctx, bundleEntry.NameWithPath, reader)
+		err = consumableBundle.store.Put(ctx, bundleEntry.NameWithPath, reader)
 		if err != nil {
 			return err
 		}

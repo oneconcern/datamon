@@ -60,7 +60,7 @@ type Option func(*defaultFs)
 // Fs implementations provide content-addressable filesystem operations
 type Fs interface {
 	Get(context.Context, Key) (io.ReadCloser, error)
-	Put(context.Context, io.Reader) (Key, []byte, error)
+	Put(context.Context, io.Reader) (int64, Key, []byte, error)
 	Delete(context.Context, Key) error
 	Clear(context.Context) error
 	Keys(context.Context) ([]Key, error)
@@ -87,39 +87,40 @@ type defaultFs struct {
 	prefix   string
 }
 
-func (d *defaultFs) Put(ctx context.Context, src io.Reader) (Key, []byte, error) {
-	w := d.writer()
+func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, error) {
+	w := d.writer(d.prefix)
 	defer w.Close()
 
-	_, err := io.Copy(w, src)
+	written, err := io.Copy(w, src)
 	if err != nil {
-		return Key{}, nil, err
+		return 0, Key{}, nil, err
 	}
 
 	key, keys, err := w.Flush()
 	if err != nil {
-		return Key{}, nil, err
+		return 0, Key{}, nil, err
 	}
 	if err = w.Close(); err != nil {
-		return Key{}, nil, err
+		return 0, Key{}, nil, err
 	}
 
-	if err := d.fs.Put(ctx, key.String(), bytes.NewReader(append(keys, key[:]...))); err != nil {
-		return Key{}, nil, err
+	if err := d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...))); err != nil {
+		return 0, Key{}, nil, err
 	}
 
-	return key, keys, nil
+	return written, key, keys, nil
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
 	return newReader(d.fs, hash, d.leafSize, d.prefix)
 }
 
-func (d *defaultFs) writer() Writer {
+func (d *defaultFs) writer(prefix string) Writer {
 	return &fsWriter{
 		fs:       d.fs,
 		leafSize: d.leafSize,
 		buf:      make([]byte, d.leafSize),
+		prefix:   prefix,
 	}
 }
 
