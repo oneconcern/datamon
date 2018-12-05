@@ -3,6 +3,15 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/url"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/oneconcern/kubeless/cmd/kubeless/function"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/oneconcern/datamon/pkg/config"
@@ -10,11 +19,6 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage/sthree"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"io/ioutil"
-	"log"
-	"os"
-	"strings"
 )
 
 var configFile string
@@ -23,8 +27,7 @@ var configFile string
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Commands to deploy models on Kubernetes.",
-	Long: `Commands to deploy models on Kubernetes.
-`,
+	Long:  "Commands to deploy models on Kubernetes.",
 
 	Run: func(cmd *cobra.Command, args []string) {
 
@@ -38,11 +41,13 @@ var deployCmd = &cobra.Command{
 			log.Printf("Error while reading config file: %s", err)
 		}
 
-		err = viper.ReadConfig(bytes.NewBuffer(configFileBytes))
+		ext, err := kubeless.ConfigExt(configFile)
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 
+		viper.SetConfigType(ext)
+		viper.ReadConfig(bytes.NewBuffer(configFileBytes))
 		processor := config.Processor{}
 
 		err = viper.Unmarshal(&processor)
@@ -73,6 +78,22 @@ var deployCmd = &cobra.Command{
 
 		if err != nil {
 			log.Fatalf("s3 upload [%s]: %v", processor.Name, err)
+		}
+		out, err := exec.Command("aws", "s3", "presign", "s3://oneconcern-datamon-dev/"+s3FileName).Output()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		bucketUrl, err := url.QueryUnescape(fmt.Sprintf("%s", bytes.TrimRight(out, "\n")))
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = function.DeployModel(processor.Name, "default", processor.Command[0], bucketUrl, "",
+			processor.Runtime, "", processor.Resources.Mem.Max, processor.Resources.CPU.Max, "180", "", 8080,
+			false, make([]string, 0), make([]string, 0), make([]string, 0))
+
+		if err != nil {
+			log.Fatalf("error model deploy %v ", err)
 		}
 	},
 }

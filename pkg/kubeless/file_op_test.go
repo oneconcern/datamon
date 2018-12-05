@@ -3,8 +3,6 @@ package kubeless
 import (
 	"archive/zip"
 	"fmt"
-	"github.com/bmatcuk/doublestar"
-	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
 	"log"
@@ -12,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bmatcuk/doublestar"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateZipFile(t *testing.T) {
@@ -189,6 +190,36 @@ func TestZipFileContent(t *testing.T) {
 
 	defer os.Remove(unzipFiles[0])
 	require.Equalf(t, fileContent1, zipFileContent, "content of file and zip is not equal")
+}
+
+func TestConfigFileYamlExtension(t *testing.T) {
+	fileName := "test-kubeless-yaml.yaml"
+	ext, err := ConfigExt(fileName)
+	require.NoError(t, err)
+
+	require.Equalf(t, "yaml", ext, "yaml extension mismatch")
+
+	fileName = "test-kubeless-yml.yml"
+	ext, err = ConfigExt(fileName)
+	require.NoError(t, err)
+
+	require.Equalf(t, "yml", ext, "yml extension mismatch")
+}
+
+func TestConfigFileJsonExtension(t *testing.T) {
+	fileName := "test-kubeless-json.json"
+
+	ext, err := ConfigExt(fileName)
+	require.NoError(t, err)
+
+	require.Equalf(t, "json", ext, "json extension mismatch")
+}
+
+func TestConfigFileDummyExtension(t *testing.T) {
+	fileName := "test-kubeless"
+
+	_, err := ConfigExt(fileName)
+	require.Error(t, err, "no extension found")
 }
 
 func unzip(src string, dest string) ([]string, error) {

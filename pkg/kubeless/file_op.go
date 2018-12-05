@@ -3,13 +3,13 @@ package kubeless
 import (
 	"archive/zip"
 	"fmt"
-
-	"github.com/bmatcuk/doublestar"
-
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
+
+	"github.com/bmatcuk/doublestar"
 )
 
 const (
@@ -65,6 +65,19 @@ func createZipFile(target string) (*os.File, error) {
 	}
 
 	return zipfile, nil
+}
+
+func ConfigExt(configFile string) (string, error) {
+	ext := filepath.Ext(configFile)
+
+	if ext == ".yaml" || ext == ".yml" {
+		return ext[1:], nil
+	}
+	if ext == ".json" {
+		return ext[1:], nil
+	}
+
+	return "", fmt.Errorf("datamon only supports yaml & json file extension ")
 }
 
 // Archiving files into a single zip file
