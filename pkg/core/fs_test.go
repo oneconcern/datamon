@@ -1,0 +1,28 @@
+package core
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+type LookupKeys struct {
+	iNode    uint64
+	name     string
+	expected []byte
+}
+
+var lookupKeys = []LookupKeys{
+	// Already clean
+	{0, "0", []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30}},
+	{1, "0", []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30}},
+	{16, "2", []byte{0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32}},
+	{18446744073709551615, "key", []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x6b, 0x65, 0x79}},
+}
+
+func TestFormLookupKey(t *testing.T) {
+	for _, test := range lookupKeys {
+		keyGenerated := formLookupKey(test.iNode, test.name)
+		require.Equal(t, test.expected, keyGenerated)
+	}
+}

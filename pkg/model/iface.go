@@ -58,7 +58,7 @@ type RepoStore interface {
 type BundleStore interface {
 	Store
 
-	ListTopLevel(context.Context) ([]Bundle, error)
+	ListTopLevel(context.Context) ([]BundleDescriptor, error)
 	ListTopLevelIDs(context.Context) ([]string, error)
 
 	ListBranches(context.Context) ([]string, error)
@@ -72,7 +72,7 @@ type BundleStore interface {
 	DeleteTag(context.Context, string) error
 
 	Create(context.Context, string, string, string, []string, ChangeSet) (string, bool, error)
-	Get(context.Context, string) (*Bundle, error)
+	Get(context.Context, string) (*BundleDescriptor, error)
 	GetObject(context.Context, string) (Entry, error)
 	GetObjectForPath(context.Context, string) (Entry, error)
 	HashForPath(context.Context, string) (string, error)
@@ -96,7 +96,7 @@ type StageMeta interface {
 type SnapshotStore interface {
 	Store
 
-	Create(context.Context, *Bundle) (*Snapshot, error)
+	Create(context.Context, *BundleDescriptor) (*Snapshot, error)
 	Get(context.Context, string) (*Snapshot, error)
 	GetForBundle(context.Context, string) (*Snapshot, error)
 }

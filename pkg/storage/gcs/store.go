@@ -3,12 +3,12 @@
 package gcs
 
 import (
-	gcsStorage "cloud.google.com/go/storage"
-
 	"context"
 	"errors"
 
 	"google.golang.org/api/iterator"
+
+	gcsStorage "cloud.google.com/go/storage"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 	"google.golang.org/api/option"
@@ -44,8 +44,11 @@ func (g *gcs) String() string {
 }
 
 func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
-
-	_, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).Attrs(ctx)
+	client, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeReadOnly))
+	if err != nil {
+		return false, err
+	}
+	_, err = client.Bucket(g.bucket).Object(objectName).Attrs(ctx)
 	if err != nil {
 		if err != gcsStorage.ErrObjectNotExist {
 			return false, nil
@@ -103,7 +106,6 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken, prefix, delimiter strin
 	}
 
 	return keys, pageToken, nil
-
 }
 
 func (g *gcs) Clear(context.Context) error {
