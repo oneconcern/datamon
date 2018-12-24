@@ -1,11 +1,10 @@
-package core_test
+package core
 
 import (
 	"bytes"
 	"context"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
-	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
@@ -41,19 +40,18 @@ var (
 )
 
 func TestBundle(t *testing.T) {
-	cleanup()
-	require.NoError(t, setup(t))
-	destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
-	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
-	archiveBundle := core.NewBundle(repo, bundleID, sourceStore)
-	consumableBundle := core.NewBundle(repo, bundleID, destinationStore)
+	require.NoError(t, Setup(t))
+	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
+	archiveStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
+	bundle := NewBundle(repo, bundleID, archiveStore, consumableStore)
 	require.NoError(t,
-		core.Publish(context.Background(), archiveBundle, consumableBundle))
-	require.NoError(t, validatePublish(t, destinationStore))
+		Publish(context.Background(), bundle))
+	require.NoError(t, validatePublish(t, consumableStore))
+
 	destinationStore2 := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir2))
-	archiveBundle2 := core.NewBundle(repo, "", destinationStore2)
+	archiveBundle2 := NewBundle(repo, "", destinationStore2, consumableStore)
 	require.NoError(t,
-		core.Upload(context.Background(), *consumableBundle, archiveBundle2))
+		Upload(context.Background(), archiveBundle2))
 	require.True(t, validateUpload(t))
 }
 
@@ -65,7 +63,7 @@ func validatePublish(t *testing.T, store storage.Store) error {
 	bundleDescriptorBuffer, err := ioutil.ReadAll(reader)
 	require.NoError(t, err)
 
-	var bundleDescriptor model.Bundle
+	var bundleDescriptor model.BundleDescriptor
 	err = yaml.Unmarshal(bundleDescriptorBuffer, &bundleDescriptor)
 	require.NoError(t, err)
 
@@ -92,7 +90,7 @@ func getTimeStamp() *time.Time {
 	return timeStamp
 }
 
-func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
+func generateDataFile(test *testing.T, store storage.Store, iNode uint64) model.BundleEntry {
 	// Generate data files to compare post publish, write to internal folder
 	ksuid, err := ksuid.NewRandom()
 	require.NoError(test, err)
@@ -115,7 +113,7 @@ func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
 	}
 }
 
-func setup(t *testing.T) error {
+func Setup(t *testing.T) error {
 	cleanup()
 
 	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
@@ -125,12 +123,12 @@ func setup(t *testing.T) error {
 
 	for i = 0; i < entryFilesCount; i++ {
 
-		bundleEntry := generateDataFile(t, blobStore)
+		bundleEntry := generateDataFile(t, blobStore, i+1024)
 
 		bundleFileList := model.BundleEntries{BundleEntries: []model.BundleEntry{bundleEntry}}
 
 		for j = 0; j < (dataFilesCount - 1); j++ {
-			bundleEntry = generateDataFile(t, blobStore)
+			bundleEntry = generateDataFile(t, blobStore, (i+1)*(j+1)+1024)
 			bundleFileList.BundleEntries = append(bundleFileList.BundleEntries, bundleEntry)
 		}
 
@@ -150,9 +148,9 @@ func setup(t *testing.T) error {
 	return sourceStore.Put(context.Background(), model.GetArchivePathToBundle(repo, bundleID), bytes.NewReader(buffer))
 }
 
-func generateBundleDescriptor() model.Bundle {
+func generateBundleDescriptor() model.BundleDescriptor {
 	// Generate Bundle
-	return model.Bundle{
+	return model.BundleDescriptor{
 		ID:                     bundleID,
 		LeafSize:               leafSize,
 		Message:                "test bundle",
@@ -162,7 +160,7 @@ func generateBundleDescriptor() model.Bundle {
 	}
 }
 
-func validateBundleDescriptor(descriptor model.Bundle) bool {
+func validateBundleDescriptor(descriptor model.BundleDescriptor) bool {
 	expectedBundle := generateBundleDescriptor()
 	return reflect.DeepEqual(descriptor, expectedBundle)
 }

@@ -23,10 +23,9 @@ var uploadBundleCmd = &cobra.Command{
 		destinationStore := gcs.New(repoParams.Bucket)
 		sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 
-		archiveBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore)
-		consumableBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, destinationStore)
+		bundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore, destinationStore)
 
-		err := core.Publish(context.Background(), archiveBundle, consumableBundle)
+		err := core.Publish(context.Background(), bundle)
 		if err != nil {
 			log.Fatalln(err)
 		}
