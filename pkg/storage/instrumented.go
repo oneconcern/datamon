@@ -100,3 +100,10 @@ func (i *instrumentedStore) Clear(ctx context.Context) error {
 func (i *instrumentedStore) String() string {
 	return i.store.String()
 }
+
+func (i *instrumentedStore) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
+	span := i.spanFromContext(ctx, i.opName("GetAt"))
+	defer span.Finish()
+	i.logs.Bg().Info("get a offset reader")
+	return i.store.GetAt(ctx, objectName)
+}

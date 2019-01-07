@@ -2,6 +2,7 @@ package sthree
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -159,4 +160,8 @@ func (s *s3FS) Clear(ctx context.Context) error {
 
 func (s *s3FS) String() string {
 	return "s3@" + s.bucket
+}
+
+func (s *s3FS) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
+	return nil, errors.New("unimplemented")
 }

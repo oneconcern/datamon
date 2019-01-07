@@ -44,7 +44,7 @@ func NewDatamonFS(bundle *Bundle) (*DatamonFS, error) {
 	}
 
 	// Extract the meta information needed.
-	err := PublishMetadata(context.Background(), fs.bundle)
+	err := Publish(context.Background(), fs.bundle)
 	if err != nil {
 		return nil, err
 	}
@@ -85,11 +85,11 @@ type fsEntry struct {
 	// remains fixed.
 	iNode      uint64                  // Unique ID for Fuse
 	attributes fuseops.InodeAttributes // Fuse Attributes
+	fullPath   string
 }
 
 type fsNodeToAdd struct {
 	parentINode uint64
-	fullPath    string
 	fsEntry     fsEntry
 }
 
@@ -97,13 +97,13 @@ func (fs *fsInternal) insertDatamonFSDirEntry(
 	dirStoreTxn *iradix.Txn,
 	lookupTreeTxn *iradix.Txn,
 	fsEntryStoreTxn *iradix.Txn,
-	fullPath string,
 	parentInode uint64,
 	dirFsEntry fsEntry) error {
 
-	_, update := dirStoreTxn.Insert([]byte(fullPath), dirFsEntry)
+	_, update := dirStoreTxn.Insert([]byte(dirFsEntry.fullPath), dirFsEntry)
+
 	if update {
-		return errors.New("dirStore updates are not expected: /" + fullPath)
+		return errors.New("dirStore updates are not expected: /" + dirFsEntry.fullPath)
 	}
 
 	key := formKey(dirFsEntry.iNode)
@@ -114,18 +114,18 @@ func (fs *fsInternal) insertDatamonFSDirEntry(
 	}
 
 	if dirFsEntry.iNode != fuseops.RootInodeID {
-		key = formLookupKey(parentInode, path.Base(fullPath))
+		key = formLookupKey(parentInode, path.Base(dirFsEntry.fullPath))
 
 		_, update = lookupTreeTxn.Insert(key, dirFsEntry)
 		if update {
-			return errors.New("lookupTree updates are not expected: " + fullPath)
+			return errors.New("lookupTree updates are not expected: " + dirFsEntry.fullPath)
 		}
 
 		childEntries := fs.readDirMap[parentInode]
 		childEntries = append(childEntries, fuseutil.Dirent{
 			Offset: fuseops.DirOffset(len(childEntries) + 1),
 			Inode:  fuseops.InodeID(dirFsEntry.iNode),
-			Name:   path.Base(fullPath),
+			Name:   path.Base(dirFsEntry.fullPath),
 			Type:   fuseutil.DT_Directory,
 		})
 		fs.readDirMap[parentInode] = childEntries
@@ -137,7 +137,6 @@ func (fs *fsInternal) insertDatamonFSDirEntry(
 func (fs *fsInternal) insertDatamonFSEntry(
 	lookupTreeTxn *iradix.Txn,
 	fsEntryStoreTxn *iradix.Txn,
-	fullPath string,
 	parentInode uint64,
 	fsEntry fsEntry) error {
 
@@ -145,21 +144,21 @@ func (fs *fsInternal) insertDatamonFSEntry(
 
 	_, update := fsEntryStoreTxn.Insert(key, fsEntry)
 	if update {
-		return errors.New("fsEntryStore updates are not expected: " + fullPath)
+		return errors.New("fsEntryStore updates are not expected: " + fsEntry.fullPath)
 	}
 
-	key = formLookupKey(parentInode, path.Base(fullPath))
+	key = formLookupKey(parentInode, path.Base(fsEntry.fullPath))
 
 	_, update = lookupTreeTxn.Insert(key, fsEntry)
 	if update {
-		return errors.New("lookupTree updates are not expected: " + fullPath)
+		return errors.New("lookupTree updates are not expected: " + fsEntry.fullPath)
 	}
 
 	childEntries := fs.readDirMap[parentInode]
 	childEntries = append(childEntries, fuseutil.Dirent{
 		Offset: fuseops.DirOffset(len(childEntries) + 1),
 		Inode:  fuseops.InodeID(fsEntry.iNode),
-		Name:   path.Base(fullPath),
+		Name:   path.Base(fsEntry.fullPath),
 		Type:   fuseutil.DT_File,
 	})
 	fs.readDirMap[parentInode] = childEntries
@@ -178,7 +177,6 @@ func (fs *fsInternal) populateFS(bundle *Bundle) (*DatamonFS, error) {
 		dirStoreTxn,
 		lookupTreeTxn,
 		fsEntryStoreTxn,
-		rootPath,
 		fuseops.RootInodeID, // Root points to itself
 		*dirFsEntry)
 	if err != nil {
@@ -210,7 +208,6 @@ func (fs *fsInternal) populateFS(bundle *Bundle) (*DatamonFS, error) {
 				nodesToAdd = append(nodesToAdd, fsNodeToAdd{
 					parentINode: fuseops.RootInodeID,
 					fsEntry:     *newFsEntry,
-					fullPath:    nameWithPath,
 				})
 				if len(nodesToAdd) > 1 {
 					// If more than one node is to be added populate the parent iNode.
@@ -223,7 +220,6 @@ func (fs *fsInternal) populateFS(bundle *Bundle) (*DatamonFS, error) {
 			nodesToAdd = append(nodesToAdd, fsNodeToAdd{
 				parentINode: 0, // undefined
 				fsEntry:     *newFsEntry,
-				fullPath:    nameWithPath,
 			})
 
 			if len(nodesToAdd) > 1 {
@@ -254,7 +250,6 @@ func (fs *fsInternal) populateFS(bundle *Bundle) (*DatamonFS, error) {
 					dirStoreTxn,
 					lookupTreeTxn,
 					fsEntryStoreTxn,
-					nodeToAdd.fullPath,
 					nodeToAdd.parentINode,
 					nodeToAdd.fsEntry,
 				)
@@ -263,7 +258,6 @@ func (fs *fsInternal) populateFS(bundle *Bundle) (*DatamonFS, error) {
 				err = fs.insertDatamonFSEntry(
 					lookupTreeTxn,
 					fsEntryStoreTxn,
-					nodeToAdd.fullPath,
 					nodeToAdd.parentINode,
 					nodeToAdd.fsEntry,
 				)
@@ -291,8 +285,9 @@ func newDatamonFSEntry(bundleEntry *model.BundleEntry, time time.Time, id uint64
 		mode = 0777 | os.ModeDir
 	}
 	return &fsEntry{
-		hash:  bundleEntry.Hash,
-		iNode: id,
+		fullPath: bundleEntry.NameWithPath,
+		hash:     bundleEntry.Hash,
+		iNode:    id,
 		attributes: fuseops.InodeAttributes{
 			Size:   bundleEntry.Size,
 			Nlink:  linkCount,
@@ -359,7 +354,7 @@ func (fs *fsInternal) StatFS(
 }
 
 func (fs *fsInternal) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
-	log.Print(fmt.Printf("lookup parent id:%d, child: %s", op.Parent, op.Name))
+	log.Print(fmt.Printf("lookup parent id:%d, child: %s ", op.Parent, op.Name))
 	parentINode := uint64(op.Parent)
 	lookupKey := formLookupKey(parentINode, op.Name)
 	val, found := fs.lookupTree.Get(lookupKey)
@@ -405,7 +400,6 @@ func (fs *fsInternal) ForgetInode(
 	ctx context.Context,
 	op *fuseops.ForgetInodeOp) (err error) {
 	log.Print(fmt.Printf("ForgetInode iNode id:%d ", op.Inode))
-	err = fuse.ENOSYS
 	return
 }
 
@@ -428,7 +422,7 @@ func (fs *fsInternal) MkNode(
 func (fs *fsInternal) CreateFile(
 	ctx context.Context,
 	op *fuseops.CreateFileOp) (err error) {
-	log.Print(fmt.Printf("CreateFile parent iNode id:%d name: %s", op.Parent, op.Name))
+	log.Print(fmt.Printf("CreateFile parent iNode id:%d name: %s ", op.Parent, op.Name))
 	err = fuse.ENOSYS
 	return
 }
@@ -452,7 +446,7 @@ func (fs *fsInternal) CreateLink(
 func (fs *fsInternal) Rename(
 	ctx context.Context,
 	op *fuseops.RenameOp) (err error) {
-	log.Print(fmt.Printf("Rename new name:"+op.NewName+" oldname:"+op.OldName+" new parent %d, old parent %d", op.NewParent, op.OldParent))
+	log.Print(fmt.Printf("Rename new name:"+op.NewName+" oldname:"+op.OldName+" new parent %d, old parent %d ", op.NewParent, op.OldParent))
 	err = fuse.ENOSYS
 	return
 }
@@ -468,7 +462,7 @@ func (fs *fsInternal) RmDir(
 func (fs *fsInternal) Unlink(
 	ctx context.Context,
 	op *fuseops.UnlinkOp) (err error) {
-	log.Print(fmt.Printf("Unlink child: "+op.Name+" parent: %d", op.Parent))
+	log.Print(fmt.Printf("Unlink child: "+op.Name+" parent: %d ", op.Parent))
 	err = fuse.ENOSYS
 	return
 }
@@ -522,17 +516,28 @@ func (fs *fsInternal) ReleaseDirHandle(
 func (fs *fsInternal) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
-	log.Print(fmt.Printf("OpenFile iNode id:%d ", op.Inode))
-	err = fuse.ENOSYS
+	log.Print(fmt.Printf("OpenFile iNode id:%d handle:%d ", op.Inode, op.Handle))
 	return
 }
 
 func (fs *fsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-	log.Print(fmt.Printf("ReadFile iNode id:%d ", op.Inode))
-	err = fuse.ENOSYS
-	return
+	log.Print(fmt.Printf("ReadFile iNode id:%d, offset: %d ", op.Inode, op.Offset))
+	p, found := fs.fsEntryStore.Get(formKey(uint64(op.Inode)))
+	if !found {
+		return fuse.ENOENT
+	}
+	fsEntry := p.(fsEntry)
+	reader, err := fs.bundle.ConsumableStore.GetAt(context.Background(), fsEntry.fullPath)
+	if err != nil {
+		log.Print(err)
+		return fuse.EIO
+	}
+	n, err := reader.ReadAt(op.Dst, op.Offset)
+	log.Print(fmt.Printf("Read: %d of %s ", n, fsEntry.fullPath))
+	op.BytesRead = n
+	return nil
 }
 
 func (fs *fsInternal) WriteFile(
@@ -563,7 +568,6 @@ func (fs *fsInternal) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
 	log.Print(fmt.Printf("ReleaseFileHandle iNode id:%d ", op.Handle))
-	err = fuse.ENOSYS
 	return
 }
 

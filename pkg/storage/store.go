@@ -30,6 +30,7 @@ type Store interface {
 	String() string
 	Has(context.Context, string) (bool, error)
 	Get(context.Context, string) (io.ReadCloser, error)
+	GetAt(context.Context, string) (io.ReaderAt, error)
 	Put(context.Context, string, io.Reader) error
 	Delete(context.Context, string) error
 	Keys(context.Context) ([]string, error)
