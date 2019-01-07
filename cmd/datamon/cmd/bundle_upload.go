@@ -25,7 +25,7 @@ var uploadBundleCmd = &cobra.Command{
 
 		bundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore, destinationStore)
 
-		err := core.Publish(context.Background(), bundle)
+		err := core.Upload(context.Background(), bundle)
 		if err != nil {
 			log.Fatalln(err)
 		}

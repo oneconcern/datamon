@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var pathToMount = "/tmp/mount/"
+
 func TestMount(t *testing.T) {
 	require.NoError(t, Setup(t))
 	destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
@@ -20,12 +22,13 @@ func TestMount(t *testing.T) {
 	bundle := NewBundle(repo, bundleID, sourceStore, destinationStore)
 	fs, err := NewDatamonFS(bundle)
 	require.NoError(t, err)
-	_ = os.Mkdir("/tmp/mount2", 0777|os.ModeDir)
-	err = fs.Mount("/tmp/mount2")
+	_ = os.Mkdir(pathToMount, 0777|os.ModeDir)
+	err = fs.Mount(pathToMount)
 	require.NoError(t, err)
 	//time.Sleep(time.Hour)
-	resp, err := ioutil.ReadDir("/tmp/mount2")
+	resp, err := ioutil.ReadDir(pathToMount)
 	require.NotNil(t, resp)
 	require.NoError(t, err)
-	require.NoError(t, fs.Unmount("/tmp/mount2"))
+	validateDataFiles(t, destinationDir+dataDir, pathToMount+dataDir)
+	require.NoError(t, fs.Unmount(pathToMount))
 }

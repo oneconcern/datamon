@@ -125,3 +125,7 @@ func (l *localFS) String() string {
 		return localfs
 	}
 }
+
+func (l *localFS) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
+	return l.fs.Open(objectName)
+}

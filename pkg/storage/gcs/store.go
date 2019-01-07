@@ -91,3 +91,7 @@ func (g *gcs) Keys(ctx context.Context) ([]string, error) {
 func (g *gcs) Clear(context.Context) error {
 	return errors.New("unimplemented")
 }
+
+func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, err) {
+	return nil, errors.New("unimplemented")
+}
