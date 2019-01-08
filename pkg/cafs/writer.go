@@ -26,6 +26,7 @@ type fsWriter struct {
 	offset   uint32
 	flushed  uint32
 	pather   func(string) string
+	prefix   string
 }
 
 func (w *fsWriter) Write(p []byte) (n int, err error) {
@@ -80,7 +81,7 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 
 	if w.pather == nil {
 		// w.pather = func(lks string) string { return filepath.Join(lks[:3], lks[3:6], lks[6:]) }
-		w.pather = func(lks string) string { return lks }
+		w.pather = func(lks string) string { return w.prefix + lks }
 	}
 	err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]))
 	if err != nil {

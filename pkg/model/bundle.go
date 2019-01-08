@@ -3,22 +3,23 @@ package model
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 )
 
 // Bundle represents a commit which is a file tree with the changes to the repository.
 type Bundle struct {
-	LeafSize        uint32        `json:"leafSize" yaml:"leafSize"` // Each bundles blobs are independently generated
-	ID              string        `json:"id" yaml:"id"`
-	Message         string        `json:"message" yaml:"message"`
-	Parents         []string      `json:"parents,omitempty" yaml:"parents,omitempty"`
-	Timestamp       time.Time     `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
-	Committers      []Contributor `json:"committers" yaml:"committers"`
-	EntryFilesCount int64         `json:"entryfilescount" yaml:"entryfilescount"`
-	_               struct{}
+	LeafSize               uint32        `json:"leafSize" yaml:"leafSize"` // Each bundles blobs are independently generated
+	ID                     string        `json:"id" yaml:"id"`
+	Message                string        `json:"message" yaml:"message"`
+	Parents                []string      `json:"parents,omitempty" yaml:"parents,omitempty"`
+	Timestamp              time.Time     `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
+	Contributors           []Contributor `json:"contributors" yaml:"contributors"`
+	BundleEntriesFileCount uint64        `json:"count" yaml:"count"` // Number of files which have Bundle Entries
+	_                      struct{}
 }
 
-// List of all files part of a bundle.
+// List of files part of a bundle.
 type BundleEntries struct {
 	BundleEntries []BundleEntry `json:"BundleEntries" yaml:"BundleEntries"`
 	_             struct{}
@@ -29,7 +30,7 @@ type BundleEntry struct {
 	Hash         string      `json:"hash" yaml:"hash"`
 	NameWithPath string      `json:"name" yaml:"name"`
 	FileMode     os.FileMode `json:"mode" yaml:"mode"`
-	Size         uint        `json:"size" yaml:"size"`
+	Size         uint64      `json:"size" yaml:"size"`
 	_            struct{}
 }
 
@@ -54,7 +55,7 @@ func GetConsumablePathToBundle(bundleID string) string {
 	return fmt.Sprint("./.datamon/", bundleID, ".json")
 }
 
-func GetConsumablePathToBundleFileList(bundleID string, index int64) string {
+func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
 	return fmt.Sprint("./.datamon/", bundleID, "-bundle-files-", index, ".json")
 }
 
@@ -62,7 +63,7 @@ func GetArchivePathToBundle(repo string, bundleID string) string {
 	return fmt.Sprint(repo, "-bundles/", bundleID, "/bundle.json")
 }
 
-func GetArchivePathToBundleFileList(repo string, bundleID string, index int64) string {
+func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
 	// <repo>-bundles/<bundle>/bundlefiles-<index>.json
 	return fmt.Sprint(repo, "-bundles/", bundleID, "/bundle-files-", index, ".json")
 }
@@ -74,4 +75,11 @@ func GetArchivePathBlobPrefix() string {
 func GetBundleTimeStamp() time.Time {
 	t := time.Now()
 	return t.UTC()
+}
+
+func IsGeneratedFile(file string) bool {
+	// TODO: Need to find a way for AeroFs to convert to abs patch while honoring the fake root
+	//path, err := filepath.Abs(file)
+	match, _ := regexp.MatchString("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$", file)
+	return match
 }

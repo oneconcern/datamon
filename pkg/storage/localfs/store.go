@@ -86,6 +86,13 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 		if path == root {
 			return nil
 		}
+		fileInfo, err := l.fs.Stat(path)
+		if err != nil {
+			return err
+		}
+		if fileInfo.IsDir() {
+			return nil
+		}
 		pth := strings.Split(path, "/")
 		if len(pth) == 3 && len(pth[0]) == 3 {
 			res = append(res, strings.Join(pth, ""))

@@ -20,6 +20,6 @@ func addRepoNameOptionFlag(cmd *cobra.Command) string {
 }
 
 func addBucketNameFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVarP(&repoParams.RepoName, bucket, "b", "", "The name of the bucket used by datamon")
+	cmd.Flags().StringVarP(&repoParams.Bucket, bucket, "b", "", "The name of the bucket used by datamon")
 	return bucket
 }
