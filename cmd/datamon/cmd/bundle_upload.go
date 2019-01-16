@@ -20,13 +20,17 @@ var uploadBundleCmd = &cobra.Command{
 
 		DieIfNotAccessible(bundleOptions.DataPath)
 
-		destinationStore := gcs.New(repoParams.Bucket)
+		destinationStore, err := gcs.New(repoParams.Bucket)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 
 		archiveBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore)
 		consumableBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, destinationStore)
 
-		err := core.Publish(context.Background(), archiveBundle, consumableBundle)
+		err = core.Publish(context.Background(), archiveBundle, consumableBundle)
 		if err != nil {
 			log.Fatalln(err)
 		}

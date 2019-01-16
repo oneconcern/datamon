@@ -83,14 +83,19 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 		// w.pather = func(lks string) string { return filepath.Join(lks[:3], lks[3:6], lks[6:]) }
 		w.pather = func(lks string) string { return w.prefix + lks }
 	}
-	err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]))
-	if err != nil {
-		return 0, fmt.Errorf("write segment file: %v", err)
+	found, _ := w.fs.Has(context.TODO(), w.pather(leafKey.String()))
+	if !found {
+		err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]))
+		if err != nil {
+			return 0, fmt.Errorf("write segment file: %v", err)
+		}
+		n := int(w.offset)
+		w.offset = 0
+		return n, nil
+	} else {
+		fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
 	}
-	n := int(w.offset)
-	w.offset = 0
-
-	return n, nil
+	return 0, nil
 }
 
 func (w *fsWriter) Flush() (Key, []byte, error) {

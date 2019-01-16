@@ -23,11 +23,14 @@ var downloadBundleCmd = &cobra.Command{
 
 		DieIfNotAccessible(bundleOptions.DataPath)
 
-		sourceStore := gcs.New(repoParams.Bucket)
+		sourceStore, err := gcs.New(repoParams.Bucket)
+		if err != nil {
+			log.Fatalln(err)
+		}
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 		archiveBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore)
 		consumableBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, destinationStore)
-		err := core.Publish(context.Background(), archiveBundle, consumableBundle)
+		err = core.Publish(context.Background(), archiveBundle, consumableBundle)
 		if err != nil {
 			log.Fatalln(err)
 		}
