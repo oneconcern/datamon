@@ -1,0 +1,86 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-node
+spec:
+  selector:
+    matchLabels:
+      app: csi-node
+  template:
+    metadata:
+      labels:
+        app: csi-node
+    spec:
+      serviceAccount: csi-driver-registrar
+      hostNetwork: true
+      imagePullSecrets:
+      - name: awsecr-cred
+      containers:
+      - name: csi-driver-registrar
+        securityContext:
+          privileged: true
+        imagePullPolicy: Always
+        image: quay.io/k8scsi/driver-registrar:v0.4.2
+        args:
+        - --v=5
+        - --csi-address=$(ADDRESS)
+        - --mode=node-register
+        - --driver-requires-attachment=true
+        - --pod-info-mount-version="v1"
+        - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+        env:
+        - name: ADDRESS
+          value: /csi/csi.sock
+        - name: DRIVER_REG_SOCK_PATH
+          value: /var/lib/kubelet/plugins/com.oc.cmd.datamonfuse/csi.sock
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: plugin-dir
+          mountPath: /csi
+        - name: registration-dir
+          mountPath: /registration
+      - name: csi-gcs
+        securityContext:
+          privileged: true
+        imagePullPolicy: Always
+        image: chandreshpancholi/csi-gce:0.5.0-alpha
+        args:
+        - --endpoint=$(CSI_ENDPOINT)
+        - --nodeid=$(NODE_ID)
+        - --logtostderr
+        - --v=5
+        env:
+        - name: CSI_ENDPOINT
+          value: unix:/csi/csi.sock
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: kubelet-dir
+          mountPath: /var/lib/kubelet
+          mountPropagation: "Bidirectional"
+        - name: plugin-dir
+          mountPath: /csi
+        - name: device-dir
+          mountPath: /dev
+      volumes:
+      - name: kubelet-dir
+        hostPath:
+          path: /var/lib/kubelet
+          type: Directory
+      - name: plugin-dir
+        hostPath:
+          path: /var/lib/kubelet/plugins/com.oc.cmd.datamonfuse/
+          type: DirectoryOrCreate
+      - name: registration-dir
+        hostPath:
+          path: /var/lib/kubelet/plugins/
+          type: Directory
+      - name: device-dir
+        hostPath:
+          path: /dev
+          type: Directory

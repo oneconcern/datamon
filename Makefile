@@ -13,6 +13,11 @@ RESET  := $(shell tput -Txterm sgr0)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 LOCAL_KUBECTX ?= "docker-for-desktop"
 TARGET_MAX_CHAR_NUM=25
+
+PKG=github.com/oneconcern/datamon
+VERSION=0.1.0-alpha
+LDFLAGS?="-X ${PKG}/pkg/driver.driverVersion=${VERSION}"
+
 ## Show help
 help:
 	@echo ''
@@ -94,3 +99,7 @@ gofmt:
 ## Runs static code analysis checks (golangci-lint)
 check: gofmt
 	@golangci-lint run --max-same-issues 0 --verbose
+
+.PHONY: csi-gce
+csi-gce:
+	GOOS=linux go build -ldflags ${LDFLAGS} -o cmd/csi/docker/csi ./cmd/csi/
