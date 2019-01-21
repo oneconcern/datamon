@@ -5,6 +5,7 @@ require (
 	github.com/aws/aws-sdk-go v1.15.81
 	github.com/bmatcuk/doublestar v1.1.1
 	github.com/docker/go-units v0.3.3
+	github.com/google/martian v2.1.0+incompatible // indirect
 	github.com/googleapis/gax-go v2.0.2+incompatible // indirect
 	github.com/json-iterator/go v1.1.5
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
