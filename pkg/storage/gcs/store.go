@@ -16,6 +16,8 @@ import (
 	"io"
 )
 
+const PageSize = 1000
+
 type gcs struct {
 	client         *gcsStorage.Client
 	readOnlyClient *gcsStorage.Client
@@ -76,15 +78,32 @@ func (g *gcs) Delete(ctx context.Context, objectName string) error {
 }
 
 func (g *gcs) Keys(ctx context.Context) ([]string, error) {
-	// TODO: Finish listing all keys in one go.
-	objectsIterator := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, nil)
-	for {
-		_, err := objectsIterator.Next()
-		if err == iterator.Done {
-			break
-		}
+	keys, _, err := g.KeysPrefix(ctx, "", "", "")
+	if err != nil {
+		return nil, err
 	}
-	return nil, nil
+
+	return keys, nil
+}
+
+func (g *gcs) KeysPrefix(ctx context.Context, pageToken, prefix, delimiter string) ([]string, string, error) {
+
+	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})
+
+	var objects []*gcsStorage.ObjectAttrs
+
+	var keys []string
+	pageToken, err := iterator.NewPager(itr, PageSize, pageToken).NextPage(&objects)
+	if err != nil {
+		return nil, "", err
+	}
+
+	for _, objAttrs := range objects {
+		keys = append(keys, objAttrs.Name)
+	}
+
+	return keys, pageToken, nil
+
 }
 
 func (g *gcs) Clear(context.Context) error {
