@@ -8,6 +8,9 @@ require (
 	github.com/google/martian v2.1.0+incompatible // indirect
 	github.com/googleapis/gax-go v2.0.2+incompatible // indirect
 	github.com/json-iterator/go v1.1.5
+	github.com/karrick/godirwalk v1.7.8
+	github.com/kr/pretty v0.1.0 // indirect
+	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/oneconcern/pipelines v0.0.0-20181120061409-9184d7135733
 	github.com/opentracing/opentracing-go v1.0.2
