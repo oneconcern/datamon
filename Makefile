@@ -43,7 +43,13 @@ push-datamon:
 
 .PHONY: build-all
 ## Build all the containers
-build-all: clean build-datamon
+build-all: clean build-datamon build-migrate
+
+.PHONY: build-migrate
+## Build migrate tool
+build-migrate:
+	@echo 'building ${YELLOW}migrate${RESET} container'
+	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') -t reg.onec.co/datamon-migrate:$(subst /,_,$(GIT_BRANCH)) -f Dockerfile.migrate .
 
 .PHONY: push-all
 ## Push all the containers

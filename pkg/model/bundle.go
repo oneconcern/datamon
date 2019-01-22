@@ -31,6 +31,7 @@ type BundleEntry struct {
 	NameWithPath string      `json:"name" yaml:"name"`
 	FileMode     os.FileMode `json:"mode" yaml:"mode"`
 	Size         uint64      `json:"size" yaml:"size"`
+	Generation   uint64      `json:"generation" yaml:"generation"`
 	_            struct{}
 }
 

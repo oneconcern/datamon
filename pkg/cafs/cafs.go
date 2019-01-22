@@ -3,6 +3,7 @@ package cafs
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -103,9 +104,13 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 	if err = w.Close(); err != nil {
 		return 0, Key{}, nil, err
 	}
-
-	if err := d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...))); err != nil {
-		return 0, Key{}, nil, err
+	found, _ := d.fs.Has(context.TODO(), d.prefix+key.String())
+	if !found {
+		if err := d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...))); err != nil {
+			return 0, Key{}, nil, err
+		}
+	} else {
+		fmt.Printf("Duplicate key:%s\n", key.String())
 	}
 
 	return written, key, keys, nil
