@@ -99,6 +99,16 @@ func TestPut(t *testing.T) {
 	assert.Len(t, k, 3)
 }
 
+func TestKeysPrefix(t *testing.T) {
+	bs, cleanup := setupStore(t)
+	defer cleanup()
+
+	keys, token, err := bs.KeysPrefix(context.Background(), "", "", "")
+	require.NoError(t, err)
+	require.Len(t, keys, 2)
+	require.Equal(t, token, "")
+}
+
 func setupStore(t testing.TB) (storage.Store, func()) {
 	t.Helper()
 

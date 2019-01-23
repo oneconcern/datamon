@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -12,6 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
+
+const PageSize = 1000
 
 type Option func(*s3FS)
 
@@ -110,6 +113,42 @@ func (s *s3FS) Keys(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return keys, nil
+}
+
+func (s *s3FS) KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error) {
+	var keys []string
+	var isTruncated bool
+
+	eachPage := func(page *s3.ListObjectsOutput, more bool) bool {
+		isTruncated = aws.BoolValue(page.IsTruncated)
+
+		for _, obj := range page.Contents {
+			key := aws.StringValue(obj.Key)
+			if key != "" {
+				keys = append(keys, key)
+			}
+		}
+		return more
+	}
+
+	params := &s3.ListObjectsInput{
+		Bucket:    aws.String(s.bucket),
+		Prefix:    aws.String(prefix),
+		Delimiter: aws.String(delimiter),
+		MaxKeys:   aws.Int64(PageSize),
+		Marker:    aws.String(token),
+	}
+
+	err := s.s3.ListObjectsPagesWithContext(ctx, params, eachPage)
+	if err != nil {
+		return nil, "", err
+	}
+
+	log.Printf("Truncated %v ", isTruncated)
+	if isTruncated {
+		token = keys[len(keys)-1]
+	}
+	return keys, token, nil
 }
 
 func (s *s3FS) Clear(ctx context.Context) error {
