@@ -4,6 +4,7 @@ package localfs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -106,6 +107,11 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 		return nil, e
 	}
 	return res, nil
+}
+
+//TODO discuss the implementation with @Ivan & @Ritesh
+func (l *localFS) KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error) {
+	return nil, "", errors.New("unimplemented")
 }
 
 func (l *localFS) Clear(ctx context.Context) error {
