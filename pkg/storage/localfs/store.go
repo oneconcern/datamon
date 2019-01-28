@@ -110,7 +110,7 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 }
 
 //TODO discuss the implementation with @Ivan & @Ritesh
-func (l *localFS) KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error) {
+func (l *localFS) KeysPrefix(ctx context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
 	return nil, "", errors.New("unimplemented")
 }
 

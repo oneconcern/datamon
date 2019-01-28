@@ -81,7 +81,7 @@ func (g *gcs) Delete(ctx context.Context, objectName string) error {
 }
 
 func (g *gcs) Keys(ctx context.Context) ([]string, error) {
-	keys, _, err := g.KeysPrefix(ctx, "", "", "")
+	keys, _, err := g.KeysPrefix(ctx, "", "", "", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (g *gcs) Keys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-func (g *gcs) KeysPrefix(ctx context.Context, pageToken, prefix, delimiter string) ([]string, string, error) {
+func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error) {
 
 	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})
 

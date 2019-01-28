@@ -215,19 +215,11 @@ func init() {
 		log.Fatalln(err)
 	}
 	upload.Flags().StringVarP(&params.fileList, "files", "f", "", "File containing list of files to upload")
-	err = upload.MarkFlagRequired("cafs-bucket")
+	err = upload.MarkFlagRequired("files")
 	if err != nil {
 		log.Fatalln(err)
 	}
 	upload.Flags().IntVarP(&params.maxConcurrency, "concurrency", "t", maxConcurrency, fmt.Sprintf("Max number of concurrent go routines, default:%d", maxConcurrency))
-	err = upload.MarkFlagRequired("cafs-bucket")
-	if err != nil {
-		log.Fatalln(err)
-	}
 	upload.Flags().IntVarP(&params.startFrom, "start", "s", 0, "Starting line number to read from.")
-	err = upload.MarkFlagRequired("cafs-bucket")
-	if err != nil {
-		log.Fatalln(err)
-	}
 	rootCmd.AddCommand(upload)
 }

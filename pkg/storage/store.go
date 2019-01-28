@@ -34,8 +34,8 @@ type Store interface {
 	Put(context.Context, string, io.Reader) error
 	Delete(context.Context, string) error
 	Keys(context.Context) ([]string, error)
-	KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error)
 	Clear(context.Context) error
+	KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error)
 }
 
 func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, destination string) ([]byte, error) {

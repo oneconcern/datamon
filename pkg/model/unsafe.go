@@ -36,3 +36,9 @@ func BytesToUint64(b []byte) uint64 {
 func BytesToInt64(b []byte) int64 {
 	return *(*int64)(unsafe.Pointer(&b[0]))
 }
+
+// UnsafeBytesToString converts []byte to string without a memcopy
+func UnsafeBytesToString(b []byte) string {
+	/* #nosec */
+	return *(*string)(unsafe.Pointer(&reflect.StringHeader{Data: uintptr(unsafe.Pointer(&b[0])), Len: len(b)}))
+}
