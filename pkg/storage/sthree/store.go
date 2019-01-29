@@ -95,24 +95,15 @@ func (s *s3FS) Delete(ctx context.Context, key string) error {
 	return err
 }
 
-func (s *s3FS) Keys(ctx context.Context) ([]string, error) {
+func (s *s3FS) Keys(ctx context.Context, token string) ([]string,string, error) {
 	var keys []string
-	eachPage := func(page *s3.ListObjectsOutput, more bool) bool {
-		for _, obj := range page.Contents {
-			key := aws.StringValue(obj.Key)
-			if key != "" {
-				keys = append(keys, key)
-			}
-		}
-		return more
-	}
-	params := &s3.ListObjectsInput{Bucket: aws.String(s.bucket)}
 
-	err := s.s3.ListObjectsPagesWithContext(ctx, params, eachPage)
+	keys, token, err := s.KeysPrefix(ctx, token, "", "")
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return keys, nil
+
+	return keys, token, nil
 }
 
 func (s *s3FS) KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error) {

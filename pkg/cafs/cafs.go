@@ -151,8 +151,9 @@ func (d *defaultFs) Keys(ctx context.Context) ([]Key, error) {
 	return d.keys(ctx, matchAnyKey)
 }
 
+//TODO pagination implementation
 func (d *defaultFs) keys(ctx context.Context, matches func(Key) bool) ([]Key, error) {
-	v, err := d.fs.Keys(ctx)
+	v, _, err := d.fs.Keys(ctx, "")
 	if err != nil {
 		return nil, err
 	}

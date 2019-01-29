@@ -18,10 +18,14 @@ const (
 	testObject1 = "test-object-1"
 	testObject2 = "test-object-2"
 	testObject3 = "test-object-3"
+	testObject4 = "test-object-4"
 
 	testObject1Content = "gcs test-object-1"
 	testObject2Content = "gcs test-object-2"
 	testObject3Content = "gcs test-object-3"
+	testObject4Contenct = "gcs test-object-4"
+
+	testDir = "test-dir/"
 )
 
 func setup(t testing.TB) (storage.Store, func()) {
@@ -43,6 +47,7 @@ func setup(t testing.TB) (storage.Store, func()) {
 
 	err = gcs.Put(ctx, testObject2, bytes.NewBufferString(testObject2Content))
 	require.NoError(t, err)
+
 
 	cleanup := func() {
 		err = gcs.Delete(ctx, testObject1)
@@ -121,7 +126,7 @@ func TestKey(t *testing.T) {
 	gcs, cleanup := setup(t)
 	defer cleanup()
 
-	key, err := gcs.Keys(ctx)
+	key,_, err := gcs.Keys(ctx,"")
 	require.NoError(t, err)
 
 	assert.Len(t, key, 2)
@@ -140,6 +145,27 @@ func TestDelete(t *testing.T) {
 	err = gcs.Delete(ctx, testObject3)
 	require.NoError(t, err)
 
-	keys, err := gcs.Keys(ctx)
+	keys,_, err := gcs.Keys(ctx, "")
 	assert.Len(t, keys, 2)
+}
+
+func TestKeyPrefix(t *testing.T)  {
+
+	ctx := context.Background()
+
+	gcs, cleanup := setup(t)
+	defer cleanup()
+
+	err := gcs.Put(ctx, testDir + testObject4, bytes.NewBufferString(testObject4Contenct))
+	require.NoError(t, err)
+
+	keys, token, err := gcs.KeysPrefix(ctx, "",testDir, "/")
+	log.Printf("%v", keys)
+	log.Printf(token)
+
+	err = gcs.Delete(ctx, testDir+testObject4)
+	require.NoError(t, err)
+
+	assert.Len(t, keys, 1)
+
 }

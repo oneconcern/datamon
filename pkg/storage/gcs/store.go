@@ -77,13 +77,13 @@ func (g *gcs) Delete(ctx context.Context, objectName string) error {
 	return g.client.Bucket(g.bucket).Object(objectName).Delete(ctx)
 }
 
-func (g *gcs) Keys(ctx context.Context) ([]string, error) {
-	keys, _, err := g.KeysPrefix(ctx, "", "", "")
+func (g *gcs) Keys(ctx context.Context, token string) ([]string, string, error) {
+	keys, token, err := g.KeysPrefix(ctx, token, "", "")
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return keys, nil
+	return keys, token, nil
 }
 
 func (g *gcs) KeysPrefix(ctx context.Context, pageToken, prefix, delimiter string) ([]string, string, error) {

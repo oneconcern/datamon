@@ -32,7 +32,7 @@ type Store interface {
 	Get(context.Context, string) (io.ReadCloser, error)
 	Put(context.Context, string, io.Reader) error
 	Delete(context.Context, string) error
-	Keys(context.Context) ([]string, error)
+	Keys(context.Context, string) ([]string, string, error)
 	KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error)
 	Clear(context.Context) error
 }

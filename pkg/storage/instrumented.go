@@ -81,12 +81,12 @@ func (i *instrumentedStore) Delete(ctx context.Context, key string) error {
 	return i.store.Delete(ctx, key)
 }
 
-func (i *instrumentedStore) Keys(ctx context.Context) ([]string, error) {
+func (i *instrumentedStore) Keys(ctx context.Context, token string) ([]string,string, error) {
 	span := i.spanFromContext(ctx, i.opName("Keys"))
 	defer span.Finish()
 	i.logs.Bg().Info("storage keys")
 
-	return i.store.Keys(ctx)
+	return i.store.Keys(ctx, token)
 }
 
 func (i *instrumentedStore) Clear(ctx context.Context) error {

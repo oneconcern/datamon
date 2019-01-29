@@ -77,7 +77,8 @@ func (l *localFS) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-func (l *localFS) Keys(ctx context.Context) ([]string, error) {
+//TODO implement pagination for localfs
+func (l *localFS) Keys(ctx context.Context, token string) ([]string, string, error) {
 	const root = "."
 	var res []string
 	e := afero.Walk(l.fs, root, func(path string, info os.FileInfo, err error) error {
@@ -104,9 +105,9 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 		return nil
 	})
 	if e != nil {
-		return nil, e
+		return nil,"", e
 	}
-	return res, nil
+	return res, token, nil
 }
 
 //TODO discuss the implementation with @Ivan & @Ritesh

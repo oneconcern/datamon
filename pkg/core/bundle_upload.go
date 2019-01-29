@@ -20,10 +20,7 @@ const (
 func uploadBundle(ctx context.Context, consumableBundle Bundle, archiveBundle *Bundle) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
-	files, err := consumableBundle.store.Keys(ctx)
-	if err != nil {
-		return err
-	}
+	token := ""
 	cafsArchive, err := cafs.New(
 		cafs.LeafSize(archiveBundle.bundleDescriptor.LeafSize),
 		cafs.Backend(archiveBundle.store),
@@ -39,62 +36,74 @@ func uploadBundle(ctx context.Context, consumableBundle Bundle, archiveBundle *B
 	if err != nil {
 		return err
 	}
-	for index, file := range files {
-		// Check to see if the file is to be skipped.
-		if model.IsGeneratedFile(file) {
-			continue
-		}
-		bundleEntriesIndex++
-		if bundleEntriesIndex == bundleEntriesPerFile {
-			bundleEntriesIndex = 0
-		}
 
-		fileReader, err := consumableBundle.store.Get(ctx, file)
+	for  {
+		files,token, err := consumableBundle.store.Keys(ctx, token)
 		if err != nil {
 			return err
 		}
 
-		written, key, keys, err := cafsArchive.Put(ctx, fileReader)
-		totalWritten = totalWritten + uint64(written)
-		filesInBundle++
+		for index, file := range files {
+			// Check to see if the file is to be skipped.
+			if model.IsGeneratedFile(file) {
+				continue
+			}
+			bundleEntriesIndex++
+			if bundleEntriesIndex == bundleEntriesPerFile {
+				bundleEntriesIndex = 0
+			}
+
+			fileReader, err := consumableBundle.store.Get(ctx, file)
+			if err != nil {
+				return err
+			}
+
+			written, key, keys, err := cafsArchive.Put(ctx, fileReader)
+			totalWritten = totalWritten + uint64(written)
+			filesInBundle++
+			if err != nil {
+				return err
+			}
+
+			log.Printf("Uploaded root key %s & %d bytes for keys for %s", key.String(), len(keys), file)
+
+			fileList.BundleEntries = append(fileList.BundleEntries, model.BundleEntry{
+				Hash:         key.String(),
+				NameWithPath: file,
+				FileMode:     0, // #TODO: #35 file mode support
+				Size:         uint64(written)})
+
+			// Write the bundle entry file if reached max or the last one
+			if index == len(files)-1 || bundleEntriesIndex == bundleEntriesPerFile {
+				buffer, err := yaml.Marshal(fileList)
+				if err != nil {
+					return err
+				}
+				err = archiveBundle.store.Put(ctx,
+					model.GetArchivePathToBundleFileList(
+						archiveBundle.repoID,
+						archiveBundle.bundleID,
+						archiveBundle.bundleDescriptor.BundleEntriesFileCount),
+					bytes.NewReader(buffer))
+				if err != nil {
+					return err
+				}
+				archiveBundle.bundleDescriptor.BundleEntriesFileCount++
+			}
+		}
+
+		err = uploadBundleDescriptor(ctx, archiveBundle)
 		if err != nil {
 			return err
 		}
 
-		log.Printf("Uploaded root key %s & %d bytes for keys for %s", key.String(), len(keys), file)
-
-		fileList.BundleEntries = append(fileList.BundleEntries, model.BundleEntry{
-			Hash:         key.String(),
-			NameWithPath: file,
-			FileMode:     0, // #TODO: #35 file mode support
-			Size:         uint64(written)})
-
-		// Write the bundle entry file if reached max or the last one
-		if index == len(files)-1 || bundleEntriesIndex == bundleEntriesPerFile {
-			buffer, err := yaml.Marshal(fileList)
-			if err != nil {
-				return err
-			}
-			err = archiveBundle.store.Put(ctx,
-				model.GetArchivePathToBundleFileList(
-					archiveBundle.repoID,
-					archiveBundle.bundleID,
-					archiveBundle.bundleDescriptor.BundleEntriesFileCount),
-				bytes.NewReader(buffer))
-			if err != nil {
-				return err
-			}
-			archiveBundle.bundleDescriptor.BundleEntriesFileCount++
+		if token == "" {
+			break
 		}
-	}
 
-	err = uploadBundleDescriptor(ctx, archiveBundle)
-	if err != nil {
-		return err
+		log.Printf("Uploaded bundle id:%s with %d files and %d bytes written", archiveBundle.bundleID,
+			filesInBundle, totalWritten)
 	}
-
-	log.Printf("Uploaded bundle id:%s with %d files and %d bytes written", archiveBundle.bundleID,
-		filesInBundle, totalWritten)
 
 	return nil
 }

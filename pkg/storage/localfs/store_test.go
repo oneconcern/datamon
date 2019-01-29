@@ -52,7 +52,7 @@ func TestKeys(t *testing.T) {
 	bs, cleanup := setupStore(t)
 	defer cleanup()
 
-	keys, err := bs.Keys(context.Background())
+	keys,_, err := bs.Keys(context.Background(),"")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 }
@@ -62,7 +62,7 @@ func TestDelete(t *testing.T) {
 	defer cleanup()
 
 	require.NoError(t, bs.Delete(context.Background(), "seventeentons"))
-	k, _ := bs.Keys(context.Background())
+	k, _, _:= bs.Keys(context.Background(),"")
 	assert.Len(t, k, 1)
 }
 
@@ -71,7 +71,7 @@ func TestClear(t *testing.T) {
 	defer cleanup()
 
 	require.NoError(t, bs.Clear(context.Background()))
-	k, _ := bs.Keys(context.Background())
+	k, _,_ := bs.Keys(context.Background(), "")
 	require.Empty(t, k)
 }
 
@@ -91,7 +91,7 @@ func TestPut(t *testing.T) {
 
 	assert.Equal(t, "here we go once again", string(b))
 
-	k, _ := bs.Keys(context.Background())
+	k, _ ,_:= bs.Keys(context.Background(),"")
 	assert.Len(t, k, 3)
 }
 

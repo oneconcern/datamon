@@ -18,6 +18,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testObject4 = "test-object-4"
+
+	testObject4Contenct = "gcs test-object-4"
+
+	testDir = "test-dir/"
+)
+
 func TestHas(t *testing.T) {
 	bs, cleanup := setupStore(t)
 	defer cleanup()
@@ -56,7 +64,7 @@ func TestKeys(t *testing.T) {
 	bs, cleanup := setupStore(t)
 	defer cleanup()
 
-	keys, err := bs.Keys(context.Background())
+	keys, _,err := bs.Keys(context.Background(), "")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 }
@@ -66,7 +74,7 @@ func TestDelete(t *testing.T) {
 	defer cleanup()
 
 	require.NoError(t, bs.Delete(context.Background(), "seventeentons"))
-	k, _ := bs.Keys(context.Background())
+	k, _,_ := bs.Keys(context.Background(), "")
 	assert.Len(t, k, 1)
 }
 
@@ -75,7 +83,7 @@ func TestClear(t *testing.T) {
 	defer cleanup()
 
 	require.NoError(t, bs.Clear(context.Background()))
-	k, _ := bs.Keys(context.Background())
+	k,_, _ := bs.Keys(context.Background(), "")
 	require.Empty(t, k)
 }
 
@@ -95,17 +103,22 @@ func TestPut(t *testing.T) {
 
 	assert.Equal(t, "here we go once again", string(b))
 
-	k, _ := bs.Keys(context.Background())
+	k, _,_ := bs.Keys(context.Background(),"")
 	assert.Len(t, k, 3)
 }
 
 func TestKeysPrefix(t *testing.T) {
+	ctx := context.Background()
+
 	bs, cleanup := setupStore(t)
 	defer cleanup()
 
-	keys, token, err := bs.KeysPrefix(context.Background(), "", "", "")
+	bs.Put(ctx, testDir + testObject4, bytes.NewBufferString(testObject4Contenct))
+
+	keys, token, err := bs.KeysPrefix(ctx, "", testDir, "/")
 	require.NoError(t, err)
-	require.Len(t, keys, 2)
+
+	require.Len(t, keys, 1)
 	require.Equal(t, token, "")
 }
 
@@ -159,5 +172,14 @@ func setupStore(t testing.TB) (storage.Store, func()) {
 		Key:    aws.String("seventeentons"),
 	})
 	require.NoError(t, err)
+
+	_, err = up.UploadWithContext(aws.BackgroundContext(), &s3manager.UploadInput{
+		Body:   bytes.NewBufferString("this is the text for another thing"),
+		Bucket: bucket,
+		Key:    aws.String("twenty/temp"),
+	})
+
+	require.NoError(t, err)
+
 	return New(Bucket(*bucket), AWSConfig(minioConfig)), cleanup
 }
