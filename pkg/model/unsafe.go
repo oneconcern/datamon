@@ -24,3 +24,15 @@ func UnsafeStringToBytes(s string) []byte {
 func Uint64ToBytes(u *uint64) []byte {
 	return (*[sizeOfUintPtr]byte)(unsafe.Pointer(u))[:]
 }
+
+func Int64ToBytes(u *int64) []byte {
+	return (*[sizeOfUintPtr]byte)(unsafe.Pointer(u))[:]
+}
+
+func BytesToUint64(b []byte) uint64 {
+	return *(*uint64)(unsafe.Pointer(&b[0]))
+}
+
+func BytesToInt64(b []byte) int64 {
+	return *(*int64)(unsafe.Pointer(&b[0]))
+}
