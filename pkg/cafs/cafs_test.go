@@ -55,7 +55,7 @@ func TestCAFS_Put(t *testing.T) {
 	require.NoError(t, err)
 
 	orig := filepath.Join(td, "original", "test-cas-put")
-	require.NoError(t, GenerateFile(orig, 512*1024, g.leafSize))
+	require.NoError(t, GenerateFile(orig, 5*1024*1024, g.leafSize))
 
 	f, err := os.Open(orig)
 	require.NoError(t, err)
@@ -68,6 +68,19 @@ func TestCAFS_Put(t *testing.T) {
 	require.Equal(t, fileInfo.Size(), written)
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
+
+	f, err = os.Open(orig)
+	require.NoError(t, err)
+	defer f.Close()
+	written, rk2, _, err := fs.Put(context.Background(), f)
+	require.NoError(t, err)
+	fileInfo, err = f.Stat()
+	require.NoError(t, err)
+	require.Equal(t, fileInfo.Size(), written)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	require.Equal(t, rk, rk2)
 
 	rdr, err := fs.Get(context.Background(), rk)
 	require.NoError(t, err)

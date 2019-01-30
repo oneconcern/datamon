@@ -68,7 +68,7 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader) error {
 	// Put if not present
-	writer := g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: true}).NewWriter(ctx)
+	writer := g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		return err
