@@ -28,11 +28,11 @@ var mountBundleCmd = &cobra.Command{
 		}
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 		archiveBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore, destinationStore)
-		fs, err := core.NewDatamonFS(archiveBundle)
+		fs, err := core.NewReadOnlyFS(archiveBundle)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		err = fs.Mount(bundleOptions.DataPath)
+		err = fs.MountReadOnly(bundleOptions.DataPath)
 		if err != nil {
 			log.Fatalln(err)
 		}

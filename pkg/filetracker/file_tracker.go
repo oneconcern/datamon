@@ -6,41 +6,45 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/spf13/afero"
+
 	"github.com/hashicorp/go-immutable-radix"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 // Tracks writes that occur on top of a base file.
-type tFile struct {
+type TFile struct {
 	io.ReaderAt
 	io.WriterAt
 	base    storage.Store
-	mutable storage.Store
-	file    string
+	file    *afero.File
 	tracker *iradix.Tree
 	lock    sync.Mutex
+	size    uint64
+	name    string
 }
 
-func newTFile(baseStore storage.Store, mutableStore storage.Store, file string) *tFile {
+func newTFile(baseStore storage.Store, file *afero.File, name string) *TFile {
 
-	return &tFile{
+	return &TFile{
 		base:    baseStore,
-		mutable: mutableStore,
 		file:    file,
+		name:    name,
 		tracker: iradix.New(),
 	}
 }
 
-func (t *tFile) ReadAt(p []byte, off uint64) (n int, err error) {
+func (t *TFile) ReadAt(p []byte, off int64) (n int, err error) {
+	getFileRange(off, int64(len(p)))
 	return 0, nil
 }
 
-func (t *tFile) WriteAt(p []byte, off uint64) (n int, err error) {
+func (t *TFile) WriteAt(p []byte, off int64) (n int, err error) {
 	return 0, nil
 }
 
-func getFileRange(offset uint64, len uint64) (uint64, uint64) {
+func getFileRange(offset int64, len int64) (int64, int64) {
 	start := offset
 	end := offset + len
 	return start, end
@@ -50,17 +54,26 @@ const (
 	startFlag = true
 	endFlag   = false
 	terminate = true
+	mutable   = true
+	base      = !mutable
 )
 
-func getKey(key uint64) []byte {
-	k := make([]byte, unsafe.Sizeof(uint64(0)))
-	binary.BigEndian.PutUint64(k, key)
+func getKey(key int64) []byte {
+	if key < 0 {
+		return nil
+	}
+	k := make([]byte, unsafe.Sizeof(int64(0)))
+	binary.BigEndian.PutUint64(k, uint64(key))
 	return k
+}
+
+func getOffset(k []byte) int64 {
+	return int64(binary.BigEndian.Uint64(k))
 }
 
 // Deletes keys that are no longer required and inserts new keys to
 // allow reads to be performed correctly.
-func (t *tFile) trackWrite(offset uint64, length uint64) {
+func (t *TFile) trackWrite(offset int64, length int64) {
 
 	start, end := getFileRange(offset, length)
 
@@ -84,7 +97,7 @@ func (t *tFile) trackWrite(offset uint64, length uint64) {
 	fn := func(k []byte, v interface{}) bool {
 		isStart := v.(bool)
 		isEnd := !isStart
-		key := binary.BigEndian.Uint64(k)
+		key := getOffset(k)
 
 		deleteKey := func() {
 			if key <= end {
@@ -123,6 +136,7 @@ func (t *tFile) trackWrite(offset uint64, length uint64) {
 		return !terminate
 	}
 
+	// TODO: To reduce the walk use prefix but needs to be walked twice offset and offset + length
 	t.tracker.Root().Walk(fn)
 	if insertStart {
 		txn.Insert(getKey(start), startFlag)
@@ -133,7 +147,7 @@ func (t *tFile) trackWrite(offset uint64, length uint64) {
 	t.tracker = txn.Commit()
 }
 
-func min(a, b uint64) uint64 {
+func min(a, b int64) int64 {
 	if a < b {
 		return a
 	}
@@ -141,33 +155,33 @@ func min(a, b uint64) uint64 {
 }
 
 // Given an offset and len , return the next contiguous read possible and the backend store for it.
-func (t *tFile) getRangeToRead(offset uint64, len uint64) (uint64, storage.Store) {
+func (t *TFile) getRangeToRead(offset int64, len int64) (int64, bool) {
 	contiguous := len
-	storage := t.base
-	terminate := true
+	storage := base
 	fn := func(k []byte, v interface{}) bool {
 
 		isStart := v.(bool)
 		isEnd := !isStart
-		key := binary.BigEndian.Uint64(k)
+		key := getOffset(k)
 
 		if isStart && (key <= offset) {
-			storage = t.mutable
+			storage = mutable
 			return !terminate
 		} else if isStart && (key > offset) {
 			contiguous = min(key-offset, len)
-			storage = t.base
+			storage = base
 			return terminate
 		} else if isEnd && (key <= offset) {
-			storage = t.base
+			storage = base
 			return !terminate
 		} else if isEnd && (key > offset) {
-			storage = t.mutable
+			storage = mutable
 			contiguous = min(key-offset, len)
 			return terminate
 		}
 		return !terminate
 	}
+	// TODO: To reduce the walk use prefix but needs to be walked twice offset and offset + length
 	t.tracker.Root().Walk(fn)
 	return contiguous, storage
 }

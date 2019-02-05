@@ -5,9 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/oneconcern/datamon/pkg/storage/localfs"
-	"github.com/spf13/afero"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,11 +20,11 @@ func setup(t *testing.T) {
 }
 
 type ioRange struct {
-	offset uint64
-	len    uint64
+	offset int64
+	len    int64
 }
 type read struct {
-	length   uint64
+	length   int64
 	fromBase bool
 }
 
@@ -172,9 +169,7 @@ func TestGetKey(t *testing.T) {
 }
 
 func TestTrackWrite(t *testing.T) {
-	base := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), testRoot+"/base"))
-	mutable := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), testRoot+"/mutable"))
-	tf := newTFile(base, mutable, "file")
+	tf := newTFile(nil, nil, "file")
 
 	for i, w := range writeSeq {
 		tf.trackWrite(w.write.offset, w.write.len)
