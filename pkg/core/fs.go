@@ -26,7 +26,7 @@ const (
 	rootPath                        = "/"
 	firstINode      fuseops.InodeID = 1023
 	dirDefaultMode                  = 0777 | os.ModeDir
-	fileDefaultMode                 = 0777
+	fileDefaultMode                 = 0666
 	defaultUID                      = 0
 	defaultGID                      = 0
 	dirInitialSize                  = 64

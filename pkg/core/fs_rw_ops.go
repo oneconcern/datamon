@@ -55,7 +55,7 @@ type fsMutable struct {
 func (fs *fsMutable) StatFS(
 	ctx context.Context,
 	op *fuseops.StatFSOp) (err error) {
-	fs.l.Info("statfs")
+	fs.l.Debug("statfs")
 	return statFS()
 }
 
@@ -127,7 +127,7 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 
 func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
 
-	fs.l.Info("lookup", zap.Uint64("p", uint64(op.Parent)), zap.String("c", op.Name))
+	fs.l.Debug("lookup", zap.Uint64("p", uint64(op.Parent)), zap.String("c", op.Name))
 
 	nodeStore, lookupTree := fs.atomicGetReferences()
 
@@ -179,6 +179,7 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 	fs.l.Info("setAttr", zap.Uint64("id", uint64(op.Inode)))
 
 	if op.Mode != nil { // File permissions not supported
+		fs.l.Info("set mode", zap.Uint32("mode", uint32(*op.Mode)))
 		return fuse.ENOSYS
 	}
 
@@ -366,19 +367,21 @@ func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err erro
 	defer fs.lock.Unlock()
 
 	// Find the old child
-	sC, found, _ := lookup(op.OldParent, op.OldName, fs.lookupTree)
+	oldChild, found, _ := fs.lookup(op.OldParent, op.OldName)
 	if !found {
 		return fuse.ENOENT
 	}
-	if sC.mode.IsDir() {
-		return fuse.ENOSYS
+	newChild, found, _ := fs.lookup(op.NewParent, op.NewName)
+	if found {
+		if newChild.mode.IsDir() {
+			return fuse.ENOSYS
+		}
+		// Delete new child, ignore if not present
+		_ = fs.deleteNSEntry(op.NewParent, op.NewName)
 	}
 
-	// Delete new child, ignore if not present
-	_ = fs.deleteNSEntry(op.NewParent, op.NewName)
-
-	// Insert iNode into readDir
-	rC := fs.readDirMap[op.OldParent][sC.iNode]
+	// Insert iNode into new readDir and lookup and remove from old.
+	rC := fs.readDirMap[op.OldParent][oldChild.iNode]
 
 	newRC := fuseutil.Dirent{
 		Inode: rC.Inode,
@@ -386,7 +389,14 @@ func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err erro
 		Type:  rC.Type,
 	}
 
-	fs.insertReadDirEntry(op.OldParent, &newRC)
+	// Delete from old parent
+	delete(fs.readDirMap[op.OldParent], rC.Inode)
+	var l interface{}
+	fs.lookupTree, l, _ = fs.lookupTree.Delete(formLookupKey(op.OldParent, op.OldName)) // lookupEntry remains the same
+
+	// Insert into new.
+	fs.insertReadDirEntry(op.NewParent, &newRC)
+	fs.insertLookupEntry(op.NewParent, op.NewName, l.(lookupEntry))
 
 	return
 }
@@ -395,8 +405,8 @@ func (fs *fsMutable) RmDir(
 	ctx context.Context,
 	op *fuseops.RmDirOp) (err error) {
 	fs.l.Info("rmdir", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
-	// TODO: If empty remove from lookup and readdir
-	return
+
+	return fs.deleteNSEntry(op.Parent, op.Name)
 }
 
 func (fs *fsMutable) Unlink(
@@ -404,7 +414,7 @@ func (fs *fsMutable) Unlink(
 	op *fuseops.UnlinkOp) (err error) {
 	fs.l.Info("unlink", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
 	// TODO: remove from lookup and readdir
-	return
+	return fs.deleteNSEntry(op.Parent, op.Name)
 }
 
 func (fs *fsMutable) OpenDir(
@@ -431,13 +441,14 @@ func (fs *fsMutable) ReadDir(
 	}
 
 	if offset > len(children) {
-		op.BytesRead = 0
-		return
+		return fuse.EINVAL
 	}
 
-	for i, c := range children {
+	var i uint64 = 1
+	for _, c := range children {
 		child := *c
-		child.Offset = fuseops.DirOffset(i + 1) // This is where dirOffset matters..
+		i++
+		child.Offset = fuseops.DirOffset(i) // This is where dirOffset matters..
 		n := fuseutil.WriteDirent(op.Dst[op.BytesRead:], child)
 		if n == 0 {
 			break
@@ -578,5 +589,10 @@ func (fs *fsMutable) Destroy() {
 
 func (fs *fsMutable) Commit() error {
 	// starting from root, find each file and upload using go routines.
+	// 1 go routine to walk the map
+	// n go routines to upload into CAFS
+	// 1 to write the bundle list.
+	// write the file list
+	// write the bundle descriptor
 	return nil
 }

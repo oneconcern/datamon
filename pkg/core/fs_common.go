@@ -82,6 +82,10 @@ func (fs *fsMutable) insertReadDirEntry(id fuseops.InodeID, dirEnt *fuseutil.Dir
 	fs.readDirMap[id][dirEnt.Inode] = dirEnt
 }
 
+func (fs *fsMutable) insertLookupEntry(id fuseops.InodeID, child string, entry lookupEntry) {
+	fs.lookupTree, _, _ = fs.lookupTree.Insert(formLookupKey(id, child), entry)
+}
+
 // Create a node. Need to hold the locks before calling.
 func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childName string,
 	entry *fuseops.ChildInodeEntry, nodeType fuseutil.DirentType, isRoot bool) error {
@@ -110,13 +114,15 @@ func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childNam
 		linkCount = dirLinkCount
 		defaultMode = dirDefaultMode
 		defaultSize = dirInitialSize
+		fs.readDirMap[iNodeID] = make(map[fuseops.InodeID]*fuseutil.Dirent)
 	} else {
 		// dont return error as open file will retry this.
 		file, err := fs.localCache.Create(fmt.Sprint(iNodeID))
 		if err != nil {
 			fs.backingFiles[iNodeID] = &file
 		} else {
-			fs.l.Error("failed to create backing file", zap.Error(err),
+			fs.l.Error("failed to create backing file",
+				zap.Error(err),
 				zap.String("child", childName),
 				zap.Uint64("parent", uint64(parentINode)))
 		}
@@ -127,8 +133,9 @@ func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childNam
 		Name:  childName,
 		Type:  nodeType,
 	}
-
-	fs.insertReadDirEntry(parentINode, d)
+	if !isRoot {
+		fs.insertReadDirEntry(parentINode, d)
+	}
 
 	ts := time.Now()
 	attr := fuseops.InodeAttributes{
