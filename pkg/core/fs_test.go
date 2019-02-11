@@ -70,38 +70,39 @@ func TestCreate(t *testing.T) {
 		},
 	})
 	childInodeEntry := fuseops.ChildInodeEntry{}
-	err := fs.createNode(nil, firstINode, child, &childInodeEntry, fuseutil.DT_Directory, false)
+	parent := firstINode
+	err := fs.createNode(nil, parent, child, &childInodeEntry, fuseutil.DT_Directory, false)
 	assert.NoError(t, err)
-	validateChild(t, child, &fs, firstINode, 3, firstINode+1, 1, &childInodeEntry)
+	validateChild(t, child, &fs, parent, 3, firstINode+1, 1, &childInodeEntry)
 
 	child2 := "child2"
-	err = fs.createNode(nil, firstINode, child2, &childInodeEntry, fuseutil.DT_Directory, false)
+	err = fs.createNode(nil, parent, child2, &childInodeEntry, fuseutil.DT_Directory, false)
 	assert.NoError(t, err)
 
-	validateChild(t, child2, &fs, firstINode, 4, firstINode+2, 2, &childInodeEntry)
+	validateChild(t, child2, &fs, parent, 4, firstINode+2, 2, &childInodeEntry)
 
 	child3 := "child3"
-	err = fs.createNode(nil, firstINode, child3, &childInodeEntry, fuseutil.DT_Directory, false)
+	err = fs.createNode(nil, parent, child3, &childInodeEntry, fuseutil.DT_Directory, false)
 	assert.NoError(t, err)
-	validateChild(t, child3, &fs, firstINode, 4, firstINode+3, 3, &childInodeEntry)
+	validateChild(t, child3, &fs, parent, 5, firstINode+3, 3, &childInodeEntry)
 }
 
-func validateChild(t *testing.T, name string, fs *fsMutable, parent fuseops.InodeID, linkCount uint32, childId fuseops.InodeID, childCount int, entry *fuseops.ChildInodeEntry) {
+func validateChild(t *testing.T, name string, fs *fsMutable, parent fuseops.InodeID, linkCount uint32, childID fuseops.InodeID, childCount int, entry *fuseops.ChildInodeEntry) {
 	// Test parent link count increment
 	p, _ := fs.iNodeStore.Get(formKey(parent))
 	assert.NotNil(t, p)
 	parentEntry := p.(*nodeEntry)
 	assert.NotNil(t, parentEntry)
-	assert.Equal(t, parentEntry.attr.Nlink, linkCount)
+	assert.Equal(t, linkCount, parentEntry.attr.Nlink)
 
 	// Test child node entry
-	c, _ := fs.iNodeStore.Get(formKey(childId))
+	c, _ := fs.iNodeStore.Get(formKey(childID))
 	assert.NotNil(t, c)
 	childEntry := c.(*nodeEntry)
 
 	var lc uint32 = 1
 	var mode os.FileMode = fileDefaultMode
-	var s uint64 = 0
+	var s uint64
 	var nodeType = fuseutil.DT_File
 	if entry.Attributes.Mode.IsDir() {
 		lc = dirLinkCount
@@ -130,18 +131,20 @@ func validateChild(t *testing.T, name string, fs *fsMutable, parent fuseops.Inod
 
 	// Test lookup
 	l, _ := fs.lookupTree.Get(formLookupKey(parent, name))
-	assert.Equal(t, childId, uint64(l.(lookupEntry).iNode))
+	assert.Equal(t, childID, l.(lookupEntry).iNode)
 
 	// Test ReadDir
 	exDE := fuseutil.Dirent{
 		Offset: fuseops.DirOffset(childCount),
-		Inode:  fuseops.InodeID(childId),
+		Inode:  childID,
 		Name:   name,
 		Type:   nodeType,
 	}
-	child := fs.readDirMap[firstINode][childId]
+	child := fs.readDirMap[firstINode][childID]
 	assert.Equal(t, childCount, len(fs.readDirMap[firstINode]))
-	assert.Equal(t, &exDE, child)
+	assert.Equal(t, exDE.Inode, child.Inode)
+	assert.Equal(t, exDE.Name, child.Name)
+	assert.Equal(t, exDE.Type, child.Type)
 	assert.Equal(t, expectedChildEntry.attr.Nlink, entry.Attributes.Nlink)
 	assert.Equal(t, expectedChildEntry.attr.Mode, entry.Attributes.Mode)
 	assert.Equal(t, expectedChildEntry.attr.Size, entry.Attributes.Size)

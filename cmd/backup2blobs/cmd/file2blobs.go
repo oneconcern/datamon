@@ -35,7 +35,6 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 		logError.Fatalln(err)
 		return
 	}
-	defer logger.Sync()
 
 	incC := func(count *uint64) {
 		atomic.AddUint64(count, 1)
@@ -43,6 +42,7 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 	for {
 		file, found := <-fileChan
 		if !found {
+			_ = logger.Sync()
 			wg.Done()
 			return
 		}
@@ -100,19 +100,6 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 	}
 }
 
-func downloadFromBlog(sourceStore storage.Store, destinationStore storage.Store, cafs cafs.Fs, fileChan chan string, wg *sync.WaitGroup) {
-	// Read json
-	// Unmarshall json
-	// Get the hash
-	// Get the file from cafs and write to destination
-}
-
-func verifyIfFileExists() {
-	// read a list of files
-	// check if file json exists
-	// if not write the missing file
-}
-
 func ProcessFiles(fileList string, sourceStore storage.Store, backupStore storage.Store, cafs cafs.Fs, maxC int, startFrom int) (err error) {
 	logger, _ := zap.NewProduction()
 	file, err := os.Open(fileList)
@@ -144,7 +131,7 @@ func ProcessFiles(fileList string, sourceStore storage.Store, backupStore storag
 	logger.Info("Waiting for routines")
 	wg.Wait()
 	logger.Info("Finished processing", zap.String("files", fileList), zap.Uint64("Total", fileCount), zap.Uint64("errors", errCount))
-	return
+	return nil
 }
 
 var upload = &cobra.Command{
@@ -191,7 +178,6 @@ var maxConcurrency = 100
 var params struct {
 	fileList           string
 	pathToMount        string
-	backendStoreType   string
 	backendStoreBucket string
 	blobStoreBucket    string
 	maxConcurrency     int

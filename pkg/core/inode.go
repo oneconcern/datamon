@@ -40,7 +40,7 @@ func (g *iNodeGenerator) allocINode() fuseops.InodeID {
 		}
 	}
 	g.lock.Unlock()
-	return fuseops.InodeID(n)
+	return n
 }
 
 func (g *iNodeGenerator) freeINode(iNode fuseops.InodeID) {

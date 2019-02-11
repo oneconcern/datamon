@@ -95,7 +95,7 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken, prefix, delimiter strin
 
 	var objects []*gcsStorage.ObjectAttrs
 
-	var keys []string
+	keys := make([]string, 0, PageSize)
 	pageToken, err := iterator.NewPager(itr, PageSize, pageToken).NextPage(&objects)
 	if err != nil {
 		return nil, "", err

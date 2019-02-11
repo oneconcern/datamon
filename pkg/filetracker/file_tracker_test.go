@@ -2,22 +2,10 @@ package filetracker
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-const (
-	testRoot = "../../testdata/filetracker"
-)
-
-func setup(t *testing.T) {
-	_, err := os.Create(testRoot + "/base/file")
-	assert.NoError(t, err)
-	_, err = os.Create(testRoot + "/mutable/file")
-	assert.NoError(t, err)
-}
 
 type ioRange struct {
 	offset int64

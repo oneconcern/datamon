@@ -21,7 +21,6 @@ type TFile struct {
 	file    *afero.File
 	tracker *iradix.Tree
 	lock    sync.Mutex
-	size    uint64
 	name    string
 }
 
@@ -36,7 +35,8 @@ func newTFile(baseStore storage.Store, file *afero.File, name string) *TFile {
 }
 
 func (t *TFile) ReadAt(p []byte, off int64) (n int, err error) {
-	getFileRange(off, int64(len(p)))
+	//TODO:
+	_, _ = getFileRange(off, int64(len(p)))
 	return 0, nil
 }
 
@@ -104,23 +104,20 @@ func (t *TFile) trackWrite(offset int64, length int64) {
 				txn.Delete(k)
 			}
 		}
-		if isStart && (key == start) {
+		switch {
+		case isStart && (key == start):
 			insertStart = false
 			return !terminate
-		} else if isStart && (key < start) {
+		case isStart && (key < start):
 			// Only interim keys need deleting
 			return !terminate
-		} else if isStart && (key > start) {
+		case isStart && (key > start):
 			deleteKey()
 			return !terminate
-		} else if isEnd && (key == start) {
-			//Contiguous region grew
-			deleteKey()
-			return !terminate
-		} else if isEnd && (key < start) {
+		case isEnd && (key < start):
 			// Previous end hit and can be ignored, process next key
 			return !terminate
-		} else if isEnd && (key > start) {
+		case isEnd && (key > start):
 			// There is an end that is after start and no other key in the range.
 			// Skip inserting start, previous start will cover the range.
 			insertStart = false
@@ -128,12 +125,12 @@ func (t *TFile) trackWrite(offset int64, length int64) {
 			if key >= end {
 				insertEnd = false
 				return terminate
-			} else {
-				deleteKey()
 			}
+			deleteKey()
+			return !terminate
+		default:
 			return !terminate
 		}
-		return !terminate
 	}
 
 	// TODO: To reduce the walk use prefix but needs to be walked twice offset and offset + length
@@ -164,17 +161,18 @@ func (t *TFile) getRangeToRead(offset int64, len int64) (int64, bool) {
 		isEnd := !isStart
 		key := getOffset(k)
 
-		if isStart && (key <= offset) {
+		switch {
+		case isStart && (key <= offset):
 			storage = mutable
 			return !terminate
-		} else if isStart && (key > offset) {
+		case isStart && (key > offset):
 			contiguous = min(key-offset, len)
 			storage = base
 			return terminate
-		} else if isEnd && (key <= offset) {
+		case isEnd && (key <= offset):
 			storage = base
 			return !terminate
-		} else if isEnd && (key > offset) {
+		case isEnd && (key > offset):
 			storage = mutable
 			contiguous = min(key-offset, len)
 			return terminate

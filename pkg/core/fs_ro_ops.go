@@ -35,7 +35,7 @@ func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookU
 			op.Entry.AttributesExpiration = time.Now().Add(cacheYearLong)
 			op.Entry.EntryExpiration = op.Entry.AttributesExpiration
 		}
-		op.Entry.Child = fuseops.InodeID(childEntry.iNode)
+		op.Entry.Child = childEntry.iNode
 		op.Entry.Generation = 1
 	} else {
 		return fuse.ENOENT
@@ -52,9 +52,9 @@ func (fs *readOnlyFsInternal) GetInodeAttributes(
 	if !found {
 		return fuse.ENOENT
 	}
-	fsEntry := e.(fsEntry)
+	fe := e.(fsEntry)
 	op.AttributesExpiration = time.Now().Add(cacheYearLong)
-	op.Attributes = fsEntry.attributes
+	op.Attributes = fe.attributes
 	return nil
 }
 
@@ -148,8 +148,8 @@ func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, openDirOp *fuseops.Op
 	if !found {
 		return fuse.ENOENT
 	}
-	fsEntry := p.(fsEntry)
-	if isDir(fsEntry) {
+	fe := p.(fsEntry)
+	if isDir(fe) {
 		return fuse.ENOTDIR
 	}
 	return nil
@@ -205,17 +205,20 @@ func (fs *readOnlyFsInternal) ReadFile(
 	if !found {
 		return fuse.ENOENT
 	}
-	fsEntry := p.(fsEntry)
-	reader, err := fs.bundle.ConsumableStore.GetAt(context.Background(), fsEntry.fullPath)
+	fe := p.(fsEntry)
+	reader, err := fs.bundle.ConsumableStore.GetAt(context.Background(), fe.fullPath)
 	if err != nil {
 		log.Print(err)
 		return fuse.EIO
 	}
 	n, err := reader.ReadAt(op.Dst, op.Offset)
-	log.Print(fmt.Printf("Read: %d of %s ", n, fsEntry.fullPath))
+	if err != nil {
+		log.Print(err)
+		return fuse.EIO
+	}
+	log.Print(fmt.Printf("Read: %d of %s ", n, fe.fullPath))
 	op.BytesRead = n
 	return nil
-	// else
 }
 
 func (fs *readOnlyFsInternal) WriteFile(
@@ -294,10 +297,7 @@ func (fs *readOnlyFsInternal) Destroy() {
 }
 
 func isDir(fsEntry fsEntry) bool {
-	if fsEntry.hash != "" {
-		return true
-	}
-	return false
+	return fsEntry.hash != ""
 }
 
 func newDatamonFSEntry(bundleEntry *model.BundleEntry, time time.Time, id fuseops.InodeID, linkCount uint32) *fsEntry {
@@ -356,11 +356,11 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 
 	generateNextINode := func(iNode *fuseops.InodeID) fuseops.InodeID {
 		*iNode++
-		return fuseops.InodeID(*iNode)
+		return *iNode
 	}
 
 	for _, bundleEntry := range fs.bundle.GetBundleEntries() {
-
+		bundleEntry := bundleEntry
 		// Generate the fsEntry
 		newFsEntry := newDatamonFSEntry(&bundleEntry, bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), fileLinkCount)
 
@@ -476,7 +476,7 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 		childEntries := fs.readDirMap[parentInode]
 		childEntries = append(childEntries, fuseutil.Dirent{
 			Offset: fuseops.DirOffset(len(childEntries) + 1),
-			Inode:  fuseops.InodeID(dirFsEntry.iNode),
+			Inode:  dirFsEntry.iNode,
 			Name:   path.Base(dirFsEntry.fullPath),
 			Type:   fuseutil.DT_Directory,
 		})
@@ -509,7 +509,7 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 	childEntries := fs.readDirMap[parentInode]
 	childEntries = append(childEntries, fuseutil.Dirent{
 		Offset: fuseops.DirOffset(len(childEntries) + 1),
-		Inode:  fuseops.InodeID(fsEntry.iNode),
+		Inode:  fsEntry.iNode,
 		Name:   path.Base(fsEntry.fullPath),
 		Type:   fuseutil.DT_File,
 	})

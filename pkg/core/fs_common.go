@@ -103,12 +103,12 @@ func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childNam
 	}
 
 	// lookup
-	fs.lookupTree, _, _ = fs.lookupTree.Insert(lk, lookupEntry{iNode: fuseops.InodeID(iNodeID)})
+	fs.lookupTree, _, _ = fs.lookupTree.Insert(lk, lookupEntry{iNode: iNodeID})
 
 	// Default to common case of create file
 	var linkCount = fileLinkCount
 	var defaultMode os.FileMode = fileDefaultMode
-	var defaultSize uint64 = 0
+	var defaultSize uint64
 
 	if nodeType == fuseutil.DT_Directory {
 		linkCount = dirLinkCount
@@ -129,7 +129,7 @@ func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childNam
 	}
 
 	d := &fuseutil.Dirent{
-		Inode: fuseops.InodeID(iNodeID),
+		Inode: iNodeID,
 		Name:  childName,
 		Type:  nodeType,
 	}
@@ -170,7 +170,7 @@ func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childNam
 		entry.Attributes = attr
 		entry.EntryExpiration = time.Now().Add(cacheYearLong)
 		entry.AttributesExpiration = time.Now().Add(cacheYearLong)
-		entry.Child = fuseops.InodeID(iNodeID)
+		entry.Child = iNodeID
 	}
 	return nil
 }

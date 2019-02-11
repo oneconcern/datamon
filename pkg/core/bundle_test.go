@@ -90,7 +90,7 @@ func getTimeStamp() *time.Time {
 	return timeStamp
 }
 
-func generateDataFile(test *testing.T, store storage.Store, iNode uint64) model.BundleEntry {
+func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
 	// Generate data files to compare post publish, write to internal folder
 	ksuid, err := ksuid.NewRandom()
 	require.NoError(test, err)
@@ -123,12 +123,12 @@ func Setup(t *testing.T) error {
 
 	for i = 0; i < entryFilesCount; i++ {
 
-		bundleEntry := generateDataFile(t, blobStore, i+1024)
+		bundleEntry := generateDataFile(t, blobStore)
 
 		bundleFileList := model.BundleEntries{BundleEntries: []model.BundleEntry{bundleEntry}}
 
 		for j = 0; j < (dataFilesCount - 1); j++ {
-			bundleEntry = generateDataFile(t, blobStore, (i+1)*(j+1)+1024)
+			bundleEntry = generateDataFile(t, blobStore)
 			bundleFileList.BundleEntries = append(bundleFileList.BundleEntries, bundleEntry)
 		}
 

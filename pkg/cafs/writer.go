@@ -92,9 +92,8 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 		n := int(w.offset)
 		w.offset = 0
 		return n, nil
-	} else {
-		fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
 	}
+	fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
 	return 0, nil
 }
 

@@ -26,7 +26,7 @@ var generateFileListCmd = &cobra.Command{
 			Callback: func(osPathname string, de *godirwalk.Dirent) error {
 				if !de.IsDir() {
 					fileToLog := strings.TrimPrefix(osPathname, generateParams.trimPrefix)
-					_, err := file.Write([]byte(fileToLog + "\n"))
+					_, err = file.Write([]byte(fileToLog + "\n"))
 					if err != nil {
 						logError.Printf("Failed to write file:%s err:%s", osPathname, err)
 					}

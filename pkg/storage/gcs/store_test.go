@@ -2,16 +2,17 @@ package gcs
 
 import (
 	"bytes"
-	gcsStorage "cloud.google.com/go/storage"
 	"context"
+	"io/ioutil"
+	"log"
+	"testing"
+
+	gcsStorage "cloud.google.com/go/storage"
 	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/option"
-	"io/ioutil"
-	"log"
-	"testing"
 )
 
 const (
@@ -141,5 +142,6 @@ func TestDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	keys, err := gcs.Keys(ctx)
+	assert.NoError(t, err)
 	assert.Len(t, keys, 2)
 }

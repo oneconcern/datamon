@@ -57,10 +57,8 @@ func NewReadOnlyFS(bundle *Bundle) (*ReadOnlyFS, error) {
 		fsDirStore:   iradix.New(),
 	}
 
-	var err error
-
 	// Extract the meta information needed.
-	err = Publish(context.Background(), fs.bundle)
+	err := Publish(context.Background(), fs.bundle)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +68,7 @@ func NewReadOnlyFS(bundle *Bundle) (*ReadOnlyFS, error) {
 }
 
 // NewMutableFS creates a new instance of the datamon filesystem.
-func NewMutableFS(bundle *Bundle, pathToStaging string) *MutableFS {
+func NewMutableFS(bundle *Bundle, pathToStaging string) (*MutableFS, error) {
 	logger, _ := zap.NewProduction()
 	fs := &fsMutable{
 		bundle:       bundle,
@@ -87,12 +85,15 @@ func NewMutableFS(bundle *Bundle, pathToStaging string) *MutableFS {
 		localCache: afero.NewBasePathFs(afero.NewOsFs(), pathToStaging),
 		l:          logger.With(zap.String("bundle", bundle.BundleID)),
 	}
-	fs.initRoot()
+	err := fs.initRoot()
+	if err != nil {
+		return nil, err
+	}
 	return &MutableFS{
 		mfs:        nil,
 		fsInternal: fs,
 		server:     fuseutil.NewFileSystemServer(fs),
-	}
+	}, err
 }
 
 func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
@@ -126,9 +127,9 @@ func (dfs *ReadOnlyFS) Unmount(path string) error {
 
 func (dfs *MutableFS) Unmount(path string) error {
 	// On unmount, walk the FS and create a bundle
-	err := dfs.fsInternal.Commit()
-	if err != nil {
-		// dump the metadata to the local FS to manually recover.
-	}
+	_ = dfs.fsInternal.Commit()
+	//if err != nil {
+	// dump the metadata to the local FS to manually recover.
+	//}
 	return fuse.Unmount(path)
 }

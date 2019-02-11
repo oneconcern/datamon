@@ -38,9 +38,6 @@ type fsMutable struct {
 	// Cache of backing files.
 	backingFiles map[fuseops.InodeID]*afero.File
 
-	// Open handles to iNode
-	hndl2iNode map[uint64]uint64
-
 	// TODO: remove one giant lock with more fine grained locking coupled with the readdir move to radix.
 	lock           sync.Mutex
 	iNodeGenerator iNodeGenerator
@@ -109,13 +106,12 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 
 	if cNode.attr.Mode.IsDir() {
 		children := fs.readDirMap[cLE.iNode]
-		if children != nil && len(children) >= 0 {
+		if len(children) > 0 {
 			return fuse.ENOTEMPTY
-		} else {
-			// Delete the child dir
-			delete(fs.readDirMap, cLE.iNode)
-			pNode.attr.Nlink--
 		}
+		// Delete the child dir
+		delete(fs.readDirMap, cLE.iNode)
+		pNode.attr.Nlink--
 	}
 
 	fs.lookupTree, _, _ = fs.lookupTree.Delete(lk)
@@ -230,7 +226,7 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 
 	// Send new attr back
 	op.Attributes = n.attr
-	return
+	return nil
 }
 
 func (fs *fsMutable) ForgetInode(
@@ -247,7 +243,6 @@ func (fs *fsMutable) ForgetInode(
 	if !found {
 		fs.l.Error("ForgetInode inode not found", zap.Uint64("inode", uint64(op.Inode)))
 		panic(fmt.Sprintf("not found iNode:%d", op.Inode))
-		return
 	}
 
 	var del bool
@@ -258,7 +253,6 @@ func (fs *fsMutable) ForgetInode(
 
 	if n.refCount < 0 {
 		panic(fmt.Sprintf("RefCount below zero %d", op.Inode))
-		return
 	}
 
 	del = shouldDelete(n)
@@ -280,8 +274,9 @@ func (fs *fsMutable) ForgetInode(
 			fs.iNodeStore, _, _ = fs.iNodeStore.Delete(key)
 			fs.l.Info("NodeStore", zap.Int("Size", fs.iNodeStore.Len()))
 		}
+		fs.iNodeGenerator.freeINode(op.Inode)
 	}
-	return
+	return nil
 }
 
 func (fs *fsMutable) MkDir(
@@ -398,7 +393,7 @@ func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err erro
 	fs.insertReadDirEntry(op.NewParent, &newRC)
 	fs.insertLookupEntry(op.NewParent, op.NewName, l.(lookupEntry))
 
-	return
+	return nil
 }
 
 func (fs *fsMutable) RmDir(
@@ -441,13 +436,16 @@ func (fs *fsMutable) ReadDir(
 	}
 
 	if offset > len(children) {
-		return fuse.EINVAL
+		return
 	}
 
 	var i uint64 = 1
 	for _, c := range children {
-		child := *c
 		i++
+		if i < uint64(offset) {
+			continue
+		}
+		child := *c
 		child.Offset = fuseops.DirOffset(i) // This is where dirOffset matters..
 		n := fuseutil.WriteDirent(op.Dst[op.BytesRead:], child)
 		if n == 0 {
@@ -455,7 +453,7 @@ func (fs *fsMutable) ReadDir(
 		}
 		op.BytesRead += n
 	}
-	return
+	return nil
 }
 
 func (fs *fsMutable) ReleaseDirHandle(
