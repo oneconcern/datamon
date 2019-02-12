@@ -31,13 +31,28 @@ var uploadBundleCmd = &cobra.Command{
 
 		sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 
-		bundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore, destinationStore, blobStore)
+		bd := core.NewBDescriptor(
+			core.Message(uploadOptions.message),
+			core.Parents(uploadOptions.parents),
+		)
+		bundle := core.New(bd,
+			core.Repo(repoParams.RepoName),
+			core.BlobStore(blobStore),
+			core.ConsumableStore(destinationStore),
+			core.MetaStore(sourceStore),
+		)
 
 		err = core.Publish(context.Background(), bundle)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	},
+}
+
+var uploadOptions struct {
+	message      string
+	contributors []string
+	parents      []string
 }
 
 func init() {

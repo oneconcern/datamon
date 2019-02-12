@@ -14,7 +14,7 @@ import (
 func unpackBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 
 	bundleDescriptorBuffer, err := storage.ReadTee(ctx,
-		bundle.ArchiveStore, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
+		bundle.MetaStore, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
 		bundle.ConsumableStore, model.GetConsumablePathToBundle(bundle.BundleID))
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func unpackBundleFileList(ctx context.Context, bundle *Bundle) error {
 	var i uint64
 	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
 		bundleEntriesBuffer, err := storage.ReadTee(ctx,
-			bundle.ArchiveStore, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i),
+			bundle.MetaStore, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i),
 			bundle.ConsumableStore, model.GetConsumablePathToBundleFileList(bundle.BundleID, i))
 		if err != nil {
 			return err

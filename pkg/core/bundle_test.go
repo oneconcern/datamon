@@ -49,7 +49,14 @@ func TestBundle(t *testing.T) {
 	archiveStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 
-	bundle := NewBundle(repo, bundleID, archiveStore, consumableStore, blobStore)
+	bd := NewBDescriptor()
+	bundle := New(bd,
+		Repo(repo),
+		BundleID(bundleID),
+		MetaStore(archiveStore),
+		ConsumableStore(consumableStore),
+		BlobStore(blobStore),
+	)
 
 	require.NoError(t,
 		Publish(context.Background(), bundle))
@@ -59,7 +66,12 @@ func TestBundle(t *testing.T) {
 	reArchive := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveDir))
 
 	b := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveBlobDir))
-	archiveBundle2 := NewBundle(repo, "", reArchive, consumableStore, b)
+	archiveBundle2 := New(bd,
+		Repo(repo),
+		MetaStore(reArchive),
+		ConsumableStore(consumableStore),
+		BlobStore(b),
+	)
 
 	require.NoError(t,
 		Upload(context.Background(), archiveBundle2))

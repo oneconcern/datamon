@@ -32,7 +32,16 @@ var downloadBundleCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
-		bundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore, destinationStore, blobStore)
+
+		bd := core.NewBDescriptor()
+		bundle := core.New(bd,
+			core.Repo(repoParams.RepoName),
+			core.MetaStore(sourceStore),
+			core.ConsumableStore(destinationStore),
+			core.BlobStore(blobStore),
+			core.BundleID(bundleOptions.ID),
+		)
+
 		err = core.Publish(context.Background(), bundle)
 		if err != nil {
 			log.Fatalln(err)

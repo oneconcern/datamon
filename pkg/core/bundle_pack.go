@@ -79,7 +79,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 			if e != nil {
 				return e
 			}
-			err = bundle.ArchiveStore.Put(ctx,
+			err = bundle.MetaStore.Put(ctx,
 				model.GetArchivePathToBundleFileList(
 					bundle.RepoID,
 					bundle.BundleID,
@@ -110,7 +110,7 @@ func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 		return err
 	}
 
-	err = bundle.ArchiveStore.Put(ctx,
+	err = bundle.MetaStore.Put(ctx,
 		model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
 		bytes.NewReader(buffer))
 	if err != nil {

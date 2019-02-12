@@ -29,7 +29,7 @@ func setup(t testing.TB) (storage.Store, func()) {
 
 	ctx := context.Background()
 
-	bucket := internal.RandStringBytesMaskImprSrc(15)
+	bucket := "DATAMON-TEST-" + internal.RandStringBytesMaskImprSrc(15)
 	log.Printf("Created bucket %s ", bucket)
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))

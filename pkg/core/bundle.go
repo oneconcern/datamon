@@ -17,7 +17,7 @@ import (
 type Bundle struct {
 	RepoID           string
 	BundleID         string
-	ArchiveStore     storage.Store
+	MetaStore        storage.Store
 	ConsumableStore  storage.Store
 	BlobStore        storage.Store
 	BundleDescriptor model.BundleDescriptor
@@ -44,24 +44,85 @@ func (bundle *Bundle) GetBundleEntries() []model.BundleEntry {
 	return bundle.BundleEntries
 }
 
-// NewArchiveBundle returns a new archive bundle
-func NewBundle(repo string, bundle string, archiveStore storage.Store, consumableStore storage.Store, blobStore storage.Store) *Bundle {
-	return &Bundle{
-		BundleDescriptor: model.BundleDescriptor{
-			LeafSize:               cafs.DefaultLeafSize,
-			ID:                     "",
-			Message:                "",
-			Parents:                nil,
-			Timestamp:              time.Now(),
-			Contributors:           nil,
-			BundleEntriesFileCount: 0,
-		},
-		RepoID:          repo,
-		BundleID:        bundle,
-		ArchiveStore:    archiveStore,
-		ConsumableStore: consumableStore,
-		BlobStore:       blobStore,
+type BundleOption func(*Bundle)
+type BundleDescriptorOption func(descriptor *model.BundleDescriptor)
+
+func Message(m string) BundleDescriptorOption {
+	return func(b *model.BundleDescriptor) {
+		b.Message = m
 	}
+}
+
+func Contributors(c []model.Contributor) BundleDescriptorOption {
+	return func(b *model.BundleDescriptor) {
+		b.Contributors = c
+	}
+}
+
+func Parents(p []string) BundleDescriptorOption {
+	return func(b *model.BundleDescriptor) {
+		b.Parents = p
+	}
+}
+
+func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescriptor {
+	bd := model.BundleDescriptor{
+		LeafSize:               cafs.DefaultLeafSize, // For now, fixed leaf size
+		ID:                     "",
+		Message:                "",
+		Parents:                nil,
+		Timestamp:              time.Now(),
+		Contributors:           nil,
+		BundleEntriesFileCount: 0,
+	}
+	for _, apply := range descriptorOps {
+		apply(&bd)
+	}
+	return &bd
+}
+
+func Repo(r string) BundleOption {
+	return func(b *Bundle) {
+		b.RepoID = r
+	}
+}
+
+func MetaStore(store storage.Store) BundleOption {
+	return func(b *Bundle) {
+		b.MetaStore = store
+	}
+}
+func ConsumableStore(store storage.Store) BundleOption {
+	return func(b *Bundle) {
+		b.ConsumableStore = store
+	}
+}
+func BlobStore(store storage.Store) BundleOption {
+	return func(b *Bundle) {
+		b.BlobStore = store
+	}
+}
+
+func BundleID(bID string) BundleOption {
+	return func(b *Bundle) {
+		b.BundleID = bID
+	}
+}
+
+func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
+	b := Bundle{
+		RepoID:           "",
+		BundleID:         "",
+		MetaStore:        nil,
+		ConsumableStore:  nil,
+		BlobStore:        nil,
+		BundleDescriptor: *bd,
+		BundleEntries:    make([]model.BundleEntry, 0, 1024),
+	}
+	for _, bApply := range bundleOps {
+		bApply(&b)
+	}
+	return &b
 }
 
 // Publish an bundle to a consumable store
