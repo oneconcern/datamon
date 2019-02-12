@@ -19,12 +19,13 @@ type Bundle struct {
 	BundleID         string
 	ArchiveStore     storage.Store
 	ConsumableStore  storage.Store
+	BlobStore        storage.Store
 	BundleDescriptor model.BundleDescriptor
 	BundleEntries    []model.BundleEntry
 }
 
 // SetBundleID for the bundle
-func (bundle *Bundle) SetBundleID(id string) {
+func (bundle *Bundle) setBundleID(id string) {
 	bundle.BundleID = id
 	bundle.BundleDescriptor.ID = id
 }
@@ -35,7 +36,7 @@ func (bundle *Bundle) InitializeBundleID() error {
 	if err != nil {
 		return err
 	}
-	bundle.SetBundleID(id.String())
+	bundle.setBundleID(id.String())
 	return nil
 }
 
@@ -44,7 +45,7 @@ func (bundle *Bundle) GetBundleEntries() []model.BundleEntry {
 }
 
 // NewArchiveBundle returns a new archive bundle
-func NewBundle(repo string, bundle string, archiveStore storage.Store, consumableStore storage.Store) *Bundle {
+func NewBundle(repo string, bundle string, archiveStore storage.Store, consumableStore storage.Store, blobStore storage.Store) *Bundle {
 	return &Bundle{
 		BundleDescriptor: model.BundleDescriptor{
 			LeafSize:               cafs.DefaultLeafSize,
@@ -59,6 +60,7 @@ func NewBundle(repo string, bundle string, archiveStore storage.Store, consumabl
 		BundleID:        bundle,
 		ArchiveStore:    archiveStore,
 		ConsumableStore: consumableStore,
+		BlobStore:       blobStore,
 	}
 }
 
@@ -90,7 +92,7 @@ func PublishMetadata(ctx context.Context, bundle *Bundle) error {
 	return nil
 }
 
-// Upload an bundle that is stored as a archive
+// Upload an bundle to archive
 func Upload(ctx context.Context, bundle *Bundle) error {
 	return uploadBundle(ctx, bundle)
 }

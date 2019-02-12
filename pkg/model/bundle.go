@@ -69,10 +69,6 @@ func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) 
 	return fmt.Sprint(repo, "-bundles/", bundleID, "/bundle-files-", index, ".json")
 }
 
-func GetArchivePathBlobPrefix() string {
-	return "blobs/"
-}
-
 func GetBundleTimeStamp() time.Time {
 	t := time.Now()
 	return t.UTC()

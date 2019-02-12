@@ -27,8 +27,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 	}
 	cafsArchive, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
-		cafs.Backend(bundle.ArchiveStore),
-		cafs.Prefix(model.GetArchivePathBlobPrefix()),
+		cafs.Backend(bundle.BlobStore),
 	)
 	if err != nil {
 		return err

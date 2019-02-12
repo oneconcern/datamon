@@ -22,17 +22,19 @@ import (
 )
 
 const (
-	leafSize        = cafs.DefaultLeafSize
-	entryFilesCount = 2
-	dataFilesCount  = 4
-	repo            = "bundle_test_repo"
-	bundleID        = "bundle123"
-	testRoot        = "../../testdata/core"
-	sourceDir       = "../../testdata/core/bundle/source/"
-	destinationDir  = "../../testdata/core/bundle/destination/"
-	destinationDir2 = "../../testdata/core/bundle/destination2/"
-	internalDir     = "../../testdata/core/internal/"
-	dataDir         = "dir/"
+	leafSize         = cafs.DefaultLeafSize
+	entryFilesCount  = 2
+	dataFilesCount   = 4
+	repo             = "bundle_test_repo"
+	bundleID         = "bundle123"
+	testRoot         = "../../testdata/core"
+	sourceDir        = "../../testdata/core/bundle/source/"
+	blobDir          = "../../testdata/core/bundle/source/blob"
+	destinationDir   = "../../testdata/core/bundle/destination/"
+	reArchiveDir     = "../../testdata/core/bundle/destination2/"
+	reArchiveBlobDir = "../../testdata/core/bundle/destination2/blob"
+	internalDir      = "../../testdata/core/internal/"
+	dataDir          = "dir/"
 )
 
 var (
@@ -40,18 +42,28 @@ var (
 )
 
 func TestBundle(t *testing.T) {
+
 	require.NoError(t, Setup(t))
+
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	archiveStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
-	bundle := NewBundle(repo, bundleID, archiveStore, consumableStore)
+	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
+
+	bundle := NewBundle(repo, bundleID, archiveStore, consumableStore, blobStore)
+
 	require.NoError(t,
 		Publish(context.Background(), bundle))
+
 	require.NoError(t, validatePublish(t, consumableStore))
 
-	destinationStore2 := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir2))
-	archiveBundle2 := NewBundle(repo, "", destinationStore2, consumableStore)
+	reArchive := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveDir))
+
+	b := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveBlobDir))
+	archiveBundle2 := NewBundle(repo, "", reArchive, consumableStore, b)
+
 	require.NoError(t,
 		Upload(context.Background(), archiveBundle2))
+
 	require.True(t, validateUpload(t))
 }
 
@@ -76,7 +88,7 @@ func validatePublish(t *testing.T, store storage.Store) error {
 
 func validateUpload(t *testing.T) bool {
 	// Check if the blobs are the same as download
-	require.True(t, validateDataFiles(t, sourceDir+"/blobs/", destinationDir2+"/blobs/"))
+	require.True(t, validateDataFiles(t, blobDir, reArchiveBlobDir))
 	// Check if the bundle json and file list are what is expected.
 	return true
 }
@@ -117,7 +129,7 @@ func Setup(t *testing.T) error {
 	cleanup()
 
 	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
-	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir+"blobs"))
+	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	require.NoError(t, os.MkdirAll(internalDir, 0700))
 	var i, j uint64
 

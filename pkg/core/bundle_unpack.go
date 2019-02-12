@@ -52,12 +52,13 @@ func unpackBundleFileList(ctx context.Context, bundle *Bundle) error {
 func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 	fs, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
-		cafs.Backend(bundle.ArchiveStore),
-		cafs.Prefix(model.GetArchivePathBlobPrefix()),
+		cafs.Backend(bundle.BlobStore),
 	)
+
 	if err != nil {
 		return err
 	}
+
 	for _, bundleEntry := range bundle.BundleEntries {
 		key, err := cafs.KeyFromString(bundleEntry.Hash)
 		if err != nil {

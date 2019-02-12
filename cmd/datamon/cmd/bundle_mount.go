@@ -22,12 +22,16 @@ var mountBundleCmd = &cobra.Command{
 
 		DieIfNotAccessible(bundleOptions.DataPath)
 
-		sourceStore, err := gcs.New(repoParams.Bucket)
+		metadataSource, err := gcs.New(repoParams.MetadataBucket)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		blobStore, err := gcs.New(repoParams.BlobBucket)
 		if err != nil {
 			log.Fatalln(err)
 		}
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
-		archiveBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore, destinationStore)
+		archiveBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, metadataSource, destinationStore, blobStore)
 		fs, err := core.NewReadOnlyFS(archiveBundle)
 		if err != nil {
 			log.Fatalln(err)
@@ -51,6 +55,8 @@ func init() {
 	// Destination
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
 
+	// Blob bucket
+	requiredFlags = append(requiredFlags, addBlobBucket(mountBundleCmd))
 	for _, flag := range requiredFlags {
 		err := mountBundleCmd.MarkFlagRequired(flag)
 		if err != nil {
