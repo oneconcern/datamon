@@ -2,16 +2,17 @@ package gcs
 
 import (
 	"bytes"
-	gcsStorage "cloud.google.com/go/storage"
 	"context"
+	"io/ioutil"
+	"log"
+	"testing"
+
+	gcsStorage "cloud.google.com/go/storage"
 	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/option"
-	"io/ioutil"
-	"log"
-	"testing"
 )
 
 const (
@@ -28,10 +29,11 @@ func setup(t testing.TB) (storage.Store, func()) {
 
 	ctx := context.Background()
 
-	bucket := internal.RandStringBytesMaskImprSrc(15)
+	bucket := "datamontest-" + internal.RandStringBytesMaskImprSrc(15)
 	log.Printf("Created bucket %s ", bucket)
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
+	require.NoError(t, err)
 	err = client.Bucket(bucket).Create(ctx, "oneconcern-1509", nil)
 	require.NoError(t, err)
 
@@ -141,5 +143,6 @@ func TestDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	keys, err := gcs.Keys(ctx)
+	assert.NoError(t, err)
 	assert.Len(t, keys, 2)
 }

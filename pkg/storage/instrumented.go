@@ -26,12 +26,12 @@ type instrumentedStore struct {
 	logs  log.Factory
 }
 
-func (i *instrumentedStore) KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error) {
+func (i *instrumentedStore) KeysPrefix(ctx context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
 	span := i.spanFromContext(ctx, i.opName("KeysPrefix"))
 	defer span.Finish()
 	i.logs.Bg().Info("storage keys with Prefix")
 
-	return i.store.KeysPrefix(ctx, token, prefix, delimiter)
+	return i.store.KeysPrefix(ctx, token, prefix, delimiter, count)
 }
 
 func (i *instrumentedStore) opName(name string) string {
@@ -99,4 +99,11 @@ func (i *instrumentedStore) Clear(ctx context.Context) error {
 
 func (i *instrumentedStore) String() string {
 	return i.store.String()
+}
+
+func (i *instrumentedStore) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
+	span := i.spanFromContext(ctx, i.opName("GetAt"))
+	defer span.Finish()
+	i.logs.Bg().Info("get a offset reader")
+	return i.store.GetAt(ctx, objectName)
 }

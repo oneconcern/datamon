@@ -103,7 +103,7 @@ func TestKeysPrefix(t *testing.T) {
 	bs, cleanup := setupStore(t)
 	defer cleanup()
 
-	keys, token, err := bs.KeysPrefix(context.Background(), "", "", "")
+	keys, token, err := bs.KeysPrefix(context.Background(), "", "", "", 0)
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 	require.Equal(t, token, "")

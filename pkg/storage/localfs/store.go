@@ -110,7 +110,7 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 }
 
 //TODO discuss the implementation with @Ivan & @Ritesh
-func (l *localFS) KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error) {
+func (l *localFS) KeysPrefix(ctx context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
 	return nil, "", errors.New("unimplemented")
 }
 
@@ -130,4 +130,8 @@ func (l *localFS) String() string {
 	default:
 		return localfs
 	}
+}
+
+func (l *localFS) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
+	return l.fs.Open(objectName)
 }

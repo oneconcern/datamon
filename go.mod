@@ -7,6 +7,8 @@ require (
 	github.com/docker/go-units v0.3.3
 	github.com/google/martian v2.1.0+incompatible // indirect
 	github.com/googleapis/gax-go v2.0.2+incompatible // indirect
+	github.com/hashicorp/go-immutable-radix v1.0.0
+	github.com/jacobsa/fuse v0.0.0-20180417054321-cd3959611bcb
 	github.com/json-iterator/go v1.1.5
 	github.com/karrick/godirwalk v1.7.8
 	github.com/kr/pretty v0.1.0 // indirect

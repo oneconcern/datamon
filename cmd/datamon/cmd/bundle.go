@@ -24,6 +24,7 @@ var bundleOptions struct {
 
 var bundleID = "bundle"
 var destination = "destination"
+var folder = "folder"
 
 func init() {
 	rootCmd.AddCommand(bundleCmd)
@@ -36,5 +37,10 @@ func addBundleFlag(cmd *cobra.Command) string {
 
 func addDataPathFlag(cmd *cobra.Command) string {
 	cmd.Flags().StringVarP(&bundleOptions.DataPath, destination, "d", "", "The path to the download folder")
+	return destination
+}
+
+func addFolderPathFlag(cmd *cobra.Command) string {
+	cmd.Flags().StringVarP(&bundleOptions.DataPath, folder, "s", "", "The path to the folder of the bundle")
 	return destination
 }

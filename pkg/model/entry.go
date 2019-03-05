@@ -10,10 +10,11 @@ import (
 
 // Entry for the stage or a bundle
 type Entry struct {
-	Path  string    `json:"path" yaml:"path"`
-	Hash  string    `json:"hash" yaml:"hash"`
-	Mtime time.Time `json:"mtime" yaml:"mtime"`
-	Mode  FileMode  `json:"mode" yaml:"mode"`
+	ID    uint64    `json:"id" yaml:"id"`       // Unique ID within the bundle, proxy for iNode
+	Path  string    `json:"path" yaml:"path"`   // Path of the entry in the bundle
+	Hash  string    `json:"hash" yaml:"hash"`   // Hash for the content in the entry
+	Mtime time.Time `json:"mtime" yaml:"mtime"` // Modified time
+	Mode  FileMode  `json:"mode" yaml:"mode"`   // Permissions on the file
 	_     struct{}
 }
 

@@ -5,6 +5,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"io"
 	"log"
 
 	"gopkg.in/yaml.v2"
@@ -17,25 +18,27 @@ const (
 	bundleEntriesPerFile = 1000
 )
 
-func uploadBundle(ctx context.Context, consumableBundle Bundle, archiveBundle *Bundle) error {
+func uploadBundle(ctx context.Context, bundle *Bundle) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
-	files, err := consumableBundle.store.Keys(ctx)
+	files, err := bundle.ConsumableStore.Keys(ctx)
 	if err != nil {
 		return err
 	}
 	cafsArchive, err := cafs.New(
-		cafs.LeafSize(archiveBundle.bundleDescriptor.LeafSize),
-		cafs.Backend(archiveBundle.store),
-		cafs.Prefix(model.GetArchivePathBlobPrefix()),
+		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
+		cafs.Backend(bundle.BlobStore),
 	)
+	if err != nil {
+		return err
+	}
 
 	fileList := model.BundleEntries{}
 	var bundleEntriesIndex uint
 	var totalWritten uint64
 	var filesInBundle uint64
 	// Upload the files and the bundle list
-	err = archiveBundle.InitializeBundleID()
+	err = bundle.InitializeBundleID()
 	if err != nil {
 		return err
 	}
@@ -49,16 +52,17 @@ func uploadBundle(ctx context.Context, consumableBundle Bundle, archiveBundle *B
 			bundleEntriesIndex = 0
 		}
 
-		fileReader, err := consumableBundle.store.Get(ctx, file)
+		var fileReader io.ReadCloser
+		fileReader, err = bundle.ConsumableStore.Get(ctx, file)
 		if err != nil {
 			return err
 		}
 
-		written, key, keys, err := cafsArchive.Put(ctx, fileReader)
-		totalWritten = totalWritten + uint64(written)
+		written, key, keys, e := cafsArchive.Put(ctx, fileReader)
+		totalWritten += uint64(written)
 		filesInBundle++
-		if err != nil {
-			return err
+		if e != nil {
+			return e
 		}
 
 		log.Printf("Uploaded root key %s & %d bytes for keys for %s", key.String(), len(keys), file)
@@ -71,29 +75,29 @@ func uploadBundle(ctx context.Context, consumableBundle Bundle, archiveBundle *B
 
 		// Write the bundle entry file if reached max or the last one
 		if index == len(files)-1 || bundleEntriesIndex == bundleEntriesPerFile {
-			buffer, err := yaml.Marshal(fileList)
-			if err != nil {
-				return err
+			buffer, e := yaml.Marshal(fileList)
+			if e != nil {
+				return e
 			}
-			err = archiveBundle.store.Put(ctx,
+			err = bundle.MetaStore.Put(ctx,
 				model.GetArchivePathToBundleFileList(
-					archiveBundle.repoID,
-					archiveBundle.bundleID,
-					archiveBundle.bundleDescriptor.BundleEntriesFileCount),
+					bundle.RepoID,
+					bundle.BundleID,
+					bundle.BundleDescriptor.BundleEntriesFileCount),
 				bytes.NewReader(buffer))
 			if err != nil {
 				return err
 			}
-			archiveBundle.bundleDescriptor.BundleEntriesFileCount++
+			bundle.BundleDescriptor.BundleEntriesFileCount++
 		}
 	}
 
-	err = uploadBundleDescriptor(ctx, archiveBundle)
+	err = uploadBundleDescriptor(ctx, bundle)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Uploaded bundle id:%s with %d files and %d bytes written", archiveBundle.bundleID,
+	log.Printf("Uploaded bundle id:%s with %d files and %d bytes written", bundle.BundleID,
 		filesInBundle, totalWritten)
 
 	return nil
@@ -101,13 +105,13 @@ func uploadBundle(ctx context.Context, consumableBundle Bundle, archiveBundle *B
 
 func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 
-	buffer, err := yaml.Marshal(bundle.bundleDescriptor)
+	buffer, err := yaml.Marshal(bundle.BundleDescriptor)
 	if err != nil {
 		return err
 	}
 
-	err = bundle.store.Put(ctx,
-		model.GetArchivePathToBundle(bundle.repoID, bundle.bundleID),
+	err = bundle.MetaStore.Put(ctx,
+		model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
 		bytes.NewReader(buffer))
 	if err != nil {
 		return err

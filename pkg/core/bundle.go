@@ -15,17 +15,19 @@ import (
 
 // ArchiveBundle represents the bundle in it's archive state
 type Bundle struct {
-	repoID           string
-	bundleID         string
-	store            storage.Store
-	bundleDescriptor model.Bundle
-	bundleEntries    []model.BundleEntry
+	RepoID           string
+	BundleID         string
+	MetaStore        storage.Store
+	ConsumableStore  storage.Store
+	BlobStore        storage.Store
+	BundleDescriptor model.BundleDescriptor
+	BundleEntries    []model.BundleEntry
 }
 
 // SetBundleID for the bundle
-func (bundle *Bundle) SetBundleID(id string) {
-	bundle.bundleID = id
-	bundle.bundleDescriptor.ID = id
+func (bundle *Bundle) setBundleID(id string) {
+	bundle.BundleID = id
+	bundle.BundleDescriptor.ID = id
 }
 
 // InitializeBundleID create and set a new bundle ID
@@ -34,48 +36,124 @@ func (bundle *Bundle) InitializeBundleID() error {
 	if err != nil {
 		return err
 	}
-	bundle.SetBundleID(id.String())
+	bundle.setBundleID(id.String())
 	return nil
 }
 
-// NewArchiveBundle returns a new archive bundle
-func NewBundle(repo string, bundle string, store storage.Store) *Bundle {
-	return &Bundle{
-		bundleDescriptor: model.Bundle{
-			LeafSize:               cafs.DefaultLeafSize,
-			ID:                     "",
-			Message:                "",
-			Parents:                nil,
-			Timestamp:              time.Now(),
-			Contributors:           nil,
-			BundleEntriesFileCount: 0,
-		},
-		repoID:   repo,
-		bundleID: bundle,
-		store:    store,
+func (bundle *Bundle) GetBundleEntries() []model.BundleEntry {
+	return bundle.BundleEntries
+}
+
+type BundleOption func(*Bundle)
+type BundleDescriptorOption func(descriptor *model.BundleDescriptor)
+
+func Message(m string) BundleDescriptorOption {
+	return func(b *model.BundleDescriptor) {
+		b.Message = m
 	}
 }
 
-// Publish an archived bundle to a consumable bundle
-func Publish(ctx context.Context, archiveBundle *Bundle, consumableBundle *Bundle) error {
-	err := unpackBundleDescriptor(ctx, archiveBundle, consumableBundle)
+func Contributors(c []model.Contributor) BundleDescriptorOption {
+	return func(b *model.BundleDescriptor) {
+		b.Contributors = c
+	}
+}
+
+func Parents(p []string) BundleDescriptorOption {
+	return func(b *model.BundleDescriptor) {
+		b.Parents = p
+	}
+}
+
+func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescriptor {
+	bd := model.BundleDescriptor{
+		LeafSize:               cafs.DefaultLeafSize, // For now, fixed leaf size
+		ID:                     "",
+		Message:                "",
+		Parents:                nil,
+		Timestamp:              time.Now(),
+		Contributors:           nil,
+		BundleEntriesFileCount: 0,
+	}
+	for _, apply := range descriptorOps {
+		apply(&bd)
+	}
+	return &bd
+}
+
+func Repo(r string) BundleOption {
+	return func(b *Bundle) {
+		b.RepoID = r
+	}
+}
+
+func MetaStore(store storage.Store) BundleOption {
+	return func(b *Bundle) {
+		b.MetaStore = store
+	}
+}
+func ConsumableStore(store storage.Store) BundleOption {
+	return func(b *Bundle) {
+		b.ConsumableStore = store
+	}
+}
+func BlobStore(store storage.Store) BundleOption {
+	return func(b *Bundle) {
+		b.BlobStore = store
+	}
+}
+
+func BundleID(bID string) BundleOption {
+	return func(b *Bundle) {
+		b.BundleID = bID
+	}
+}
+
+func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
+	b := Bundle{
+		RepoID:           "",
+		BundleID:         "",
+		MetaStore:        nil,
+		ConsumableStore:  nil,
+		BlobStore:        nil,
+		BundleDescriptor: *bd,
+		BundleEntries:    make([]model.BundleEntry, 0, 1024),
+	}
+	for _, bApply := range bundleOps {
+		bApply(&b)
+	}
+	return &b
+}
+
+// Publish an bundle to a consumable store
+func Publish(ctx context.Context, bundle *Bundle) error {
+	err := PublishMetadata(ctx, bundle)
 	if err != nil {
 		return err
 	}
 
-	err = unpackBundleFileList(ctx, archiveBundle, consumableBundle)
-	if err != nil {
-		return err
-	}
-
-	err = unpackDataFiles(ctx, archiveBundle, consumableBundle)
+	err = unpackDataFiles(ctx, bundle)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// Upload an archive bundle that is stored as a consumable bundle
-func Upload(ctx context.Context, consumableBundle Bundle, archiveBundle *Bundle) error {
-	return uploadBundle(ctx, consumableBundle, archiveBundle)
+// PublishMetadata from the archive to the consumable store
+func PublishMetadata(ctx context.Context, bundle *Bundle) error {
+	err := unpackBundleDescriptor(ctx, bundle)
+	if err != nil {
+		return err
+	}
+
+	err = unpackBundleFileList(ctx, bundle)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Upload an bundle to archive
+func Upload(ctx context.Context, bundle *Bundle) error {
+	return uploadBundle(ctx, bundle)
 }

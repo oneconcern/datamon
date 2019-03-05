@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -29,13 +30,13 @@ import (
 
 func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs cafs.Fs, fileChan chan string, wg *sync.WaitGroup, c *uint64, errC *uint64, duplicateCount *uint64) {
 	logError := log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
-	logger, err := zap.NewProduction()
+	var err error
+	logger, err = zap.NewProduction()
 	if err != nil {
 		wg.Done()
 		logError.Fatalln(err)
 		return
 	}
-	defer logger.Sync()
 
 	incC := func(count *uint64) {
 		atomic.AddUint64(count, 1)
@@ -43,6 +44,7 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 	for {
 		file, found := <-fileChan
 		if !found {
+			_ = logger.Sync()
 			wg.Done()
 			return
 		}
@@ -100,51 +102,48 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 	}
 }
 
-func downloadFromBlog(sourceStore storage.Store, destinationStore storage.Store, cafs cafs.Fs, fileChan chan string, wg *sync.WaitGroup) {
-	// Read json
-	// Unmarshall json
-	// Get the hash
-	// Get the file from cafs and write to destination
-}
-
-func verifyIfFileExists() {
-	// read a list of files
-	// check if file json exists
-	// if not write the missing file
-}
-
-func ProcessFiles(fileList string, sourceStore storage.Store, backupStore storage.Store, cafs cafs.Fs, maxC int, startFrom int) (err error) {
-	logger, _ := zap.NewProduction()
+func publishFiles(fileList string, fileChan chan string, startFrom int, staggeredStart bool, wg *sync.WaitGroup) {
 	file, err := os.Open(fileList)
 	if err != nil {
 		logger.Error("Failed to open file", zap.String("files", fileList), zap.Error(err))
+		close(fileChan)
+		wg.Done()
 		return
 	}
 	defer file.Close()
-	var wg sync.WaitGroup
 	lineScanner := bufio.NewScanner(file)
-	var fileCount uint64
-	var errCount uint64
-	var duplicateCount uint64
 	for i := startFrom; i > 0; i-- {
 		lineScanner.Scan()
 	}
-	// Upload single to acquire token.
-	wg.Add(maxC)
-	var fileChan = make(chan string, 1000000)
-	for i := 0; i < maxConcurrency; i++ {
-		go UploadToBlob(sourceStore, backupStore, cafs, fileChan, &wg, &fileCount, &errCount, &duplicateCount)
-	}
-	lineScanner.Scan()
-	fileChan <- lineScanner.Text()
 	for lineScanner.Scan() {
 		fileChan <- lineScanner.Text()
+		if staggeredStart {
+			time.Sleep(time.Millisecond * 500)
+			staggeredStart = false
+		}
 	}
 	close(fileChan)
+	wg.Done()
+}
+
+func ProcessFiles(fileList string, sourceStore storage.Store, backupStore storage.Store, cafs cafs.Fs, maxC int, startFrom int) (err error) {
+	var fileCount uint64
+	var errCount uint64
+	var duplicateCount uint64
+	var wg sync.WaitGroup
+	wg.Add(maxC)
+
+	var fileChan = make(chan string)
+
+	go publishFiles(fileList, fileChan, startFrom, true, &wg)
+
+	for i := 1; i < maxC; i++ {
+		go UploadToBlob(sourceStore, backupStore, cafs, fileChan, &wg, &fileCount, &errCount, &duplicateCount)
+	}
 	logger.Info("Waiting for routines")
 	wg.Wait()
 	logger.Info("Finished processing", zap.String("files", fileList), zap.Uint64("Total", fileCount), zap.Uint64("errors", errCount))
-	return
+	return nil
 }
 
 var upload = &cobra.Command{
@@ -180,7 +179,10 @@ var rootCmd = &cobra.Command{
 	Long:  "This tools helps generate a list of files and upload it to CAFS based FS",
 }
 
+var logger *zap.Logger
+
 func Execute() {
+	logger, _ = zap.NewProduction()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -191,7 +193,6 @@ var maxConcurrency = 100
 var params struct {
 	fileList           string
 	pathToMount        string
-	backendStoreType   string
 	backendStoreBucket string
 	blobStoreBucket    string
 	maxConcurrency     int
@@ -215,19 +216,11 @@ func init() {
 		log.Fatalln(err)
 	}
 	upload.Flags().StringVarP(&params.fileList, "files", "f", "", "File containing list of files to upload")
-	err = upload.MarkFlagRequired("cafs-bucket")
+	err = upload.MarkFlagRequired("files")
 	if err != nil {
 		log.Fatalln(err)
 	}
 	upload.Flags().IntVarP(&params.maxConcurrency, "concurrency", "t", maxConcurrency, fmt.Sprintf("Max number of concurrent go routines, default:%d", maxConcurrency))
-	err = upload.MarkFlagRequired("cafs-bucket")
-	if err != nil {
-		log.Fatalln(err)
-	}
 	upload.Flags().IntVarP(&params.startFrom, "start", "s", 0, "Starting line number to read from.")
-	err = upload.MarkFlagRequired("cafs-bucket")
-	if err != nil {
-		log.Fatalln(err)
-	}
 	rootCmd.AddCommand(upload)
 }

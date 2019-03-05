@@ -7,12 +7,14 @@ import (
 )
 
 var repoParams struct {
-	Bucket   string
-	RepoName string
+	MetadataBucket string
+	RepoName       string
+	BlobBucket     string
 }
 
 var name = "name"
-var bucket = "bucket"
+var bucket = "meta"
+var blob = "blob"
 
 func addRepoNameOptionFlag(cmd *cobra.Command) string {
 	cmd.Flags().StringVarP(&repoParams.RepoName, name, "n", "", "The name of this repository")
@@ -20,6 +22,11 @@ func addRepoNameOptionFlag(cmd *cobra.Command) string {
 }
 
 func addBucketNameFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVarP(&repoParams.Bucket, bucket, "b", "", "The name of the bucket used by datamon")
+	cmd.Flags().StringVarP(&repoParams.MetadataBucket, bucket, "m", "", "The name of the bucket used by datamon metadata")
 	return bucket
+}
+
+func addBlobBucket(cmd *cobra.Command) string {
+	cmd.Flags().StringVarP(&repoParams.BlobBucket, blob, "b", "", "The name of the bucket hosting the datamon blobs")
+	return name
 }

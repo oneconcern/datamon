@@ -23,14 +23,26 @@ var downloadBundleCmd = &cobra.Command{
 
 		DieIfNotAccessible(bundleOptions.DataPath)
 
-		sourceStore, err := gcs.New(repoParams.Bucket)
+		sourceStore, err := gcs.New(repoParams.MetadataBucket)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		blobStore, err := gcs.New(repoParams.BlobBucket)
 		if err != nil {
 			log.Fatalln(err)
 		}
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
-		archiveBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, sourceStore)
-		consumableBundle := core.NewBundle(repoParams.RepoName, bundleOptions.ID, destinationStore)
-		err = core.Publish(context.Background(), archiveBundle, consumableBundle)
+
+		bd := core.NewBDescriptor()
+		bundle := core.New(bd,
+			core.Repo(repoParams.RepoName),
+			core.MetaStore(sourceStore),
+			core.ConsumableStore(destinationStore),
+			core.BlobStore(blobStore),
+			core.BundleID(bundleOptions.ID),
+		)
+
+		err = core.Publish(context.Background(), bundle)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -48,6 +60,9 @@ func init() {
 
 	// Destination
 	requiredFlags = append(requiredFlags, addDataPathFlag(downloadBundleCmd))
+
+	// Blob bucket
+	requiredFlags = append(requiredFlags, addBlobBucket(downloadBundleCmd))
 
 	for _, flag := range requiredFlags {
 		err := downloadBundleCmd.MarkFlagRequired(flag)

@@ -3,12 +3,12 @@
 package gcs
 
 import (
-	gcsStorage "cloud.google.com/go/storage"
-
 	"context"
 	"errors"
 
 	"google.golang.org/api/iterator"
+
+	gcsStorage "cloud.google.com/go/storage"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 	"google.golang.org/api/option"
@@ -44,8 +44,11 @@ func (g *gcs) String() string {
 }
 
 func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
-
-	_, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).Attrs(ctx)
+	client, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeReadOnly))
+	if err != nil {
+		return false, err
+	}
+	_, err = client.Bucket(g.bucket).Object(objectName).Attrs(ctx)
 	if err != nil {
 		if err != gcsStorage.ErrObjectNotExist {
 			return false, nil
@@ -65,7 +68,7 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader) error {
 	// Put if not present
-	writer := g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: true}).NewWriter(ctx)
+	writer := g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		return err
@@ -78,7 +81,7 @@ func (g *gcs) Delete(ctx context.Context, objectName string) error {
 }
 
 func (g *gcs) Keys(ctx context.Context) ([]string, error) {
-	keys, _, err := g.KeysPrefix(ctx, "", "", "")
+	keys, _, err := g.KeysPrefix(ctx, "", "", "", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -86,13 +89,13 @@ func (g *gcs) Keys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-func (g *gcs) KeysPrefix(ctx context.Context, pageToken, prefix, delimiter string) ([]string, string, error) {
+func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error) {
 
 	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})
 
 	var objects []*gcsStorage.ObjectAttrs
 
-	var keys []string
+	keys := make([]string, 0, PageSize)
 	pageToken, err := iterator.NewPager(itr, PageSize, pageToken).NextPage(&objects)
 	if err != nil {
 		return nil, "", err
@@ -103,7 +106,6 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken, prefix, delimiter strin
 	}
 
 	return keys, pageToken, nil
-
 }
 
 func (g *gcs) Clear(context.Context) error {
