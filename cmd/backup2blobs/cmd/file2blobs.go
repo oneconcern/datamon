@@ -30,7 +30,8 @@ import (
 
 func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs cafs.Fs, fileChan chan string, wg *sync.WaitGroup, c *uint64, errC *uint64, duplicateCount *uint64) {
 	logError := log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
-	logger, err := zap.NewProduction()
+	var err error
+	logger, err = zap.NewProduction()
 	if err != nil {
 		wg.Done()
 		logError.Fatalln(err)

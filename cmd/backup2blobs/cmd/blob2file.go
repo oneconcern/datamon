@@ -26,7 +26,9 @@ import (
 
 // Due to a race condition in uploading duplicate blobs, some objects got a bad hash, these were reuploaded but this is to verify.
 // Github Issue #67
-var BAD_HASH = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+// BadHash should never occur
+var BadHash = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
 func downloadFromBlob(destination storage.Store, backupStore storage.Store, c cafs.Fs, fileChan chan string, wg *sync.WaitGroup, fileCount *uint64, errCount *uint64) {
 	incC := func(count *uint64) {
@@ -58,6 +60,10 @@ func downloadFromBlob(destination storage.Store, backupStore storage.Store, c ca
 		}
 		var entry model.BundleEntry
 		b, err := ioutil.ReadAll(r)
+		if err != nil {
+			log.Error("Read failed", zap.Error(err))
+			continue
+		}
 		err = yaml.Unmarshal(b, &entry)
 		if err != nil {
 			log.Error("Unmarshal failed", zap.String("file", file))
@@ -66,6 +72,10 @@ func downloadFromBlob(destination storage.Store, backupStore storage.Store, c ca
 		}
 
 		key, err := cafs.KeyFromString(entry.Hash)
+		if err != nil {
+			log.Error("Get Keys failed", zap.Error(err))
+			continue
+		}
 
 		r, err = c.Get(context.Background(), key)
 		if err != nil {

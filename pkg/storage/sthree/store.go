@@ -116,7 +116,7 @@ func (s *s3FS) Keys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-func (s *s3FS) KeysPrefix(ctx context.Context, token, prefix, delimiter string) ([]string, string, error) {
+func (s *s3FS) KeysPrefix(ctx context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
 	var keys []string
 	var isTruncated bool
 

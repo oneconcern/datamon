@@ -48,7 +48,7 @@ func (d *task) iterator() *iradix.Iterator {
 func (d *task) incChildTasks(count int) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	d.childTasks = d.childTasks + count
+	d.childTasks += count
 }
 
 func (d *task) childDone() {
@@ -149,10 +149,9 @@ func processFiles(fileChan chan string, wg *sync.WaitGroup) {
 			logger.Error("Failed to write file", zap.String("file", file.Name()), zap.Error(err))
 		}
 	}
-	file.Sync()
-	file.Close()
+	_ = file.Sync()
+	_ = file.Close()
 	wg.Done()
-	return
 }
 
 func processDir(dirChan chan *task, fileChan chan string) {
@@ -256,7 +255,7 @@ var generateFileListCmd = &cobra.Command{
 				Callback: func(osPathname string, de *godirwalk.Dirent) error {
 					if !de.IsDir() {
 						fileToLog := strings.TrimPrefix(osPathname, generateParams.trimPrefix)
-						_, err := file.Write(model.UnsafeStringToBytes(fileToLog + "\n"))
+						_, err = file.Write(model.UnsafeStringToBytes(fileToLog + "\n"))
 						if err != nil {
 							logError.Printf("Failed to write file:%s err:%s", osPathname, err)
 						}

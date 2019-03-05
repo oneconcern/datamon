@@ -29,10 +29,11 @@ func setup(t testing.TB) (storage.Store, func()) {
 
 	ctx := context.Background()
 
-	bucket := "DATAMON-TEST-" + internal.RandStringBytesMaskImprSrc(15)
+	bucket := "datamontest-" + internal.RandStringBytesMaskImprSrc(15)
 	log.Printf("Created bucket %s ", bucket)
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
+	require.NoError(t, err)
 	err = client.Bucket(bucket).Create(ctx, "oneconcern-1509", nil)
 	require.NoError(t, err)
 

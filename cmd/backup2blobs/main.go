@@ -13,7 +13,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	pprof.StartCPUProfile(f)
+	_ = pprof.StartCPUProfile(f)
 	cmd.Execute()
 	defer pprof.StopCPUProfile()
 }

@@ -91,8 +91,8 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 		}
 		fmt.Printf("Uploading blob:%s, bytes:%d\n", leafKey.String(), w.offset)
 	} else {
-	   fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
-    }
+		fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
+	}
 
 	n := int(w.offset)
 	w.offset = 0

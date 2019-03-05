@@ -50,9 +50,8 @@ var uploadBundleCmd = &cobra.Command{
 }
 
 var uploadOptions struct {
-	message      string
-	contributors []string
-	parents      []string
+	message string
+	parents []string
 }
 
 func init() {
