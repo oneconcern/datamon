@@ -65,7 +65,6 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 			Hash:         key.String(),
 			NameWithPath: file,
 			FileMode:     os.ModePerm,
-			Generation:   0,
 		}
 		buffer, err := yaml.Marshal(backingStoreEntry)
 		if err != nil {
@@ -74,7 +73,7 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 			reader.Close()
 			continue
 		}
-		err = backupStore.Put(context.Background(), file, bytes.NewReader(buffer))
+		err = backupStore.Put(context.Background(), file, bytes.NewReader(buffer), storage.OverWrite)
 		status := "success"
 		if err != nil {
 			if strings.Contains(err.Error(), "googleapi: Error 412:") {

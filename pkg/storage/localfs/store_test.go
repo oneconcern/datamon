@@ -80,7 +80,7 @@ func TestPut(t *testing.T) {
 	defer cleanup()
 
 	content := bytes.NewBufferString("here we go once again")
-	err := bs.Put(context.Background(), "eighteentons", content)
+	err := bs.Put(context.Background(), "eighteentons", content, storage.IfNotPresent)
 	require.NoError(t, err)
 
 	rdr, err := bs.Get(context.Background(), "eighteentons")

@@ -160,7 +160,7 @@ func Setup(t *testing.T) error {
 		require.NoError(t, err)
 		destinationPath := model.GetArchivePathToBundleFileList(repo, bundleID, i)
 		require.NoError(t,
-			sourceStore.Put(context.Background(), destinationPath, bytes.NewReader(buffer)))
+			sourceStore.Put(context.Background(), destinationPath, bytes.NewReader(buffer), storage.IfNotPresent))
 	}
 
 	bundleDescriptor := generateBundleDescriptor()
@@ -169,7 +169,7 @@ func Setup(t *testing.T) error {
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(destinationDir, 0700))
 
-	return sourceStore.Put(context.Background(), model.GetArchivePathToBundle(repo, bundleID), bytes.NewReader(buffer))
+	return sourceStore.Put(context.Background(), model.GetArchivePathToBundle(repo, bundleID), bytes.NewReader(buffer), ifnot)
 }
 
 func generateBundleDescriptor() model.BundleDescriptor {

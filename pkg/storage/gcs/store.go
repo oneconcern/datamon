@@ -24,15 +24,16 @@ type gcs struct {
 	bucket         string
 }
 
-func New(bucket string) (storage.Store, error) {
+func New(bucket string, credentialFile string) (storage.Store, error) {
 	googleStore := new(gcs)
 	googleStore.bucket = bucket
 	var err error
-	googleStore.readOnlyClient, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeReadOnly))
+	c := option.WithCredentialsFile(credentialFile)
+	googleStore.readOnlyClient, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeReadOnly), c)
 	if err != nil {
 		return nil, err
 	}
-	googleStore.client, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
+	googleStore.client, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl), c)
 	if err != nil {
 		return nil, err
 	}
@@ -66,9 +67,10 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 	return objectReader, nil
 }
 
-func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader) error {
+func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool) error {
 	// Put if not present
-	writer := g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
+
+	writer := g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: doesNotExist}).NewWriter(ctx)
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		return err

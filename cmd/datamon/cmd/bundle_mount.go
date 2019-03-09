@@ -22,11 +22,11 @@ var mountBundleCmd = &cobra.Command{
 
 		DieIfNotAccessible(bundleOptions.DataPath)
 
-		metadataSource, err := gcs.New(repoParams.MetadataBucket)
+		metadataSource, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		blobStore, err := gcs.New(repoParams.BlobBucket)
+		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -54,18 +54,12 @@ var mountBundleCmd = &cobra.Command{
 
 func init() {
 
-	// Source
-	requiredFlags := []string{addBucketNameFlag(mountBundleCmd)}
-	requiredFlags = append(requiredFlags, addRepoNameOptionFlag(mountBundleCmd))
-
-	// Bundle to mount
+	requiredFlags := []string{addRepoNameOptionFlag(mountBundleCmd)}
+	addBucketNameFlag(mountBundleCmd)
+	addBlobBucket(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addBundleFlag(mountBundleCmd))
-
-	// Destination
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
 
-	// Blob bucket
-	requiredFlags = append(requiredFlags, addBlobBucket(mountBundleCmd))
 	for _, flag := range requiredFlags {
 		err := mountBundleCmd.MarkFlagRequired(flag)
 		if err != nil {

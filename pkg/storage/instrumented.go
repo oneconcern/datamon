@@ -65,12 +65,12 @@ func (i *instrumentedStore) Get(ctx context.Context, key string) (io.ReadCloser,
 	return i.store.Get(ctx, key)
 }
 
-func (i *instrumentedStore) Put(ctx context.Context, key string, rdr io.Reader) error {
+func (i *instrumentedStore) Put(ctx context.Context, key string, rdr io.Reader, c bool) error {
 	span := i.spanFromContext(ctx, i.opName("Put"))
 	defer span.Finish()
 
 	i.logs.Bg().Info("storage put", zap.String("key", key))
-	return i.store.Put(ctx, key, rdr)
+	return i.store.Put(ctx, key, rdr, c)
 }
 
 func (i *instrumentedStore) Delete(ctx context.Context, key string) error {

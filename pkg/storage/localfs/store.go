@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/spf13/afero"
@@ -46,14 +45,18 @@ func (l *localFS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return l.fs.Open(key)
 }
 
-func (l *localFS) Put(ctx context.Context, key string, source io.Reader) error {
+func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
 	dir := filepath.Dir(key)
 	if dir != "" {
 		if err := l.fs.MkdirAll(filepath.Dir(key), 0700); err != nil {
 			return fmt.Errorf("ensuring directories for %q: %v", key, err)
 		}
 	}
-	target, err := l.fs.OpenFile(key, os.O_EXCL|os.O_CREATE|os.O_WRONLY|os.O_SYNC, 0600)
+	flag := os.O_CREATE | os.O_WRONLY | os.O_SYNC | 0600
+	if exclusive {
+		flag = flag | os.O_EXCL
+	}
+	target, err := l.fs.OpenFile(key, flag, 0600)
 	if err != nil {
 		return fmt.Errorf("create record for %q: %v", key, err)
 	}
@@ -94,13 +97,7 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 		if fileInfo.IsDir() {
 			return nil
 		}
-		pth := strings.Split(path, "/")
-		if len(pth) == 3 && len(pth[0]) == 3 {
-			res = append(res, strings.Join(pth, ""))
-		} else {
-			res = append(res, path)
-		}
-
+		res = append(res, path)
 		return nil
 	})
 	if e != nil {

@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
+
+	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -19,12 +22,12 @@ var uploadBundleCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		DieIfNotAccessible(bundleOptions.DataPath)
-
-		destinationStore, err := gcs.New(repoParams.MetadataBucket)
+		fmt.Println(config.Credential)
+		MetaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		blobStore, err := gcs.New(repoParams.BlobBucket)
+		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -32,37 +35,35 @@ var uploadBundleCmd = &cobra.Command{
 		sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 
 		bd := core.NewBDescriptor(
-			core.Message(uploadOptions.message),
-			core.Parents(uploadOptions.parents),
+			core.Message(bundleOptions.Message),
+			core.Contributors([]model.Contributor{{
+				Name:  repoParams.ContributorName,
+				Email: repoParams.ContributorEmail,
+			},
+			}),
 		)
 		bundle := core.New(bd,
 			core.Repo(repoParams.RepoName),
 			core.BlobStore(blobStore),
-			core.ConsumableStore(destinationStore),
-			core.MetaStore(sourceStore),
+			core.ConsumableStore(sourceStore),
+			core.MetaStore(MetaStore),
 		)
 
-		err = core.Publish(context.Background(), bundle)
+		err = core.Upload(context.Background(), bundle)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	},
 }
 
-var uploadOptions struct {
-	message string
-	parents []string
-}
-
 func init() {
 
-	requiredFlags := []string{addBucketNameFlag(uploadBundleCmd)}
-	requiredFlags = append(requiredFlags, addBlobBucket(uploadBundleCmd))
-	requiredFlags = append(requiredFlags, addRepoNameOptionFlag(uploadBundleCmd))
+	requiredFlags := []string{addRepoNameOptionFlag(uploadBundleCmd)}
 	requiredFlags = append(requiredFlags, addFolderPathFlag(uploadBundleCmd))
+	requiredFlags = append(requiredFlags, addCommitMessageFlag(uploadBundleCmd))
 
 	for _, flag := range requiredFlags {
-		err := downloadBundleCmd.MarkFlagRequired(flag)
+		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {
 			log.Fatalln(err)
 		}

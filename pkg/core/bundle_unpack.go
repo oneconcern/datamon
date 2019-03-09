@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -68,7 +69,8 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 		if err != nil {
 			return err
 		}
-		err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader)
+		err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.IfNotPresent)
+		fmt.Printf("downloaded %s\n", bundleEntry.NameWithPath)
 		if err != nil {
 			return err
 		}
