@@ -83,7 +83,7 @@ func downloadFromBlob(destination storage.Store, backupStore storage.Store, c ca
 			incC(errCount)
 			continue
 		}
-		err = destination.Put(context.Background(), file, r)
+		err = destination.Put(context.Background(), file, r, storage.IfNotPresent)
 		if err != nil {
 			log.Error("Put from CAFS to dest failed", zap.String("file", file), zap.Error(err))
 			incC(errCount)

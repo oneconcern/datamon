@@ -12,35 +12,40 @@ var bundleCmd = &cobra.Command{
 	Short: "Commands to manage bundles for a repo",
 	Long: `Commands to manage bundles for a repo.
 
-A bundle is a group of files that were changed together.
+A bundle is a group of files that are tracked and changed together.
 Every bundle is an entry in the history of a repository at a point in time.
 `,
 }
 
 var bundleOptions struct {
-	ID       string
-	DataPath string
+	ID               string
+	DataPath         string
+	Message          string
+	ContributorEmail string
 }
-
-var bundleID = "bundle"
-var destination = "destination"
-var folder = "folder"
 
 func init() {
 	rootCmd.AddCommand(bundleCmd)
+	addBucketNameFlag(bundleCmd)
+	addBlobBucket(bundleCmd)
 }
 
 func addBundleFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVarP(&bundleOptions.ID, bundleID, "i", "", "The hash id for the bundle")
+	cmd.Flags().StringVar(&bundleOptions.ID, bundleID, "", "The hash id for the bundle")
 	return bundleID
 }
 
 func addDataPathFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVarP(&bundleOptions.DataPath, destination, "d", "", "The path to the download folder")
+	cmd.Flags().StringVar(&bundleOptions.DataPath, destination, "", "The path to the download folder")
 	return destination
 }
 
 func addFolderPathFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVarP(&bundleOptions.DataPath, folder, "s", "", "The path to the folder of the bundle")
-	return destination
+	cmd.Flags().StringVar(&bundleOptions.DataPath, folder, "", "The path to the folder of the bundle")
+	return folder
+}
+
+func addCommitMessageFlag(cmd *cobra.Command) string {
+	cmd.Flags().StringVar(&bundleOptions.Message, message, "", "The message describing the new bundle")
+	return message
 }

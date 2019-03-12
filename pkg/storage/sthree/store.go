@@ -79,7 +79,7 @@ func (s *s3FS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return obj.Body, nil
 }
 
-func (s *s3FS) Put(ctx context.Context, key string, rdr io.Reader) error {
+func (s *s3FS) Put(ctx context.Context, key string, rdr io.Reader, _ bool) error {
 	_, err := s.uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),

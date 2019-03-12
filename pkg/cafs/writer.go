@@ -85,7 +85,7 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 	}
 	found, _ := w.fs.Has(context.TODO(), w.pather(leafKey.String()))
 	if !found {
-		err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]))
+		err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.IfNotPresent)
 		if err != nil {
 			return 0, fmt.Errorf("write segment file: %v", err)
 		}

@@ -37,13 +37,13 @@ func setup(t testing.TB) (storage.Store, func()) {
 	err = client.Bucket(bucket).Create(ctx, "oneconcern-1509", nil)
 	require.NoError(t, err)
 
-	gcs, err := New(bucket)
+	gcs, err := New(bucket, "") // Use GOOGLE_APPLICATION_CREDENTIALS env variable
 	require.NoError(t, err)
 
-	err = gcs.Put(ctx, testObject1, bytes.NewBufferString(testObject1Content))
+	err = gcs.Put(ctx, testObject1, bytes.NewBufferString(testObject1Content), storage.IfNotPresent)
 	require.NoError(t, err)
 
-	err = gcs.Put(ctx, testObject2, bytes.NewBufferString(testObject2Content))
+	err = gcs.Put(ctx, testObject2, bytes.NewBufferString(testObject2Content), storage.IfNotPresent)
 	require.NoError(t, err)
 
 	cleanup := func() {
@@ -103,7 +103,7 @@ func TestPut(t *testing.T) {
 	gcs, cleanup := setup(t)
 	defer cleanup()
 
-	err := gcs.Put(ctx, testObject3, bytes.NewBufferString(testObject3Content))
+	err := gcs.Put(ctx, testObject3, bytes.NewBufferString(testObject3Content), storage.IfNotPresent)
 	require.NoError(t, err)
 
 	rdr, err := gcs.Get(ctx, testObject3)
@@ -136,7 +136,7 @@ func TestDelete(t *testing.T) {
 	gcs, cleanup := setup(t)
 	defer cleanup()
 
-	err := gcs.Put(ctx, testObject3, bytes.NewBufferString(testObject3Content))
+	err := gcs.Put(ctx, testObject3, bytes.NewBufferString(testObject3Content), storage.IfNotPresent)
 	require.NoError(t, err)
 
 	err = gcs.Delete(ctx, testObject3)

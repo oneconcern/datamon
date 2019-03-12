@@ -15,6 +15,11 @@ const MaxObjectSizeInMemory = 2 * 1024 * 1024 * 1024 // 2 gigs
 func (e errString) Error() string                    { return string(e) }
 
 const (
+	IfNotPresent = true
+	OverWrite    = false
+)
+
+const (
 	ErrNotFound     errString = "not found"
 	ErrForbidden    errString = "forbidden"
 	ErrNotSupported errString = "not supported"
@@ -31,7 +36,7 @@ type Store interface {
 	Has(context.Context, string) (bool, error)
 	Get(context.Context, string) (io.ReadCloser, error)
 	GetAt(context.Context, string) (io.ReaderAt, error)
-	Put(context.Context, string, io.Reader) error
+	Put(context.Context, string, io.Reader, bool) error
 	Delete(context.Context, string) error
 	Keys(context.Context) ([]string, error)
 	Clear(context.Context) error
@@ -48,7 +53,7 @@ func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, des
 	if err != nil {
 		return nil, err
 	}
-	err = dStore.Put(ctx, destination, bytes.NewReader(object))
+	err = dStore.Put(ctx, destination, bytes.NewReader(object), IfNotPresent)
 	if err != nil {
 		return nil, err
 	}

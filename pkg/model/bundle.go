@@ -31,7 +31,6 @@ type BundleEntry struct {
 	NameWithPath string      `json:"name" yaml:"name"`
 	FileMode     os.FileMode `json:"mode" yaml:"mode"`
 	Size         uint64      `json:"size" yaml:"size"`
-	Generation   uint64      `json:"generation" yaml:"generation"`
 	_            struct{}
 }
 
@@ -61,12 +60,20 @@ func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
 }
 
 func GetArchivePathToBundle(repo string, bundleID string) string {
-	return fmt.Sprint(repo, "-bundles/", bundleID, "/bundle.json")
+	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle.json")
+}
+
+func GetArchivePathPrefixToBundles(repo string) string {
+	return fmt.Sprint(getArchivePathToBundles(), repo+"/")
+}
+
+func getArchivePathToBundles() string {
+	return fmt.Sprint("bundles/")
 }
 
 func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
 	// <repo>-bundles/<bundle>/bundlefiles-<index>.json
-	return fmt.Sprint(repo, "-bundles/", bundleID, "/bundle-files-", index, ".json")
+	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".json")
 }
 
 func GetBundleTimeStamp() time.Time {

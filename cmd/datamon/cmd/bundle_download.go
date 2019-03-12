@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -21,16 +22,16 @@ var downloadBundleCmd = &cobra.Command{
 	Long:  "Download a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		DieIfNotAccessible(bundleOptions.DataPath)
+		sourceStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
+		if err != nil {
+			log.Fatalln(err)
+		}
 
-		sourceStore, err := gcs.New(repoParams.MetadataBucket)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		blobStore, err := gcs.New(repoParams.BlobBucket)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		_ = os.MkdirAll(bundleOptions.DataPath, 0700)
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 
 		bd := core.NewBDescriptor()
@@ -52,8 +53,7 @@ var downloadBundleCmd = &cobra.Command{
 func init() {
 
 	// Source
-	requiredFlags := []string{addBucketNameFlag(downloadBundleCmd)}
-	requiredFlags = append(requiredFlags, addRepoNameOptionFlag(downloadBundleCmd))
+	requiredFlags := []string{addRepoNameOptionFlag(downloadBundleCmd)}
 
 	// Bundle to download
 	requiredFlags = append(requiredFlags, addBundleFlag(downloadBundleCmd))
@@ -62,7 +62,8 @@ func init() {
 	requiredFlags = append(requiredFlags, addDataPathFlag(downloadBundleCmd))
 
 	// Blob bucket
-	requiredFlags = append(requiredFlags, addBlobBucket(downloadBundleCmd))
+	addBlobBucket(downloadBundleCmd)
+	addBucketNameFlag(downloadBundleCmd)
 
 	for _, flag := range requiredFlags {
 		err := downloadBundleCmd.MarkFlagRequired(flag)
