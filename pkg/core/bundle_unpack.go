@@ -5,6 +5,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -50,6 +51,11 @@ func unpackBundleFileList(ctx context.Context, bundle *Bundle) error {
 	return nil
 }
 
+type errorHit struct {
+	error error
+	file  string
+}
+
 func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 	fs, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
@@ -59,20 +65,53 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 	if err != nil {
 		return err
 	}
-
-	for _, bundleEntry := range bundle.BundleEntries {
-		key, err := cafs.KeyFromString(bundleEntry.Hash)
-		if err != nil {
-			return err
+	var count int64
+	errC := make(chan errorHit, len(bundle.BundleEntries))
+	fC := make(chan string, len(bundle.BundleEntries))
+	for _, b := range bundle.BundleEntries {
+		fmt.Println("started " + b.NameWithPath)
+		go func(bundleEntry model.BundleEntry) {
+			atomic.AddInt64(&count, 1)
+			key, err := cafs.KeyFromString(bundleEntry.Hash)
+			if err != nil {
+				errC <- errorHit{
+					err,
+					bundleEntry.NameWithPath,
+				}
+				return
+			}
+			reader, err := fs.Get(ctx, key)
+			if err != nil {
+				errC <- errorHit{
+					err,
+					bundleEntry.NameWithPath,
+				}
+				return
+			}
+			err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.IfNotPresent)
+			if err != nil {
+				fmt.Printf("Failed to download %s error %s", bundleEntry.NameWithPath, err)
+				errC <- errorHit{
+					err,
+					bundleEntry.NameWithPath,
+				}
+				return
+			}
+			fmt.Printf("downloaded %s\n", bundleEntry.NameWithPath)
+			fC <- bundleEntry.NameWithPath
+		}(b)
+	}
+	for {
+		if atomic.LoadInt64(&count) == 0 {
+			break
 		}
-		reader, err := fs.Get(ctx, key)
-		if err != nil {
-			return err
-		}
-		err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.IfNotPresent)
-		fmt.Printf("downloaded %s\n", bundleEntry.NameWithPath)
-		if err != nil {
-			return err
+		select {
+		case eh := <-errC:
+			return eh.error
+		case _ = <-fC:
+			atomic.AddInt64(&count, -1)
+		default:
+			continue
 		}
 	}
 	return nil
