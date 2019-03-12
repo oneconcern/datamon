@@ -5,9 +5,11 @@ package core
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"sync"
+	"sync/atomic"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 
@@ -20,6 +22,13 @@ import (
 const (
 	bundleEntriesPerFile = 1000
 )
+
+type filePacked struct {
+	hash string
+	name string
+	keys []byte
+	size uint64
+}
 
 func uploadBundle(ctx context.Context, bundle *Bundle) error {
 	// Walk the entire tree
@@ -38,21 +47,19 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 
 	fileList := model.BundleEntries{}
 	var bundleEntriesIndex uint
-	var totalWritten uint64
-	var filesInBundle uint64
 	// Upload the files and the bundle list
 	err = bundle.InitializeBundleID()
 	if err != nil {
 		return err
 	}
-	for index, file := range files {
+
+	fC := make(chan filePacked, len(files))
+	eC := make(chan errorHit, len(files))
+	var count int64
+	for _, file := range files {
 		// Check to see if the file is to be skipped.
 		if model.IsGeneratedFile(file) {
 			continue
-		}
-		bundleEntriesIndex++
-		if bundleEntriesIndex == bundleEntriesPerFile {
-			bundleEntriesIndex = 0
 		}
 
 		var fileReader io.ReadCloser
@@ -60,49 +67,70 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 		if err != nil {
 			return err
 		}
-
-		written, key, keys, e := cafsArchive.Put(ctx, fileReader)
-		totalWritten += uint64(written)
-		filesInBundle++
-		if e != nil {
-			return e
-		}
-
-		log.Printf("Uploaded root key %s & %d bytes for keys for %s", key.String(), len(keys), file)
-
-		fileList.BundleEntries = append(fileList.BundleEntries, model.BundleEntry{
-			Hash:         key.String(),
-			NameWithPath: file,
-			FileMode:     0, // #TODO: #35 file mode support
-			Size:         uint64(written)})
-
-		// Write the bundle entry file if reached max or the last one
-		if index == len(files)-1 || bundleEntriesIndex == bundleEntriesPerFile {
-			buffer, e := yaml.Marshal(fileList)
+		go func(file string) {
+			atomic.AddInt64(&count, 1)
+			written, key, keys, e := cafsArchive.Put(ctx, fileReader)
 			if e != nil {
-				return e
+				eC <- errorHit{
+					error: e,
+					file:  file,
+				}
+				return
 			}
-			err = bundle.MetaStore.Put(ctx,
-				model.GetArchivePathToBundleFileList(
-					bundle.RepoID,
-					bundle.BundleID,
-					bundle.BundleDescriptor.BundleEntriesFileCount),
-				bytes.NewReader(buffer), storage.IfNotPresent)
-			if err != nil {
-				return err
+			fC <- filePacked{
+				hash: key.String(),
+				keys: keys,
+				name: file,
+				size: uint64(written),
 			}
-			bundle.BundleDescriptor.BundleEntriesFileCount++
+		}(file)
+	}
+	for atomic.LoadInt64(&count) > 0 {
+		select {
+		case f := <-fC:
+			log.Printf("Uploaded file:%s with root key %s & %d bytes for keys", f.name, f.hash, len(f.keys))
+
+			atomic.AddInt64(&count, -1)
+
+			fileList.BundleEntries = append(fileList.BundleEntries, model.BundleEntry{
+				Hash:         f.hash,
+				NameWithPath: f.name,
+				FileMode:     0, // #TODO: #35 file mode support
+				Size:         f.size})
+
+			bundleEntriesIndex++
+			if bundleEntriesIndex == bundleEntriesPerFile {
+				bundleEntriesIndex = 0
+			}
+
+			// Write the bundle entry file if reached max or the last one
+			if atomic.LoadInt64(&count) == 0 || bundleEntriesIndex == bundleEntriesPerFile {
+				buffer, e := yaml.Marshal(fileList)
+				if e != nil {
+					return e
+				}
+				err = bundle.MetaStore.Put(ctx,
+					model.GetArchivePathToBundleFileList(
+						bundle.RepoID,
+						bundle.BundleID,
+						bundle.BundleDescriptor.BundleEntriesFileCount),
+					bytes.NewReader(buffer), storage.IfNotPresent)
+				if err != nil {
+					return err
+				}
+				bundle.BundleDescriptor.BundleEntriesFileCount++
+			}
+		case e := <-eC:
+			atomic.AddInt64(&count, -1)
+			fmt.Printf("Failed to upload file %s err: %s", e.file, e.error)
+			return e.error
 		}
 	}
-
 	err = uploadBundleDescriptor(ctx, bundle)
 	if err != nil {
 		return err
 	}
-
-	log.Printf("Uploaded bundle id:%s with %d files and %d bytes written", bundle.BundleID,
-		filesInBundle, totalWritten)
-
+	log.Printf("Uploaded bundle id:%s ", bundle.BundleID)
 	return nil
 }
 
