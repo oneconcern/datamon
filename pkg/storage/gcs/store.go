@@ -28,12 +28,21 @@ func New(bucket string, credentialFile string) (storage.Store, error) {
 	googleStore := new(gcs)
 	googleStore.bucket = bucket
 	var err error
-	c := option.WithCredentialsFile(credentialFile)
-	googleStore.readOnlyClient, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeReadOnly), c)
+	if credentialFile != "" {
+		c := option.WithCredentialsFile(credentialFile)
+		googleStore.readOnlyClient, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeReadOnly), c)
+	} else {
+		googleStore.readOnlyClient, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeReadOnly))
+	}
 	if err != nil {
 		return nil, err
 	}
-	googleStore.client, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl), c)
+	if credentialFile != "" {
+		c := option.WithCredentialsFile(credentialFile)
+		googleStore.client, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl), c)
+	} else {
+		googleStore.client, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
+	}
 	if err != nil {
 		return nil, err
 	}

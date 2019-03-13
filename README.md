@@ -9,13 +9,21 @@ Example:
 ```$bash
 tar -zxvf datamon.mac.tgz 
 ```
-Configure datamon
+
+Configure datamon (for non kubernetes use)
+
 Example:
 ```$bash
 # Replace path to gcloud credential file. Use absolute path
 ./datamon config create --email ritesh@oneconcern.com --name "Ritesh H Shukla" --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
 ```
-Check the config file
+
+Configure datamon inside a pod. Datamon will use kubernetes service credentials.
+```bash
+~/datamon config create --name "Ritesh Shukla" --email ritesh@oneconcern.com
+```
+
+Check the config file, credential file will not be set in kubernetes deployment.
 ```bash
 # cat ~/.datamon/datamon.yaml 
 metadata: datamon-meta-data
@@ -24,6 +32,7 @@ email: ritesh@oneconcern.com
 name: Ritesh H Shukla
 credential: /Users/ritesh/.config/gcloud/application_default_credentials.json
 ```
+
 Create repo analogous to git repo
 ```bash
 ./datamon repo create  --description "Ritesh's repo for testing" --repo ritesh-datamon-test-repo  

@@ -42,10 +42,10 @@ var configGen = &cobra.Command{
 func init() {
 
 	requiredFlags := []string{addContributorEmail(configGen)}
+	requiredFlags = append(requiredFlags, addContributorName(configGen))
 	addBucketNameFlag(configGen)
 	addBlobBucket(configGen)
-	requiredFlags = append(requiredFlags, addContributorName(configGen))
-	requiredFlags = append(requiredFlags, addCredentialFile(configGen))
+	addCredentialFile(configGen)
 
 	for _, flag := range requiredFlags {
 		err := configGen.MarkFlagRequired(flag)
