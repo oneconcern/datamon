@@ -11,7 +11,7 @@ type RepoDescriptor struct {
 	Name        string      `json:"name,omitempty" yaml:"name,omitempty"`
 	Description string      `json:"description,omitempty" yaml:"description,omitempty"`
 	Timestamp   time.Time   `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
-	Contributor Contributor `json:"contributors" yaml:"contributors"`
+	Contributor Contributor `json:"contributor,omitempty" yaml:"contributor,omitempty"`
 }
 
 func GetArchivePathToRepoDescriptor(repo string) string {

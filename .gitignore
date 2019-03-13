@@ -94,3 +94,6 @@ playground/
 testdata/
 data/repos/
 scratch.txt
+
+# MAC
+.DS_Store
