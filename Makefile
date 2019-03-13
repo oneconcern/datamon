@@ -32,7 +32,7 @@ help:
 
 .PHONY: build-datamon
 ## Build datamon docker container (datamon)
-build-datamon: test
+build-datamon:
 	@echo 'building ${YELLOW}datamon${RESET} container'
 	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') -t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) .
 
@@ -49,7 +49,7 @@ build-all: clean build-datamon build-migrate
 ## Build migrate tool
 build-migrate:
 	@echo 'building ${YELLOW}migrate${RESET} container'
-	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') -t reg.onec.co/datamon-migrate:$(subst /,_,$(GIT_BRANCH)) -f Dockerfile.migrate .
+	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') -t reg.onec.co/datamon-migrate:$(subst /,_,$(GIT_BRANCH)) -f migrate.Dockerfile .
 
 .PHONY: push-all
 ## Push all the containers
