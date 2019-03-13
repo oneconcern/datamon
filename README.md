@@ -1,3 +1,58 @@
+# CLI Guide
+
+Make sure your gcloud credentials have been setup.
+```$bash
+gcloud auth application-default login
+```
+Download the datamon binary for mac or for linux on the [Releases Page](https://github.com/oneconcern/datamon/releases/tag/0.1)
+Example:
+```$bash
+tar -zxvf datamon.mac.tgz 
+```
+Configure datamon
+Example:
+```$bash
+# Replace path to gcloud credential file. Use absolute path
+./datamon config create --email ritesh@oneconcern.com --name "Ritesh H Shukla" --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
+```
+Check the config file
+```bash
+# cat ~/.datamon/datamon.yaml 
+metadata: datamon-meta-data
+blob: datamon-blob-data
+email: ritesh@oneconcern.com
+name: Ritesh H Shukla
+credential: /Users/ritesh/.config/gcloud/application_default_credentials.json
+```
+Create repo analogous to git repo
+```bash
+./datamon repo create  --description "Ritesh's repo for testing" --repo ritesh-datamon-test-repo  
+```
+
+Upload a bundle, the last line prints the commit hash. This will be needed for downloading the bundle
+```bash
+#./datamon bundle upload --folder /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo
+..
+..
+Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR 
+```
+
+List bundles in a repo
+```bash
+#./datamon bundle list --repo ritesh-test-repo                                                                                                                
+Using config file: /Users/ritesh/.datamon/datamon.yaml
+1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT , Updating test bundle
+```
+
+Download a bundle
+```bash
+./datamon bundle download --repo ritesh-test-repo --destination /path/to/folder/to/download --bundle 1INzQ5TV4vAAfU2PbRFgPfnzEwR
+```
+
+# Feature requests and bugs
+
+Please file GitHub issues for features desired in addition to any bugs encountered.
+
 # Datamon
 
 Datamon is a datascience tool that helps managing data at scale.
@@ -78,6 +133,5 @@ This was used to move data from AWS to GCP.
 Datamon can serve bundles as well as consume data that is authenticated via JWT
 
 # Getting started guide.
-# CLI Guide
 # Kubernetes Guide
 # GIT

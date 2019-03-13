@@ -26,9 +26,9 @@ RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extl
 RUN upx /stage/usr/bin/datamon
 
 # Build the dist image
-FROM scratch
-COPY --from=base /stage /
-ENV ZONEINFO /zoneinfo.zip
-ENTRYPOINT [ "datamon" ]
-CMD ["--help"]
+# FROM scratch
+# COPY --from=base /stage /
+# ENV ZONEINFO /zoneinfo.zip
+# ENTRYPOINT [ "datamon" ]
+# CMD ["--help"]
 
