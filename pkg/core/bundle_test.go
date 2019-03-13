@@ -25,15 +25,16 @@ const (
 	leafSize         = cafs.DefaultLeafSize
 	entryFilesCount  = 2
 	dataFilesCount   = 4
-	repo             = "bundle_test_repo"
+	repo             = "bundle-test-repo"
 	bundleID         = "bundle123"
 	testRoot         = "../../testdata/core"
 	sourceDir        = "../../testdata/core/bundle/source/"
 	blobDir          = "../../testdata/core/bundle/source/blob"
+	metaDir          = "../../testdata/core/bundle/source/meta"
 	destinationDir   = "../../testdata/core/bundle/destination/"
-	reArchiveDir     = "../../testdata/core/bundle/destination2/"
+	reArchiveMetaDir = "../../testdata/core/bundle/destination2/meta"
 	reArchiveBlobDir = "../../testdata/core/bundle/destination2/blob"
-	internalDir      = "../../testdata/core/internal/"
+	original         = "../../testdata/core/internal/"
 	dataDir          = "dir/"
 )
 
@@ -46,31 +47,50 @@ func TestBundle(t *testing.T) {
 	require.NoError(t, Setup(t))
 
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
-	archiveStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
+	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
+	reArchiveBlob := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveBlobDir))
+	reArchive := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveMetaDir))
+	require.NoError(t, CreateRepo(model.RepoDescriptor{
+		Name:        repo,
+		Description: "test",
+		Timestamp:   time.Time{},
+		Contributor: model.Contributor{
+			Name:  "test",
+			Email: "t@test.com",
+		},
+	}, metaStore))
+	require.NoError(t, CreateRepo(model.RepoDescriptor{
+		Name:        repo,
+		Description: "test",
+		Timestamp:   time.Time{},
+		Contributor: model.Contributor{
+			Name:  "test",
+			Email: "t@test.com",
+		},
+	}, reArchive))
 
 	bd := NewBDescriptor()
 	bundle := New(bd,
 		Repo(repo),
 		BundleID(bundleID),
-		MetaStore(archiveStore),
+		MetaStore(metaStore),
 		ConsumableStore(consumableStore),
 		BlobStore(blobStore),
 	)
 
+	// Publish the bundle and compare with original
 	require.NoError(t,
 		Publish(context.Background(), bundle))
 
 	require.NoError(t, validatePublish(t, consumableStore))
 
-	reArchive := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveDir))
-
-	b := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveBlobDir))
 	archiveBundle2 := New(bd,
 		Repo(repo),
 		MetaStore(reArchive),
 		ConsumableStore(consumableStore),
-		BlobStore(b),
+		BlobStore(reArchiveBlob),
+		BundleID(bundleID),
 	)
 
 	require.NoError(t,
@@ -94,7 +114,7 @@ func validatePublish(t *testing.T, store storage.Store) error {
 	require.True(t, validateBundleDescriptor(bundleDescriptor))
 
 	// Check Files
-	validateDataFiles(t, internalDir, destinationDir+dataDir)
+	validateDataFiles(t, original, destinationDir+dataDir)
 	return nil
 }
 
@@ -119,14 +139,14 @@ func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
 	ksuid, err := ksuid.NewRandom()
 	require.NoError(test, err)
 	var size int = 2 * leafSize
-	require.NoError(test, cafs.GenerateFile(internalDir+ksuid.String(), size, leafSize))
+	require.NoError(test, cafs.GenerateFile(original+ksuid.String(), size, leafSize))
 	// Write individual blobs
 	fs, err := cafs.New(
 		cafs.LeafSize(leafSize),
 		cafs.Backend(store),
 	)
 	require.NoError(test, err)
-	keys, err := cafs.GenerateCAFSChunks(internalDir+ksuid.String(), fs)
+	keys, err := cafs.GenerateCAFSChunks(original+ksuid.String(), fs)
 	require.NoError(test, err)
 	// return the Bundle Entry
 	return model.BundleEntry{
@@ -140,9 +160,9 @@ func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
 func Setup(t *testing.T) error {
 	cleanup()
 
-	sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
-	require.NoError(t, os.MkdirAll(internalDir, 0700))
+	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
+	require.NoError(t, os.MkdirAll(original, 0700))
 	var i, j uint64
 
 	for i = 0; i < entryFilesCount; i++ {
@@ -160,7 +180,7 @@ func Setup(t *testing.T) error {
 		require.NoError(t, err)
 		destinationPath := model.GetArchivePathToBundleFileList(repo, bundleID, i)
 		require.NoError(t,
-			sourceStore.Put(context.Background(), destinationPath, bytes.NewReader(buffer), storage.IfNotPresent))
+			metaStore.Put(context.Background(), destinationPath, bytes.NewReader(buffer), storage.IfNotPresent))
 	}
 
 	bundleDescriptor := generateBundleDescriptor()
@@ -169,7 +189,7 @@ func Setup(t *testing.T) error {
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(destinationDir, 0700))
 
-	return sourceStore.Put(context.Background(), model.GetArchivePathToBundle(repo, bundleID), bytes.NewReader(buffer), ifnot)
+	return metaStore.Put(context.Background(), model.GetArchivePathToBundle(repo, bundleID), bytes.NewReader(buffer), storage.IfNotPresent)
 }
 
 func generateBundleDescriptor() model.BundleDescriptor {

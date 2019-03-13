@@ -5,7 +5,7 @@ package core
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
+	"sync"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -65,19 +65,19 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 	if err != nil {
 		return err
 	}
-	var count int64
+	var wg sync.WaitGroup
 	errC := make(chan errorHit, len(bundle.BundleEntries))
-	fC := make(chan string, len(bundle.BundleEntries))
+	wg.Add(len(bundle.BundleEntries))
 	for _, b := range bundle.BundleEntries {
 		fmt.Println("started " + b.NameWithPath)
 		go func(bundleEntry model.BundleEntry) {
-			atomic.AddInt64(&count, 1)
 			key, err := cafs.KeyFromString(bundleEntry.Hash)
 			if err != nil {
 				errC <- errorHit{
 					err,
 					bundleEntry.NameWithPath,
 				}
+				wg.Done()
 				return
 			}
 			reader, err := fs.Get(ctx, key)
@@ -86,6 +86,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 					err,
 					bundleEntry.NameWithPath,
 				}
+				wg.Done()
 				return
 			}
 			err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.IfNotPresent)
@@ -95,24 +96,19 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 					err,
 					bundleEntry.NameWithPath,
 				}
+				wg.Done()
 				return
 			}
 			fmt.Printf("downloaded %s\n", bundleEntry.NameWithPath)
-			fC <- bundleEntry.NameWithPath
+			wg.Done()
 		}(b)
 	}
-	for {
-		if atomic.LoadInt64(&count) == 0 {
-			break
-		}
-		select {
-		case eh := <-errC:
-			return eh.error
-		case _ = <-fC:
-			atomic.AddInt64(&count, -1)
-		default:
-			continue
-		}
+	wg.Wait()
+	select {
+	case eh := <-errC:
+		return eh.error
+	default:
+		return nil
 	}
 	return nil
 }
