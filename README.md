@@ -4,7 +4,7 @@ Make sure your gcloud credentials have been setup.
 ```$bash
 gcloud auth application-default login
 ```
-Download the datamon binary for mac or for linux on the [Releases Page](https://github.com/oneconcern/datamon/releases/tag/0.1)
+Download the datamon binary for mac or for linux on the [Releases Page](https://github.com/oneconcern/datamon/releases/)
 Example:
 ```$bash
 tar -zxvf datamon.mac.tgz 
