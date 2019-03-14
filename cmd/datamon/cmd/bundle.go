@@ -22,6 +22,7 @@ var bundleOptions struct {
 	DataPath         string
 	Message          string
 	ContributorEmail string
+	MountPath        string
 }
 
 func init() {
@@ -36,8 +37,13 @@ func addBundleFlag(cmd *cobra.Command) string {
 }
 
 func addDataPathFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.DataPath, destination, "", "The path to the download folder")
+	cmd.Flags().StringVar(&bundleOptions.DataPath, destination, "", "The path to the download dir")
 	return destination
+}
+
+func addMountPathFlag(cmd *cobra.Command) string {
+	cmd.Flags().StringVar(&bundleOptions.MountPath, mount, "", "The path to the mount dir")
+	return mount
 }
 
 func addFolderPathFlag(cmd *cobra.Command) string {

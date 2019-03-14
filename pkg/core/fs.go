@@ -20,16 +20,18 @@ import (
 
 const (
 	// Cache duration
-	cacheYearLong                   = 365 * 24 * time.Hour
-	dirLinkCount    uint32          = 2
-	fileLinkCount   uint32          = 1
-	rootPath                        = "/"
-	firstINode      fuseops.InodeID = 1023
-	dirDefaultMode                  = 0777 | os.ModeDir
-	fileDefaultMode                 = 0666
-	defaultUID                      = 0
-	defaultGID                      = 0
-	dirInitialSize                  = 64
+	cacheYearLong                    = 365 * 24 * time.Hour
+	dirLinkCount     uint32          = 2
+	fileLinkCount    uint32          = 1
+	rootPath                         = "/"
+	firstINode       fuseops.InodeID = 1023
+	dirDefaultMode                   = 0777 | os.ModeDir
+	fileDefaultMode                  = 0666
+	dirReadOnlyMode                  = 0755 | os.ModeDir
+	fileReadOnlyMode                 = 0655
+	defaultUID                       = 0
+	defaultGID                       = 0
+	dirInitialSize                   = 64
 )
 
 // ReadOnlyFS is the virtual filesystem created on top of a bundle.

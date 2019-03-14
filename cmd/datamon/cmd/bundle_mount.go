@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"log"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -35,7 +36,7 @@ var mountBundleCmd = &cobra.Command{
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
 			core.Repo(repoParams.RepoName),
-			core.BundleID(bundleID),
+			core.BundleID(bundleOptions.ID),
 			core.BlobStore(blobStore),
 			core.ConsumableStore(consumableStore),
 			core.MetaStore(metadataSource),
@@ -45,9 +46,12 @@ var mountBundleCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		err = fs.MountReadOnly(bundleOptions.DataPath)
+		err = fs.MountReadOnly(bundleOptions.MountPath)
 		if err != nil {
 			log.Fatalln(err)
+		}
+		for {
+			time.Sleep(time.Hour)
 		}
 	},
 }
@@ -59,6 +63,7 @@ func init() {
 	addBlobBucket(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addBundleFlag(mountBundleCmd))
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
+	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
 
 	for _, flag := range requiredFlags {
 		err := mountBundleCmd.MarkFlagRequired(flag)

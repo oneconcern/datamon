@@ -301,9 +301,9 @@ func isDir(fsEntry fsEntry) bool {
 }
 
 func newDatamonFSEntry(bundleEntry *model.BundleEntry, time time.Time, id fuseops.InodeID, linkCount uint32) *fsEntry {
-	var mode os.FileMode = 0775
+	var mode os.FileMode = fileReadOnlyMode
 	if bundleEntry.Hash == "" {
-		mode = 0777 | os.ModeDir
+		mode = dirReadOnlyMode
 	}
 	return &fsEntry{
 		fullPath: bundleEntry.NameWithPath,
@@ -327,7 +327,7 @@ func generateBundleDirEntry(nameWithPath string) *model.BundleEntry {
 	return &model.BundleEntry{
 		Hash:         "", // Directories do not have datamon backed hash
 		NameWithPath: nameWithPath,
-		FileMode:     0777 | os.ModeDir,
+		FileMode:     dirReadOnlyMode,
 		Size:         2048, // TODO: Increase size of directory with file count when mount is mutable.
 	}
 }

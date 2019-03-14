@@ -32,7 +32,7 @@ func TestMount(t *testing.T) {
 	err = fs.MountReadOnly(pathToMount)
 	require.NoError(t, err)
 	// uncomment to manually try out the FS
-	//time.Sleep(time.Hour)
+	// time.Sleep(time.Hour)
 	resp, err := ioutil.ReadDir(pathToMount)
 	require.NotNil(t, resp)
 	require.NoError(t, err)
