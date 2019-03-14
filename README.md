@@ -15,7 +15,7 @@ Configure datamon (for non kubernetes use)
 Example:
 ```$bash
 # Replace path to gcloud credential file. Use absolute path
-./datamon config create --email ritesh@oneconcern.com --name "Ritesh H Shukla" --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
+datamon config create --email ritesh@oneconcern.com --name "Ritesh H Shukla" --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
 ```
 
 Configure datamon inside a pod. Datamon will use kubernetes service credentials.
@@ -35,12 +35,12 @@ credential: /Users/ritesh/.config/gcloud/application_default_credentials.json
 
 Create repo analogous to git repo
 ```bash
-./datamon repo create  --description "Ritesh's repo for testing" --repo ritesh-datamon-test-repo  
+datamon repo create  --description "Ritesh's repo for testing" --repo ritesh-datamon-test-repo  
 ```
 
 Upload a bundle, the last line prints the commit hash. This will be needed for downloading the bundle
 ```bash
-#./datamon bundle upload --folder /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo
+#datamon bundle upload --folder /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo
 ..
 ..
 Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR 
@@ -48,14 +48,24 @@ Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR
 
 List bundles in a repo
 ```bash
-#./datamon bundle list --repo ritesh-test-repo                                                                                                                
+#datamon bundle list --repo ritesh-test-repo                                                                                                                
 Using config file: /Users/ritesh/.datamon/datamon.yaml
 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT , Updating test bundle
 ```
 
 Download a bundle
 ```bash
-./datamon bundle download --repo ritesh-test-repo --destination /path/to/folder/to/download --bundle 1INzQ5TV4vAAfU2PbRFgPfnzEwR
+datamon bundle download --repo ritesh-test-repo --destination /path/to/folder/to/download --bundle 1INzQ5TV4vAAfU2PbRFgPfnzEwR
+```
+
+List all files in a bundle
+```bash
+datamon bundle list files --repo ritesh-test-repo --bundle 1ISwIzeAR6m3aOVltAsj1kfQaml
+```
+
+Download a single file from a bundle
+```bash
+datamon bundle download file --file datamon/cmd/repo_list.go --repo ritesh-test-repo --bundle 1ISwIzeAR6m3aOVltAsj1kfQaml --destination /tmp
 ```
 
 # Feature requests and bugs
