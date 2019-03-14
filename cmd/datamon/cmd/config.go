@@ -18,13 +18,13 @@ type Config struct {
 	Credential string `json:"credential" yaml:"credential"`
 }
 
-func newConfig() (error, *Config) {
+func newConfig() (*Config, error) {
 	var config Config
 	err := viper.Unmarshal(&config)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, &config
+	return &config, nil
 }
 
 func (c *Config) setContributor(repoParams *RepoParams) {

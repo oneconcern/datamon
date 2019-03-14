@@ -3,9 +3,12 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/segmentio/ksuid"
 
@@ -132,7 +135,7 @@ func Publish(ctx context.Context, bundle *Bundle) error {
 		return err
 	}
 
-	err = unpackDataFiles(ctx, bundle)
+	err = unpackDataFiles(ctx, bundle, "")
 	if err != nil {
 		return err
 	}
@@ -160,4 +163,59 @@ func Upload(ctx context.Context, bundle *Bundle) error {
 		return err
 	}
 	return uploadBundle(ctx, bundle)
+}
+
+func PopulateFiles(ctx context.Context, bundle *Bundle) error {
+	reader, err := bundle.MetaStore.Get(ctx, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID))
+	if err != nil {
+		fmt.Printf("Failed to download the bundle descriptor: %s", err)
+		return err
+	}
+	defer reader.Close()
+	object, err := ioutil.ReadAll(reader)
+	if err != nil {
+		fmt.Printf("Failed to read the bundle descriptor: %s", err)
+		return err
+	}
+	// Unmarshal the file
+	err = yaml.Unmarshal(object, &bundle.BundleDescriptor)
+	if err != nil {
+		fmt.Printf("Failed to unmarshal the bundle descriptor: %s", err)
+		return err
+	}
+
+	// Download the files json
+	var i uint64
+	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
+		r, err := bundle.MetaStore.Get(ctx, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i))
+		if err != nil {
+			fmt.Printf("Failed to download the bundle files: %s", err)
+			return err
+		}
+		object, err = ioutil.ReadAll(r)
+		if err != nil {
+			fmt.Printf("Failed to read the bundle files: %s", err)
+			return err
+		}
+		var bundleEntries model.BundleEntries
+		err = yaml.Unmarshal(object, &bundleEntries)
+		if err != nil {
+			return err
+		}
+		bundle.BundleEntries = append(bundle.BundleEntries, bundleEntries.BundleEntries...)
+	}
+	return nil
+}
+
+func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
+	err := PublishMetadata(ctx, bundle)
+	if err != nil {
+		return err
+	}
+
+	err = unpackDataFiles(ctx, bundle, file)
+	if err != nil {
+		return err
+	}
+	return nil
 }

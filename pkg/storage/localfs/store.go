@@ -54,7 +54,7 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	}
 	flag := os.O_CREATE | os.O_WRONLY | os.O_SYNC | 0600
 	if exclusive {
-		flag = flag | os.O_EXCL
+		flag |= os.O_EXCL
 	}
 	target, err := l.fs.OpenFile(key, flag, 0600)
 	if err != nil {

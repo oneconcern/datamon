@@ -15,7 +15,7 @@ func ListBundles(repo string, store storage.Store) ([]string, error) {
 	// TODO: Don;t format string here, return a paginated list of id<->bd
 	// Get a list
 	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", 1000000)
-	var keys = make([]string, 0, 0)
+	var keys = make([]string, 0)
 	for _, k := range ks {
 		c := strings.SplitN(k, "/", 4)[3]
 		if c != "bundle.json" {
@@ -32,6 +32,9 @@ func ListBundles(repo string, store storage.Store) ([]string, error) {
 		}
 		var bd model.BundleDescriptor
 		err = yaml.Unmarshal(o, &bd)
+		if err != nil {
+			return nil, err
+		}
 		keys = append(keys, c+" , "+bd.Timestamp.String()+" , "+bd.Message)
 	}
 

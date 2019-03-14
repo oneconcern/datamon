@@ -23,6 +23,7 @@ var bundleOptions struct {
 	Message          string
 	ContributorEmail string
 	MountPath        string
+	File             string
 }
 
 func init() {
@@ -54,4 +55,9 @@ func addFolderPathFlag(cmd *cobra.Command) string {
 func addCommitMessageFlag(cmd *cobra.Command) string {
 	cmd.Flags().StringVar(&bundleOptions.Message, message, "", "The message describing the new bundle")
 	return message
+}
+
+func addBundleFileFlag(cmd *cobra.Command) string {
+	cmd.Flags().StringVar(&bundleOptions.File, file, "", "The file to download from the bundle")
+	return file
 }
