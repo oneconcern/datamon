@@ -14,7 +14,7 @@ func ListRepos(store storage.Store) ([]string, error) {
 	// TODO: Don;t format string here, return a paginated list of id<->bd
 	// Get a list
 	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", 1000000)
-	var keys = make([]string, 0, 0)
+	var keys = make([]string, 0)
 	for _, k := range ks {
 		c := strings.SplitN(k, "/", 3)[1]
 		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(c))
@@ -27,6 +27,9 @@ func ListRepos(store storage.Store) ([]string, error) {
 		}
 		var rd model.RepoDescriptor
 		err = yaml.Unmarshal(o, &rd)
+		if err != nil {
+			return nil, err
+		}
 		keys = append(keys, c+" , "+rd.Description+" , "+rd.Contributor.Name+" , "+rd.Contributor.Email+" , "+rd.Timestamp.String())
 	}
 

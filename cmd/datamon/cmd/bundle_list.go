@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listBundleCommand = &cobra.Command{
+var BundleListCommand = &cobra.Command{
 	Use:   "list",
 	Short: "List bundles",
 	Long:  "List the bundles in a repo",
@@ -30,17 +30,17 @@ var listBundleCommand = &cobra.Command{
 
 func init() {
 
-	requiredFlags := []string{addRepoNameOptionFlag(listBundleCommand)}
+	requiredFlags := []string{addRepoNameOptionFlag(BundleListCommand)}
 
-	addBucketNameFlag(listBundleCommand)
-	addBlobBucket(listBundleCommand)
+	addBucketNameFlag(BundleListCommand)
+	addBlobBucket(BundleListCommand)
 
 	for _, flag := range requiredFlags {
-		err := listBundleCommand.MarkFlagRequired(flag)
+		err := BundleListCommand.MarkFlagRequired(flag)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
 
-	bundleCmd.AddCommand(listBundleCommand)
+	bundleCmd.AddCommand(BundleListCommand)
 }

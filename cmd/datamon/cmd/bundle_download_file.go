@@ -1,5 +1,3 @@
-// Copyright © 2018 One Concern
-
 package cmd
 
 import (
@@ -14,10 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var BundleDownloadCmd = &cobra.Command{
-	Use:   "download",
-	Short: "Download a bundle",
-	Long:  "Download a readonly, non-interactive view of the entire data that is part of a bundle",
+var bundleDownloadFileCmd = &cobra.Command{
+	Use:   "file",
+	Short: "Download a file from bundle",
+	Long:  "Download a readonly, non-interactive view of a single file from a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 
 		sourceStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
@@ -41,7 +39,7 @@ var BundleDownloadCmd = &cobra.Command{
 			core.BundleID(bundleOptions.ID),
 		)
 
-		err = core.Publish(context.Background(), bundle)
+		err = core.PublishFile(context.Background(), bundle, bundleOptions.File)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -50,25 +48,20 @@ var BundleDownloadCmd = &cobra.Command{
 
 func init() {
 
-	// Source
-	requiredFlags := []string{addRepoNameOptionFlag(BundleDownloadCmd)}
+	requiredFlags := []string{addRepoNameOptionFlag(bundleDownloadFileCmd)}
+	requiredFlags = append(requiredFlags, addBundleFlag(bundleDownloadFileCmd))
+	requiredFlags = append(requiredFlags, addDataPathFlag(bundleDownloadFileCmd))
+	requiredFlags = append(requiredFlags, addBundleFileFlag(bundleDownloadFileCmd))
 
-	// Bundle to download
-	requiredFlags = append(requiredFlags, addBundleFlag(BundleDownloadCmd))
-
-	// Destination
-	requiredFlags = append(requiredFlags, addDataPathFlag(BundleDownloadCmd))
-
-	// Blob bucket
-	addBlobBucket(BundleDownloadCmd)
-	addBucketNameFlag(BundleDownloadCmd)
+	addBlobBucket(bundleDownloadFileCmd)
+	addBucketNameFlag(bundleDownloadFileCmd)
 
 	for _, flag := range requiredFlags {
-		err := BundleDownloadCmd.MarkFlagRequired(flag)
+		err := bundleDownloadFileCmd.MarkFlagRequired(flag)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
 
-	bundleCmd.AddCommand(BundleDownloadCmd)
+	BundleDownloadCmd.AddCommand(bundleDownloadFileCmd)
 }

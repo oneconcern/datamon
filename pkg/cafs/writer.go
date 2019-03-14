@@ -90,9 +90,9 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 			return 0, fmt.Errorf("write segment file: %v", err)
 		}
 		fmt.Printf("Uploading blob:%s, bytes:%d\n", leafKey.String(), w.offset)
-	} else {
-		//fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
-	}
+	} //else {
+	//fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
+	//}
 
 	n := int(w.offset)
 	w.offset = 0
