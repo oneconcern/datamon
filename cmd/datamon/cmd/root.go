@@ -16,6 +16,7 @@ import (
 const (
 	bundleID         = "bundle"
 	destination      = "destination"
+	mount            = "mount"
 	folder           = "folder"
 	message          = "message"
 	repo             = "repo"
