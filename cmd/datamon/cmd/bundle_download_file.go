@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -26,9 +27,12 @@ var bundleDownloadFileCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-
-		_ = os.MkdirAll(bundleOptions.DataPath, 0700)
-		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
+		path, err := filepath.Abs(filepath.Clean(bundleOptions.DataPath))
+		if err != nil {
+			log.Fatalf("Failed path validation: %s", err)
+		}
+		_ = os.MkdirAll(path, 0700)
+		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
 
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
