@@ -3,8 +3,11 @@ package cafs
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
+	"log"
+	"sync"
+
+	"go.uber.org/zap"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
@@ -61,7 +64,7 @@ type Option func(*defaultFs)
 // Fs implementations provide content-addressable filesystem operations
 type Fs interface {
 	Get(context.Context, Key) (io.ReadCloser, error)
-	Put(context.Context, io.Reader) (int64, Key, []byte, error)
+	Put(context.Context, io.Reader) (int64, Key, []byte, bool, error)
 	Delete(context.Context, Key) error
 	Clear(context.Context) error
 	Keys(context.Context) ([]Key, error)
@@ -86,34 +89,34 @@ type defaultFs struct {
 	fs       storage.Store
 	leafSize uint32
 	prefix   string
+	zl       zap.Logger
+	l        log.Logger
 }
 
-func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, error) {
+func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
 	w := d.writer(d.prefix)
 	defer w.Close()
 
 	written, err := io.Copy(w, src)
 	if err != nil {
-		return 0, Key{}, nil, err
+		return 0, Key{}, nil, false, err
 	}
 
 	key, keys, err := w.Flush()
 	if err != nil {
-		return 0, Key{}, nil, err
+		return 0, Key{}, nil, false, err
 	}
 	if err = w.Close(); err != nil {
-		return 0, Key{}, nil, err
+		return 0, Key{}, nil, false, err
 	}
 	found, _ := d.fs.Has(context.TODO(), d.prefix+key.String())
 	if !found {
-		if err := d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...)), storage.IfNotPresent); err != nil {
-			return 0, Key{}, nil, err
+		if err := d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...)), storage.OverWrite); err != nil {
+			return 0, Key{}, nil, found, err
 		}
-	} else {
-		fmt.Printf("Duplicate key:%s\n", key.String())
 	}
 
-	return written, key, keys, nil
+	return written, key, keys, found, nil
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
@@ -122,10 +125,19 @@ func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
 
 func (d *defaultFs) writer(prefix string) Writer {
 	return &fsWriter{
-		fs:       d.fs,
-		leafSize: d.leafSize,
-		buf:      make([]byte, d.leafSize),
-		prefix:   prefix,
+		fs:            d.fs,
+		leafSize:      d.leafSize,
+		leafs:         nil,
+		buf:           make([]byte, d.leafSize),
+		offset:        0,
+		flushed:       0,
+		pather:        nil,
+		prefix:        prefix,
+		count:         0,
+		flushChan:     make(chan blobFlush, 100000),
+		errC:          make(chan error, 1000000),
+		maxGoRoutines: make(chan struct{}, maxGoRoutinesPerPut),
+		wg:            sync.WaitGroup{},
 	}
 }
 

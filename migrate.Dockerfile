@@ -23,8 +23,11 @@ ADD . /datamon
 WORKDIR /datamon
 
 RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/datamon
+RUN go build -o /stage/usr/bin/migrate --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/backup2blobs/
 RUN upx /stage/usr/bin/datamon
+RUN upx /stage/usr/bin/migrate
 RUN md5sum /stage/usr/bin/datamon
+RUN md5sum /stage/usr/bin/migrate
 # Build the dist image
 # FROM scratch
 # COPY --from=base /stage /

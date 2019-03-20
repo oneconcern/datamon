@@ -61,7 +61,7 @@ func TestCAFS_Put(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	written, rk, _, err := fs.Put(context.Background(), f)
+	written, rk, _, _, err := fs.Put(context.Background(), f)
 	require.NoError(t, err)
 	fileInfo, err := f.Stat()
 	require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestCAFS_Put(t *testing.T) {
 	f, err = os.Open(orig)
 	require.NoError(t, err)
 	defer f.Close()
-	written, rk2, _, err := fs.Put(context.Background(), f)
+	written, rk2, _, _, err := fs.Put(context.Background(), f)
 	require.NoError(t, err)
 	fileInfo, err = f.Stat()
 	require.NoError(t, err)
