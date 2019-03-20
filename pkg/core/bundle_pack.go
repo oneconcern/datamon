@@ -23,10 +23,11 @@ const (
 )
 
 type filePacked struct {
-	hash string
-	name string
-	keys []byte
-	size uint64
+	hash      string
+	name      string
+	keys      []byte
+	size      uint64
+	duplicate bool
 }
 
 func uploadBundle(ctx context.Context, bundle *Bundle) error {
@@ -68,7 +69,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 		}
 		go func(file string) {
 			atomic.AddInt64(&count, 1)
-			written, key, keys, e := cafsArchive.Put(ctx, fileReader)
+			written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
 			if e != nil {
 				eC <- errorHit{
 					error: e,
@@ -76,18 +77,20 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 				}
 				return
 			}
+
 			fC <- filePacked{
-				hash: key.String(),
-				keys: keys,
-				name: file,
-				size: uint64(written),
+				hash:      key.String(),
+				keys:      keys,
+				name:      file,
+				size:      uint64(written),
+				duplicate: duplicate,
 			}
 		}(file)
 	}
 	for atomic.LoadInt64(&count) > 0 {
 		select {
 		case f := <-fC:
-			log.Printf("Uploaded file:%s with root key %s & %d bytes for keys", f.name, f.hash, len(f.keys))
+			log.Printf("Uploaded file:%s, duplicate:%t, key:%s, keys:%d", f.name, f.duplicate, f.hash, len(f.keys))
 
 			atomic.AddInt64(&count, -1)
 
@@ -121,7 +124,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 			}
 		case e := <-eC:
 			atomic.AddInt64(&count, -1)
-			fmt.Printf("Failed to upload file %s err: %s", e.file, e.error)
+			fmt.Printf("Bundle upload failed. Failed to upload file %s err: %s", e.file, e.error)
 			return e.error
 		}
 	}

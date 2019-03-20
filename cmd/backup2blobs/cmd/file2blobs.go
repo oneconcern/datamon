@@ -54,11 +54,14 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 			incC(errC)
 			continue
 		}
-		size, key, _, err := cafs.Put(context.Background(), reader)
+		size, key, _, duplicate, err := cafs.Put(context.Background(), reader)
 		if err != nil {
 			logger.Error("Failed to upload blob", zap.String("file", file), zap.Error(err))
 			incC(errC)
 			continue
+		}
+		if duplicate {
+			incC(duplicateCount)
 		}
 		backingStoreEntry := model.BundleEntry{
 			Size:         uint64(size),
@@ -78,7 +81,6 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 		if err != nil {
 			if strings.Contains(err.Error(), "googleapi: Error 412:") {
 				status = "File descriptor exists"
-				incC(duplicateCount)
 			} else {
 				incC(errC)
 			}
@@ -90,6 +92,7 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 			zap.String("key", key.String()),
 			zap.Int64("size", size),
 			zap.Uint64("total", atomic.LoadUint64(c)),
+			zap.Bool("duplicate", duplicate),
 		)
 		if atomic.LoadUint64(c)%1000 == 0 {
 			logger.Info("summary",

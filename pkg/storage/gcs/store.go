@@ -78,8 +78,13 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool) error {
 	// Put if not present
+	var writer *gcsStorage.Writer
+	if doesNotExist {
+		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: doesNotExist}).NewWriter(ctx)
+	} else {
+		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
 
-	writer := g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: doesNotExist}).NewWriter(ctx)
+	}
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		return err
