@@ -68,12 +68,41 @@ func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
 	return true, nil
 }
 
+type gcsReader struct {
+	objectReader io.ReadCloser
+}
+
+func (r *gcsReader) WriteTo(writer io.Writer) (n int64, err error) {
+	return storage.PipeIO(writer, r.objectReader)
+}
+
+func (r gcsReader) Close() error {
+	return r.objectReader.Close()
+}
+
+func (r gcsReader) Read(p []byte) (n int, err error) {
+	return r.objectReader.Read(p)
+}
+
 func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	objectReader, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).NewReader(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return objectReader, nil
+	return gcsReader{
+		objectReader: objectReader,
+	}, nil
+}
+
+type readCloser struct {
+	reader io.Reader
+}
+
+func (rc readCloser) Read(p []byte) (n int, err error) {
+	return rc.reader.Read(p)
+}
+func (rc readCloser) Close() error {
+	return nil
 }
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool) error {
@@ -85,7 +114,7 @@ func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, does
 		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
 
 	}
-	_, err := io.Copy(writer, reader)
+	_, err := storage.PipeIO(writer, readCloser{reader: reader})
 	if err != nil {
 		return err
 	}
