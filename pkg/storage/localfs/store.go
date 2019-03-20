@@ -41,8 +41,27 @@ func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
 	return !fi.IsDir(), nil
 }
 
+type localReader struct {
+	objectReader io.ReadCloser
+}
+
+func (r *localReader) WriteTo(writer io.Writer) (n int64, err error) {
+	return storage.WriteTo(writer, r.objectReader)
+}
+
+func (r localReader) Close() error {
+	return r.objectReader.Close()
+}
+
+func (r localReader) Read(p []byte) (n int, err error) {
+	return r.objectReader.Read(p)
+}
+
 func (l *localFS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	return l.fs.Open(key)
+	t, err := l.fs.Open(key)
+	return localReader{
+		objectReader: t,
+	}, err
 }
 
 func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {

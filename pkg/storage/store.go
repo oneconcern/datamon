@@ -59,3 +59,23 @@ func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, des
 	}
 	return object, err
 }
+
+func WriteTo(writer io.Writer, reader io.ReadCloser) (n int64, err error) {
+	pr, pw := io.Pipe()
+	errC := make(chan error, 1)
+	go func() {
+		defer pw.Close()
+		_, err := io.Copy(pw, reader)
+		if err != nil {
+			errC <- err
+		}
+		close(errC)
+	}()
+	written, err := io.Copy(writer, pr)
+	select {
+	case err = <-errC:
+		return 0, err
+	default:
+	}
+	return written, err
+}

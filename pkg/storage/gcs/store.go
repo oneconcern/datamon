@@ -68,12 +68,30 @@ func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
 	return true, nil
 }
 
+type gcsReader struct {
+	objectReader io.ReadCloser
+}
+
+func (r *gcsReader) WriteTo(writer io.Writer) (n int64, err error) {
+	return storage.WriteTo(writer, r.objectReader)
+}
+
+func (r gcsReader) Close() error {
+	return r.objectReader.Close()
+}
+
+func (r gcsReader) Read(p []byte) (n int, err error) {
+	return r.objectReader.Read(p)
+}
+
 func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	objectReader, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).NewReader(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return objectReader, nil
+	return gcsReader{
+		objectReader: objectReader,
+	}, nil
 }
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool) error {
