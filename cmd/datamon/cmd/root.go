@@ -17,7 +17,7 @@ const (
 	bundleID         = "bundle"
 	destination      = "destination"
 	mount            = "mount"
-	folder           = "folder"
+	path             = "path"
 	message          = "message"
 	repo             = "repo"
 	meta             = "meta"

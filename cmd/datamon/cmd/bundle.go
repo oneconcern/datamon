@@ -47,9 +47,9 @@ func addMountPathFlag(cmd *cobra.Command) string {
 	return mount
 }
 
-func addFolderPathFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.DataPath, folder, "", "The path to the folder of the bundle")
-	return folder
+func addPathFlag(cmd *cobra.Command) string {
+	cmd.Flags().StringVar(&bundleOptions.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
+	return path
 }
 
 func addCommitMessageFlag(cmd *cobra.Command) string {

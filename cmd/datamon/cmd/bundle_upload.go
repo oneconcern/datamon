@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
+
+	"github.com/oneconcern/datamon/pkg/storage"
 
 	"github.com/oneconcern/datamon/pkg/model"
 
@@ -21,7 +24,6 @@ var uploadBundleCmd = &cobra.Command{
 	Long:  "Upload a bundle consisting of all files stored in a directory",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		DieIfNotAccessible(bundleOptions.DataPath)
 		fmt.Println(config.Credential)
 		MetaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
@@ -31,9 +33,17 @@ var uploadBundleCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-
-		sourceStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
-
+		var sourceStore storage.Store
+		if strings.HasPrefix(bundleOptions.DataPath, "gs://") {
+			fmt.Println(bundleOptions.DataPath[4:])
+			sourceStore, err = gcs.New(bundleOptions.DataPath[5:], config.Credential)
+			if err != nil {
+				log.Fatalln(err)
+			}
+		} else {
+			DieIfNotAccessible(bundleOptions.DataPath)
+			sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
+		}
 		bd := core.NewBDescriptor(
 			core.Message(bundleOptions.Message),
 			core.Contributors([]model.Contributor{{
@@ -59,7 +69,7 @@ var uploadBundleCmd = &cobra.Command{
 func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(uploadBundleCmd)}
-	requiredFlags = append(requiredFlags, addFolderPathFlag(uploadBundleCmd))
+	requiredFlags = append(requiredFlags, addPathFlag(uploadBundleCmd))
 	requiredFlags = append(requiredFlags, addCommitMessageFlag(uploadBundleCmd))
 
 	for _, flag := range requiredFlags {
