@@ -42,7 +42,17 @@ type fsWriter struct {
 func (w *fsWriter) Write(p []byte) (n int, err error) {
 	for desired := uint32(len(p)); desired > 0; {
 		ofd := w.offset + desired
-		if ofd == w.leafSize { // sizes line up, flush and continue
+		if ofd < w.leafSize {
+			copy(w.buf[w.offset:], p[uint32(len(p))-desired:])
+			w.offset += desired
+			desired = 0
+		} else {
+			actual := w.leafSize - w.offset
+			copy(w.buf[w.offset:], p[uint32(len(p))-desired:uint32(len(p))-desired+actual])
+			desired -= actual
+			w.offset += actual
+		}
+		if w.offset == w.leafSize { // sizes line up, flush and continue
 			w.wg.Add(1)
 			w.count++ // next leaf
 			w.maxGoRoutines <- struct{}{}
@@ -63,17 +73,6 @@ func (w *fsWriter) Write(p []byte) (n int, err error) {
 			w.buf = make([]byte, w.leafSize) // new buffer
 			w.offset = 0                     // new offset for new buffer
 			continue
-		}
-
-		if ofd < w.leafSize {
-			copy(w.buf[w.offset:], p[uint32(len(p))-desired:])
-			w.offset += desired
-			desired = 0
-		} else {
-			actual := w.leafSize - w.offset
-			copy(w.buf[w.offset:], p[uint32(len(p))-desired:uint32(len(p))-desired+actual])
-			desired -= actual
-			w.offset += actual
 		}
 	}
 	return len(p), nil
@@ -159,6 +158,9 @@ func pFlush(
 }
 
 func (w *fsWriter) flush(isLastNode bool) (int, error) {
+	if w.offset == 0 {
+		return 0, nil
+	}
 	hasher, err := blake2b.New(&blake2b.Config{
 		Size: blake2b.Size,
 		Tree: &blake2b.Tree{
@@ -207,10 +209,9 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 }
 
 func (w *fsWriter) Flush() (Key, []byte, error) {
-	w.leafs = make([]Key, 0, w.count)
+	w.leafs = make([]Key, w.count)
 	if w.count > 0 {
 		w.wg.Wait()
-		w.leafs = make([]Key, w.count)
 		for {
 			select {
 			case bf := <-w.flushChan:

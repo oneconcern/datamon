@@ -59,8 +59,26 @@ func testFiles(destDir string) []testFile {
 		{
 			Original: filepath.Join(destDir, "original", "tenparts"),
 			RootHash: filepath.Join(destDir, "roots", "tenparts"),
-			Parts:    11,
+			Parts:    10,
 			Size:     int(10*leafSize - 512),
+		},
+		{
+			Original: filepath.Join(destDir, "original", "exact10"),
+			RootHash: filepath.Join(destDir, "roots", "exact10"),
+			Parts:    10,
+			Size:     int(10 * leafSize),
+		},
+		{
+			Original: filepath.Join(destDir, "original", "under10"),
+			RootHash: filepath.Join(destDir, "roots", "under10"),
+			Parts:    10,
+			Size:     int(10*leafSize - 1),
+		},
+		{
+			Original: filepath.Join(destDir, "original", "over10"),
+			RootHash: filepath.Join(destDir, "roots", "over10"),
+			Parts:    11,
+			Size:     int(10*leafSize + 1),
 		},
 		{
 			Original: filepath.Join(destDir, "original", "onetwoeigth-not-tree-root"),
