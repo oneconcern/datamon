@@ -3,22 +3,43 @@ package cafs
 import (
 	"context"
 	"io"
+	"sync"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string) (io.ReadCloser, error) {
-	keys, err := LeafsForHash(blobs, hash, leafSize, prefix)
-	if err != nil {
-		return nil, err
+type ReaderOption func(reader *chunkReader)
+
+func TruncateLeaf(t bool) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.leafTruncation = t
 	}
-	return &chunkReader{
+}
+
+func Keys(keys []Key) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.keys = keys
+	}
+}
+
+func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string, opts ...ReaderOption) (io.ReadCloser, error) {
+	c := &chunkReader{
 		fs:       blobs,
 		hash:     hash,
-		keys:     keys,
 		leafSize: leafSize,
-		prefix:   prefix,
-	}, nil
+	}
+
+	for _, apply := range opts {
+		apply(c)
+	}
+	var err error
+	if c.keys == nil {
+		c.keys, err = LeafsForHash(blobs, hash, leafSize, prefix)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
 }
 
 type chunkReader struct {
@@ -29,9 +50,10 @@ type chunkReader struct {
 	keys     []Key
 	idx      int
 
-	rdr       io.ReadCloser
-	readSoFar int
-	lastChunk bool
+	rdr            io.ReadCloser
+	readSoFar      int
+	lastChunk      bool
+	leafTruncation bool
 }
 
 func (r *chunkReader) Close() error {
@@ -39,6 +61,83 @@ func (r *chunkReader) Close() error {
 		return r.rdr.Close()
 	}
 	return nil
+}
+
+type cafsWriterAt struct {
+	written int64
+	w       io.WriterAt
+	offset  int64
+}
+
+func (cw *cafsWriterAt) Write(p []byte) (n int, err error) {
+	written, err := cw.w.WriteAt(p, cw.offset+cw.written) // io.WriteAt is expected to be thread safe
+	cw.written += int64(written)
+	return written, err
+}
+
+type serialReader struct {
+	reader io.Reader
+}
+
+func (s *serialReader) Read(data []byte) (int, error) {
+	return s.reader.Read(data)
+}
+
+func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
+	// WriteAt
+	w, ok := writer.(io.WriterAt)
+	if !ok {
+		sR := &serialReader{ //Warp reader to avoid io.Copy from calling WriteTo in a loop.
+			reader: r,
+		}
+		return io.Copy(writer, sR)
+	}
+
+	errC := make(chan error, len(r.keys))
+	writtenC := make(chan int64, len(r.keys))
+	var wg sync.WaitGroup
+
+	// Start a go routine for each key and give the offset to write at.
+	for index, key := range r.keys {
+		wg.Add(1)
+		var truncation uint32
+		if r.leafTruncation {
+			truncation = 32 * 1024 // Buffer size used by io.Copy
+		}
+		i := int64(index) * int64(r.leafSize-truncation)
+		go func(writeAt int64, writer io.WriterAt, key Key, prefix string, cafs storage.Store, wg *sync.WaitGroup) {
+			rdr, err := cafs.Get(context.Background(), key.StringWithPrefix(r.prefix)) // thread safe
+			if err != nil {
+				errC <- err
+			}
+			w := &cafsWriterAt{
+				w:      writer,
+				offset: writeAt,
+			}
+			written, err := io.Copy(w, rdr) // io.WriteAt is expected to be thread safe.
+			if err != nil {
+				errC <- err
+			}
+			writtenC <- written
+			wg.Done()
+		}(i, w, key, r.prefix, r.fs, &wg)
+	}
+	var count int
+	var written int64
+	wg.Wait()
+	for {
+		select {
+		case w := <-writtenC:
+			count++
+			written += w
+			if count == len(r.keys) {
+				return written, nil
+			}
+		case errC := <-errC:
+			return 0, errC
+		}
+	}
+
 }
 
 func (r *chunkReader) Read(data []byte) (int, error) {

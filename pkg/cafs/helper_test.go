@@ -108,6 +108,7 @@ func setupTestData(dir string, files []testFile) (*testDataGenerator, storage.St
 	fs, err := New(
 		LeafSize(leafSize),
 		Backend(blobs),
+		LeafTruncation(false),
 	)
 	if err != nil {
 		return nil, nil, nil, err

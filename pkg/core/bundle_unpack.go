@@ -57,8 +57,10 @@ type errorHit struct {
 }
 
 func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
+	ls := bundle.BundleDescriptor.LeafSize
 	fs, err := cafs.New(
-		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
+		cafs.LeafSize(ls),
+		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Backend(bundle.BlobStore),
 	)
 

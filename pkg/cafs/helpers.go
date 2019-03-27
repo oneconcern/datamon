@@ -73,6 +73,9 @@ func LeafsForHash(blobs storage.Store, hash Key, leafSize uint32, prefix string)
 }
 
 func LeafKeys(verify Key, data []byte, leafSize uint32) ([]Key, error) {
+	if len(data) < KeySize {
+		return nil, errors.New("the last hash in the file is not the checksum")
+	}
 	if !bytes.Equal(data[len(data)-KeySize:], verify[:]) {
 		return nil, errors.New("the last hash in the file is not the checksum")
 	}

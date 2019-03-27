@@ -93,9 +93,18 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	s := readCloser{
 		reader: source,
 	}
-	_, err = storage.PipeIO(target, s)
-	if err != nil {
-		return fmt.Errorf("write record for %q: %v", key, err)
+	// If reader implements writeto use it.
+	wt := source.(io.WriterTo)
+	if wt != nil {
+		_, err = wt.WriteTo(target)
+		if err != nil {
+			return fmt.Errorf("write record for %q: %v", key, err)
+		}
+	} else {
+		_, err = storage.PipeIO(target, s)
+		if err != nil {
+			return fmt.Errorf("write record for %q: %v", key, err)
+		}
 	}
 
 	if err = target.Close(); err != nil {

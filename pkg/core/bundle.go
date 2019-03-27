@@ -77,6 +77,7 @@ func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescri
 		Timestamp:              time.Now(),
 		Contributors:           nil,
 		BundleEntriesFileCount: 0,
+		Version:                model.CurrentBundleVersion,
 	}
 	for _, apply := range descriptorOps {
 		apply(&bd)

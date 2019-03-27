@@ -47,6 +47,12 @@ func HasGatherIncomplete() HasOption {
 	}
 }
 
+func LeafTruncation(a bool) Option {
+	return func(w *defaultFs) {
+		w.leafTruncation = a
+	}
+}
+
 func Prefix(prefix string) Option {
 	return func(w *defaultFs) {
 		w.prefix = prefix
@@ -86,22 +92,21 @@ func New(opts ...Option) (Fs, error) {
 }
 
 type defaultFs struct {
-	fs       storage.Store
-	leafSize uint32
-	prefix   string
-	zl       zap.Logger
-	l        log.Logger
+	fs             storage.Store
+	leafSize       uint32
+	prefix         string
+	zl             zap.Logger
+	l              log.Logger
+	leafTruncation bool
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
 	w := d.writer(d.prefix)
 	defer w.Close()
-
 	written, err := io.Copy(w, src)
 	if err != nil {
 		return 0, Key{}, nil, false, err
 	}
-
 	key, keys, err := w.Flush()
 	if err != nil {
 		return 0, Key{}, nil, false, err
@@ -120,7 +125,7 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
-	return newReader(d.fs, hash, d.leafSize, d.prefix)
+	return newReader(d.fs, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation))
 }
 
 func (d *defaultFs) writer(prefix string) Writer {

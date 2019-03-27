@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	CurrentBundleVersion = 1
+)
+
 // BundleDescriptor represents a commit which is a file tree with the changes to the repository.
 type BundleDescriptor struct {
 	LeafSize               uint32        `json:"leafSize" yaml:"leafSize"` // Each bundles blobs are independently generated
@@ -15,7 +19,8 @@ type BundleDescriptor struct {
 	Parents                []string      `json:"parents,omitempty" yaml:"parents,omitempty"`
 	Timestamp              time.Time     `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
 	Contributors           []Contributor `json:"contributors" yaml:"contributors"`
-	BundleEntriesFileCount uint64        `json:"count" yaml:"count"` // Number of files which have BundleDescriptor Entries
+	BundleEntriesFileCount uint64        `json:"count" yaml:"count"`                         // Number of files which have BundleDescriptor Entries
+	Version                uint64        `json:"version,omitempty" yaml:"version,omitempty"` // Version for the bundle
 	_                      struct{}
 }
 

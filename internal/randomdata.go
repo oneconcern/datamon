@@ -7,6 +7,10 @@ import (
 
 // from https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-golang
 func RandStringBytesMaskImprSrc(n int) string {
+	return string(RandBytesMaskImprSrc(n))
+}
+
+func RandBytesMaskImprSrc(n int) []byte {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyz0123456789"
 	const (
 		letterIdxBits = 6                    // 6 bits to represent a letter index
@@ -28,5 +32,5 @@ func RandStringBytesMaskImprSrc(n int) string {
 		remain--
 	}
 
-	return string(b)
+	return b
 }
