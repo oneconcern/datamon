@@ -57,8 +57,10 @@ type errorHit struct {
 }
 
 func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
+	ls := bundle.BundleDescriptor.LeafSize
 	fs, err := cafs.New(
-		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
+		cafs.LeafSize(ls),
+		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Backend(bundle.BlobStore),
 	)
 
@@ -73,8 +75,8 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 			wg.Done()
 			continue
 		}
-		fmt.Println("started " + b.NameWithPath)
 		go func(bundleEntry model.BundleEntry) {
+			fmt.Println("started " + b.NameWithPath)
 			key, err := cafs.KeyFromString(bundleEntry.Hash)
 			if err != nil {
 				errC <- errorHit{

@@ -77,6 +77,7 @@ func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescri
 		Timestamp:              time.Now(),
 		Contributors:           nil,
 		BundleEntriesFileCount: 0,
+		Version:                model.CurrentBundleVersion,
 	}
 	for _, apply := range descriptorOps {
 		apply(&bd)
@@ -166,6 +167,10 @@ func Upload(ctx context.Context, bundle *Bundle) error {
 }
 
 func PopulateFiles(ctx context.Context, bundle *Bundle) error {
+	e := RepoExists(bundle.RepoID, bundle.MetaStore)
+	if e != nil {
+		return e
+	}
 	reader, err := bundle.MetaStore.Get(ctx, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID))
 	if err != nil {
 		fmt.Printf("Failed to download the bundle descriptor: %s", err)

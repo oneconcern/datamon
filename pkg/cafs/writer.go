@@ -24,32 +24,43 @@ type Writer interface {
 }
 
 type fsWriter struct {
-	fs            storage.Store
-	leafSize      uint32
-	leafs         []Key
-	buf           []byte
-	offset        uint32
-	flushed       uint32
-	pather        func(string) string
-	prefix        string
-	count         uint64
-	flushChan     chan blobFlush
-	errC          chan error
-	maxGoRoutines chan struct{}
-	wg            sync.WaitGroup
+	fs            storage.Store       // CAFS backing store
+	prefix        string              // Prefix for fs paths
+	leafSize      uint32              // Size of chunks
+	leafs         []Key               // List of keys backing a file
+	buf           []byte              // Buffer stage a chunk == leafsize
+	offset        int                 // till where buffer is used
+	flushed       uint32              // writer has been flushed to fs
+	pather        func(string) string // pathing logic
+	count         uint64              // total number of parallel writes
+	flushChan     chan blobFlush      // channel for parallel writes
+	errC          chan error          // channel for errors during parallel writes
+	maxGoRoutines chan struct{}       // Max number of concurrent writes
+	wg            sync.WaitGroup      // Sync
 }
 
 func (w *fsWriter) Write(p []byte) (n int, err error) {
-	for desired := uint32(len(p)); desired > 0; {
-		ofd := w.offset + desired
-		if ofd == w.leafSize { // sizes line up, flush and continue
+	written := 0
+	for {
+		if written == len(p) {
+			return len(p), nil
+		}
+		// Copy p to w.buf
+		writable := len(w.buf) - w.offset
+		if len(p) < writable {
+			writable = len(p)
+		}
+		c := copy(w.buf[w.offset:], p[written:writable])
+		w.offset += c
+		written += c
+		if w.offset == len(w.buf) { // sizes line up, flush and continue
 			w.wg.Add(1)
 			w.count++ // next leaf
 			w.maxGoRoutines <- struct{}{}
 			go pFlush(
 				false,
 				w.buf,
-				int(w.offset),
+				w.offset,
 				w.prefix,
 				w.leafSize,
 				w.count,
@@ -64,19 +75,7 @@ func (w *fsWriter) Write(p []byte) (n int, err error) {
 			w.offset = 0                     // new offset for new buffer
 			continue
 		}
-
-		if ofd < w.leafSize {
-			copy(w.buf[w.offset:], p[uint32(len(p))-desired:])
-			w.offset += desired
-			desired = 0
-		} else {
-			actual := w.leafSize - w.offset
-			copy(w.buf[w.offset:], p[uint32(len(p))-desired:uint32(len(p))-desired+actual])
-			desired -= actual
-			w.offset += actual
-		}
 	}
-	return len(p), nil
 }
 
 type blobFlush struct {
@@ -147,9 +146,9 @@ func pFlush(
 			done()
 			return
 		}
-		fmt.Printf("pUploading blob:%s, bytes:%d\n", leafKey.String(), endOffset)
+		fmt.Printf("Uploading blob:%s\n", leafKey.String())
 	} else {
-		fmt.Printf("pDuplicate blob:%s, bytes:%d\n", leafKey.String(), endOffset)
+		fmt.Printf("Duplicate blob:%s\n", leafKey.String())
 	}
 	flushChan <- blobFlush{
 		count: count,
@@ -159,6 +158,9 @@ func pFlush(
 }
 
 func (w *fsWriter) flush(isLastNode bool) (int, error) {
+	if w.offset == 0 {
+		return 0, nil
+	}
 	hasher, err := blake2b.New(&blake2b.Config{
 		Size: blake2b.Size,
 		Tree: &blake2b.Tree{
@@ -207,10 +209,9 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 }
 
 func (w *fsWriter) Flush() (Key, []byte, error) {
-	w.leafs = make([]Key, 0, w.count)
+	w.leafs = make([]Key, w.count)
 	if w.count > 0 {
 		w.wg.Wait()
-		w.leafs = make([]Key, w.count)
 		for {
 			select {
 			case bf := <-w.flushChan:

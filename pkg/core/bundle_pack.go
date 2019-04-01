@@ -67,8 +67,8 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 		if err != nil {
 			return err
 		}
+		atomic.AddInt64(&count, 1)
 		go func(file string) {
-			atomic.AddInt64(&count, 1)
 			written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
 			if e != nil {
 				eC <- errorHit{
