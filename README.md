@@ -40,9 +40,7 @@ datamon repo create  --description "Ritesh's repo for testing" --repo ritesh-dat
 
 Upload a bundle, the last line prints the commit hash. This will be needed for downloading the bundle
 ```bash
-#datamon bundle upload --folder /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo
-..
-..
+#datamon bundle upload --path /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo
 Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR 
 ```
 
