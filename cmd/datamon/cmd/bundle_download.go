@@ -18,7 +18,8 @@ import (
 var BundleDownloadCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Download a bundle",
-	Long:  "Download a readonly, non-interactive view of the entire data that is part of a bundle",
+	Long: "Download a readonly, non-interactive view of the entire data that is part of a bundle. If --bundle is not specified" +
+		" the latest bundle will be downloaded",
 	Run: func(cmd *cobra.Command, args []string) {
 
 		sourceStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
@@ -45,6 +46,10 @@ var BundleDownloadCmd = &cobra.Command{
 		}
 		destinationStore := localfs.New(fs)
 
+		err = setLatestBundle(sourceStore)
+		if err != nil {
+			log.Fatalln(err)
+		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
 			core.Repo(repoParams.RepoName),
@@ -66,12 +71,11 @@ func init() {
 	// Source
 	requiredFlags := []string{addRepoNameOptionFlag(BundleDownloadCmd)}
 
-	// Bundle to download
-	requiredFlags = append(requiredFlags, addBundleFlag(BundleDownloadCmd))
-
 	// Destination
 	requiredFlags = append(requiredFlags, addDataPathFlag(BundleDownloadCmd))
 
+	// Bundle to download
+	addBundleFlag(BundleDownloadCmd)
 	// Blob bucket
 	addBlobBucket(BundleDownloadCmd)
 	addBucketNameFlag(BundleDownloadCmd)
