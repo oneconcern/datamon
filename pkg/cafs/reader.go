@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/minio/blake2b-simd"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
@@ -22,11 +23,18 @@ func Keys(keys []Key) ReaderOption {
 	}
 }
 
+func VerifyHash(t bool) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.verifyHash = t
+	}
+}
+
 func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string, opts ...ReaderOption) (io.ReadCloser, error) {
 	c := &chunkReader{
 		fs:       blobs,
 		hash:     hash,
 		leafSize: leafSize,
+		currLeaf: make([]byte, 0),
 	}
 
 	for _, apply := range opts {
@@ -34,10 +42,16 @@ func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string, op
 	}
 	var err error
 	if c.keys == nil {
-		c.keys, err = LeafsForHash(blobs, hash, leafSize, prefix)
+		// ??? distinguish these two functions?
+		if c.verifyHash {
+			c.keys, err = LeafsForHash(blobs, hash, leafSize, prefix)
+		} else {
+			c.keys, err = leafsForHashInternVerify(blobs, hash, leafSize, prefix)
+		}
 		if err != nil {
 			return nil, err
 		}
+
 	}
 	return c, nil
 }
@@ -54,6 +68,8 @@ type chunkReader struct {
 	readSoFar      int
 	lastChunk      bool
 	leafTruncation bool
+	currLeaf       []byte
+	verifyHash bool
 }
 
 func (r *chunkReader) Close() error {
@@ -157,6 +173,7 @@ func (r *chunkReader) Read(data []byte) (int, error) {
 		}
 
 		n, err := r.rdr.Read(data[r.readSoFar:])
+		r.currLeaf = append(r.currLeaf, data[r.readSoFar:r.readSoFar+n]...)
 		if err != nil {
 			//#nosec
 			r.rdr.Close()
@@ -165,15 +182,51 @@ func (r *chunkReader) Read(data []byte) (int, error) {
 				r.idx++
 				r.rdr = nil
 				r.lastChunk = r.idx == len(r.keys)
-
+				if r.verifyHash {
+					nodeOffset := r.idx
+					isLastNode := false
+					/* ??? what? */
+					if r.lastChunk {
+						if uint32(len(r.currLeaf)) != r.leafSize {
+							nodeOffset--
+							isLastNode = true
+						}
+					}
+					hasher, err := blake2b.New(&blake2b.Config{
+						Size: blake2b.Size,
+						Tree: &blake2b.Tree{
+							Fanout:        0,
+							MaxDepth:      2,
+							LeafSize:      r.leafSize,
+							NodeOffset:    uint64(nodeOffset),
+							NodeDepth:     0,
+							InnerHashSize: blake2b.Size,
+							IsLastNode:    isLastNode,
+						},
+					})
+					if err != nil {
+						return 0, err
+					}
+					_, err = hasher.Write(r.currLeaf)
+					if err != nil {
+						return 0, err
+					}
+					leafKey, err := NewKey(hasher.Sum(nil))
+					if err != nil {
+						return 0, err
+					}
+					if key != leafKey {
+						return 0, err
+					}
+				}
 				if r.lastChunk { // this was the last chunk, so also EOF for this hash
 					if n == bytesToRead {
 						return n, nil
 					}
 					return r.readSoFar, io.EOF
 				}
-
 				// move on to the next key
+				r.currLeaf = make([]byte, 0)
 				continue
 			}
 			return n, err

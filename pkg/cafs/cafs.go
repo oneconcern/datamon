@@ -134,7 +134,7 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
-	return newReader(d.fs, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation))
+	return newReader(d.fs, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation), VerifyHash(true))
 }
 
 func (d *defaultFs) writer(prefix string) Writer {
