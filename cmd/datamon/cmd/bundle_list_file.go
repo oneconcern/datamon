@@ -22,6 +22,10 @@ var bundleFileList = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
+		err = setLatestBundle(store)
+		if err != nil {
+			log.Fatalln(err)
+		}
 		bundle := core.Bundle{
 			RepoID:           repoParams.RepoName,
 			BundleID:         bundleOptions.ID,
@@ -47,7 +51,7 @@ func init() {
 	requiredFlags := []string{addRepoNameOptionFlag(bundleFileList)}
 
 	// Bundle to download
-	requiredFlags = append(requiredFlags, addBundleFlag(bundleFileList))
+	addBundleFlag(bundleFileList)
 
 	addBlobBucket(bundleFileList)
 	addBucketNameFlag(bundleFileList)

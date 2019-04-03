@@ -3,6 +3,10 @@
 package cmd
 
 import (
+	"fmt"
+
+	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +37,7 @@ func init() {
 }
 
 func addBundleFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.ID, bundleID, "", "The hash id for the bundle")
+	cmd.Flags().StringVar(&bundleOptions.ID, bundleID, "", "The hash id for the bundle, if not specified the latest bundle will be used")
 	return bundleID
 }
 
@@ -60,4 +64,16 @@ func addCommitMessageFlag(cmd *cobra.Command) string {
 func addBundleFileFlag(cmd *cobra.Command) string {
 	cmd.Flags().StringVar(&bundleOptions.File, file, "", "The file to download from the bundle")
 	return file
+}
+
+func setLatestBundle(store storage.Store) error {
+	if bundleOptions.ID == "" {
+		key, err := core.GetLatestBundle(repoParams.RepoName, store)
+		if err != nil {
+			return err
+		}
+		bundleOptions.ID = key
+	}
+	fmt.Printf("Using bundle: %s\n", bundleOptions.ID)
+	return nil
 }

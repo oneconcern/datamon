@@ -33,7 +33,10 @@ var bundleDownloadFileCmd = &cobra.Command{
 		}
 		_ = os.MkdirAll(path, 0700)
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
-
+		err = setLatestBundle(sourceStore)
+		if err != nil {
+			log.Fatalln(err)
+		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
 			core.Repo(repoParams.RepoName),
@@ -53,7 +56,7 @@ var bundleDownloadFileCmd = &cobra.Command{
 func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(bundleDownloadFileCmd)}
-	requiredFlags = append(requiredFlags, addBundleFlag(bundleDownloadFileCmd))
+	addBundleFlag(bundleDownloadFileCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(bundleDownloadFileCmd))
 	requiredFlags = append(requiredFlags, addBundleFileFlag(bundleDownloadFileCmd))
 

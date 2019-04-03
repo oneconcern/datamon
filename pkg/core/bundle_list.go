@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -18,7 +19,10 @@ func ListBundles(repo string, store storage.Store) ([]string, error) {
 	if e != nil {
 		return nil, e
 	}
-	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", 1000000)
+	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", 1000000)
+	if err != nil {
+		return nil, err
+	}
 	var keys = make([]string, 0)
 	for _, k := range ks {
 		c := strings.SplitN(k, "/", 4)[3]
@@ -43,4 +47,19 @@ func ListBundles(repo string, store storage.Store) ([]string, error) {
 	}
 
 	return keys, nil
+}
+
+func GetLatestBundle(repo string, store storage.Store) (string, error) {
+	e := RepoExists(repo, store)
+	if e != nil {
+		return "", e
+	}
+	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", 1000000)
+	if err != nil {
+		return "", err
+	}
+	if len(ks) == 0 {
+		return "", fmt.Errorf("no bundles uploaded to repo: %s\n", repo)
+	}
+	return strings.SplitN(ks[len(ks)-1], "/", 4)[2], nil
 }
