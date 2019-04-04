@@ -3,6 +3,7 @@ package cafs
 import (
 	"bytes"
 	"context"
+	"hash/crc32"
 	"io"
 	"log"
 	"sync"
@@ -116,7 +117,15 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 	}
 	found, _ := d.fs.Has(context.TODO(), d.prefix+key.String())
 	if !found {
-		if err := d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...)), storage.OverWrite); err != nil {
+		crcFS, ok := d.fs.(storage.StoreCRC)
+		if ok {
+			buffer := append(keys, key[:]...)
+			crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
+			err = crcFS.PutCRC(context.TODO(), d.prefix+key.String(), bytes.NewReader(buffer), storage.OverWrite, crc)
+		} else {
+			err = d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...)), storage.OverWrite)
+		}
+		if err != nil {
 			return 0, Key{}, nil, found, err
 		}
 	}

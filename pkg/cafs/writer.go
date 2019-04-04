@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -60,7 +61,6 @@ func (w *fsWriter) Write(p []byte) (n int, err error) {
 			go pFlush(
 				false,
 				w.buf,
-				w.offset,
 				w.prefix,
 				w.leafSize,
 				w.count,
@@ -86,7 +86,6 @@ type blobFlush struct {
 func pFlush(
 	isLastNode bool,
 	buffer []byte,
-	endOffset int,
 	prefix string,
 	leafSize uint32,
 	count uint64,
@@ -119,7 +118,7 @@ func pFlush(
 		done()
 		return
 	}
-	_, err = hasher.Write(buffer[:endOffset])
+	_, err = hasher.Write(buffer)
 	if err != nil {
 		errC <- fmt.Errorf("flush segment hash: %v", err)
 		done()
@@ -140,7 +139,13 @@ func pFlush(
 	}
 	found, _ := destination.Has(context.TODO(), pather(leafKey.String()))
 	if !found {
-		err = destination.Put(context.TODO(), pather(leafKey.String()), bytes.NewReader(buffer[:endOffset]), storage.OverWrite)
+		d, ok := destination.(storage.StoreCRC)
+		if ok {
+			crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
+			err = d.PutCRC(context.TODO(), pather(leafKey.String()), bytes.NewReader(buffer), storage.OverWrite, crc)
+		} else {
+			err = destination.Put(context.TODO(), pather(leafKey.String()), bytes.NewReader(buffer), storage.OverWrite)
+		}
 		if err != nil {
 			errC <- fmt.Errorf("write segment file: %v", err)
 			done()
@@ -193,7 +198,13 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 	}
 	found, _ := w.fs.Has(context.TODO(), w.pather(leafKey.String()))
 	if !found {
-		err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
+		d, ok := w.fs.(storage.StoreCRC)
+		if ok {
+			crc := crc32.Checksum(w.buf[:w.offset], crc32.MakeTable(crc32.Castagnoli))
+			err = d.PutCRC(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite, crc)
+		} else {
+			err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
+		}
 		if err != nil {
 			return 0, fmt.Errorf("write segment file: %v", err)
 		}

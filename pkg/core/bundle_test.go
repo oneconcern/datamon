@@ -139,14 +139,15 @@ func generateDataFile(test *testing.T, store storage.Store) model.BundleEntry {
 	ksuid, err := ksuid.NewRandom()
 	require.NoError(test, err)
 	var size int = 2 * leafSize
-	require.NoError(test, cafs.GenerateFile(original+ksuid.String(), size, leafSize))
+	file := original + ksuid.String()
+	require.NoError(test, cafs.GenerateFile(file, size, leafSize))
 	// Write individual blobs
 	fs, err := cafs.New(
 		cafs.LeafSize(leafSize),
 		cafs.Backend(store),
 	)
 	require.NoError(test, err)
-	keys, err := cafs.GenerateCAFSChunks(original+ksuid.String(), fs)
+	keys, err := cafs.GenerateCAFSChunks(file, fs)
 	require.NoError(test, err)
 	// return the Bundle Entry
 	return model.BundleEntry{
