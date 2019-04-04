@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"time"
+	"strings"
 )
 
 const (
@@ -28,6 +29,12 @@ type BundleDescriptor struct {
 type BundleEntries struct {
 	BundleEntries []BundleEntry `json:"BundleEntries" yaml:"BundleEntries"`
 	_             struct{}
+}
+
+type ArchivePathComponents struct {
+	Repo string
+	BundleID string
+	ArchiveFileName string
 }
 
 // List of files, directories (empty) skipped
@@ -79,6 +86,15 @@ func getArchivePathToBundles() string {
 func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
 	// <repo>-bundles/<bundle>/bundlefiles-<index>.json
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".json")
+}
+
+func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error)  {
+	cs := strings.SplitN(archivePath, "/", 4)
+	return ArchivePathComponents{
+	Repo: cs[1],
+	BundleID: cs[2],
+	ArchiveFileName: cs[3],
+	}, nil // placeholder in case of mor parsing
 }
 
 func GetBundleTimeStamp() time.Time {

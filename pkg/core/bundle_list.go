@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -25,11 +24,14 @@ func ListBundles(repo string, store storage.Store) ([]string, error) {
 	}
 	var keys = make([]string, 0)
 	for _, k := range ks {
-		c := strings.SplitN(k, "/", 4)[3]
-		if c != "bundle.json" {
+		apc, err := model.GetArchivePathComponents(k)
+		if err != nil {
+			return nil, err
+		}
+		if apc.ArchiveFileName != "bundle.json" {
 			continue
 		}
-		c = strings.SplitN(k, "/", 4)[2]
+		c := apc.BundleID
 		r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, c))
 		if err != nil {
 			return nil, err
@@ -61,5 +63,11 @@ func GetLatestBundle(repo string, store storage.Store) (string, error) {
 	if len(ks) == 0 {
 		return "", fmt.Errorf("no bundles uploaded to repo: %s\n", repo)
 	}
-	return strings.SplitN(ks[len(ks)-1], "/", 4)[2], nil
+
+	apc, err := model.GetArchivePathComponents(ks[len(ks)-1])
+	if err != nil {
+		return "", err
+	}
+
+	return apc.BundleID, nil
 }
