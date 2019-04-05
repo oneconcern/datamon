@@ -43,6 +43,10 @@ type Store interface {
 	KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error)
 }
 
+type StoreCRC interface {
+	PutCRC(context.Context, string, io.Reader, bool, uint32) error
+}
+
 func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, destination string) ([]byte, error) {
 	reader, err := sStore.Get(ctx, source)
 	if err != nil {

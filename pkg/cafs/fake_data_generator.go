@@ -2,6 +2,8 @@ package cafs
 
 import (
 	"context"
+	"fmt"
+	"path"
 
 	"github.com/oneconcern/datamon/internal"
 
@@ -11,11 +13,17 @@ import (
 )
 
 func GenerateFile(tgt string, size int, leafSize uint32) error {
-	f, err := os.Create(tgt)
+	err := os.MkdirAll(path.Dir(tgt), os.ModePerm)
 	if err != nil {
+		fmt.Printf("Unable to create file:%s, err:%s\n", tgt, err)
 		return err
 	}
-	defer f.Close()
+	f, err := os.Create(tgt)
+	if err != nil {
+		fmt.Printf("Unable to create file:%s, err:%s\n", tgt, err)
+		return err
+	}
+	f.Sync()
 
 	if size <= int(leafSize) { // small single chunk file
 		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(size))
@@ -40,11 +48,11 @@ func GenerateFile(tgt string, size int, leafSize uint32) error {
 			return err
 		}
 	}
+	f.Sync()
 	return f.Close()
 }
 
 func GenerateCAFSFile(src string, fs Fs, destDir string) error {
-
 	key, err := GenerateCAFSChunks(src, fs)
 	if err != nil {
 		return err
@@ -55,6 +63,7 @@ func GenerateCAFSFile(src string, fs Fs, destDir string) error {
 func GenerateCAFSChunks(src string, fs Fs) (*Key, error) {
 	sourceFile, err := os.Open(src)
 	if err != nil {
+		fmt.Printf("Failed to open file:%s, err:%s\n", src, err)
 		return nil, err
 	}
 	defer sourceFile.Close()
