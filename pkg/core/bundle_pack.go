@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"sync/atomic"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 
@@ -67,7 +66,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 		if err != nil {
 			return err
 		}
-		atomic.AddInt64(&count, 1)
+		count++
 		go func(file string) {
 			written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
 			if e != nil {
@@ -87,12 +86,12 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 			}
 		}(file)
 	}
-	for atomic.LoadInt64(&count) > 0 {
+	for count > 0 {
 		select {
 		case f := <-fC:
 			log.Printf("Uploaded file:%s, duplicate:%t, key:%s, keys:%d", f.name, f.duplicate, f.hash, len(f.keys))
 
-			atomic.AddInt64(&count, -1)
+			count--
 
 			fileList.BundleEntries = append(fileList.BundleEntries, model.BundleEntry{
 				Hash:         f.hash,
@@ -106,7 +105,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 			}
 
 			// Write the bundle entry file if reached max or the last one
-			if atomic.LoadInt64(&count) == 0 || bundleEntriesIndex == bundleEntriesPerFile {
+			if count == 0 || bundleEntriesIndex == bundleEntriesPerFile {
 				buffer, e := yaml.Marshal(fileList)
 				if e != nil {
 					return e
@@ -123,7 +122,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 				bundle.BundleDescriptor.BundleEntriesFileCount++
 			}
 		case e := <-eC:
-			atomic.AddInt64(&count, -1)
+			count--
 			fmt.Printf("Bundle upload failed. Failed to upload file %s err: %s", e.file, e.error)
 			return e.error
 		}
