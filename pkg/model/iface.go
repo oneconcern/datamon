@@ -54,30 +54,6 @@ type RepoStore interface {
 	Delete(context.Context, string) error
 }
 
-// A BundleStore manages model for bundle related data
-type BundleStore interface {
-	Store
-
-	ListTopLevel(context.Context) ([]BundleDescriptor, error)
-	ListTopLevelIDs(context.Context) ([]string, error)
-
-	ListBranches(context.Context) ([]string, error)
-	HashForBranch(context.Context, string) (string, error)
-	CreateBranch(context.Context, string, string) error
-	DeleteBranch(context.Context, string) error
-
-	ListTags(context.Context) ([]string, error)
-	HashForTag(context.Context, string) (string, error)
-	CreateTag(context.Context, string, string) error
-	DeleteTag(context.Context, string) error
-
-	Create(context.Context, string, string, string, []string, ChangeSet) (string, bool, error)
-	Get(context.Context, string) (*BundleDescriptor, error)
-	GetObject(context.Context, string) (Entry, error)
-	GetObjectForPath(context.Context, string) (Entry, error)
-	HashForPath(context.Context, string) (string, error)
-}
-
 // An StageMeta model manages the indices for file paths to
 // hashes and the file info meta data
 type StageMeta interface {
