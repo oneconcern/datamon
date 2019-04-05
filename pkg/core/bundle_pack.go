@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"log"
 
@@ -110,12 +111,23 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 				if e != nil {
 					return e
 				}
-				err = bundle.MetaStore.Put(ctx,
-					model.GetArchivePathToBundleFileList(
-						bundle.RepoID,
-						bundle.BundleID,
-						bundle.BundleDescriptor.BundleEntriesFileCount),
-					bytes.NewReader(buffer), storage.IfNotPresent)
+				msCRC, ok := bundle.MetaStore.(storage.StoreCRC)
+				if ok {
+					crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
+					err = msCRC.PutCRC(ctx,
+						model.GetArchivePathToBundleFileList(
+							bundle.RepoID,
+							bundle.BundleID,
+							bundle.BundleDescriptor.BundleEntriesFileCount),
+						bytes.NewReader(buffer), storage.IfNotPresent, crc)
+				} else {
+					err = bundle.MetaStore.Put(ctx,
+						model.GetArchivePathToBundleFileList(
+							bundle.RepoID,
+							bundle.BundleID,
+							bundle.BundleDescriptor.BundleEntriesFileCount),
+						bytes.NewReader(buffer), storage.IfNotPresent)
+				}
 				if err != nil {
 					return err
 				}
@@ -141,10 +153,18 @@ func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 	if err != nil {
 		return err
 	}
+	msCRC, ok := bundle.MetaStore.(storage.StoreCRC)
+	if ok {
+		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
+		err = msCRC.PutCRC(ctx,
+			model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
+			bytes.NewReader(buffer), storage.IfNotPresent, crc)
 
-	err = bundle.MetaStore.Put(ctx,
-		model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
-		bytes.NewReader(buffer), storage.IfNotPresent)
+	} else {
+		err = bundle.MetaStore.Put(ctx,
+			model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
+			bytes.NewReader(buffer), storage.IfNotPresent)
+	}
 	if err != nil {
 		return err
 	}
