@@ -112,8 +112,23 @@ func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, does
 		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: doesNotExist}).NewWriter(ctx)
 	} else {
 		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
-
 	}
+	_, err := storage.PipeIO(writer, readCloser{reader: reader})
+	if err != nil {
+		return err
+	}
+	return writer.Close()
+}
+
+func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool, crc uint32) error {
+	// Put if not present
+	var writer *gcsStorage.Writer
+	if doesNotExist {
+		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: doesNotExist}).NewWriter(ctx)
+	} else {
+		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
+	}
+	writer.CRC32C = crc
 	_, err := storage.PipeIO(writer, readCloser{reader: reader})
 	if err != nil {
 		return err
