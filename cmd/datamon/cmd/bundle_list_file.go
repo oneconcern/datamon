@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -20,11 +19,11 @@ var bundleFileList = &cobra.Command{
 
 		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		err = setLatestBundle(store)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		bundle := core.Bundle{
 			RepoID:           repoParams.RepoName,
@@ -37,7 +36,7 @@ var bundleFileList = &cobra.Command{
 		}
 		err = core.PopulateFiles(context.Background(), &bundle)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		for _, e := range bundle.BundleEntries {
 			fmt.Printf("name:%s, size:%d, hash:%s\n", e.NameWithPath, e.Size, e.Hash)
@@ -59,7 +58,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 	}
 	BundleListCommand.AddCommand(bundleFileList)

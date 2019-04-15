@@ -76,7 +76,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 			continue
 		}
 		go func(bundleEntry model.BundleEntry) {
-			fmt.Println("started " + b.NameWithPath)
+			fmt.Println("started " + bundleEntry.NameWithPath)
 			key, err := cafs.KeyFromString(bundleEntry.Hash)
 			if err != nil {
 				errC <- errorHit{

@@ -15,11 +15,11 @@ var repoList = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		keys, err := core.ListRepos(store)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		for _, key := range keys {
 			log.Println(key)
