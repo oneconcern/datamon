@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/spf13/cobra"
 
@@ -31,14 +30,14 @@ func (c *Config) setContributor(repoParams *RepoParams) {
 	if repoParams.ContributorEmail == "" {
 		repoParams.ContributorEmail = config.Email
 		if repoParams.ContributorEmail == "" {
-			log.Fatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
+			log_Fatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
 		}
 	}
 
 	if repoParams.ContributorName == "" {
 		repoParams.ContributorName = config.Name
 		if repoParams.ContributorName == "" {
-			log.Fatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
+			log_Fatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
 		}
 	}
 }
@@ -48,13 +47,13 @@ func (c *Config) setRepoParams(params *RepoParams) {
 	if repoParams.MetadataBucket == "" {
 		repoParams.MetadataBucket = config.Metadata
 		if repoParams.MetadataBucket == "" {
-			log.Fatalln(fmt.Errorf("metadata bucket not set in config or as a cli param"))
+			log_Fatalln(fmt.Errorf("metadata bucket not set in config or as a cli param"))
 		}
 	}
 	if repoParams.BlobBucket == "" {
 		repoParams.BlobBucket = config.Blob
 		if repoParams.BlobBucket == "" {
-			log.Fatalln(fmt.Errorf("blob bucket not set in config or as a cli param"))
+			log_Fatalln(fmt.Errorf("blob bucket not set in config or as a cli param"))
 		}
 	}
 }

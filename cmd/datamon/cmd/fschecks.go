@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"log"
 	"os"
 )
 
@@ -11,6 +10,6 @@ import (
 func DieIfNotAccessible(path string) {
 	_, err := os.Stat(path)
 	if err != nil {
-		log.Fatalln(err)
+		log_Fatalln(err)
 	}
 }

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -21,21 +20,21 @@ var bundleDownloadFileCmd = &cobra.Command{
 
 		sourceStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		path, err := filepath.Abs(filepath.Clean(bundleOptions.DataPath))
 		if err != nil {
-			log.Fatalf("Failed path validation: %s", err)
+			log_Fatalf("Failed path validation: %s", err)
 		}
 		_ = os.MkdirAll(path, 0700)
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
 		err = setLatestBundle(sourceStore)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
@@ -48,7 +47,7 @@ var bundleDownloadFileCmd = &cobra.Command{
 
 		err = core.PublishFile(context.Background(), bundle, bundleOptions.File)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 	},
 }
@@ -66,7 +65,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := bundleDownloadFileCmd.MarkFlagRequired(flag)
 		if err != nil {
-			log.Fatalln(err)
+			log_Fatalln(err)
 		}
 	}
 

@@ -46,6 +46,10 @@ It executes pipelines by scheduling the processors as serverless functions on ei
 var config *Config
 var credFile string
 
+// used to patch over calls to os.Exit() during test
+var log_Fatalln = log.Fatalln
+var log_Fatalf = log.Fatalf
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -81,7 +85,7 @@ func initConfig() {
 	var err error
 	config, err = newConfig()
 	if err != nil {
-		log.Fatalln(err)
+		log_Fatalln(err)
 	}
 	config.setRepoParams(&repoParams)
 	if config.Credential != "" {
