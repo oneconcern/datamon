@@ -30,6 +30,37 @@ type filePacked struct {
 	duplicate bool
 }
 
+func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList []model.BundleEntry) error {
+	buffer, err := yaml.Marshal(model.BundleEntries{
+		BundleEntries: fileList,
+	})
+	if err != nil {
+		return err
+	}
+	msCRC, ok := bundle.MetaStore.(storage.StoreCRC)
+	if ok {
+		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
+		err = msCRC.PutCRC(ctx,
+			model.GetArchivePathToBundleFileList(
+				bundle.RepoID,
+				bundle.BundleID,
+				bundle.BundleDescriptor.BundleEntriesFileCount),
+			bytes.NewReader(buffer), storage.IfNotPresent, crc)
+	} else {
+		err = bundle.MetaStore.Put(ctx,
+			model.GetArchivePathToBundleFileList(
+				bundle.RepoID,
+				bundle.BundleID,
+				bundle.BundleDescriptor.BundleEntriesFileCount),
+			bytes.NewReader(buffer), storage.IfNotPresent)
+	}
+	if err != nil {
+		return err
+	}
+	bundle.BundleDescriptor.BundleEntriesFileCount++
+	return nil
+}
+
 func uploadBundle(ctx context.Context, bundle *Bundle) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
@@ -102,33 +133,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 
 			// Write the bundle entry file if reached max or the last one
 			if count == 0 || len(fileList)%bundleEntriesPerFile == 0 {
-				buffer, e := yaml.Marshal(model.BundleEntries{
-					BundleEntries: fileList[firstUnuploadBundleEntryIndex:],
-				})
-				if e != nil {
-					return e
-				}
-				msCRC, ok := bundle.MetaStore.(storage.StoreCRC)
-				if ok {
-					crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
-					err = msCRC.PutCRC(ctx,
-						model.GetArchivePathToBundleFileList(
-							bundle.RepoID,
-							bundle.BundleID,
-							bundle.BundleDescriptor.BundleEntriesFileCount),
-						bytes.NewReader(buffer), storage.IfNotPresent, crc)
-				} else {
-					err = bundle.MetaStore.Put(ctx,
-						model.GetArchivePathToBundleFileList(
-							bundle.RepoID,
-							bundle.BundleID,
-							bundle.BundleDescriptor.BundleEntriesFileCount),
-						bytes.NewReader(buffer), storage.IfNotPresent)
-				}
-				if err != nil {
-					return err
-				}
-				bundle.BundleDescriptor.BundleEntriesFileCount++
+				uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:])
 				firstUnuploadBundleEntryIndex = uint(len(fileList))
 			}
 		case e := <-eC:
