@@ -37,7 +37,7 @@ func addRepoNameOptionFlag(cmd *cobra.Command) string {
 }
 
 func addBucketNameFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&repoParams.MetadataBucket, meta, "datamon-meta-data", "The name of the bucket used by datamon metadata")
+	cmd.Flags().StringVar(&repoParams.MetadataBucket, meta, "", "The name of the bucket used by datamon metadata")
 	_ = cmd.Flags().MarkHidden(meta)
 	return meta
 }
@@ -48,7 +48,7 @@ func addRepoDescription(cmd *cobra.Command) string {
 }
 
 func addBlobBucket(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&repoParams.BlobBucket, blob, "datamon-blob-data", "The name of the bucket hosting the datamon blobs")
+	cmd.Flags().StringVar(&repoParams.BlobBucket, blob, "", "The name of the bucket hosting the datamon blobs")
 	_ = cmd.Flags().MarkHidden(blob)
 	return blob
 }

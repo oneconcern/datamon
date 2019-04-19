@@ -67,6 +67,8 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	viper.SetDefault("metadata", "datamon-meta-data")
+	viper.SetDefault("blob", "datamon-blob-data")
 	if os.Getenv("DATAMON_CONFIG") != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(os.Getenv("DATAMON_CONFIG"))
