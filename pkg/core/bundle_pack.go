@@ -45,8 +45,8 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 		return err
 	}
 
-	fileList := model.BundleEntries{}
-	var bundleEntriesIndex uint
+	fileList := make([]model.BundleEntry, 0)
+	var firstUnuploadBundleEntryIndex uint
 	// Upload the files and the bundle list
 	err = bundle.InitializeBundleID()
 	if err != nil {
@@ -94,20 +94,17 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 
 			count--
 
-			fileList.BundleEntries = append(fileList.BundleEntries, model.BundleEntry{
+			fileList = append(fileList, model.BundleEntry{
 				Hash:         f.hash,
 				NameWithPath: f.name,
 				FileMode:     0, // #TODO: #35 file mode support
 				Size:         f.size})
 
-			bundleEntriesIndex++
-			if bundleEntriesIndex == bundleEntriesPerFile {
-				bundleEntriesIndex = 0
-			}
-
 			// Write the bundle entry file if reached max or the last one
-			if count == 0 || bundleEntriesIndex == bundleEntriesPerFile {
-				buffer, e := yaml.Marshal(fileList)
+			if count == 0 || len(fileList)%bundleEntriesPerFile == 0 {
+				buffer, e := yaml.Marshal(model.BundleEntries{
+					BundleEntries: fileList[firstUnuploadBundleEntryIndex:],
+				})
 				if e != nil {
 					return e
 				}
@@ -132,6 +129,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 					return err
 				}
 				bundle.BundleDescriptor.BundleEntriesFileCount++
+				firstUnuploadBundleEntryIndex = uint(len(fileList))
 			}
 		case e := <-eC:
 			count--
