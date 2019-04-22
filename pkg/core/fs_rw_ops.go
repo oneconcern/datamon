@@ -790,9 +790,10 @@ func (fs *fsMutable) Commit() error {
 		}
 		fileList = append(fileList, bundleEntry)
 	}
-	for i := 0; i*bundleEntriesPerFile < len(fileList); i++ {
-		firstIdx := i * bundleEntriesPerFile
-		nextFirstIdx := (i + 1) * bundleEntriesPerFile
+	// todo: defaultBundleEntriesPerFile const -> bundleEntriesPerFile param
+	for i := 0; i*defaultBundleEntriesPerFile < len(fileList); i++ {
+		firstIdx := i * defaultBundleEntriesPerFile
+		nextFirstIdx := (i + 1) * defaultBundleEntriesPerFile
 		if nextFirstIdx < len(fileList) {
 			if err := uploadBundleEntriesFileList(ctx, fs.bundle, fileList[firstIdx:nextFirstIdx]); err != nil {
 				return err
