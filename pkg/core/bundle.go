@@ -159,11 +159,16 @@ func PublishMetadata(ctx context.Context, bundle *Bundle) error {
 
 // Upload an bundle to archive
 func Upload(ctx context.Context, bundle *Bundle) error {
+	return implUpload(ctx, bundle, defaultBundleEntriesPerFile)
+}
+
+// implementation of Upload() with some additional parameters for test
+func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
 	err := RepoExists(bundle.RepoID, bundle.MetaStore)
 	if err != nil {
 		return err
 	}
-	return uploadBundle(ctx, bundle)
+	return uploadBundle(ctx, bundle, bundleEntriesPerFile)
 }
 
 func PopulateFiles(ctx context.Context, bundle *Bundle) error {
