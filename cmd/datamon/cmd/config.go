@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 
@@ -62,7 +63,7 @@ func (c *Config) setRepoParams(params *RepoParams) {
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Commands to manage a config",
-	Long: `Commands to manage datamon cli config. 
+	Long: `Commands to manage datamon cli config.
 
 Configuration for datamon is the common set of params that are needed for most commands and do not change.
 `,
