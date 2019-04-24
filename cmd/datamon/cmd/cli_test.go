@@ -1,3 +1,5 @@
+// +build integration
+
 package cmd
 
 import (
@@ -237,11 +239,11 @@ func TestRepoList(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 	ll, err = listRepos(t)
 	require.NoError(t, err)
-	require.Equal(t, len(ll), 1)
-	require.Equal(t, ll[0].repo, repo1)
-	require.Equal(t, ll[0].description, "testing")
-	require.Equal(t, ll[0].name, "tests")
-	require.Equal(t, ll[0].email, "datamon@oneconcern.com")
+	require.Equal(t, 1, len(ll))
+	require.Equal(t, repo1, ll[0].repo)
+	require.Equal(t, "testing", ll[0].description)
+	require.Equal(t, "tests", ll[0].name)
+	require.Equal(t, "datamon@oneconcern.com", ll[0].email)
 	require.True(t, testNow.Sub(ll[0].time).Seconds() < 3)
 	testNow = time.Now()
 	rootCmd.SetArgs([]string{"repo",
@@ -254,15 +256,15 @@ func TestRepoList(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 	ll, err = listRepos(t)
 	require.NoError(t, err)
-	require.Equal(t, len(ll), 2)
-	require.Equal(t, ll[0].repo, repo1)
-	require.Equal(t, ll[0].description, "testing")
-	require.Equal(t, ll[0].name, "tests")
-	require.Equal(t, ll[0].email, "datamon@oneconcern.com")
-	require.Equal(t, ll[1].repo, repo2)
-	require.Equal(t, ll[1].description, "testing too")
-	require.Equal(t, ll[1].name, "tests2")
-	require.Equal(t, ll[1].email, "datamon2@oneconcern.com")
+	require.Equal(t, 2, len(ll))
+	require.Equal(t, repo1, ll[0].repo)
+	require.Equal(t, "testing", ll[0].description)
+	require.Equal(t, "tests", ll[0].name)
+	require.Equal(t, "datamon@oneconcern.com", ll[0].email)
+	require.Equal(t, repo2, ll[1].repo)
+	require.Equal(t, "testing too", ll[1].description)
+	require.Equal(t, "tests2", ll[1].name)
+	require.Equal(t, "datamon2@oneconcern.com", ll[1].email)
 	require.True(t, testNow.Sub(ll[1].time).Seconds() < 3)
 }
 

@@ -34,7 +34,7 @@ func setup(t testing.TB) (storage.Store, func()) {
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err)
-	err = client.Bucket(bucket).Create(ctx, "oneconcern-1509", nil)
+	err = client.Bucket(bucket).Create(ctx, "onec-co", nil)
 	require.NoError(t, err)
 
 	gcs, err := New(bucket, "") // Use GOOGLE_APPLICATION_CREDENTIALS env variable
