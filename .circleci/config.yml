@@ -18,8 +18,14 @@ jobs:
       - run:
           name: Install packages
           command: |
-            sudo apt-get update
+            sudo apt-get update -y
+            sudo apt-get install lsb-core
+            export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
+            echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+            curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+            sudo apt-get update -y
             sudo apt-get install -y git build-essential
+            sudo apt-get install -y google-cloud-sdk
       - run:
           name: Install go tools
           command: |
@@ -34,6 +40,10 @@ jobs:
       - run:
           name: Run golang tests
           command: |
+            mkdir -p ~/extra
+            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
+            echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             gotestsum --junitfile /tmp/test-results/go-test-report.xml ./... -- -race ./...
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}

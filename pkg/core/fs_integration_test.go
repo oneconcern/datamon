@@ -1,12 +1,14 @@
+// +build fsintegration
+
 package core
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-	"context"
-	"path/filepath"
 
 	"github.com/spf13/afero"
 
