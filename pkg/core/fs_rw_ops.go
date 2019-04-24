@@ -17,6 +17,9 @@ import (
 
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
+
+	"github.com/oneconcern/datamon/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/model"
 )
 
 type fsMutable struct {
@@ -316,6 +319,7 @@ func (fs *fsMutable) CreateFile(
 
 	// TODO: Implement a CAFS friendly store. That will chunk file at leaf size and on commit, move the chunks into
 	// blob cache.
+	// ??? chunking occurs on disk or in memory?
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
@@ -474,7 +478,7 @@ func (fs *fsMutable) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
 	fs.l.Info("readFile", zap.Uint64("id", uint64(op.Inode)))
-	file, err := fs.localCache.OpenFile(fmt.Sprint(op.Inode), os.O_RDONLY|os.O_SYNC, fileDefaultMode)
+	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_RDONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
 		return fuse.EIO
 	}
@@ -490,7 +494,7 @@ func (fs *fsMutable) WriteFile(
 	ctx context.Context,
 	op *fuseops.WriteFileOp) (err error) {
 	fs.l.Info("writeFile", zap.Uint64("id", uint64(op.Inode)))
-	file, err := fs.localCache.OpenFile(fmt.Sprint(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
+	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
 		return fuse.EIO
 	}
@@ -585,12 +589,222 @@ func (fs *fsMutable) SetXattr(
 func (fs *fsMutable) Destroy() {
 }
 
+type commit_chans struct {
+	// recv data from goroutines about uploaded files
+	bundleEntry chan<- model.BundleEntry
+	error       chan<- error
+	// broadcast to all goroutines not to block by closing this channel
+	done <-chan struct{}
+}
+
+type commit_uploadTask struct {
+	inodeID fuseops.InodeID
+	name    string
+}
+
+// todo: pre-chunk as mentioned in  `CreateFile` TODO
+func commit_fileUpload(
+	fs *fsMutable,
+	ctx context.Context,
+	chans commit_chans,
+	bundleUploadWaitGroup *sync.WaitGroup,
+	caFs cafs.Fs,
+	uploadTask commit_uploadTask) {
+	defer bundleUploadWaitGroup.Done()
+	file, err := fs.localCache.OpenFile(getPathToBackingFile(uploadTask.inodeID),
+		os.O_RDONLY|os.O_SYNC, fileDefaultMode)
+	if err != nil {
+		select {
+		case chans.error <- err:
+		case <-chans.done:
+		}
+		return
+	}
+	// written, key, keys, duplicate, err =
+	written, key, _, _, err := caFs.Put(ctx, file)
+	if err != nil {
+		select {
+		case chans.error <- err:
+		case <-chans.done:
+		}
+		return
+	}
+	be := model.BundleEntry{
+		Hash:         key.String(),
+		NameWithPath: uploadTask.name,
+		FileMode:     0, // #TODO: #35 file mode support
+		Size:         uint64(written),
+	}
+	select {
+	case chans.bundleEntry <- be:
+	case <-chans.done:
+	}
+
+}
+
+/* these are the concurrency primitives used to get bounded concurrency in the
+ * directory upload.  the idea of using a buffered channel to set a bounds on concurrency is
+ * from, for example, TestTCPSpuriousConnSetupCompletionWithCancel in the stdlib net package.
+ */
+type commit_dirUploadSync struct {
+	waitGroup       *sync.WaitGroup
+	bufferedChanSem chan struct{}
+}
+
+func commit_dirUpload(
+	fs *fsMutable,
+	ctx context.Context,
+	chans commit_chans,
+	bundleUploadWaitGroup *sync.WaitGroup,
+	caFs cafs.Fs,
+	dirUploadSync commit_dirUploadSync,
+	uploadTask commit_uploadTask) {
+	defer dirUploadSync.waitGroup.Done()
+	var directoryUploadTasks []commit_uploadTask
+	func() {
+		defer func() { <-dirUploadSync.bufferedChanSem }()
+		directoryUploadTasks = make([]commit_uploadTask, 0)
+		for currInode, currEnt := range fs.readDirMap[uploadTask.inodeID] {
+			tsk := commit_uploadTask{inodeID: currInode, name: uploadTask.name + "/" + currEnt.Name}
+			if currEnt.Type == fuseutil.DT_File {
+				bundleUploadWaitGroup.Add(1)
+				go commit_fileUpload(
+					fs,
+					ctx,
+					chans,
+					bundleUploadWaitGroup,
+					caFs,
+					tsk)
+			} else if currEnt.Type == fuseutil.DT_Directory {
+				directoryUploadTasks = append(directoryUploadTasks, tsk)
+			} else {
+				fs.l.Warn("unexpected file type")
+			}
+		}
+	}()
+	for _, dutsk := range directoryUploadTasks {
+		select {
+		case dirUploadSync.bufferedChanSem <- struct{}{}:
+		case <-chans.done:
+			return
+		}
+		dirUploadSync.waitGroup.Add(1)
+		go commit_dirUpload(
+			fs,
+			ctx,
+			chans,
+			bundleUploadWaitGroup,
+			caFs,
+			dirUploadSync,
+			dutsk,
+		)
+	}
+}
+
+const maxDirUploadTasks = 4 // approximate number of cores
+func commit_walkReadDirMap(
+	fs *fsMutable,
+	ctx context.Context,
+	chans commit_chans,
+	caFs cafs.Fs) {
+	// bundle upload wait group: used to wait for all file upload operations to complete
+	bundleUploadWaitGroup := new(sync.WaitGroup)
+	// directory upload wait group: used to wait for all directory upload operations to complete
+	dirUploadSync := commit_dirUploadSync{
+		waitGroup:       new(sync.WaitGroup),
+		bufferedChanSem: make(chan struct{}, maxDirUploadTasks),
+	}
+	defer func() {
+		dirUploadSync.waitGroup.Wait()
+		bundleUploadWaitGroup.Wait()
+		close(chans.bundleEntry)
+	}()
+	dirUploadSync.bufferedChanSem <- struct{}{}
+	dirUploadSync.waitGroup.Add(1)
+	commit_dirUpload(
+		fs,
+		ctx,
+		chans,
+		bundleUploadWaitGroup,
+		caFs,
+		dirUploadSync,
+		commit_uploadTask{inodeID: fuseops.RootInodeID, name: ""})
+}
+
+// starting from root, find each file and upload using go routines.
 func (fs *fsMutable) Commit() error {
-	// starting from root, find each file and upload using go routines.
-	// 1 go routine to walk the map
-	// n go routines to upload into CAFS
-	// 1 to write the bundle list.
-	// write the file list
-	// write the bundle descriptor
+	/* some sync setup */
+	if fs.bundle.BundleID == "" {
+		if err := fs.bundle.InitializeBundleID(); err != nil {
+			return err
+		}
+	}
+	// ??? allocate caFs here or in each goroutine?
+	caFs, err := cafs.New(
+		cafs.LeafSize(fs.bundle.BundleDescriptor.LeafSize),
+		cafs.Backend(fs.bundle.BlobStore),
+	)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background() // ??? is this the correct context?
+	/* `commit_chans` includes rules about directionality that apply to threads only,
+	 * so we keep channels without directionality restriction separately.
+	 */
+	bundleEntryC := make(chan model.BundleEntry)
+	errorC := make(chan error)
+	doneC := make(chan struct{})
+	/* closing the done channel broadcasts to all threads and is particularly important to prevent
+	 * goroutine leaks in the case of an error from any particular thread.
+	 * see the "Explicit cancellation" section of https://blog.golang.org/pipelines
+	 * for more detailed description on using closure of a channel to broadcast errors.
+	 *
+	 * using defer to cleanup concurrency and similar resource usage is preferred throughout,
+	 * both as a stylistic hint that what's going on is cleanup as well as for the practical reason
+	 * that deferred calls still occur, even in the case of a panic(), as described in the blog post
+	 * https://blog.golang.org/defer-panic-and-recover
+	 */
+	defer close(doneC)
+	/* `commit_walkReadDirMap` signals that it's done to the caller by closing the channel containing
+	 * `model.BundleEntry` instances.  since the goal of the commit is to produce a sequence of bundle uploads,
+	 * and since the second parameter to reading from a channel is false when the channel is both empty and closed,
+	 * this thread can use reading from the bundle entry channel to detect whether the walk is finished.
+	 */
+	go commit_walkReadDirMap(fs, ctx, commit_chans{
+		bundleEntry: bundleEntryC,
+		error:       errorC,
+		done:        doneC,
+	}, caFs)
+	fileList := make([]model.BundleEntry, 0)
+	for {
+		var bundleEntry model.BundleEntry
+		var moreBundleEntries bool
+		select {
+		case bundleEntry, moreBundleEntries = <-bundleEntryC:
+		case err := <-errorC:
+			// one of the threads has had an error.
+			return err
+		}
+		if !moreBundleEntries {
+			break
+		}
+		fileList = append(fileList, bundleEntry)
+	}
+	for i := 0; i*bundleEntriesPerFile < len(fileList); i++ {
+		firstIdx := i * bundleEntriesPerFile
+		nextFirstIdx := (i + 1) * bundleEntriesPerFile
+		if nextFirstIdx < len(fileList) {
+			if err := uploadBundleEntriesFileList(ctx, fs.bundle, fileList[firstIdx:nextFirstIdx]); err != nil {
+				return err
+			}
+		} else {
+			if err := uploadBundleEntriesFileList(ctx, fs.bundle, fileList[firstIdx:]); err != nil {
+				return err
+			}
+		}
+	}
+	if err := uploadBundleDescriptor(ctx, fs.bundle); err != nil {
+		return err
+	}
 	return nil
 }
