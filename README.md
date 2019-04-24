@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/oneconcern/datamon/tree/master.svg?style=svg&circle-token=e827ee1509892d8ba85db2a819b692ca451a7a97)](https://circleci.com/gh/oneconcern/datamon/tree/master)
+
 # CLI Guide
 
 Make sure your gcloud credentials have been setup.
