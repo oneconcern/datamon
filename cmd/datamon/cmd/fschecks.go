@@ -13,3 +13,13 @@ func DieIfNotAccessible(path string) {
 		log_Fatalln(err)
 	}
 }
+
+func DieIfNotDirectory(path string) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		log_Fatalln(err)
+	}
+	if !fileInfo.IsDir() {
+		log_Fatalln("'" + path + "' is not a directory")
+	}
+}

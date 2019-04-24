@@ -8,10 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
-	"strconv"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 
@@ -34,7 +34,7 @@ const (
 	consumedData   = destinationDir + "/downloads"
 	repo1          = "test-repo1"
 	repo2          = "test-repo2"
-	timeForm = "2006-01-02 15:04:05.999999999 -0700 MST"
+	timeForm       = "2006-01-02 15:04:05.999999999 -0700 MST"
 )
 
 type uploadTree struct {
@@ -213,7 +213,7 @@ func listRepos(t *testing.T) ([]repoListEntry, error) {
 			name:        strings.TrimSpace(sl[2]),
 			description: strings.TrimSpace(sl[1]),
 			email:       strings.TrimSpace(sl[3]),
-			time: t,
+			time:        t,
 		}
 		rles = append(rles, rle)
 	}
@@ -328,27 +328,18 @@ func TestUploadBundle_filePath(t *testing.T) {
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
 	}
+
+	require.Equal(t, exitMocks.fatalCalls, 0)
 	rootCmd.SetArgs(cmd)
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Logf("todo: there's currently no error on file bundle upload")
-		bcnt := 1
-		rll, err := listBundles(t, repo1)
-		require.NoError(t, err)
-		require.Equal(t, len(rll), bcnt)
-		bll, err := listBundleFiles(t, repo1, rll[len(rll)-1].hash)
-		require.NoError(t, err)
-		if len(bll) == 0 {
-			t.Logf("even though the resultant bundle contains no files...")
-		}
-	}
+	require.NoError(t, rootCmd.Execute())
+	require.Equal(t, exitMocks.fatalCalls, 1)
 }
 
 type bundleListEntry struct {
-	rawLine     string
-	hash        string
-	message        string
-	time        time.Time
+	rawLine string
+	hash    string
+	message string
+	time    time.Time
 }
 
 func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
@@ -384,10 +375,10 @@ func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
 			return nil, err
 		}
 		rle := bundleListEntry{
-			rawLine:     line,
-			hash:        strings.TrimSpace(sl[0]),
+			rawLine: line,
+			hash:    strings.TrimSpace(sl[0]),
 			message: strings.TrimSpace(sl[2]),
-			time: t,
+			time:    t,
 		}
 		bles = append(bles, rle)
 	}
@@ -503,12 +494,11 @@ func TestDownloadBundles(t *testing.T) {
 }
 
 type bundleFileListEntry struct {
-	rawLine     string
-	hash        string
-	name        string
-	size        int
+	rawLine string
+	hash    string
+	name    string
+	size    int
 }
-
 
 func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileListEntry, error) {
 	r, w, err := os.Pipe()
@@ -540,7 +530,7 @@ func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileLis
 	//
 	lms := make([]map[string]string, 0)
 	for _, line := range ll[1:] {
-		lm :=  make(map[string]string)
+		lm := make(map[string]string)
 		sl := strings.Split(line, ",")
 		for _, kvstr := range sl {
 			kvslice := strings.Split(strings.TrimSpace(kvstr), ":")
@@ -561,10 +551,10 @@ func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileLis
 		size, err := strconv.Atoi(sizeStr)
 		require.NoError(t, err)
 		bfle := bundleFileListEntry{
-			rawLine:     lm["_line"],
-			hash: hash,
-			name: name,
-			size: size,
+			rawLine: lm["_line"],
+			hash:    hash,
+			name:    name,
+			size:    size,
 		}
 		bfles = append(bfles, bfle)
 	}

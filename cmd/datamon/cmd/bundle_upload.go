@@ -41,6 +41,7 @@ var uploadBundleCmd = &cobra.Command{
 			}
 		} else {
 			DieIfNotAccessible(bundleOptions.DataPath)
+			DieIfNotDirectory(bundleOptions.DataPath)
 			sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 		}
 		bd := core.NewBDescriptor(
