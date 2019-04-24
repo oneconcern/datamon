@@ -2,6 +2,8 @@ module github.com/oneconcern/datamon
 
 replace google.golang.org/api => github.com/googleapis/google-api-go-client v0.2.1-0.20190318183801-2dc3ad4d67ba
 
+replace github.com/spf13/cobra => github.com/babysnakes/cobra v0.0.2-0.20180603190830-61ca3af7ef22
+
 require (
 	cloud.google.com/go v0.37.1
 	github.com/aws/aws-sdk-go v1.18.6
