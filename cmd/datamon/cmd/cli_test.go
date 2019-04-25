@@ -1,5 +1,3 @@
-// +build integration
-
 package cmd
 
 import (
@@ -123,9 +121,9 @@ func setupTests(t *testing.T) func() {
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
 	err = client.Bucket(bucketMeta).Create(ctx, "onec-co", nil)
-	require.NoError(t, err)
+	require.NoError(t, err, "couldn't create metadata bucket")
 	err = client.Bucket(bucketBlob).Create(ctx, "onec-co", nil)
-	require.NoError(t, err)
+	require.NoError(t, err, "couldn't create blob bucket")
 	repoParams.MetadataBucket = bucketMeta
 	repoParams.BlobBucket = bucketBlob
 	createTree()
@@ -137,36 +135,43 @@ func setupTests(t *testing.T) func() {
 	return cleanup
 }
 
+func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool) {
+	fatalCallsBefore := exitMocks.fatalCalls
+	rootCmd.SetArgs(cmd)
+	require.NoError(t, rootCmd.Execute(), "error executing '"+strings.Join(cmd, " ")+"' : "+intentMsg)
+	if expectError {
+		require.Equal(t, fatalCallsBefore+1, exitMocks.fatalCalls,
+			"ran '"+strings.Join(cmd, " ")+"' expecting error and didn't see one in mocks : "+intentMsg)
+	} else {
+		require.Equal(t, fatalCallsBefore, exitMocks.fatalCalls,
+			"unexpected error in mocks on '"+strings.Join(cmd, " ")+"' : "+intentMsg)
+	}
+}
+
 func TestCreateRepo(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
-	rootCmd.SetArgs([]string{"repo",
+	}, "create first test repo", false)
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo2,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
-	// negative test
-	require.Equal(t, exitMocks.fatalCalls, 0)
-	rootCmd.SetArgs([]string{"repo",
+	}, "create second test repo", false)
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
-	require.Equal(t, exitMocks.fatalCalls, 1)
+	}, "observe error on create repo with duplicate name", true)
 }
 
 type repoListEntry struct {
@@ -178,6 +183,42 @@ type repoListEntry struct {
 	time        time.Time
 }
 
+/* for tests that need to read stdout into data structures, this function converts
+ * a string to a slice of lines, each of which can be parsed into a struct.
+ */
+func getDataLogLines(t *testing.T, ls string, ignorePatterns []string) []string {
+	ll := strings.Split(strings.TrimSpace(ls), "\n")
+	if len(ll) == 0 {
+		return ll
+	}
+	var repoLinesStart int
+	for repoLinesStart < len(ll) && ll[repoLinesStart] == "" {
+		repoLinesStart++
+	}
+	for {
+		if !(repoLinesStart < len(ll)) {
+			break
+		}
+		var sawPattern bool
+		for _, ip := range ignorePatterns {
+			m, err := regexp.MatchString(ip, ll[repoLinesStart])
+			require.NoError(t, err, "regexp match error.  likely a programming mistake in tests.")
+			if m {
+				repoLinesStart++
+				sawPattern = true
+				break
+			}
+		}
+		if !sawPattern {
+			break
+		}
+	}
+	if repoLinesStart == len(ll) {
+		return make([]string, 0)
+	}
+	return ll[repoLinesStart:]
+}
+
 func listRepos(t *testing.T) ([]repoListEntry, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -185,25 +226,18 @@ func listRepos(t *testing.T) ([]repoListEntry, error) {
 	}
 	log.SetOutput(w)
 	//
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"list",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create second test repo", false)
 	//
 	log.SetOutput(os.Stdout)
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
-	require.NoError(t, err)
-	ls := string(lb)
-	ll := strings.Split(strings.TrimSpace(ls), "\n")
-	//
-	m, err := regexp.MatchString(`Using config file`, ll[0])
-	require.NoError(t, err)
-	require.NotNil(t, m)
+	require.NoError(t, err, "i/o error reading patched log from pipe")
 	//
 	rles := make([]repoListEntry, 0)
-	for _, line := range ll[1:] {
+	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
 		sl := strings.Split(line, ",")
 		t, err := time.Parse(timeForm, strings.TrimSpace(sl[4]))
 		if err != nil {
@@ -226,46 +260,44 @@ func TestRepoList(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
 	ll, err := listRepos(t)
-	require.NoError(t, err)
-	require.Equal(t, len(ll), 0)
+	require.NoError(t, err, "error out of listRepos() test helper")
+	require.Equal(t, len(ll), 0, "expect empty repo list before creating repos")
 	testNow := time.Now()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create first test repo", false)
 	ll, err = listRepos(t)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(ll))
-	require.Equal(t, repo1, ll[0].repo)
-	require.Equal(t, "testing", ll[0].description)
-	require.Equal(t, "tests", ll[0].name)
-	require.Equal(t, "datamon@oneconcern.com", ll[0].email)
-	require.True(t, testNow.Sub(ll[0].time).Seconds() < 3)
+	require.NoError(t, err, "error out of listRepos() test helper")
+	require.Equal(t, 1, len(ll), "one repo in list after create")
+	require.Equal(t, repo1, ll[0].repo, "repo name after first create")
+	require.Equal(t, "testing", ll[0].description, "repo description after first create")
+	require.Equal(t, "tests", ll[0].name, "contributor name after first create")
+	require.Equal(t, "datamon@oneconcern.com", ll[0].email, "contributor email after first create")
+	require.True(t, testNow.Sub(ll[0].time).Seconds() < 3, "timestamp bounds after first create")
 	testNow = time.Now()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing too",
 		"--repo", repo2,
 		"--name", "tests2",
 		"--email", "datamon2@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create second test repo", false)
 	ll, err = listRepos(t)
-	require.NoError(t, err)
-	require.Equal(t, 2, len(ll))
-	require.Equal(t, repo1, ll[0].repo)
-	require.Equal(t, "testing", ll[0].description)
-	require.Equal(t, "tests", ll[0].name)
-	require.Equal(t, "datamon@oneconcern.com", ll[0].email)
-	require.Equal(t, repo2, ll[1].repo)
-	require.Equal(t, "testing too", ll[1].description)
-	require.Equal(t, "tests2", ll[1].name)
-	require.Equal(t, "datamon2@oneconcern.com", ll[1].email)
-	require.True(t, testNow.Sub(ll[1].time).Seconds() < 3)
+	require.NoError(t, err, "error out of listRepos() test helper")
+	require.Equal(t, 2, len(ll), "two repos in list after second create")
+	require.Equal(t, repo1, ll[0].repo, "first repo name after second create")
+	require.Equal(t, "testing", ll[0].description, "first repo description after second create")
+	require.Equal(t, "tests", ll[0].name, "first contributor name after second create")
+	require.Equal(t, "datamon@oneconcern.com", ll[0].email, "first contributor email after second create")
+	require.Equal(t, repo2, ll[1].repo, "second repo name after second create")
+	require.Equal(t, "testing too", ll[1].description, "second repo description after second create")
+	require.Equal(t, "tests2", ll[1].name, "second contributor name after second create")
+	require.Equal(t, "datamon2@oneconcern.com", ll[1].email, "second contributor email after second create")
+	require.True(t, testNow.Sub(ll[1].time).Seconds() < 3, "second timestamp bounds after second create")
 }
 
 func testUploadBundle(t *testing.T, file uploadTree) {
@@ -275,38 +307,35 @@ func testUploadBundle(t *testing.T, file uploadTree) {
 	}
 	log.SetOutput(w)
 	//
-	cmd := []string{"bundle",
+	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
-	}
-	rootCmd.SetArgs(cmd)
-	require.NoError(t, rootCmd.Execute())
+	}, "upload bundle at "+dirPathStr(t, file), false)
 	//
 	log.SetOutput(os.Stdout)
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
-	require.NoError(t, err)
+	require.NoError(t, err, "i/o error reading patched log from pipe")
 	ls := string(lb)
 	//
 	m, err := regexp.MatchString(`Uploaded bundle`, ls)
-	require.NoError(t, err)
-	require.NotNil(t, m)
+	require.NoError(t, err, "regexp match error.  likely a programming mistake in tests.")
+	require.True(t, m, "expect confirmation message on upload")
 }
 
 func TestUploadBundle(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create test repo", false)
 	for _, tree := range testUploadTrees {
 		testUploadBundle(t, tree[0])
 	}
@@ -315,26 +344,20 @@ func TestUploadBundle(t *testing.T) {
 func TestUploadBundle_filePath(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create test repo", false)
 	file := testUploadTrees[0][0]
-	cmd := []string{"bundle",
+	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", filePathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
-	}
-
-	require.Equal(t, exitMocks.fatalCalls, 0)
-	rootCmd.SetArgs(cmd)
-	require.NoError(t, rootCmd.Execute())
-	require.Equal(t, exitMocks.fatalCalls, 1)
+	}, "observe error on bundle upload path as file rather than directory", true)
 }
 
 type bundleListEntry struct {
@@ -350,27 +373,16 @@ func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
 		panic(err)
 	}
 	log.SetOutput(w)
-	//
-	rootCmd.SetArgs([]string{"bundle",
+	runCmd(t, []string{"bundle",
 		"list",
 		"--repo", repoName,
-	})
-	require.NoError(t, rootCmd.Execute())
-	//
+	}, "list bundles", false)
 	log.SetOutput(os.Stdout)
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
-	require.NoError(t, err)
-	ls := string(lb)
-	ll := strings.Split(strings.TrimSpace(ls), "\n")
-	//
-	m, err := regexp.MatchString(`Using config file`, ll[0])
-	require.NoError(t, err)
-	require.NotNil(t, m)
-	//
 	bles := make([]bundleListEntry, 0)
-	for _, line := range ll[1:] {
+	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
 		sl := strings.Split(line, ",")
 		t, err := time.Parse(timeForm, strings.TrimSpace(sl[1]))
 		if err != nil {
@@ -390,49 +402,45 @@ func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
 func testListBundle(t *testing.T, file uploadTree, bcnt int) {
 	msg := internal.RandStringBytesMaskImprSrc(15)
 	testNow := time.Now()
-	rootCmd.SetArgs([]string{"bundle",
+	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, file),
 		"--message", msg,
 		"--repo", repo1,
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "upload bundle at "+dirPathStr(t, file), false)
 	ll, err := listBundles(t, repo2)
-	require.NoError(t, err)
-	require.Equal(t, len(ll), 0, "no bundles created yet")
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 0, len(ll), "no bundles in secondary repo")
 	ll, err = listBundles(t, repo1)
-	require.NoError(t, err)
-	require.Equal(t, len(ll), bcnt)
-	require.Equal(t, ll[len(ll)-1].message, msg)
-	require.True(t, testNow.Sub(ll[len(ll)-1].time).Seconds() < 3)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, bcnt, len(ll), "bundle count in test repo")
+	require.Equal(t, msg, ll[len(ll)-1].message, "bundle log message")
+	require.True(t, testNow.Sub(ll[len(ll)-1].time).Seconds() < 3, "timestamp bounds after bundle create")
 }
 
 func TestListBundles(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
-	rootCmd.SetArgs([]string{"repo",
+	}, "create second test repo", false)
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo2,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create second test repo", false)
 	ll, err := listBundles(t, repo1)
-	require.NoError(t, err)
+	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, len(ll), 0, "no bundles created yet")
 	ll, err = listBundles(t, repo2)
-	require.NoError(t, err)
-	require.Equal(t, len(ll), 0, "no bundles created yet")
-
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 0, len(ll), "no bundles created yet")
 	for i, tree := range testUploadTrees {
 		testListBundle(t, tree[0], i+1)
 	}
@@ -440,16 +448,16 @@ func TestListBundles(t *testing.T) {
 
 func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 	msg := internal.RandStringBytesMaskImprSrc(15)
-	rootCmd.SetArgs([]string{"bundle",
+	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "upload bundle at "+dirPathStr(t, files[0]), false)
+
 	ll, err := listBundles(t, repo1)
-	require.NoError(t, err)
-	require.Equal(t, len(ll), bcnt)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, bcnt, len(ll), "bundle count in test repo")
 	//
 	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
 	dpc := "bundle-dl-" + ll[len(ll)-1].hash
@@ -458,38 +466,36 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		t.Errorf("couldn't build file path: %v", err)
 	}
 	exists, err := afero.Exists(destFS, dpc)
-	require.NoError(t, err)
-	require.False(t, exists)
-	rootCmd.SetArgs([]string{"bundle",
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.False(t, exists, "no filesystem entry at destination path '"+dpc+"' before bundle upload")
+	runCmd(t, []string{"bundle",
 		"download",
 		"--repo", repo1,
 		"--destination", dp,
 		"--bundle", ll[len(ll)-1].hash,
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
-	require.NoError(t, err)
-	require.True(t, exists)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
 	//
 	for _, file := range files {
 		expected := readTextFile(t, filePathStr(t, file))
 		actual := readTextFile(t, filepath.Join(dp, pathInBundle(t, file)))
-		require.Equal(t, len(expected), len(actual))
-		require.Equal(t, expected, actual)
+		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(t, file)+"' size")
+		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(t, file)+"' contents")
 	}
 }
 
 func TestDownloadBundles(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create second test repo", false)
 	for i, tree := range testUploadTrees {
 		testDownloadBundle(t, tree, i+1)
 	}
@@ -510,33 +516,25 @@ func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileLis
 	stdout := os.Stdout
 	os.Stdout = w
 	//
-	rootCmd.SetArgs([]string{"bundle",
+	runCmd(t, []string{"bundle",
 		"list",
 		"files",
 		"--repo", repoName,
 		"--bundle", bid,
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "get bundle files list", false)
+
 	//
 	os.Stdout = stdout
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
-	require.NoError(t, err)
-	ls := string(lb)
-	ll := strings.Split(strings.TrimSpace(ls), "\n")
-	//
-	m, err := regexp.MatchString(`Using config file`, ll[0])
-	require.NoError(t, err)
-	require.NotNil(t, m)
-	//
 	lms := make([]map[string]string, 0)
-	for _, line := range ll[1:] {
+	for _, line := range getDataLogLines(t, string(lb), []string{`Using bundle`}) {
 		lm := make(map[string]string)
 		sl := strings.Split(line, ",")
 		for _, kvstr := range sl {
 			kvslice := strings.Split(strings.TrimSpace(kvstr), ":")
-			require.Equal(t, len(kvslice), 2)
+			require.Equal(t, 2, len(kvslice), "key-val parse error of bundle files list log lines")
 			lm[kvslice[0]] = kvslice[1]
 		}
 		lm["_line"] = line
@@ -545,13 +543,13 @@ func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileLis
 	bfles := make([]bundleFileListEntry, 0)
 	for _, lm := range lms {
 		name, has := lm["name"]
-		require.True(t, has)
+		require.True(t, has, "didn't find 'name' in parsed key-val bundle files list log line entry")
 		hash, has := lm["hash"]
-		require.True(t, has)
+		require.True(t, has, "didn't find 'hash' in parsed key-val bundle files list log line entry")
 		sizeStr, has := lm["size"]
-		require.True(t, has)
+		require.True(t, has, "didn't find 'size' in parsed key-val bundle files list log line entry")
 		size, err := strconv.Atoi(sizeStr)
-		require.NoError(t, err)
+		require.NoError(t, err, "parse error of size string from  bundle files list")
 		bfle := bundleFileListEntry{
 			rawLine: lm["_line"],
 			hash:    hash,
@@ -565,20 +563,20 @@ func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileLis
 
 func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 	msg := internal.RandStringBytesMaskImprSrc(15)
-	rootCmd.SetArgs([]string{"bundle",
+	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create second test repo", false)
+
 	rll, err := listBundles(t, repo1)
-	require.NoError(t, err)
-	require.Equal(t, len(rll), bcnt)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, bcnt, len(rll), "bundle count in test repo")
 	//
 	bfles, err := listBundleFiles(t, repo1, rll[len(rll)-1].hash)
-	require.NoError(t, err)
-	require.Equal(t, len(bfles), len(files))
+	require.NoError(t, err, "error out of listBundleFiles() test helper")
+	require.Equal(t, len(files), len(bfles), "file count in bundle files list log")
 	/* test set equality of names while setting up maps to test data by name */
 	bnsAc := make(map[string]bool)
 	bflesM := make(map[string]bundleFileListEntry)
@@ -592,24 +590,23 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 		bEx[pathInBundle(t, file)] = true
 		filesM[pathInBundle(t, file)] = file
 	}
-	require.Equal(t, bnsAc, bEx)
+	require.Equal(t, bEx, bnsAc, "bundle files list log compared to fixture data: list's name set")
 	for name, bfle := range bflesM {
-		require.Equal(t, bfle.size, filesM[name].size)
+		require.Equal(t, filesM[name].size, bfle.size, "bundle files list log compared to fixture data: "+
+			"entry's size '"+name+"'")
 	}
 }
 
 func TestListBundlesFiles(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
-
+	}, "create second test repo", false)
 	for i, tree := range testUploadTrees {
 		testListBundleFiles(t, tree, i+1)
 	}
@@ -622,42 +619,39 @@ func testBundleDownloadFile(t *testing.T, file uploadTree, bid string) {
 	if err != nil {
 		t.Errorf("couldn't build file path: %v", err)
 	}
-	cmd := []string{"bundle",
+	runCmd(t, []string{"bundle",
 		"download",
 		"file",
 		"--file", pathInBundle(t, file),
 		"--repo", repo1,
 		"--bundle", bid,
 		"--destination", dp,
-	}
-	rootCmd.SetArgs(cmd)
-	require.NoError(t, rootCmd.Execute())
+	}, "download bundle file "+pathInBundle(t, file), false)
 	// see iss #111 re. pathInBundle() use here and per-file cleanup below
 	exists, err := afero.Exists(destFS, pathInBundle(t, file))
-	require.NoError(t, err)
-	require.True(t, exists)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.True(t, exists, "filesystem entry exists in specified file location individual file download")
 	//
 	expected := readTextFile(t, filePathStr(t, file))
 	actual := readTextFile(t, filepath.Join(dp, pathInBundle(t, file)))
-	require.Equal(t, len(expected), len(actual))
-	require.Equal(t, expected, actual)
+	require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(t, file)+"' size")
+	require.Equal(t, actual, expected, "downloaded file '"+pathInBundle(t, file)+"' contents")
 	/* per-file cleanup */
-	err = destFS.RemoveAll(".datamon")
-	require.NoError(t, err)
+	require.NoError(t, destFS.RemoveAll(".datamon"),
+		"error removing per-file download metadata (in order to allow downloading more indiv files)")
 }
 
 func testBundleDownloadFiles(t *testing.T, files []uploadTree, bcnt int) {
 	msg := internal.RandStringBytesMaskImprSrc(15)
-	rootCmd.SetArgs([]string{"bundle",
+	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "upload bundle in order to test downloading individual files", false)
 	rll, err := listBundles(t, repo1)
-	require.NoError(t, err)
-	require.Equal(t, len(rll), bcnt)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, bcnt, len(rll), "bundle count in test repo")
 	//
 	for _, file := range files {
 		testBundleDownloadFile(t, file, rll[len(rll)-1].hash)
@@ -667,14 +661,14 @@ func testBundleDownloadFiles(t *testing.T, files []uploadTree, bcnt int) {
 func TestBundlesDownloadFiles(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	rootCmd.SetArgs([]string{"repo",
+	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
-	})
-	require.NoError(t, rootCmd.Execute())
+	}, "create repo", false)
+
 	testBundleDownloadFiles(t, testUploadTrees[0], 1)
 	testBundleDownloadFiles(t, testUploadTrees[1], 2)
 	testBundleDownloadFiles(t, testUploadTrees[2], 3)
@@ -733,7 +727,7 @@ func pathInBundle(t *testing.T, file uploadTree) string {
 func readTextFile(t testing.TB, pth string) string {
 	v, err := ioutil.ReadFile(pth)
 	if err != nil {
-		require.NoError(t, err)
+		require.NoError(t, err, "error reading file at '"+pth+"'")
 	}
 	return string(v)
 }
