@@ -25,10 +25,10 @@ WORKDIR /datamon
 RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/datamon
 RUN upx /stage/usr/bin/datamon
 RUN md5sum /stage/usr/bin/datamon
-# Build the dist image
-# FROM scratch
-# COPY --from=base /stage /
-# ENV ZONEINFO /zoneinfo.zip
-# ENTRYPOINT [ "datamon" ]
-# CMD ["--help"]
+#Build the dist image
+FROM scratch
+COPY --from=base /stage /
+ENV ZONEINFO /zoneinfo.zip
+ENTRYPOINT [ "datamon" ]
+CMD ["--help"]
 
