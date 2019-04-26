@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
 
-	"github.com/hashicorp/go-immutable-radix"
+	iradix "github.com/hashicorp/go-immutable-radix"
 
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseutil"

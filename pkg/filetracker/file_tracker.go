@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/afero"
 
-	"github.com/hashicorp/go-immutable-radix"
+	iradix "github.com/hashicorp/go-immutable-radix"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 )

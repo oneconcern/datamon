@@ -10,9 +10,9 @@ import (
 
 	"go.uber.org/zap"
 
+	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/spf13/afero"
 
-	"github.com/hashicorp/go-immutable-radix"
 	"github.com/jacobsa/fuse/fuseutil"
 
 	"github.com/jacobsa/fuse"
@@ -589,7 +589,7 @@ func (fs *fsMutable) SetXattr(
 func (fs *fsMutable) Destroy() {
 }
 
-type commit_chans struct {
+type commitChans struct {
 	// recv data from goroutines about uploaded files
 	bundleEntry chan<- model.BundleEntry
 	error       chan<- error
@@ -597,19 +597,19 @@ type commit_chans struct {
 	done <-chan struct{}
 }
 
-type commit_uploadTask struct {
+type commitUploadTask struct {
 	inodeID fuseops.InodeID
 	name    string
 }
 
 // todo: pre-chunk as mentioned in  `CreateFile` TODO
-func commit_fileUpload(
-	fs *fsMutable,
+func commitFileUpload(
 	ctx context.Context,
-	chans commit_chans,
+	fs *fsMutable,
+	chans commitChans,
 	bundleUploadWaitGroup *sync.WaitGroup,
 	caFs cafs.Fs,
-	uploadTask commit_uploadTask) {
+	uploadTask commitUploadTask) {
 	defer bundleUploadWaitGroup.Done()
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(uploadTask.inodeID),
 		os.O_RDONLY|os.O_SYNC, fileDefaultMode)
@@ -646,38 +646,39 @@ func commit_fileUpload(
  * directory upload.  the idea of using a buffered channel to set a bounds on concurrency is
  * from, for example, TestTCPSpuriousConnSetupCompletionWithCancel in the stdlib net package.
  */
-type commit_dirUploadSync struct {
+type commitDirUploadSync struct {
 	waitGroup       *sync.WaitGroup
 	bufferedChanSem chan struct{}
 }
 
-func commit_dirUpload(
-	fs *fsMutable,
+func commitUploadDir(
 	ctx context.Context,
-	chans commit_chans,
+	fs *fsMutable,
+	chans commitChans,
 	bundleUploadWaitGroup *sync.WaitGroup,
 	caFs cafs.Fs,
-	dirUploadSync commit_dirUploadSync,
-	uploadTask commit_uploadTask) {
+	dirUploadSync commitDirUploadSync,
+	uploadTask commitUploadTask) {
 	defer dirUploadSync.waitGroup.Done()
-	var directoryUploadTasks []commit_uploadTask
+	var directoryUploadTasks []commitUploadTask
 	func() {
 		defer func() { <-dirUploadSync.bufferedChanSem }()
-		directoryUploadTasks = make([]commit_uploadTask, 0)
+		directoryUploadTasks = make([]commitUploadTask, 0)
 		for currInode, currEnt := range fs.readDirMap[uploadTask.inodeID] {
-			tsk := commit_uploadTask{inodeID: currInode, name: uploadTask.name + "/" + currEnt.Name}
-			if currEnt.Type == fuseutil.DT_File {
+			tsk := commitUploadTask{inodeID: currInode, name: uploadTask.name + "/" + currEnt.Name}
+			switch currEnt.Type {
+			case fuseutil.DT_File:
 				bundleUploadWaitGroup.Add(1)
-				go commit_fileUpload(
-					fs,
+				go commitFileUpload(
 					ctx,
+					fs,
 					chans,
 					bundleUploadWaitGroup,
 					caFs,
 					tsk)
-			} else if currEnt.Type == fuseutil.DT_Directory {
+			case fuseutil.DT_Directory:
 				directoryUploadTasks = append(directoryUploadTasks, tsk)
-			} else {
+			default:
 				fs.l.Warn("unexpected file type")
 			}
 		}
@@ -689,9 +690,9 @@ func commit_dirUpload(
 			return
 		}
 		dirUploadSync.waitGroup.Add(1)
-		go commit_dirUpload(
-			fs,
+		go commitUploadDir(
 			ctx,
+			fs,
 			chans,
 			bundleUploadWaitGroup,
 			caFs,
@@ -702,15 +703,15 @@ func commit_dirUpload(
 }
 
 const maxDirUploadTasks = 4 // approximate number of cores
-func commit_walkReadDirMap(
-	fs *fsMutable,
+func commitWalkReadDirMap(
 	ctx context.Context,
-	chans commit_chans,
+	fs *fsMutable,
+	chans commitChans,
 	caFs cafs.Fs) {
 	// bundle upload wait group: used to wait for all file upload operations to complete
 	bundleUploadWaitGroup := new(sync.WaitGroup)
 	// directory upload wait group: used to wait for all directory upload operations to complete
-	dirUploadSync := commit_dirUploadSync{
+	dirUploadSync := commitDirUploadSync{
 		waitGroup:       new(sync.WaitGroup),
 		bufferedChanSem: make(chan struct{}, maxDirUploadTasks),
 	}
@@ -721,14 +722,14 @@ func commit_walkReadDirMap(
 	}()
 	dirUploadSync.bufferedChanSem <- struct{}{}
 	dirUploadSync.waitGroup.Add(1)
-	commit_dirUpload(
-		fs,
+	commitUploadDir(
 		ctx,
+		fs,
 		chans,
 		bundleUploadWaitGroup,
 		caFs,
 		dirUploadSync,
-		commit_uploadTask{inodeID: fuseops.RootInodeID, name: ""})
+		commitUploadTask{inodeID: fuseops.RootInodeID, name: ""})
 }
 
 // starting from root, find each file and upload using go routines.
@@ -748,7 +749,7 @@ func (fs *fsMutable) Commit() error {
 		return err
 	}
 	ctx := context.Background() // ??? is this the correct context?
-	/* `commit_chans` includes rules about directionality that apply to threads only,
+	/* `commitChans` includes rules about directionality that apply to threads only,
 	 * so we keep channels without directionality restriction separately.
 	 */
 	bundleEntryC := make(chan model.BundleEntry)
@@ -765,12 +766,12 @@ func (fs *fsMutable) Commit() error {
 	 * https://blog.golang.org/defer-panic-and-recover
 	 */
 	defer close(doneC)
-	/* `commit_walkReadDirMap` signals that it's done to the caller by closing the channel containing
+	/* `commitWalkReadDirMap` signals that it's done to the caller by closing the channel containing
 	 * `model.BundleEntry` instances.  since the goal of the commit is to produce a sequence of bundle uploads,
 	 * and since the second parameter to reading from a channel is false when the channel is both empty and closed,
 	 * this thread can use reading from the bundle entry channel to detect whether the walk is finished.
 	 */
-	go commit_walkReadDirMap(fs, ctx, commit_chans{
+	go commitWalkReadDirMap(ctx, fs, commitChans{
 		bundleEntry: bundleEntryC,
 		error:       errorC,
 		done:        doneC,

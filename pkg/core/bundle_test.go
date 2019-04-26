@@ -83,7 +83,7 @@ func TestBundle(t *testing.T) {
 	require.NoError(t,
 		Publish(context.Background(), bundle))
 
-	require.NoError(t, validatePublish(t, consumableStore))
+	validatePublish(t, consumableStore)
 
 	archiveBundle2 := New(bd,
 		Repo(repo),
@@ -99,7 +99,7 @@ func TestBundle(t *testing.T) {
 	require.True(t, validateUpload(t))
 }
 
-func validatePublish(t *testing.T, store storage.Store) error {
+func validatePublish(t *testing.T, store storage.Store) {
 	// Check Bundle File
 	reader, err := store.Get(context.Background(), model.GetConsumablePathToBundle(bundleID))
 	require.NoError(t, err)
@@ -115,7 +115,6 @@ func validatePublish(t *testing.T, store storage.Store) error {
 
 	// Check Files
 	validateDataFiles(t, original, destinationDir+dataDir)
-	return nil
 }
 
 func validateUpload(t *testing.T) bool {

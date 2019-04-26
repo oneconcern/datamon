@@ -47,8 +47,8 @@ var config *Config
 var credFile string
 
 // used to patch over calls to os.Exit() during test
-var log_Fatalln = log.Fatalln
-var log_Fatalf = log.Fatalf
+var logFatalln = log.Fatalln
+var logFatalf = log.Fatalf
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -87,7 +87,7 @@ func initConfig() {
 	var err error
 	config, err = newConfig()
 	if err != nil {
-		log_Fatalln(err)
+		logFatalln(err)
 	}
 	config.setRepoParams(&repoParams)
 	if config.Credential != "" {

@@ -17,7 +17,7 @@ var configGen = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		user, err := user.Current()
 		if user == nil || err != nil {
-			log_Fatalln("Could not get home directory for user")
+			logFatalln("Could not get home directory for user")
 		}
 		config := Config{
 			Email:      repoParams.ContributorEmail,
@@ -28,12 +28,12 @@ var configGen = &cobra.Command{
 		}
 		o, e := yaml.Marshal(config)
 		if e != nil {
-			log_Fatalln(e)
+			logFatalln(e)
 		}
 		_ = os.Mkdir(user.HomeDir+"/.datamon", 0700)
 		err = ioutil.WriteFile(user.HomeDir+"/.datamon/datamon.yaml", o, 0600)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	},
 }
@@ -49,7 +49,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := configGen.MarkFlagRequired(flag)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	}
 

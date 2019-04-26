@@ -37,8 +37,6 @@ func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, c
 	s.wg.Add(1)
 
 	go s.serve(endpoint, ids, cs, ns, logger)
-
-	return
 }
 
 func (s *nonBlockingGRPCServer) Wait() {
@@ -60,14 +58,15 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	}
 
 	var addr string
-	if u.Scheme == "unix" {
+	switch u.Scheme {
+	case "unix":
 		addr = u.Path
-		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
+		if err = os.Remove(addr); err != nil && !os.IsNotExist(err) {
 			logger.Fatal("failed to remove", zap.String("addr", addr), zap.Error(err))
 		}
-	} else if u.Scheme == "tcp" {
+	case "tcp":
 		addr = u.Host
-	} else {
+	default:
 		logger.Fatal("endpoint scheme not supported", zap.String("scheme", u.Scheme))
 	}
 

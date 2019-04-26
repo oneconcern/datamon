@@ -9,7 +9,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/hashicorp/go-immutable-radix"
+	iradix "github.com/hashicorp/go-immutable-radix"
 
 	"github.com/oneconcern/datamon/pkg/model"
 

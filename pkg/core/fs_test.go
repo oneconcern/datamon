@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/spf13/afero"
 
 	"github.com/stretchr/testify/assert"
@@ -13,8 +14,6 @@ import (
 	"github.com/jacobsa/fuse/fuseops"
 
 	"github.com/jacobsa/fuse/fuseutil"
-
-	"github.com/hashicorp/go-immutable-radix"
 
 	"github.com/stretchr/testify/require"
 )

@@ -213,7 +213,7 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 		fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
 	}
 
-	n := int(w.offset)
+	n := w.offset
 	w.offset = 0
 	w.leafs = append(w.leafs, leafKey)
 	return n, nil

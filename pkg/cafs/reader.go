@@ -105,7 +105,7 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 			truncation = 32 * 1024 // Buffer size used by io.Copy
 		}
 		i := int64(index) * int64(r.leafSize-truncation)
-		go func(writeAt int64, writer io.WriterAt, key Key, prefix string, cafs storage.Store, wg *sync.WaitGroup) {
+		go func(writeAt int64, writer io.WriterAt, key Key, cafs storage.Store, wg *sync.WaitGroup) {
 			rdr, err := cafs.Get(context.Background(), key.StringWithPrefix(r.prefix)) // thread safe
 			if err != nil {
 				errC <- err
@@ -120,7 +120,7 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 			}
 			writtenC <- written
 			wg.Done()
-		}(i, w, key, r.prefix, r.fs, &wg)
+		}(i, w, key, r.fs, &wg)
 	}
 	var count int
 	var written int64
