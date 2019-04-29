@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 
@@ -154,6 +155,8 @@ func TestMutableMountWrite(t *testing.T) {
 	/* store files to bundle on unmount */
 	require.NoError(t, fs.Unmount(pathToMount))
 	require.NotEqual(t, bundle.BundleID, "")
+	// Destroy() callback isn't sync with unmount
+	time.Sleep(1 * time.Second)
 
 	/* validate files stored to bundle */
 	destFS := afero.NewBasePathFs(afero.NewOsFs(), destinationDir)
@@ -172,7 +175,7 @@ func TestMutableMountWrite(t *testing.T) {
 	for _, uf := range testUploadTree {
 		exists, err := afero.Exists(destFS, uf.path)
 		require.NoError(t, err)
-		require.True(t, exists)
+		require.True(t, exists, "'"+uf.path+"' doesn't exist")
 		fbytes, err := afero.ReadFile(destFS, uf.path)
 		require.NoError(t, err)
 		require.Equal(t, fbytes, uf.data)

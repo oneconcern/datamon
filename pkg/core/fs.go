@@ -129,9 +129,6 @@ func (dfs *ReadOnlyFS) Unmount(path string) error {
 
 func (dfs *MutableFS) Unmount(path string) error {
 	// On unmount, walk the FS and create a bundle
-	_ = dfs.fsInternal.Commit()
-	//if err != nil {
-	// dump the metadata to the local FS to manually recover.
-	//}
+	// Destroy() is the FUSE callback that occurs on unmount
 	return fuse.Unmount(path)
 }

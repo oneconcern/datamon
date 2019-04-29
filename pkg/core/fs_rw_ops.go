@@ -587,6 +587,8 @@ func (fs *fsMutable) SetXattr(
 }
 
 func (fs *fsMutable) Destroy() {
+	fs.l.Info("Destroy")
+	_ = fs.Commit()
 }
 
 type commit_chans struct {
