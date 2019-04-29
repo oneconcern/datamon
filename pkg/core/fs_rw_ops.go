@@ -616,6 +616,9 @@ func commitFileUpload(
 	if err != nil {
 		select {
 		case chans.error <- err:
+			fs.l.Error("Commit: backing fs open() error on file upload",
+				zap.Error(err),
+				zap.String("filename", uploadTask.name))
 		case <-chans.done:
 		}
 		return
@@ -625,6 +628,9 @@ func commitFileUpload(
 	if err != nil {
 		select {
 		case chans.error <- err:
+			fs.l.Error("Commit: cafs Put() error on file upload",
+				zap.Error(err),
+				zap.String("filename", uploadTask.name))
 		case <-chans.done:
 		}
 		return
@@ -649,6 +655,30 @@ func commitFileUpload(
 type commitDirUploadSync struct {
 	waitGroup       *sync.WaitGroup
 	bufferedChanSem chan struct{}
+}
+
+// util for logging
+func fuseDirentTypeString(direntType fuseutil.DirentType) string {
+	var fileType string
+	switch direntType {
+	case fuseutil.DT_Unknown:
+		fileType = "Unknown"
+	case fuseutil.DT_Socket:
+		fileType = "Socket"
+	case fuseutil.DT_Link:
+		fileType = "Link"
+	case fuseutil.DT_File:
+		fileType = "File"
+	case fuseutil.DT_Block:
+		fileType = "Block"
+	case fuseutil.DT_Directory:
+		fileType = "Directory"
+	case fuseutil.DT_Char:
+		fileType = "Char"
+	case fuseutil.DT_FIFO:
+		fileType = "FIFO"
+	}
+	return fileType
 }
 
 func commitUploadDir(
@@ -679,7 +709,7 @@ func commitUploadDir(
 			case fuseutil.DT_Directory:
 				directoryUploadTasks = append(directoryUploadTasks, tsk)
 			default:
-				fs.l.Warn("unexpected file type")
+				fs.l.Warn("unexpected file type", zap.String("file type", fuseDirentTypeString(currEnt.Type)))
 			}
 		}
 	}()
@@ -733,20 +763,13 @@ func commitWalkReadDirMap(
 }
 
 // starting from root, find each file and upload using go routines.
-func (fs *fsMutable) Commit() error {
+func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
+	fs.l.Info("Commit")
 	/* some sync setup */
 	if fs.bundle.BundleID == "" {
 		if err := fs.bundle.InitializeBundleID(); err != nil {
 			return err
 		}
-	}
-	// ??? allocate caFs here or in each goroutine?
-	caFs, err := cafs.New(
-		cafs.LeafSize(fs.bundle.BundleDescriptor.LeafSize),
-		cafs.Backend(fs.bundle.BlobStore),
-	)
-	if err != nil {
-		return err
 	}
 	ctx := context.Background() // ??? is this the correct context?
 	/* `commitChans` includes rules about directionality that apply to threads only,
@@ -771,6 +794,7 @@ func (fs *fsMutable) Commit() error {
 	 * and since the second parameter to reading from a channel is false when the channel is both empty and closed,
 	 * this thread can use reading from the bundle entry channel to detect whether the walk is finished.
 	 */
+	fs.l.Info("Commit: spinning off goroutines")
 	go commitWalkReadDirMap(ctx, fs, commitChans{
 		bundleEntry: bundleEntryC,
 		error:       errorC,
@@ -791,6 +815,7 @@ func (fs *fsMutable) Commit() error {
 		}
 		fileList = append(fileList, bundleEntry)
 	}
+	fs.l.Info("Commit: goroutines ok.  uploading metadata.")
 	for i := 0; i*bundleEntriesPerFile < len(fileList); i++ {
 		firstIdx := i * bundleEntriesPerFile
 		nextFirstIdx := (i + 1) * bundleEntriesPerFile
@@ -807,5 +832,17 @@ func (fs *fsMutable) Commit() error {
 	if err := uploadBundleDescriptor(ctx, fs.bundle); err != nil {
 		return err
 	}
+	fs.l.Info("Commit: ok.")
 	return nil
+}
+
+func (fs *fsMutable) Commit() error {
+	caFs, err := cafs.New(
+		cafs.LeafSize(fs.bundle.BundleDescriptor.LeafSize),
+		cafs.Backend(fs.bundle.BlobStore),
+	)
+	if err != nil {
+		return err
+	}
+	return fs.commitImpl(caFs)
 }
