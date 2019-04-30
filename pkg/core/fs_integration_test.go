@@ -4,6 +4,8 @@ package core
 
 import (
 	"context"
+	"errors"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -180,6 +182,94 @@ func TestMutableMountWrite(t *testing.T) {
 
 }
 
+/* the mutable filesystem writes a bundle via the Commit() function, and Commit() indirectly calls
+ * calls cafs.Fs.Put().  this test currently simulates what happens when Put(), in particular, returns an error
+ * by passing an alterate implementation of the Fs interface to the implementation of Commit().
+ *
+ * the intent of this sort of test is not specific to errors on Put(), and futher tests could describe what
+ * happens on various other io errors such as reading or writing from the backing filesystem as well
+ * as the storage backing the cafs.
+ */
+func TestMutableMountCommitError(t *testing.T) {
+	require.NoError(t, setupEmptyBundle(t))
+	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
+	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
+	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
+	bd := NewBDescriptor()
+	bundle := New(bd,
+		Repo(repo),
+		MetaStore(metaStore),
+		ConsumableStore(consumableStore),
+		BlobStore(blobStore),
+	)
+	fs, _ := NewMutableFS(bundle, "/tmp/")
+	_ = os.Mkdir(pathToMount, 0777|os.ModeDir)
+	err := fs.MountMutable(pathToMount)
+	require.NoError(t, err)
+	/* add files to filesystem */
+	afs := afero.NewBasePathFs(afero.NewOsFs(), pathToMount)
+	for idx, _ := range testUploadTree {
+		testUploadTree[idx].data = internal.RandBytesMaskImprSrc(testUploadTree[idx].size)
+	}
+	for _, uf := range testUploadTree {
+		dirname, _ := filepath.Split(uf.path)
+		require.NoError(t, afero_MkdirAll(afs, dirname, 0755))
+		require.NoError(t, afero_WriteFile(afs, uf.path, uf.data, 0644))
+
+	}
+	// setup the mock
+	caFsImpl, err := cafs.New(
+		cafs.LeafSize(fs.fsInternal.bundle.BundleDescriptor.LeafSize),
+		cafs.Backend(fs.fsInternal.bundle.BlobStore),
+	)
+	require.NoError(t, err)
+	randErrData := internal.RandStringBytesMaskImprSrc(15)
+	caFs := &testErrCaFs{fsImpl: caFsImpl, errMsg: randErrData}
+	// ensure error data returned properly
+	err = fs.fsInternal.commitImpl(caFs)
+	require.NotNil(t, err)
+	require.Equal(t, randErrData, err.Error())
+	// cleanup
+	require.NoError(t, fs.Unmount(pathToMount))
+}
+
+/* mock cafs.Fs used to simulate error */
+// ??? moq?
+
+type testErrCaFs struct {
+	fsImpl cafs.Fs
+	errMsg string
+}
+
+func (fs *testErrCaFs) Put(ctx context.Context, src io.Reader) (int64, cafs.Key, []byte, bool, error) {
+	return 0, cafs.Key{}, make([]byte, 0), false, errors.New(fs.errMsg)
+}
+
+func (fs *testErrCaFs) Get(ctx context.Context, hash cafs.Key) (io.ReadCloser, error) {
+	return fs.fsImpl.Get(ctx, hash)
+}
+
+func (fs *testErrCaFs) Delete(ctx context.Context, hash cafs.Key) error {
+	return fs.fsImpl.Delete(ctx, hash)
+}
+
+func (fs *testErrCaFs) Clear(ctx context.Context) error {
+	return fs.fsImpl.Clear(ctx)
+}
+
+func (fs *testErrCaFs) Keys(ctx context.Context) ([]cafs.Key, error) {
+	return fs.fsImpl.Keys(ctx)
+}
+
+func (fs *testErrCaFs) RootKeys(ctx context.Context) ([]cafs.Key, error) {
+	return fs.fsImpl.RootKeys(ctx)
+}
+
+func (fs *testErrCaFs) Has(ctx context.Context, key cafs.Key, cfgs ...cafs.HasOption) (bool, []cafs.Key, error) {
+	return fs.fsImpl.Has(ctx, key, cfgs...)
+}
+
+/* os x fuse workarounds */
 func afero_Mkdir(afs afero.Fs, name string, mode os.FileMode) (err error) {
 	rc := 2
 	for i := 0; i < rc; i++ {
