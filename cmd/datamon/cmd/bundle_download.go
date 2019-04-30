@@ -23,31 +23,31 @@ var BundleDownloadCmd = &cobra.Command{
 
 		sourceStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		path, err := filepath.Abs(filepath.Clean(bundleOptions.DataPath))
 		if err != nil {
-			log_Fatalf("Failed path validation: %s", err)
+			logFatalf("Failed path validation: %s", err)
 		}
 		// Ignore error
 		_ = os.MkdirAll(path, 0700)
 		fs := afero.NewBasePathFs(afero.NewOsFs(), path)
 		empty, err := afero.IsEmpty(fs, "/")
 		if err != nil {
-			log_Fatalf("Failed path validation: %s", err)
+			logFatalf("Failed path validation: %s", err)
 		}
 		if !empty {
-			log_Fatalf("%s should be empty", path)
+			logFatalf("%s should be empty", path)
 		}
 		destinationStore := localfs.New(fs)
 
 		err = setLatestBundle(sourceStore)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
@@ -60,7 +60,7 @@ var BundleDownloadCmd = &cobra.Command{
 
 		err = core.Publish(context.Background(), bundle)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	},
 }
@@ -82,7 +82,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	}
 

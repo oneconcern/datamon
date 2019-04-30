@@ -29,9 +29,9 @@ func formLookupKey(id fuseops.InodeID, childName string) []byte {
 	return append(i, c...)
 }
 
-func formKey(ID fuseops.InodeID) []byte {
+func formKey(id fuseops.InodeID) []byte {
 	b := make([]byte, unsafe.Sizeof(uint64(0)))
-	binary.BigEndian.PutUint64(b, uint64(ID))
+	binary.BigEndian.PutUint64(b, uint64(id))
 	return b
 }
 

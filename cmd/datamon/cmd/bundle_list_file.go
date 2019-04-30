@@ -19,11 +19,11 @@ var bundleFileList = &cobra.Command{
 
 		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		err = setLatestBundle(store)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		bundle := core.Bundle{
 			RepoID:           repoParams.RepoName,
@@ -36,7 +36,7 @@ var bundleFileList = &cobra.Command{
 		}
 		err = core.PopulateFiles(context.Background(), &bundle)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		for _, e := range bundle.BundleEntries {
 			fmt.Printf("name:%s, size:%d, hash:%s\n", e.NameWithPath, e.Size, e.Hash)
@@ -58,7 +58,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	}
 	BundleListCommand.AddCommand(bundleFileList)

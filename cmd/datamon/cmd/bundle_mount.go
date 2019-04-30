@@ -24,11 +24,11 @@ var mountBundleCmd = &cobra.Command{
 
 		metadataSource, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 
@@ -43,11 +43,11 @@ var mountBundleCmd = &cobra.Command{
 
 		fs, err := core.NewReadOnlyFS(bundle)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		err = fs.MountReadOnly(bundleOptions.MountPath)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		for {
 			time.Sleep(time.Hour)
@@ -67,7 +67,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := mountBundleCmd.MarkFlagRequired(flag)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	}
 

@@ -130,11 +130,11 @@ func TestWriteTo(t *testing.T) {
 	keyStr2 := k + "02"
 	rKeyStr := k + "12"
 	// Pass writer without write at. make sure data read from reader is written to writer
-	fakeStore := fakeStore{
+	testFakeStore := fakeStore{
 		chunks: make(map[string][]byte, 2),
 	}
-	fakeStore.chunks[keyStr1] = internal.RandBytesMaskImprSrc(64 * 1024)
-	fakeStore.chunks[keyStr2] = internal.RandBytesMaskImprSrc(64 * 1024)
+	testFakeStore.chunks[keyStr1] = internal.RandBytesMaskImprSrc(64 * 1024)
+	testFakeStore.chunks[keyStr2] = internal.RandBytesMaskImprSrc(64 * 1024)
 	key, err := KeyFromString(rKeyStr)
 	require.NoError(t, err)
 	key1, err := KeyFromString(keyStr1)
@@ -142,7 +142,7 @@ func TestWriteTo(t *testing.T) {
 	key2, err := KeyFromString(keyStr2)
 	require.NoError(t, err)
 	keys := []Key{key1, key2}
-	reader, err := newReader(&fakeStore, key, 64*1024, "",
+	reader, err := newReader(&testFakeStore, key, 64*1024, "",
 		TruncateLeaf(false),
 		Keys(keys),
 	)
@@ -155,8 +155,8 @@ func TestWriteTo(t *testing.T) {
 	written, err := rWriteTo.WriteTo(fakeWriterAt)
 	require.NoError(t, err)
 	require.Equal(t, written, int64(2*64*1024))
-	require.Equal(t, fakeStore.chunks[keyStr1], fakeWriterAt.data[:64*1024])
-	require.Equal(t, fakeStore.chunks[keyStr2], fakeWriterAt.data[64*1024:])
+	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriterAt.data[:64*1024])
+	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriterAt.data[64*1024:])
 	// Pass writer with write at. make sure data read from reader is written to writerAt
 	fakeWriter := &fakeWriter{
 		data: make([]byte, 2*64*1024),
@@ -164,7 +164,7 @@ func TestWriteTo(t *testing.T) {
 	written, err = rWriteTo.WriteTo(fakeWriter)
 	require.NoError(t, err)
 	require.Equal(t, written, int64(2*64*1024))
-	require.Equal(t, fakeStore.chunks[keyStr1], fakeWriter.data[:64*1024])
-	require.Equal(t, fakeStore.chunks[keyStr2], fakeWriter.data[64*1024:])
+	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriter.data[:64*1024])
+	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriter.data[64*1024:])
 	// Set truncation on and verify.
 }

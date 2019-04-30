@@ -20,7 +20,7 @@ var repoCreate = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 
 		repo := model.RepoDescriptor{
@@ -34,7 +34,7 @@ var repoCreate = &cobra.Command{
 		}
 		err = core.CreateRepo(repo, store)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	},
 }
@@ -53,7 +53,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := repoCreate.MarkFlagRequired(flag)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	}
 

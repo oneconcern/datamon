@@ -103,7 +103,7 @@ func downloadFromBlob(destination storage.Store, backupStore storage.Store, c ca
 	}
 }
 
-func startBlob2File(input string, destination storage.Store, backupStore storage.Store, cafs cafs.Fs, routines int, startFrom int) error {
+func startBlob2File(input string, destination storage.Store, backupStore storage.Store, cafs cafs.Fs, routines int, startFrom int) {
 	var fileCount uint64
 	var errCount uint64
 	var wg sync.WaitGroup
@@ -119,7 +119,6 @@ func startBlob2File(input string, destination storage.Store, backupStore storage
 	logger.Info("Waiting for routines")
 	wg.Wait()
 	logger.Info("Finished processing", zap.String("files", input), zap.Uint64("Total", fileCount), zap.Uint64("errors", errCount))
-	return nil
 }
 
 var download = &cobra.Command{
@@ -148,10 +147,7 @@ var download = &cobra.Command{
 			log.Fatalln(err)
 		}
 
-		err = startBlob2File(b2fParams.inputFile, localStore, backupStore, cafs, b2fParams.maxConcurrency, b2fParams.startFrom)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		startBlob2File(b2fParams.inputFile, localStore, backupStore, cafs, b2fParams.maxConcurrency, b2fParams.startFrom)
 	},
 }
 

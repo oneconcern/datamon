@@ -40,7 +40,6 @@ const (
 type uploadTree struct {
 	path string
 	size int
-	data []byte
 }
 
 var testUploadTrees = [][]uploadTree{{
@@ -113,13 +112,14 @@ func setupTests(t *testing.T) func() {
 	os.RemoveAll(destinationDir)
 	ctx := context.Background()
 	exitMocks = new(ExitMocks)
-	log_Fatalf = MakeFatalfMock(exitMocks)
-	log_Fatalln = MakeFatallnMock(exitMocks)
+	logFatalf = MakeFatalfMock(exitMocks)
+	logFatalln = MakeFatallnMock(exitMocks)
 	btag := internal.RandStringBytesMaskImprSrc(15)
 	bucketMeta := "datamontestmeta-" + btag
 	bucketBlob := "datamontestblob-" + btag
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
+	require.NoError(t, err, "couldn't create bucket client")
 	err = client.Bucket(bucketMeta).Create(ctx, "onec-co", nil)
 	require.NoError(t, err, "couldn't create metadata bucket")
 	err = client.Bucket(bucketBlob).Create(ctx, "onec-co", nil)
@@ -129,8 +129,8 @@ func setupTests(t *testing.T) func() {
 	createTree()
 	cleanup := func() {
 		os.RemoveAll(destinationDir)
-		deleteBucket(t, ctx, client, bucketMeta)
-		deleteBucket(t, ctx, client, bucketBlob)
+		deleteBucket(ctx, t, client, bucketMeta)
+		deleteBucket(ctx, t, client, bucketBlob)
 	}
 	return cleanup
 }
@@ -381,6 +381,7 @@ func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
+	require.NoError(t, err, "i/o error reading patched log from pipe")
 	bles := make([]bundleListEntry, 0)
 	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
 		sl := strings.Split(line, ",")
@@ -480,9 +481,9 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 	//
 	for _, file := range files {
 		expected := readTextFile(t, filePathStr(t, file))
-		actual := readTextFile(t, filepath.Join(dp, pathInBundle(t, file)))
-		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(t, file)+"' size")
-		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(t, file)+"' contents")
+		actual := readTextFile(t, filepath.Join(dp, pathInBundle(file)))
+		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(file)+"' size")
+		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(file)+"' contents")
 	}
 }
 
@@ -508,7 +509,7 @@ type bundleFileListEntry struct {
 	size    int
 }
 
-func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileListEntry, error) {
+func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileListEntry {
 	r, w, err := os.Pipe()
 	if err != nil {
 		panic(err)
@@ -528,6 +529,7 @@ func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileLis
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
+	require.NoError(t, err, "i/o error reading patched stdout from pipe")
 	lms := make([]map[string]string, 0)
 	for _, line := range getDataLogLines(t, string(lb), []string{`Using bundle`}) {
 		lm := make(map[string]string)
@@ -558,7 +560,7 @@ func listBundleFiles(t *testing.T, repoName string, bid string) ([]bundleFileLis
 		}
 		bfles = append(bfles, bfle)
 	}
-	return bfles, nil
+	return bfles
 }
 
 func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
@@ -574,8 +576,7 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, bcnt, len(rll), "bundle count in test repo")
 	//
-	bfles, err := listBundleFiles(t, repo1, rll[len(rll)-1].hash)
-	require.NoError(t, err, "error out of listBundleFiles() test helper")
+	bfles := listBundleFiles(t, repo1, rll[len(rll)-1].hash)
 	require.Equal(t, len(files), len(bfles), "file count in bundle files list log")
 	/* test set equality of names while setting up maps to test data by name */
 	bnsAc := make(map[string]bool)
@@ -587,8 +588,8 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 	bEx := make(map[string]bool)
 	filesM := make(map[string]uploadTree)
 	for _, file := range files {
-		bEx[pathInBundle(t, file)] = true
-		filesM[pathInBundle(t, file)] = file
+		bEx[pathInBundle(file)] = true
+		filesM[pathInBundle(file)] = file
 	}
 	require.Equal(t, bEx, bnsAc, "bundle files list log compared to fixture data: list's name set")
 	for name, bfle := range bflesM {
@@ -622,20 +623,20 @@ func testBundleDownloadFile(t *testing.T, file uploadTree, bid string) {
 	runCmd(t, []string{"bundle",
 		"download",
 		"file",
-		"--file", pathInBundle(t, file),
+		"--file", pathInBundle(file),
 		"--repo", repo1,
 		"--bundle", bid,
 		"--destination", dp,
-	}, "download bundle file "+pathInBundle(t, file), false)
+	}, "download bundle file "+pathInBundle(file), false)
 	// see iss #111 re. pathInBundle() use here and per-file cleanup below
-	exists, err := afero.Exists(destFS, pathInBundle(t, file))
+	exists, err := afero.Exists(destFS, pathInBundle(file))
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
 	require.True(t, exists, "filesystem entry exists in specified file location individual file download")
 	//
 	expected := readTextFile(t, filePathStr(t, file))
-	actual := readTextFile(t, filepath.Join(dp, pathInBundle(t, file)))
-	require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(t, file)+"' size")
-	require.Equal(t, actual, expected, "downloaded file '"+pathInBundle(t, file)+"' contents")
+	actual := readTextFile(t, filepath.Join(dp, pathInBundle(file)))
+	require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(file)+"' size")
+	require.Equal(t, actual, expected, "downloaded file '"+pathInBundle(file)+"' contents")
 	/* per-file cleanup */
 	require.NoError(t, destFS.RemoveAll(".datamon"),
 		"error removing per-file download metadata (in order to allow downloading more indiv files)")
@@ -717,7 +718,7 @@ func dirPathStr(t *testing.T, file uploadTree) (path string) {
 	return
 }
 
-func pathInBundle(t *testing.T, file uploadTree) string {
+func pathInBundle(file uploadTree) string {
 	pathComp := strings.Split(file.path, string(os.PathSeparator))
 	return filepath.Join(pathComp[2:]...)
 }
@@ -733,7 +734,7 @@ func readTextFile(t testing.TB, pth string) string {
 }
 
 /* objects can be deleted recursively.  non-empty buckets cannot be deleted. */
-func deleteBucket(t *testing.T, ctx context.Context, client *gcsStorage.Client, bucketName string) {
+func deleteBucket(ctx context.Context, t *testing.T, client *gcsStorage.Client, bucketName string) {
 	mb := client.Bucket(bucketName)
 	oi := mb.Objects(ctx, &gcsStorage.Query{})
 	for {

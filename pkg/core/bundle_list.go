@@ -61,7 +61,7 @@ func GetLatestBundle(repo string, store storage.Store) (string, error) {
 		return "", err
 	}
 	if len(ks) == 0 {
-		return "", fmt.Errorf("no bundles uploaded to repo: %s\n", repo)
+		return "", fmt.Errorf("no bundles uploaded to repo: %s", repo)
 	}
 
 	apc, err := model.GetArchivePathComponents(ks[len(ks)-1])

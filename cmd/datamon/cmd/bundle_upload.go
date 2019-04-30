@@ -26,18 +26,18 @@ var uploadBundleCmd = &cobra.Command{
 		fmt.Println(config.Credential)
 		MetaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 		var sourceStore storage.Store
 		if strings.HasPrefix(bundleOptions.DataPath, "gs://") {
 			fmt.Println(bundleOptions.DataPath[4:])
 			sourceStore, err = gcs.New(bundleOptions.DataPath[5:], config.Credential)
 			if err != nil {
-				log_Fatalln(err)
+				logFatalln(err)
 			}
 		} else {
 			DieIfNotAccessible(bundleOptions.DataPath)
@@ -61,7 +61,7 @@ var uploadBundleCmd = &cobra.Command{
 
 		err = core.Upload(context.Background(), bundle)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	},
 }
@@ -75,7 +75,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {
-			log_Fatalln(err)
+			logFatalln(err)
 		}
 	}
 

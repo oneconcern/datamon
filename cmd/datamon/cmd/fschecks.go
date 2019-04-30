@@ -10,16 +10,16 @@ import (
 func DieIfNotAccessible(path string) {
 	_, err := os.Stat(path)
 	if err != nil {
-		log_Fatalln(err)
+		logFatalln(err)
 	}
 }
 
 func DieIfNotDirectory(path string) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		log_Fatalln(err)
+		logFatalln(err)
 	}
 	if !fileInfo.IsDir() {
-		log_Fatalln("'" + path + "' is not a directory")
+		logFatalln("'" + path + "' is not a directory")
 	}
 }

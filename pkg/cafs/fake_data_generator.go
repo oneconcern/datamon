@@ -23,10 +23,13 @@ func GenerateFile(tgt string, size int, leafSize uint32) error {
 		fmt.Printf("Unable to create file:%s, err:%s\n", tgt, err)
 		return err
 	}
-	f.Sync()
+	if err = f.Sync(); err != nil {
+		fmt.Printf("Unable to sync file:%s, err:%s\n", tgt, err)
+		return err
+	}
 
 	if size <= int(leafSize) { // small single chunk file
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(size))
+		_, err = f.WriteString(internal.RandStringBytesMaskImprSrc(size))
 		if err != nil {
 			return err
 		}
@@ -36,19 +39,22 @@ func GenerateFile(tgt string, size int, leafSize uint32) error {
 	var parts = size / int(leafSize)
 	var i int
 	for i = 0; i < parts; i++ {
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(int(leafSize)))
+		_, err = f.WriteString(internal.RandStringBytesMaskImprSrc(int(leafSize)))
 		if err != nil {
 			return err
 		}
 	}
 	remaining := size - (parts * int(leafSize))
 	if remaining > 0 {
-		_, err := f.WriteString(internal.RandStringBytesMaskImprSrc(remaining))
+		_, err = f.WriteString(internal.RandStringBytesMaskImprSrc(remaining))
 		if err != nil {
 			return err
 		}
 	}
-	f.Sync()
+	if err = f.Sync(); err != nil {
+		fmt.Printf("Unable to sync file:%s, err:%s\n", tgt, err)
+		return err
+	}
 	return f.Close()
 }
 

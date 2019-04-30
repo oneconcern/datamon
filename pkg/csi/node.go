@@ -6,10 +6,10 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 )
 
-type nodeServer struct {
+type nodeServer struct { //nolint:unused
 }
 
-func newNodeServer() *nodeServer {
+func newNodeServer() *nodeServer { // nolint:deadcode,unused
 	return &nodeServer{}
 }
 
@@ -29,7 +29,7 @@ func (n *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	return nil, nil
 }
 
-func (n *nodeServer) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
+func (n *nodeServer) NodeGetID(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
 	return nil, nil
 }
 

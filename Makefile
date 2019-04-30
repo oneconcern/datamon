@@ -96,7 +96,12 @@ runtests:
 gofmt:
 	@gofmt -s -w ./cmd ./pkg
 
+.PHONY: goimports
+## Run goimports on the cmd and pkg packages
+goimports:
+	@goimports -w ./cmd ./pkg
+
 .PHONY: check
 ## Runs static code analysis checks (golangci-lint)
-check: gofmt
+check: gofmt goimports
 	@golangci-lint run --max-same-issues 0 --verbose

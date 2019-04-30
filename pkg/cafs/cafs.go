@@ -96,8 +96,8 @@ type defaultFs struct {
 	fs             storage.Store
 	leafSize       uint32
 	prefix         string
-	zl             zap.Logger
-	l              log.Logger
+	zl             zap.Logger //nolint:structcheck,unused
+	l              log.Logger //nolint:structcheck,unused
 	leafTruncation bool
 }
 

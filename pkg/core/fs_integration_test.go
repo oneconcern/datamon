@@ -139,7 +139,7 @@ func TestMutableMountWrite(t *testing.T) {
 	/* add files to filesystem */
 	afs := afero.NewBasePathFs(afero.NewOsFs(), pathToMount)
 
-	for idx, _ := range testUploadTree {
+	for idx := range testUploadTree {
 		testUploadTree[idx].data = internal.RandBytesMaskImprSrc(testUploadTree[idx].size)
 	}
 	for _, uf := range testUploadTree {

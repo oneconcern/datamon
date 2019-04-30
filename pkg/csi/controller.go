@@ -9,13 +9,13 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 )
 
-type controllerServer struct {
+type controllerServer struct { //nolint:unused
 }
 
-type controllerServerConfig struct {
+type controllerServerConfig struct { //nolint:unused
 }
 
-func newControllerServer(config *controllerServerConfig) csi.ControllerServer {
+func newControllerServer(config *controllerServerConfig) csi.ControllerServer { // nolint:deadcode,unparam,unused
 	return &controllerServer{}
 }
 

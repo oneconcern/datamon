@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 
 	"os"
 	"strconv"

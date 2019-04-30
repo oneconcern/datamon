@@ -6,11 +6,11 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 )
 
-type identityServer struct {
+type identityServer struct { //nolint:unused
 	driver *Driver
 }
 
-func newIdentityServer(driver *Driver) csi.IdentityServer {
+func newIdentityServer(driver *Driver) csi.IdentityServer { // nolint:deadcode,unused
 	return &identityServer{driver: driver}
 }
 
