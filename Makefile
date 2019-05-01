@@ -30,11 +30,49 @@ help:
 	} \
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
+.PHONY: fuse-demo-build-shell
+## build shell container used in fuse demo
+fuse-demo-build-shell:
+	@echo 'building fuse demo container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-fuse-demo-shell \
+		--ssh default \
+		-f ./hack/fuse-demo/shell.Dockerfile \
+		.
+
+.PHONY: fuse-demo-build-sidecar
+## build sidecar container used in fuse demo
+fuse-demo-build-sidecar:
+	@echo 'building fuse demo container'
+	docker build \
+		--progress plain \
+		--build-arg github_user=$(GITHUB_USER) \
+		--build-arg github_token=$(GITHUB_TOKEN) \
+		-t gcr.io/onec-co/datamon-fuse-demo-sidecar \
+		--ssh default \
+		-f ./hack/fuse-demo/sidecar.Dockerfile \
+		.
+
 .PHONY: build-datamon
 ## Build datamon docker container (datamon)
 build-datamon:
 	@echo 'building ${YELLOW}datamon${RESET} container'
-	@docker build --pull --build-arg github_user=$(GITHUB_USER) --build-arg github_token=$(GITHUB_TOKEN) -t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') -t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) .
+	@docker build \
+		--pull \
+		--build-arg github_user=$(GITHUB_USER) \
+		--build-arg github_token=$(GITHUB_TOKEN) \
+		-t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') \
+		-t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) \
+		.
+
+## demonstrate a fuse read-only filesystem
+fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
+	@docker image push gcr.io/onec-co/datamon-fuse-demo-shell
+	@docker image push gcr.io/onec-co/datamon-fuse-demo-sidecar
+	@./hack/fuse-demo/create_ro_pod.sh
+	@sleep 8 # dumb timeout on container startup
+	@./hack/fuse-demo/run_shell.sh
 
 .PHONY: push-datamon
 ## Push datamon docker container

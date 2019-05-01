@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datamon-ro-demo
+spec:
+  selector:
+    matchLabels:
+      app: datamon-ro-demo
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: datamon-ro-demo
+    spec:
+      containers:
+      - name: demo-shell
+        image: gcr.io/onec-co/datamon-fuse-demo-shell:latest
+        imagePullPolicy: "Always"
+        command: ["/bin/tini"]
+        args: ["--", "/bin/bash"]
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /tmp/mount
+          name: fuse-mountpoint
+          mountPropagation: "HostToContainer"
+      - name: datamon-sidecar
+        image: gcr.io/onec-co/datamon-fuse-demo-sidecar:latest
+        imagePullPolicy: "Always"
+        command: ["datamon"]
+        args: ["bundle", "mount", "--repo", "ransom-datamon-test-repo", "--destination", "/tmp", "--mount", "/tmp/mount"]
+        securityContext:
+          privileged: true
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /tmp/mount
+          name: fuse-mountpoint
+          mountPropagation: "Bidirectional"
+        - mountPath: /tmp/gac
+          name: google-application-credentials
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /tmp/gac/google-application-credentials.json
+      volumes:
+      - name: fuse-mountpoint
+        emptyDir: {}
+      - name: google-application-credentials
+        secret:
+          secretName: google-application-credentials
