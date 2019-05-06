@@ -28,6 +28,7 @@ var bundleOptions struct {
 	ContributorEmail string
 	MountPath        string
 	File             string
+	Daemonize        bool
 }
 
 func init() {
@@ -64,6 +65,11 @@ func addCommitMessageFlag(cmd *cobra.Command) string {
 func addBundleFileFlag(cmd *cobra.Command) string {
 	cmd.Flags().StringVar(&bundleOptions.File, file, "", "The file to download from the bundle")
 	return file
+}
+
+func addDaemonizeFlag(cmd *cobra.Command) string {
+	cmd.Flags().BoolVar(&bundleOptions.Daemonize, daemonize, false, "Whether to run the command as a daemonized process")
+	return daemonize
 }
 
 func setLatestBundle(store storage.Store) error {
