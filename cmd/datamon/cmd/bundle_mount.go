@@ -32,6 +32,10 @@ var mountBundleCmd = &cobra.Command{
 		}
 		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 
+		err = setLatestBundle(metadataSource)
+		if err != nil {
+			logFatalln(err)
+		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
 			core.Repo(repoParams.RepoName),
@@ -60,7 +64,7 @@ func init() {
 	requiredFlags := []string{addRepoNameOptionFlag(mountBundleCmd)}
 	addBucketNameFlag(mountBundleCmd)
 	addBlobBucket(mountBundleCmd)
-	requiredFlags = append(requiredFlags, addBundleFlag(mountBundleCmd))
+	addBundleFlag(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
 	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
 
