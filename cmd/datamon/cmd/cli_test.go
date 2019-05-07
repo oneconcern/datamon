@@ -126,7 +126,7 @@ func setupTests(t *testing.T) func() {
 	require.NoError(t, err, "couldn't create blob bucket")
 	repoParams.MetadataBucket = bucketMeta
 	repoParams.BlobBucket = bucketBlob
-	createTree()
+	createAllTestUploadTrees(t)
 	cleanup := func() {
 		os.RemoveAll(destinationDir)
 		deleteBucket(ctx, t, client, bucketMeta)
@@ -523,7 +523,6 @@ func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileList
 		"--repo", repoName,
 		"--bundle", bid,
 	}, "get bundle files list", false)
-
 	//
 	os.Stdout = stdout
 	w.Close()
@@ -676,22 +675,34 @@ func TestBundlesDownloadFiles(t *testing.T) {
 }
 
 /** untested:
- * - bundle_mount.go
  * - config_generate.go
  */
 
-func createTree() {
+func createAllTestUploadTrees(t *testing.T) {
 	sourceFS := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), sourceData))
 	for _, tree := range testUploadTrees {
-		for _, file := range tree {
-			err := sourceFS.Put(context.Background(),
+		createTestUploadTreeHelper(t, sourceFS, tree, 1)
+	}
+}
+
+func createTestUploadTree(t *testing.T, pathRoot string, tree []uploadTree) {
+	sourceFS := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), pathRoot))
+	createTestUploadTreeHelper(t, sourceFS, tree, 2)
+}
+
+func createTestUploadTreeHelper(t *testing.T, sourceFS storage.Store, tree []uploadTree, rc int) {
+	for _, file := range tree {
+		var err error
+		for i := 0; i < rc; i++ {
+			err = sourceFS.Put(context.Background(),
 				file.path,
 				bytes.NewReader(internal.RandBytesMaskImprSrc(file.size)),
 				storage.IfNotPresent)
-			if err != nil {
-				log.Fatalln(err)
+			if err == nil {
+				break
 			}
 		}
+		require.NoError(t, err)
 	}
 }
 
