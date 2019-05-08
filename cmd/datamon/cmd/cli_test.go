@@ -68,6 +68,10 @@ var testUploadTrees = [][]uploadTree{{
 		path: "/leafs/root",
 		size: 1,
 	},
+	{
+		path: "/leafs/zero",
+		size: 0,
+	},
 }, {
 	{
 		path: "/1/2/3/4/5/6/deep",

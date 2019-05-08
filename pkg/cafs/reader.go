@@ -96,7 +96,9 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 	errC := make(chan error, len(r.keys))
 	writtenC := make(chan int64, len(r.keys))
 	var wg sync.WaitGroup
-
+	if len(r.keys) == 0 {
+		return 0, nil
+	}
 	// Start a go routine for each key and give the offset to write at.
 	for index, key := range r.keys {
 		wg.Add(1)
