@@ -133,7 +133,11 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 
 			// Write the bundle entry file if reached max or the last one
 			if count == 0 || len(fileList)%bundleEntriesPerFile == 0 {
-				uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:]) // nolint:errcheck
+				err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:])
+				if err != nil {
+					fmt.Printf("Bundle upload failed.  Failed to upload bundle entries list %v", err)
+					return err
+				}
 				firstUnuploadBundleEntryIndex = uint(len(fileList))
 			}
 		case e := <-eC:
