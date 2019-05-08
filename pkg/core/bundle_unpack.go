@@ -56,6 +56,8 @@ type errorHit struct {
 	file  string
 }
 
+const maxConcurrentDownloads = 100
+
 func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 	ls := bundle.BundleDescriptor.LeafSize
 	fs, err := cafs.New(
@@ -69,13 +71,20 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 	}
 	var wg sync.WaitGroup
 	errC := make(chan errorHit, len(bundle.BundleEntries))
-	wg.Add(len(bundle.BundleEntries))
+	concurrencyControl := make(chan struct{}, maxConcurrentDownloads)
+	fmt.Printf("Downloading %d files\n", len(bundle.BundleEntries))
 	for _, b := range bundle.BundleEntries {
 		if file != "" && file != b.NameWithPath {
-			wg.Done()
 			continue
 		}
-		go func(bundleEntry model.BundleEntry) {
+		wg.Add(1)
+		go func(bundleEntry model.BundleEntry, cc chan struct{}) {
+			cc <- struct{}{}
+			defer func() {
+				<-cc
+			}()
+
+			defer wg.Done()
 			fmt.Println("started " + bundleEntry.NameWithPath)
 			key, err := cafs.KeyFromString(bundleEntry.Hash)
 			if err != nil {
@@ -83,7 +92,6 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 					err,
 					bundleEntry.NameWithPath,
 				}
-				wg.Done()
 				return
 			}
 			reader, err := fs.Get(ctx, key)
@@ -92,7 +100,6 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 					err,
 					bundleEntry.NameWithPath,
 				}
-				wg.Done()
 				return
 			}
 			err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.IfNotPresent)
@@ -102,12 +109,10 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 					err,
 					bundleEntry.NameWithPath,
 				}
-				wg.Done()
 				return
 			}
 			fmt.Printf("downloaded %s\n", bundleEntry.NameWithPath)
-			wg.Done()
-		}(b)
+		}(b, concurrencyControl)
 	}
 	wg.Wait()
 	select {
