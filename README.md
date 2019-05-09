@@ -84,7 +84,9 @@ output/new data that is generated from the existing data.
 ## Design
 
 Datamon is composed of
-1. Data Storage
+1. Datamon Core
+   1. Datamon Content Addressable Storage
+   2. Datamon Metadata
 2. Data access layer
    1. CLI
    2. FUSE
@@ -92,9 +94,14 @@ Datamon is composed of
 3. Data consumption integrations.
    1. CLI
    2. Kubernetes integration
+   3. InPod Filesystem
    3. GIT LFS
    4. Jupyter notebook
    4. JWT integration
+4. ML/AI pipeline run metadata: Captures the end to end metadata for a ML/AI pipeline runs.
+5. Datamon Query: Allows introspection on pipeline runs and data repos.
+
+![Architecture Overview](/docs/ArchitectureOverview.png)
 
 ## Data Storage
 
@@ -111,10 +118,15 @@ For external storage based on the external source, the redundancy and ability to
 ### Data modeling
 
 ***Repo***: Analogous to git repos. A repo in datamon is a dataset that has a unified lifecycle.
+***Bundle***: A bundle is a point in time readonly view of a rep:branch and is composed of individual files. Analogous to a commit in git.
+
+Planned features:
 
 ***Branch***: A branch represents the various lifecycles data might undergo within a repo.
+***Tags***: A name given to a bundle. Example: Latest, production
+***Runs***: ML pipeline run metadata that includes the versions of compute and data in use for a given run of a pipeline.
 
-***Bundle***: A bundle is a point in time readonly view of a rep:branch and is composed of individual files. Analogous to a commit in git.
+![Datamon Model](/docs/DatamonModel.png)
 
 ## Data Access layer
 
@@ -146,11 +158,3 @@ Datamon API/Tooling can be used to write custom services to ingest large data se
 These services can be deployed in kubernetes to manage the long duration ingest.
 
 This was used to move data from AWS to GCP.
-
-### JWT integration
-
-Datamon can serve bundles as well as consume data that is authenticated via JWT
-
-# Getting started guide.
-# Kubernetes Guide
-# GIT
