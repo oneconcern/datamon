@@ -55,6 +55,24 @@ func RootHash(leaves []Key, leafSize uint32) (Key, error) {
 }
 
 func LeafsForHash(blobs storage.Store, hash Key, leafSize uint32, prefix string) ([]Key, error) {
+	b, err := leafBytesForHash(blobs, hash, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	return LeafKeys(hash, b, leafSize)
+}
+
+func leafsForHashInternVerify(blobs storage.Store, hash Key, leafSize uint32, prefix string) ([]Key, error) {
+	b, err := leafBytesForHash(blobs, hash, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	return leafKeysInternVerify(b, leafSize)
+}
+
+func leafBytesForHash(blobs storage.Store, hash Key, prefix string) ([]byte, error) {
 	rdr, err := blobs.Get(context.Background(), hash.StringWithPrefix(prefix))
 	if err != nil {
 		return nil, err
@@ -69,7 +87,7 @@ func LeafsForHash(blobs storage.Store, hash Key, leafSize uint32, prefix string)
 		return nil, err
 	}
 
-	return LeafKeys(hash, b, leafSize)
+	return b, nil
 }
 
 func LeafKeys(verify Key, data []byte, leafSize uint32) ([]Key, error) {
@@ -78,6 +96,18 @@ func LeafKeys(verify Key, data []byte, leafSize uint32) ([]Key, error) {
 	}
 	if !bytes.Equal(data[len(data)-KeySize:], verify[:]) {
 		return nil, errors.New("the last hash in the file is not the checksum")
+	}
+
+	return leafKeysInternVerify(data, leafSize)
+}
+
+func leafKeysInternVerify(data []byte, leafSize uint32) ([]Key, error) {
+	if len(data) < KeySize {
+		return nil, errors.New("the last hash in the file is not the checksum")
+	}
+	verify, err := NewKey(data[len(data)-KeySize:])
+	if err != nil {
+		return nil, err
 	}
 
 	keys := make([]Key, 0, len(data)/KeySize-1)
