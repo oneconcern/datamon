@@ -23,6 +23,12 @@ var mutableMountBundleCmd = &cobra.Command{
 	Short: "Create a bundle incrementally with filesystem operations",
 	Long:  "Write directories and files to the mountpoint.  Unmount to discard or send SIGINT to this process to save.",
 	Run: func(cmd *cobra.Command, args []string) {
+		if repoParams.ContributorEmail == "" {
+			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
+		}
+		if repoParams.ContributorName == "" {
+			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
+		}
 
 		DieIfNotDirectory(bundleOptions.DataPath)
 

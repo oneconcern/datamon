@@ -19,10 +19,24 @@ RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
 WORKDIR /usr/share/zoneinfo
 RUN zip -r -0 /stage/zoneinfo.zip .
 
+ARG version
+ARG commit
+ARG dirty
+
+ENV VERSION ${version}
+ENV GIT_COMMIT ${commit}
+ENV GIT_DIRTY ${dirty}
+
 ADD . /datamon
 WORKDIR /datamon
 
-RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/datamon
+RUN LDFLAGS='-s -w -linkmode external -extldflags "-static"' && \
+  LDFLAGS="$LDFLAGS -X 'github.com/oneconcern/datamon/cmd/datamon/cmd.Version=${VERSION}'" && \
+  LDFLAGS="$LDFLAGS -X 'github.com/oneconcern/datamon/cmd/datamon/cmd.BuildDate=$(date -u -R)'" && \
+  LDFLAGS="$LDFLAGS -X 'github.com/oneconcern/datamon/cmd/datamon/cmd.GitCommit=${GIT_COMMIT}'" && \
+  LDFLAGS="$LDFLAGS -X 'github.com/oneconcern/datamon/cmd/datamon/cmd.GitState=${GIT_DIRTY}'" && \
+  go build -o /stage/usr/bin/datamon --ldflags "$LDFLAGS" ./cmd/datamon
+
 RUN upx /stage/usr/bin/datamon
 RUN md5sum /stage/usr/bin/datamon
 #Build the dist image

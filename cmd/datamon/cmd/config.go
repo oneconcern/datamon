@@ -30,16 +30,10 @@ func newConfig() (*Config, error) {
 func (c *Config) setContributor(params *RepoParams) {
 	if params.ContributorEmail == "" {
 		params.ContributorEmail = config.Email
-		if params.ContributorEmail == "" {
-			log.Fatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
-		}
 	}
 
 	if params.ContributorName == "" {
 		params.ContributorName = config.Name
-		if params.ContributorName == "" {
-			log.Fatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
-		}
 	}
 }
 
