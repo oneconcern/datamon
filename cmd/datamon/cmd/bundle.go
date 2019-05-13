@@ -22,13 +22,14 @@ Every bundle is an entry in the history of a repository at a point in time.
 }
 
 var bundleOptions struct {
-	ID               string
-	DataPath         string
-	Message          string
-	ContributorEmail string
-	MountPath        string
-	File             string
-	Daemonize        bool
+	ID                  string
+	DataPath            string
+	Message             string
+	ContributorEmail    string
+	MountPath           string
+	File                string
+	Daemonize           bool
+	CacheMountDownloads bool
 }
 
 func init() {
@@ -70,6 +71,11 @@ func addBundleFileFlag(cmd *cobra.Command) string {
 func addDaemonizeFlag(cmd *cobra.Command) string {
 	cmd.Flags().BoolVar(&bundleOptions.Daemonize, daemonize, false, "Whether to run the command as a daemonized process")
 	return daemonize
+}
+
+func addCacheMountDownloadsFlag(cmd *cobra.Command) string {
+	cmd.Flags().BoolVar(&bundleOptions.CacheMountDownloads, cache, false, "Download and cache file data on read")
+	return file
 }
 
 func setLatestBundle(store storage.Store) error {

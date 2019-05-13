@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"time"
@@ -11,6 +12,7 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"go.uber.org/zap"
 
+	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/jacobsa/fuse"
@@ -304,13 +306,38 @@ func (fs *readOnlyFsInternal) ReadFile(
 		err = fuse.ENOENT
 		return
 	}
-
 	fe := typeAssertToFsEntry(p)
-
-	reader, err := fs.bundle.ConsumableStore.GetAt(context.Background(), fe.fullPath)
-	if err != nil {
-		err = fuse.EIO
-		return
+	var reader io.ReaderAt
+	if fs.cachingCafs == nil {
+		reader, err = fs.bundle.ConsumableStore.GetAt(context.Background(), fe.fullPath)
+		if err != nil {
+			// ??? style guide regarding zap.Field keys?
+			fs.l.Error("get consumable store reader",
+				zap.String("Path", fe.fullPath),
+				zap.Error(err),
+			)
+			return fuse.EIO
+		}
+	} else {
+		var key cafs.Key
+		key, err = cafs.KeyFromString(fe.hash)
+		if err != nil {
+			fs.l.Error("convert hash string to cafs key",
+				zap.String("file entry hash", fe.hash),
+				zap.Error(err),
+			)
+			return fuse.EIO
+		}
+		reader, err = fs.cachingCafs.GetAt(context.Background(), key)
+		if err != nil {
+			fs.l.Error("get caching Cafs reader",
+				zap.String("file entry hash", fe.hash),
+				// ??? log cafs prefix (e.g. stringer interface)
+				zap.String("key string with prefix", key.String()),
+				zap.Error(err),
+			)
+			return fuse.EIO
+		}
 	}
 	n, err := reader.ReadAt(op.Dst, op.Offset)
 	if err != nil && err.Error() != "EOF" {
@@ -464,12 +491,15 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 	// For a Bundle Entry there might be intermediate directories that need adding.
 	var nodesToAdd []fsNodeToAdd
 	// iNode for fs entries
-	var iNode = firstINode
 
-	generateNextINode := func(iNode *fuseops.InodeID) fuseops.InodeID {
-		*iNode++
-		return *iNode
-	}
+	generateNextINode := func() func() fuseops.InodeID {
+		var iNode = firstINode
+
+		return func() fuseops.InodeID {
+			iNode++
+			return iNode
+		}
+	}()
 
 	fs.l.Info("Populating fs",
 		zap.String("repo", fs.bundle.RepoID),
@@ -480,7 +510,7 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 	for _, bundleEntry := range fs.bundle.GetBundleEntries() {
 		be := bundleEntry
 		// Generate the fsEntry
-		newFsEntry := newDatamonFSEntry(&be, bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), fileLinkCount)
+		newFsEntry := newDatamonFSEntry(&be, bundle.BundleDescriptor.Timestamp, generateNextINode(), fileLinkCount)
 
 		// Add parents if first visit
 		// If a parent has been visited, all the parent's parents in the path have been visited
@@ -518,8 +548,7 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 			if !found {
 				fs.l.Debug("parentPath not found",
 					zap.String("parent", parentPath))
-				newFsEntry = newDatamonFSEntry(generateBundleDirEntry(parentPath), bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), dirLinkCount)
-
+				newFsEntry = newDatamonFSEntry(generateBundleDirEntry(parentPath), bundle.BundleDescriptor.Timestamp, generateNextINode(), dirLinkCount)
 				// Continue till we hit root or found
 				nameWithPath = parentPath
 				continue
@@ -671,7 +700,11 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 type readOnlyFsInternal struct {
 
 	// Backing bundle for this FS.
+	// to download data files before mount, Publish() to the bundle's ConsumableStore and leave cachingCafs nil
 	bundle *Bundle
+
+	// used to download data files as needed after mount
+	cachingCafs cafs.Fs
 
 	// Get iNode for path. This is needed to generate directory entries without imposing a strict order of traversal.
 	fsDirStore *iradix.Tree

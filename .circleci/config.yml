@@ -41,7 +41,7 @@ jobs:
       - run:
           name: Run golang linter
           command: |
-            golangci-lint run --disable golint --build-tags fuse_cli --max-same-issues 0 --verbose
+            golangci-lint run --disable golint --build-tags fuse_cli,fsintegration --max-same-issues 0 --verbose
   go_build:
     working_directory: ~/project
     docker:

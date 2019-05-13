@@ -53,6 +53,34 @@ func TestMount(t *testing.T) {
 	require.NoError(t, fs.Unmount(pathToMount))
 }
 
+func TestMountCached(t *testing.T) {
+	require.NoError(t, Setup(t))
+	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
+	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
+	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
+	bd := NewBDescriptor()
+	bundle := New(bd,
+		Repo(repo),
+		BundleID(bundleID),
+		MetaStore(metaStore),
+		CachingStore(consumableStore),
+		BlobStore(blobStore),
+	)
+	l, _ := zap.NewProduction()
+	fs, err := NewReadOnlyFS(bundle, l)
+	require.NoError(t, err)
+	_ = os.Mkdir(pathToMount, 0777|os.ModeDir)
+	err = fs.MountReadOnly(pathToMount)
+	require.NoError(t, err)
+	// uncomment to manually try out the FS
+	// time.Sleep(time.Hour)
+	resp, err := ioutil.ReadDir(pathToMount)
+	require.NotNil(t, resp)
+	require.NoError(t, err)
+	validateDataFilesAndContents(t, original, pathToMount+dataDir)
+	require.NoError(t, fs.Unmount(pathToMount))
+}
+
 func TestMutableMount(t *testing.T) {
 	require.NoError(t, Setup(t))
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
@@ -151,7 +179,6 @@ func TestMutableMountWrite(t *testing.T) {
 		dirname, _ := filepath.Split(uf.path)
 		require.NoError(t, aferoMkdirAll(afs, dirname, 0755))
 		require.NoError(t, aferoWriteFile(afs, uf.path, uf.data, 0644))
-
 	}
 
 	require.Equal(t, bundle.BundleID, "")
@@ -218,7 +245,6 @@ func TestMutableMountCommitError(t *testing.T) {
 		dirname, _ := filepath.Split(uf.path)
 		require.NoError(t, aferoMkdirAll(afs, dirname, 0755))
 		require.NoError(t, aferoWriteFile(afs, uf.path, uf.data, 0644))
-
 	}
 	// setup the mock
 	caFsImpl, err := cafs.New(
@@ -250,6 +276,10 @@ func (fs *testErrCaFs) Put(ctx context.Context, src io.Reader) (int64, cafs.Key,
 
 func (fs *testErrCaFs) Get(ctx context.Context, hash cafs.Key) (io.ReadCloser, error) {
 	return fs.fsImpl.Get(ctx, hash)
+}
+
+func (fs *testErrCaFs) GetAt(ctx context.Context, hash cafs.Key) (io.ReaderAt, error) {
+	return fs.fsImpl.GetAt(ctx, hash)
 }
 
 func (fs *testErrCaFs) Delete(ctx context.Context, hash cafs.Key) error {

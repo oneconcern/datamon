@@ -22,6 +22,7 @@ type Bundle struct {
 	BundleID         string
 	MetaStore        storage.Store
 	ConsumableStore  storage.Store
+	CachingStore     storage.Store
 	BlobStore        storage.Store
 	BundleDescriptor model.BundleDescriptor
 	BundleEntries    []model.BundleEntry
@@ -96,11 +97,19 @@ func MetaStore(store storage.Store) BundleOption {
 		b.MetaStore = store
 	}
 }
+
 func ConsumableStore(store storage.Store) BundleOption {
 	return func(b *Bundle) {
 		b.ConsumableStore = store
 	}
 }
+
+func CachingStore(store storage.Store) BundleOption {
+	return func(b *Bundle) {
+		b.CachingStore = store
+	}
+}
+
 func BlobStore(store storage.Store) BundleOption {
 	return func(b *Bundle) {
 		b.BlobStore = store

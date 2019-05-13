@@ -3,6 +3,7 @@ package cafs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"hash/crc32"
 	"io"
 	"log"
@@ -71,6 +72,7 @@ type Option func(*defaultFs)
 // Fs implementations provide content-addressable filesystem operations
 type Fs interface {
 	Get(context.Context, Key) (io.ReadCloser, error)
+	GetAt(context.Context, Key) (io.ReaderAt, error)
 	Put(context.Context, io.Reader) (int64, Key, []byte, bool, error)
 	Delete(context.Context, Key) error
 	Clear(context.Context) error
@@ -135,6 +137,10 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
 	return newReader(d.fs, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation), VerifyHash(true))
+}
+
+func (d *defaultFs) GetAt(ctx context.Context, key Key) (io.ReaderAt, error) {
+	return nil, errors.New("unimplemented")
 }
 
 func (d *defaultFs) writer(prefix string) Writer {
@@ -251,4 +257,109 @@ func IsRootKey(fs storage.Store, key Key, leafSize uint32) bool {
 		return false
 	}
 	return len(keys) > 0
+}
+
+/* thread-safety of Get() and Put() relies on that of the cacheStore implementation:
+ * use a thread-safe implementation of storage.Store in order to get a thread-safe cached Fs instance.
+ */
+func AddCaching(fsImpl Fs, cacheStore storage.Store, cafsKey2StoreKey func(Key) (string, error)) Fs {
+	return &cachedFs{
+		fsImpl:           fsImpl,
+		cacheStore:       cacheStore,
+		cafsKey2StoreKey: cafsKey2StoreKey,
+	}
+}
+
+type cachedFs struct {
+	fsImpl           Fs
+	cacheStore       storage.Store
+	cafsKey2StoreKey func(Key) (string, error)
+}
+
+func (fs *cachedFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
+	return fs.fsImpl.Put(ctx, src)
+}
+
+func (fs *cachedFs) Get(ctx context.Context, key Key) (io.ReadCloser, error) {
+	storeKey, err := fs.cafsKey2StoreKey(key)
+	if err != nil {
+		return nil, err
+	}
+	/* lookup in cache */
+	rdr, err := fs.cacheStore.Get(ctx, storeKey)
+	if err == nil {
+		return rdr, nil
+	}
+	if err != storage.ErrNotFound {
+		return nil, err
+	}
+	/* cache miss */
+	rdr, err = fs.fsImpl.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	err = fs.cacheStore.Put(ctx, storeKey, rdr, storage.IfNotPresent)
+	if err != nil {
+		return nil, err
+	}
+	rdr, err = fs.cacheStore.Get(ctx, storeKey)
+	if err != nil {
+		return nil, err
+	}
+	return rdr, nil
+}
+
+// dupe: Get
+func (fs *cachedFs) GetAt(ctx context.Context, key Key) (io.ReaderAt, error) {
+	storeKey, err := fs.cafsKey2StoreKey(key)
+	if err != nil {
+		return nil, err
+	}
+	/* lookup in cache */
+	rdrAt, err := fs.cacheStore.GetAt(ctx, storeKey)
+	if err == nil {
+		return rdrAt, nil
+	}
+	/* cache miss */
+	rdr, err := fs.fsImpl.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	err = fs.cacheStore.Put(ctx, storeKey, rdr, storage.IfNotPresent)
+	if err != nil {
+		return nil, err
+	}
+	rdrAt, err = fs.cacheStore.GetAt(ctx, storeKey)
+	if err != nil {
+		return nil, err
+	}
+	return rdrAt, nil
+}
+
+func (fs *cachedFs) Delete(ctx context.Context, key Key) error {
+	storeKey, err := fs.cafsKey2StoreKey(key)
+	if err != nil {
+		return err
+	}
+	if err := fs.cacheStore.Delete(ctx, storeKey); err != nil {
+		// ??? idempotent deletes in impls
+		return err
+	}
+	return fs.fsImpl.Delete(ctx, key)
+}
+
+func (fs *cachedFs) Clear(ctx context.Context) error {
+	return fs.fsImpl.Clear(ctx)
+}
+
+func (fs *cachedFs) Keys(ctx context.Context) ([]Key, error) {
+	return fs.fsImpl.Keys(ctx)
+}
+
+func (fs *cachedFs) RootKeys(ctx context.Context) ([]Key, error) {
+	return fs.fsImpl.RootKeys(ctx)
+}
+
+func (fs *cachedFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, []Key, error) {
+	return fs.fsImpl.Has(ctx, key, cfgs...)
 }

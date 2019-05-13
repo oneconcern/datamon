@@ -31,6 +31,7 @@ const (
 	loglevel         = "loglevel"
 	cpuprof          = "cpuprof"
 	daemonize        = "daemonize"
+	cache            = "cache"
 )
 
 // todo: "namespace" these with a struct{} as elsewhere

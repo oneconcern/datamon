@@ -1,6 +1,7 @@
 package cafs
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"io/ioutil"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -324,6 +326,7 @@ func TestCAFS_RootKeys(t *testing.T) {
 
 	require.Empty(t, allKeys)
 }
+
 func TestCAFS_Clear(t *testing.T) {
 	td, err := ioutil.TempDir("", "tpt-cafs-clear")
 	require.NoError(t, err)
@@ -349,4 +352,95 @@ func TestCAFS_Clear(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, has)
 	}
+}
+
+type callCountFs struct {
+	fsImpl      Fs
+	cntGet      uint
+	cntGetAt    uint
+	cntPut      uint
+	cntDelete   uint
+	cntClear    uint
+	cntKeys     uint
+	cntRootKeys uint
+	cntHas      uint
+}
+
+func (fs *callCountFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
+	fs.cntPut++
+	return fs.fsImpl.Put(ctx, src)
+}
+
+func (fs *callCountFs) Get(ctx context.Context, key Key) (io.ReadCloser, error) {
+	fs.cntGet++
+	return fs.fsImpl.Get(ctx, key)
+}
+
+func (fs *callCountFs) GetAt(ctx context.Context, key Key) (io.ReaderAt, error) {
+	fs.cntGetAt++
+	return fs.fsImpl.GetAt(ctx, key)
+}
+
+func (fs *callCountFs) Delete(ctx context.Context, key Key) error {
+	fs.cntDelete++
+	return fs.fsImpl.Delete(ctx, key)
+}
+
+func (fs *callCountFs) Clear(ctx context.Context) error {
+	fs.cntClear++
+	return fs.fsImpl.Clear(ctx)
+}
+
+func (fs *callCountFs) Keys(ctx context.Context) ([]Key, error) {
+	fs.cntKeys++
+	return fs.fsImpl.Keys(ctx)
+}
+
+func (fs *callCountFs) RootKeys(ctx context.Context) ([]Key, error) {
+	fs.cntRootKeys++
+	return fs.fsImpl.RootKeys(ctx)
+}
+
+func (fs *callCountFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, []Key, error) {
+	fs.cntHas++
+	return fs.fsImpl.Has(ctx, key, cfgs...)
+}
+
+func TestCAFSCached_PutTee(t *testing.T) {
+	cDir, err := ioutil.TempDir("", "tpt-cafscached-put-tee-cache")
+	require.NoError(t, err)
+	td, err := ioutil.TempDir("", "tpt-cafscached-put-tee")
+	require.NoError(t, err)
+	files := testFiles(td)
+	g, _, fs, err := setupTestData(td, files)
+	require.NoError(t, err)
+
+	cacheStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), cDir))
+	blobCafsKey2ConsumableStoreKey := func(blobCafsKey Key) (string, error) {
+		return blobCafsKey.String(), nil
+	}
+	callCountingFs := callCountFs{fsImpl: fs}
+	cachingCafs := AddCaching(&callCountingFs, cacheStore, blobCafsKey2ConsumableStoreKey)
+
+	var newSrcBytesBuf bytes.Buffer
+	newSrcBytesBuf.Write(internal.RandBytesMaskImprSrc(int(g.leafSize)))
+	_, newKey, _, _, err := cachingCafs.Put(context.Background(), &newSrcBytesBuf)
+	require.NoError(t, err)
+	cacheMissesBeforeGet := callCountingFs.cntGet
+	_, err = cachingCafs.Get(context.Background(), newKey)
+	require.NoError(t, err)
+	require.Equal(t, cacheMissesBeforeGet+1, callCountingFs.cntGet, "cache miss after Put()s to caching CAFS")
+
+	newSrcBytesBuf = *bytes.NewBuffer(internal.RandBytesMaskImprSrc(int(g.leafSize)))
+	_, newKey, _, _, err = fs.Put(context.Background(), &newSrcBytesBuf)
+	require.NoError(t, err)
+	cacheMissesBeforeGet = callCountingFs.cntGet
+	_, err = cachingCafs.Get(context.Background(), newKey)
+	require.NoError(t, err)
+	require.Equal(t, cacheMissesBeforeGet+1, callCountingFs.cntGet, "cache miss after Put()s to non-caching CAFS")
+	cacheMissesBeforeGet = callCountingFs.cntGet
+	_, err = cachingCafs.Get(context.Background(), newKey)
+	require.NoError(t, err)
+	require.Equal(t, cacheMissesBeforeGet, callCountingFs.cntGet, "no cache miss after Get()s to non-caching CAFS")
+
 }

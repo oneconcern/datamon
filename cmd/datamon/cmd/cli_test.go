@@ -86,14 +86,29 @@ var testUploadTrees = [][]uploadTree{{
 
 type ExitMocks struct {
 	mock.Mock
-	fatalCalls int
+	fatalCalls      int
+	lastFatalFormat string
+	lastFatalV      []interface{}
 }
 
 func (m *ExitMocks) Fatalf(format string, v ...interface{}) {
+	if format != "" {
+		m.lastFatalFormat = format
+	} else {
+		lastFatalFormat := "mocked Fatalf blank: "
+		for i := 0; i < len(v); i++ {
+			lastFatalFormat += "%v "
+		}
+		lastFatalFormat += "\n"
+		m.lastFatalFormat = lastFatalFormat
+	}
+	m.lastFatalV = v
 	m.fatalCalls++
 }
 
 func (m *ExitMocks) Fatalln(v ...interface{}) {
+	m.lastFatalFormat = ""
+	m.lastFatalV = v
 	m.fatalCalls++
 }
 
@@ -738,7 +753,7 @@ func pathInBundle(file uploadTree) string {
 	return filepath.Join(pathComp[2:]...)
 }
 
-// dupe: cafs/reader_test.go
+// dupe: cafs/reader_test.go, core/bundle_test.go
 // comparing large files could be faster by reading chunks and failing on the first chunk that differs
 func readTextFile(t testing.TB, pth string) string {
 	v, err := ioutil.ReadFile(pth)

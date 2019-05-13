@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"math"
+	"path/filepath"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -253,6 +254,14 @@ func generateBundleDescriptor() model.BundleDescriptor {
 }
 
 func validateDataFiles(t *testing.T, expectedDir string, actualDir string) bool {
+	return validateDataFilesAndPerhapsContents(t, expectedDir, actualDir, false)
+}
+
+func validateDataFilesAndContents(t *testing.T, expectedDir string, actualDir string) bool {
+	return validateDataFilesAndPerhapsContents(t, expectedDir, actualDir, true)
+}
+
+func validateDataFilesAndPerhapsContents(t *testing.T, expectedDir string, actualDir string, validateContents bool) bool {
 	// TODO: make this a general purpose diff 2 folders or reuse a package
 	fileListExpected, err := ioutil.ReadDir(expectedDir)
 	require.NoError(t, err)
@@ -267,11 +276,27 @@ func validateDataFiles(t *testing.T, expectedDir string, actualDir string) bool 
 				require.Equal(t, fileExpected.Size(), fileActual.Size())
 				// TODO: Issue #35
 				// require.Equal(t, fileExpected.Mode(), fileActual.Mode())
+				require.Equal(t, fileExpected.IsDir(), fileActual.IsDir())
+				if validateContents && !fileExpected.IsDir() && !fileActual.IsDir() {
+					contentsExpected := readTextFile(t, filepath.Join(expectedDir, fileExpected.Name()))
+					contentsActual := readTextFile(t, filepath.Join(actualDir, fileActual.Name()))
+					require.Equal(t, contentsExpected, contentsActual)
+				}
 			}
 		}
 		require.True(t, found)
 	}
 	return true
+}
+
+// dupe: cafs/reader_test.go, cmd/cli_test.go
+// comparing large files could be faster by reading chunks and failing on the first chunk that differs
+func readTextFile(t testing.TB, pth string) string {
+	v, err := ioutil.ReadFile(pth)
+	if err != nil {
+		require.NoError(t, err, "error reading file at '"+pth+"'")
+	}
+	return string(v)
 }
 
 func cleanup() {

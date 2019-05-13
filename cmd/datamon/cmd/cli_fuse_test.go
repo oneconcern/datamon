@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,9 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBundleMount(t *testing.T) {
-	cleanup := setupTests(t)
-	defer cleanup()
+const (
+	pathBackingFs = "/tmp/mmfs"
+	pathToMount   = "/tmp/mmp"
+)
+
+func setupMountTests(t *testing.T) func() {
+	setupTestsCleanup := setupTests(t)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
@@ -24,6 +29,27 @@ func TestBundleMount(t *testing.T) {
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
 	}, "create repo", false)
+	require.NoError(t, os.Mkdir(pathBackingFs, 0777|os.ModeDir))
+	require.NoError(t, os.Mkdir(pathToMount, 0777|os.ModeDir))
+	cleanup := func() {
+		os.RemoveAll(pathBackingFs)
+		os.RemoveAll(pathToMount)
+		setupTestsCleanup()
+	}
+	return cleanup
+}
+
+func execCmd(t *testing.T, cmdArgs []string) (*exec.Cmd, io.ReadCloser) {
+	cmd := exec.Command("../datamon", cmdArgs...)
+	rdr, err := cmd.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, cmd.Start(), "error executing '"+strings.Join(cmdArgs, " "))
+	return cmd, rdr
+}
+
+func TestBundleMount(t *testing.T) {
+	cleanup := setupMountTests(t)
+	defer cleanup()
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, testUploadTrees[1][0]),
@@ -33,16 +59,7 @@ func TestBundleMount(t *testing.T) {
 	rll, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, 1, len(rll), "bundle count in test repo")
-	const (
-		pathBackingFs = "/tmp/mmfs"
-		pathToMount   = "/tmp/mmp"
-	)
-	require.NoError(t, os.Mkdir(pathBackingFs, 0777|os.ModeDir))
-	require.NoError(t, os.Mkdir(pathToMount, 0777|os.ModeDir))
-	defer os.RemoveAll(pathBackingFs)
-	defer os.RemoveAll(pathToMount)
-	cmd := exec.Command(
-		"../datamon",
+	cmd, _ := execCmd(t, []string{
 		"bundle", "mount",
 		"--repo", repo1,
 		"--bundle", rll[0].hash,
@@ -50,8 +67,7 @@ func TestBundleMount(t *testing.T) {
 		"--mount", pathToMount,
 		"--meta", repoParams.MetadataBucket,
 		"--blob", repoParams.BlobBucket,
-	)
-	require.NoError(t, cmd.Start())
+	})
 	time.Sleep(5 * time.Second)
 	for _, file := range testUploadTrees[1] {
 		expected := readTextFile(t, filePathStr(t, file))
@@ -59,6 +75,54 @@ func TestBundleMount(t *testing.T) {
 		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(file)+"' size")
 		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(file)+"' contents")
 	}
+	require.NoError(t, cmd.Process.Kill())
+	err = cmd.Wait()
+	require.Equal(t, "signal: killed", err.Error(), "cmd exit with killed error")
+}
+
+func getCacheFiles(t *testing.T) []os.FileInfo {
+	fileListCache, err := ioutil.ReadDir(pathBackingFs)
+	require.NoError(t, err)
+	fileListCacheFiltered := make([]os.FileInfo, 0)
+	for _, fileInfo := range fileListCache {
+		if n := fileInfo.Name(); n != ".datamon" && n != ".put-stage" {
+			fileListCacheFiltered = append(fileListCacheFiltered, fileInfo)
+		}
+	}
+	return fileListCacheFiltered
+}
+
+func TestBundleMountCached(t *testing.T) {
+	cleanup := setupMountTests(t)
+	defer cleanup()
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, testUploadTrees[1][0]),
+		"--message", "read-only mount test bundle",
+		"--repo", repo1,
+	}, "upload bundle in order to test downloading individual files", false)
+	rll, err := listBundles(t, repo1)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 1, len(rll), "bundle count in test repo")
+	cmd, _ := execCmd(t, []string{
+		"bundle", "mount",
+		"--repo", repo1,
+		"--bundle", rll[0].hash,
+		"--destination", pathBackingFs,
+		"--mount", pathToMount,
+		"--meta", repoParams.MetadataBucket,
+		"--blob", repoParams.BlobBucket,
+		"--cache",
+	})
+	time.Sleep(5 * time.Second)
+	require.Equal(t, 0, len(getCacheFiles(t)), "empty cache before reads")
+	for _, file := range testUploadTrees[1] {
+		expected := readTextFile(t, filePathStr(t, file))
+		actual := readTextFile(t, filepath.Join(pathToMount, pathInBundle(file)))
+		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(file)+"' size")
+		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(file)+"' contents")
+	}
+	require.NotEqual(t, 0, len(getCacheFiles(t)), "nonempty cache after reads")
 	require.NoError(t, cmd.Process.Kill())
 	err = cmd.Wait()
 	require.Equal(t, "signal: killed", err.Error(), "cmd exit with killed error")
@@ -78,28 +142,12 @@ func mutableMountOutputToBundleID(t *testing.T, out string) string {
 }
 
 func TestBundleMutableMount(t *testing.T) {
-	cleanup := setupTests(t)
+	cleanup := setupMountTests(t)
 	defer cleanup()
-	runCmd(t, []string{"repo",
-		"create",
-		"--description", "testing",
-		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
-	}, "create repo", false)
-	const (
-		pathBackingFs = "/tmp/mmfs"
-		pathToMount   = "/tmp/mmp"
-	)
-	require.NoError(t, os.Mkdir(pathBackingFs, 0777|os.ModeDir))
-	require.NoError(t, os.Mkdir(pathToMount, 0777|os.ModeDir))
-	defer os.RemoveAll(pathBackingFs)
-	defer os.RemoveAll(pathToMount)
 	rll, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, 0, len(rll), "bundle count in test repo")
-	cmd := exec.Command(
-		"../datamon",
+	cmd, rdr := execCmd(t, []string{
 		"bundle", "mount", "new",
 		"--repo", repo1,
 		"--message", "mutabletest",
@@ -107,10 +155,7 @@ func TestBundleMutableMount(t *testing.T) {
 		"--mount", pathToMount,
 		"--meta", repoParams.MetadataBucket,
 		"--blob", repoParams.BlobBucket,
-	)
-	rdr, err := cmd.StdoutPipe()
-	require.NoError(t, err)
-	require.NoError(t, cmd.Start())
+	})
 	time.Sleep(1 * time.Second)
 	createTestUploadTree(t, pathToMount, testUploadTrees[1])
 	backingFileInfos, err := ioutil.ReadDir(pathBackingFs)

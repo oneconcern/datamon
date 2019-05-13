@@ -15,9 +15,19 @@ import (
 
 func unpackBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 
+	var destStore storage.Store
+	switch {
+	case bundle.ConsumableStore != nil:
+		destStore = bundle.ConsumableStore
+	case bundle.CachingStore != nil:
+		destStore = bundle.CachingStore
+	default:
+		return fmt.Errorf("couldn't find suitable destination for bundle descriptor")
+	}
+
 	bundleDescriptorBuffer, err := storage.ReadTee(ctx,
 		bundle.MetaStore, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
-		bundle.ConsumableStore, model.GetConsumablePathToBundle(bundle.BundleID))
+		destStore, model.GetConsumablePathToBundle(bundle.BundleID))
 	if err != nil {
 		return err
 	}
@@ -31,12 +41,23 @@ func unpackBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 }
 
 func unpackBundleFileList(ctx context.Context, bundle *Bundle) error {
+
+	var destStore storage.Store
+	switch {
+	case bundle.ConsumableStore != nil:
+		destStore = bundle.ConsumableStore
+	case bundle.CachingStore != nil:
+		destStore = bundle.CachingStore
+	default:
+		return fmt.Errorf("couldn't find suitable destination for bundle descriptor")
+	}
+
 	// Download the files json
 	var i uint64
 	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
 		bundleEntriesBuffer, err := storage.ReadTee(ctx,
 			bundle.MetaStore, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i),
-			bundle.ConsumableStore, model.GetConsumablePathToBundleFileList(bundle.BundleID, i))
+			destStore, model.GetConsumablePathToBundleFileList(bundle.BundleID, i))
 		if err != nil {
 			return err
 		}
@@ -58,14 +79,17 @@ type errorHit struct {
 
 const maxConcurrentDownloads = 100
 
-func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
+func bundleBlobCafs(bundle *Bundle) (cafs.Fs, error) {
 	ls := bundle.BundleDescriptor.LeafSize
-	fs, err := cafs.New(
+	return cafs.New(
 		cafs.LeafSize(ls),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Backend(bundle.BlobStore),
 	)
+}
 
+func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
+	fs, err := bundleBlobCafs(bundle)
 	if err != nil {
 		return err
 	}

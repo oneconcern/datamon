@@ -15,6 +15,8 @@ import (
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 
+	"github.com/oneconcern/datamon/pkg/cafs"
+
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseutil"
 )
@@ -49,8 +51,8 @@ type MutableFS struct {
 	server     fuse.Server             // Fuse server
 }
 
-// NewReadOnlyFS creates a new instance of the datamon filesystem.
 func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
+	/* verify params */
 	if l == nil {
 		return nil, fmt.Errorf("logger is nil")
 	}
@@ -59,7 +61,22 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 		l.Error("bundle is nil", zap.Error(err))
 		return nil, err
 	}
-	fs := &readOnlyFsInternal{
+	isCaching := bundle.CachingStore != nil
+	var err error
+	var publishErrMsg string
+	if isCaching {
+		err = PublishMetadata(context.Background(), bundle)
+		publishErrMsg = "Failed to publish bundle metadata"
+	} else {
+		err = Publish(context.Background(), bundle)
+		publishErrMsg = "Failed to publish bundle"
+	}
+	if err != nil {
+		l.Error(publishErrMsg, zap.String("id", bundle.BundleID),
+			zap.Error(err))
+		return nil, err
+	}
+	fsInternal := &readOnlyFsInternal{
 		bundle:       bundle,
 		readDirMap:   make(map[fuseops.InodeID][]fuseutil.Dirent),
 		fsEntryStore: iradix.New(),
@@ -67,17 +84,22 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 		fsDirStore:   iradix.New(),
 		l:            l,
 	}
-
-	// Extract the meta information needed.
-	err := Publish(context.Background(), fs.bundle)
+	fs, err := fsInternal.populateFS(bundle)
+	if !isCaching {
+		return fs, err
+	}
 	if err != nil {
-		l.Error("Failed to publish bundle", zap.String("id", bundle.BundleID),
-			zap.Error(err))
 		return nil, err
 	}
-	// TODO: Introduce streaming and caching
-	// Populate the filesystem.
-	return fs.populateFS(bundle)
+	blobCafs, err := bundleBlobCafs(bundle)
+	if err != nil {
+		return nil, err
+	}
+	blobCafsKey2ConsumableStoreKey := func(blobCafsKey cafs.Key) (string, error) {
+		return blobCafsKey.String(), nil
+	}
+	fs.fsInternal.cachingCafs = cafs.AddCaching(blobCafs, bundle.CachingStore, blobCafsKey2ConsumableStoreKey)
+	return fs, nil
 }
 
 // NewMutableFS creates a new instance of the datamon filesystem.

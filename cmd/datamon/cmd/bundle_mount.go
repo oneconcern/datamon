@@ -11,6 +11,7 @@ import (
 	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
+	"github.com/oneconcern/datamon/pkg/storage"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -87,7 +88,19 @@ var mountBundleCmd = &cobra.Command{
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
+		consumableStoreAferoFs := afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath)
+		var localStoreBundleOpt core.BundleOption
+		if bundleOptions.CacheMountDownloads {
+			var consumableStore storage.Store
+			consumableStore, err = localfs.NewAtomic(consumableStoreAferoFs)
+			if err != nil {
+				onDaemonError(err)
+			}
+			localStoreBundleOpt = core.CachingStore(consumableStore)
+		} else {
+			consumableStore := localfs.New(consumableStoreAferoFs)
+			localStoreBundleOpt = core.ConsumableStore(consumableStore)
+		}
 
 		err = setLatestBundle(metadataSource)
 		if err != nil {
@@ -98,17 +111,19 @@ var mountBundleCmd = &cobra.Command{
 			core.Repo(repoParams.RepoName),
 			core.BundleID(bundleOptions.ID),
 			core.BlobStore(blobStore),
-			core.ConsumableStore(consumableStore),
+			localStoreBundleOpt,
 			core.MetaStore(metadataSource),
 		)
 		logger, err := dlogger.GetLogger(logLevel)
 		if err != nil {
 			log.Fatalln("Failed to set log level:" + err.Error())
 		}
+
 		fs, err := core.NewReadOnlyFS(bundle, logger)
 		if err != nil {
 			onDaemonError(err)
 		}
+
 		if err = fs.MountReadOnly(bundleOptions.MountPath); err != nil {
 			onDaemonError(err)
 		}
@@ -133,6 +148,7 @@ func init() {
 	addLogLevel(mountBundleCmd)
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
+	addCacheMountDownloadsFlag(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
 	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
 
