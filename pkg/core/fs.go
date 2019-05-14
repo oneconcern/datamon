@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -49,19 +50,29 @@ type MutableFS struct {
 }
 
 // NewReadOnlyFS creates a new instance of the datamon filesystem.
-func NewReadOnlyFS(bundle *Bundle) (*ReadOnlyFS, error) {
-
+func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
+	if l == nil {
+		return nil, fmt.Errorf("logger is nil")
+	}
+	if bundle == nil {
+		err := fmt.Errorf("bundle is nil")
+		l.Error("bundle is nil", zap.Error(err))
+		return nil, err
+	}
 	fs := &readOnlyFsInternal{
 		bundle:       bundle,
 		readDirMap:   make(map[fuseops.InodeID][]fuseutil.Dirent),
 		fsEntryStore: iradix.New(),
 		lookupTree:   iradix.New(),
 		fsDirStore:   iradix.New(),
+		l:            l,
 	}
 
 	// Extract the meta information needed.
 	err := Publish(context.Background(), fs.bundle)
 	if err != nil {
+		l.Error("Failed to publish bundle", zap.String("id", bundle.BundleID),
+			zap.Error(err))
 		return nil, err
 	}
 	// TODO: Introduce streaming and caching

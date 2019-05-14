@@ -1,7 +1,7 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: datamon-csi-node
+  name: datamon-csi-node-test
 spec:
   selector:
     matchLabels:
@@ -22,17 +22,17 @@ spec:
           args:
             - "--v=10"
             - "--csi-address=$(ADDRESS)"
-            - "--kubelet-registration-path=/var/lib/kubelet/plugins/com.datamon.csi/csi.sock"
+            - "--kubelet-registration-path=/var/lib/kubelet/plugins/com.test.datamon.csi/csi.sock"
           env:
             - name: ADDRESS
-              value: /var/lib/kubelet/plugins/com.datamon.csi/csi.sock
+              value: /var/lib/kubelet/plugins/com.test.datamon.csi/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
             - name: plugin-dir
-              mountPath: /var/lib/kubelet/plugins/com.datamon.csi/
+              mountPath: /var/lib/kubelet/plugins/com.test.datamon.csi/
             - name: registration-dir
               mountPath: /registration
         - name: datamon-node-driver
@@ -76,7 +76,7 @@ spec:
             type: Directory
         - name: plugin-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/com.datamon.csi/
+            path: /var/lib/kubelet/plugins/com.test.datamon.csi/
             type: DirectoryOrCreate
         - name: credentials
           secret:

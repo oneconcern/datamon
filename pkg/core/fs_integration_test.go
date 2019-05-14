@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/spf13/afero"
 
 	"github.com/stretchr/testify/require"
@@ -36,7 +38,8 @@ func TestMount(t *testing.T) {
 		ConsumableStore(consumableStore),
 		BlobStore(blobStore),
 	)
-	fs, err := NewReadOnlyFS(bundle)
+	l, _ := zap.NewProduction()
+	fs, err := NewReadOnlyFS(bundle, l)
 	require.NoError(t, err)
 	_ = os.Mkdir(pathToMount, 0777|os.ModeDir)
 	err = fs.MountReadOnly(pathToMount)

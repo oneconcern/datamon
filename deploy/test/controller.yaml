@@ -1,8 +1,11 @@
-kind: DaemonSet
+kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: datamon-csi-node
+  name: datamon-csi-controller-test
+  namespace: dev
 spec:
+  serviceName: "datamon-csi-driver"
+  replicas: 1
   selector:
     matchLabels:
       app: datamon-csi-driver
@@ -14,39 +17,41 @@ spec:
         app: datamon-csi-driver
     spec:
       serviceAccountName: datamon-csi-controller-sa
-      hostNetwork: true
       containers:
-        - name: csi-driver-registrar
+        - name: csi-external-attacher
           imagePullPolicy: Always
-          image: quay.io/k8scsi/driver-registrar:v0.4.2
+          image: quay.io/k8scsi/csi-attacher:v0.4.1
           args:
             - "--v=10"
             - "--csi-address=$(ADDRESS)"
-            - "--kubelet-registration-path=/var/lib/kubelet/plugins/com.datamon.csi/csi.sock"
           env:
             - name: ADDRESS
-              value: /var/lib/kubelet/plugins/com.datamon.csi/csi.sock
-            - name: KUBE_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
+              value: /csi/csi.sock
           volumeMounts:
-            - name: plugin-dir
-              mountPath: /var/lib/kubelet/plugins/com.datamon.csi/
-            - name: registration-dir
-              mountPath: /registration
-        - name: datamon-node-driver
-          securityContext:
-            privileged: true
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-external-provisioner
+          imagePullPolicy: Always
+          image: gcr.io/onec-co/csi-provisioner:v0.4-canary
+          args:
+            - "--v=10"
+            - "--provisioner=com.test.datamon.csi"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: datamon-driver
           imagePullPolicy: Always
           image: gcr.io/onec-co/datamon-csi:csi
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
-            - "--server=true"
+            - "--controller=true"
             - "--log-level=debug"
             - "--credential=/etc/datamon-creds/gcp-storage-admin.json"
-            - "--localfs=/tmp"
           env:
             - name: CSI_ENDPOINT
               value: unix:/csi/csi.sock
@@ -57,27 +62,14 @@ spec:
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: "/etc/datamon-creds/gcp-storage-admin.json"
           volumeMounts:
-            - name: kubelet-dir
-              mountPath: /var/lib/kubelet
-              mountPropagation: "Bidirectional"
-            - name: plugin-dir
+            - name: socket-dir
               mountPath: /csi
             - name: credentials
               readOnly: true
               mountPath: "/etc/datamon-creds"
       volumes:
-        - name: registration-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins/
-            type: Directory
-        - name: kubelet-dir
-          hostPath:
-            path: /var/lib/kubelet
-            type: Directory
-        - name: plugin-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins/com.datamon.csi/
-            type: DirectoryOrCreate
+        - name: socket-dir
+          emptyDir: {}
         - name: credentials
           secret:
             secretName: gcs-credentials
