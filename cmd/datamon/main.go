@@ -16,7 +16,7 @@ func main() {
 	cmd.Execute()
 }
 
-func startCpuProf() {
+func startCPUProf() {
 	f, err := os.Create("cpu.prof")
 	if err != nil {
 		log.Fatal(err)
@@ -24,6 +24,6 @@ func startCpuProf() {
 	_ = pprof.StartCPUProfile(f)
 }
 
-func stopCpuProf() {
+func stopCPUProf() {
 	pprof.StopCPUProfile()
 }
