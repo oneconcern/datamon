@@ -11,6 +11,9 @@ YELLOW := $(shell tput -Txterm setaf 3)
 WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+VERSION=$(shell git describe --tags)
+COMMIT=$(shell git rev-parse HEAD)
+GITDIRTY=$(shell git diff --quiet || echo 'dirty')
 LOCAL_KUBECTX ?= "docker-for-desktop"
 TARGET_MAX_CHAR_NUM=25
 ## Show help
@@ -62,7 +65,10 @@ build-datamon:
 		--pull \
 		--build-arg github_user=$(GITHUB_USER) \
 		--build-arg github_token=$(GITHUB_TOKEN) \
-		-t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') \
+		--build-arg version=$(VERSION) \
+		--build-arg commit=$(COMMIT) \
+	  --build-arg dirty=$(GITDIRTY) \
+	  -t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') \
 		-t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) \
 		.
 
