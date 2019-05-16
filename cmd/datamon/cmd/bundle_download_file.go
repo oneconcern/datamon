@@ -18,7 +18,7 @@ var bundleDownloadFileCmd = &cobra.Command{
 	Long:  "Download a readonly, non-interactive view of a single file from a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		sourceStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		metadataStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -32,14 +32,14 @@ var bundleDownloadFileCmd = &cobra.Command{
 		}
 		_ = os.MkdirAll(path, 0700)
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
-		err = setLatestBundle(sourceStore)
+		err = setLatestBundle(metadataStore)
 		if err != nil {
 			logFatalln(err)
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
 			core.Repo(repoParams.RepoName),
-			core.MetaStore(sourceStore),
+			core.MetaStore(metadataStore),
 			core.ConsumableStore(destinationStore),
 			core.BlobStore(blobStore),
 			core.BundleID(bundleOptions.ID),

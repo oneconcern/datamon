@@ -1,0 +1,7 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: datamon.test
+provisioner: com.test.datamon.csi
+parameters:
+  repo: "ritesh-test-repo"

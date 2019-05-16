@@ -27,6 +27,7 @@ const (
 	contributorName  = "name"
 	credential       = "credential"
 	file             = "file"
+	loglevel         = "loglevel"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -45,6 +46,7 @@ It executes pipelines by scheduling the processors as serverless functions on ei
 
 var config *Config
 var credFile string
+var logLevel string
 
 // used to patch over calls to os.Exit() during test
 var logFatalln = log.Fatalln
@@ -100,4 +102,9 @@ func initConfig() {
 func addCredentialFile(cmd *cobra.Command) string {
 	cmd.Flags().StringVar(&credFile, credential, "", "The path to the credential file")
 	return contributorName
+}
+
+func addLogLevel(cmd *cobra.Command) string {
+	cmd.Flags().StringVar(&logLevel, loglevel, "info", "The logging level")
+	return logLevel
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -18,6 +19,12 @@ var repoCreate = &cobra.Command{
 	Long: "Create a repo. Repo names must not contain special characters. " +
 		"Allowed characters Unicode characters, digits and hyphen. Example: dm-test-repo-1",
 	Run: func(cmd *cobra.Command, args []string) {
+		if repoParams.ContributorEmail == "" {
+			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
+		}
+		if repoParams.ContributorName == "" {
+			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
+		}
 		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)

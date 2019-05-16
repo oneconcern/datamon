@@ -100,7 +100,7 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - go_lint:
-          context: "OC Common"
+      # - go_lint:
+      #    context: "OC Common"
       - go_build:
           context: "OC Common"

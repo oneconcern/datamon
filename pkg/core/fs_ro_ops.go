@@ -3,13 +3,13 @@ package core
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
 	"os"
 	"path"
+	"reflect"
 	"time"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
+	"go.uber.org/zap"
 
 	"github.com/oneconcern/datamon/pkg/model"
 
@@ -24,12 +24,96 @@ func (fs *readOnlyFsInternal) StatFS(
 	return statFS()
 }
 
-func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
-	log.Print(fmt.Printf("lookup parent id:%d, child: %s ", op.Parent, op.Name))
+func (fs *readOnlyFsInternal) opStart(op interface{}) {
+	opType := reflect.TypeOf(op)
+	switch op.(type) {
+	case *fuseops.ReadFileOp:
+		r := op.(*fuseops.ReadFileOp)
+		fs.l.Info("Start",
+			zap.String("Request", opType.String()),
+			zap.String("repo", fs.bundle.RepoID),
+			zap.String("bundle", fs.bundle.BundleID),
+			zap.Uint64("inode", uint64(r.Inode)),
+		)
+		return
+	case *fuseops.WriteFileOp:
+		w := op.(*fuseops.WriteFileOp)
+		fs.l.Info("Start",
+			zap.String("Request", opType.String()),
+			zap.String("repo", fs.bundle.RepoID),
+			zap.String("bundle", fs.bundle.BundleID),
+			zap.Uint64("inode", uint64(w.Inode)),
+		)
+		return
+	case *fuseops.ReadDirOp:
+		r := op.(*fuseops.ReadDirOp)
+		fs.l.Info("Start",
+			zap.String("Request", opType.String()),
+			zap.String("repo", fs.bundle.RepoID),
+			zap.String("bundle", fs.bundle.BundleID),
+			zap.Uint64("inode", uint64(r.Inode)),
+		)
+		return
+	}
+	fs.l.Info("Start",
+		zap.String("Request", opType.String()),
+		zap.String("repo", fs.bundle.RepoID),
+		zap.String("bundle", fs.bundle.BundleID),
+		zap.Any("op", op),
+	)
+}
+func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
+	opType := reflect.TypeOf(op)
+	switch t := op.(type) {
+	case *fuseops.ReadFileOp:
+		fs.l.Info("End",
+			zap.String("Request", opType.String()),
+			zap.String("repo", fs.bundle.RepoID),
+			zap.String("bundle", fs.bundle.BundleID),
+			zap.Uint64("inode", uint64(t.Inode)),
+			zap.Error(err),
+		)
+		return
+	case *fuseops.WriteFileOp:
+		fs.l.Info("End",
+			zap.String("Request", opType.String()),
+			zap.String("repo", fs.bundle.RepoID),
+			zap.String("bundle", fs.bundle.BundleID),
+			zap.Uint64("inode", uint64(t.Inode)),
+			zap.Error(err),
+		)
+		return
+	case *fuseops.ReadDirOp:
+		fs.l.Info("End",
+			zap.String("Request", opType.String()),
+			zap.String("repo", fs.bundle.RepoID),
+			zap.String("bundle", fs.bundle.BundleID),
+			zap.Uint64("inode", uint64(t.Inode)),
+			zap.Error(err),
+		)
+		return
+	}
+	fs.l.Info("End",
+		zap.String("Request", reflect.TypeOf(op).String()),
+		zap.String("repo", fs.bundle.RepoID),
+		zap.String("bundle", fs.bundle.BundleID),
+		zap.Any("op", op),
+		zap.Error(err),
+	)
+}
+func typeAssertToFsEntry(p interface{}) *fsEntry {
+	fe := p.(fsEntry)
+	return &fe
+}
+
+func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	lookupKey := formLookupKey(op.Parent, op.Name)
 	val, found := fs.lookupTree.Get(lookupKey)
+
 	if found {
-		childEntry := val.(fsEntry)
+		childEntry := typeAssertToFsEntry(val)
 		op.Entry.Attributes = childEntry.attributes
 		if fs.isReadOnly {
 			op.Entry.AttributesExpiration = time.Now().Add(cacheYearLong)
@@ -37,22 +121,27 @@ func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookU
 		}
 		op.Entry.Child = childEntry.iNode
 		op.Entry.Generation = 1
+
 	} else {
-		return fuse.ENOENT
+		err = fuse.ENOENT
+		return
 	}
+	fs.opEnd(op, err)
 	return nil
 }
 
 func (fs *readOnlyFsInternal) GetInodeAttributes(
 	ctx context.Context,
 	op *fuseops.GetInodeAttributesOp) (err error) {
-	log.Print(fmt.Printf("iNode attr id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	key := formKey(op.Inode)
 	e, found := fs.fsEntryStore.Get(key)
 	if !found {
-		return fuse.ENOENT
+		err = fuse.ENOENT
+		return
 	}
-	fe := e.(fsEntry)
+	fe := typeAssertToFsEntry(e)
 	op.AttributesExpiration = time.Now().Add(cacheYearLong)
 	op.Attributes = fe.attributes
 	return nil
@@ -61,7 +150,8 @@ func (fs *readOnlyFsInternal) GetInodeAttributes(
 func (fs *readOnlyFsInternal) SetInodeAttributes(
 	ctx context.Context,
 	op *fuseops.SetInodeAttributesOp) (err error) {
-	log.Print(fmt.Printf("SetInodeAttributes iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -69,15 +159,16 @@ func (fs *readOnlyFsInternal) SetInodeAttributes(
 func (fs *readOnlyFsInternal) ForgetInode(
 	ctx context.Context,
 	op *fuseops.ForgetInodeOp) (err error) {
-	log.Print(fmt.Printf("ForgetInode iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	return
 }
 
 func (fs *readOnlyFsInternal) MkDir(
 	ctx context.Context,
 	op *fuseops.MkDirOp) (err error) {
-
-	log.Print(fmt.Printf("Mkdir parent iNode id:%d ", op.Parent))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -85,7 +176,8 @@ func (fs *readOnlyFsInternal) MkDir(
 func (fs *readOnlyFsInternal) MkNode(
 	ctx context.Context,
 	op *fuseops.MkNodeOp) (err error) {
-	log.Print(fmt.Printf("MkNode parent iNode id:%d ", op.Parent))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -93,18 +185,17 @@ func (fs *readOnlyFsInternal) MkNode(
 func (fs *readOnlyFsInternal) CreateFile(
 	ctx context.Context,
 	op *fuseops.CreateFileOp) (err error) {
-	log.Print(fmt.Printf("CreateFile parent iNode id:%d name: %s ", op.Parent, op.Name))
-	// Take RW lock.
-	// Check if the child exists
-	// Create child
-	// Open Child
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+	err = fuse.ENOSYS
 	return
 }
 
 func (fs *readOnlyFsInternal) CreateSymlink(
 	ctx context.Context,
 	op *fuseops.CreateSymlinkOp) (err error) {
-	log.Print(fmt.Printf("CreateSymLink"))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -113,7 +204,8 @@ func (fs *readOnlyFsInternal) CreateSymlink(
 func (fs *readOnlyFsInternal) CreateLink(
 	ctx context.Context,
 	op *fuseops.CreateLinkOp) (err error) {
-	log.Print(fmt.Printf("CreateLink"))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -121,7 +213,8 @@ func (fs *readOnlyFsInternal) CreateLink(
 func (fs *readOnlyFsInternal) Rename(
 	ctx context.Context,
 	op *fuseops.RenameOp) (err error) {
-	log.Print(fmt.Printf("Rename new name:"+op.NewName+" oldname:"+op.OldName+" new parent %d, old parent %d ", op.NewParent, op.OldParent))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -129,7 +222,8 @@ func (fs *readOnlyFsInternal) Rename(
 func (fs *readOnlyFsInternal) RmDir(
 	ctx context.Context,
 	op *fuseops.RmDirOp) (err error) {
-	log.Print(fmt.Printf("RmDir iNode id:%d ", op.Parent))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -137,86 +231,97 @@ func (fs *readOnlyFsInternal) RmDir(
 func (fs *readOnlyFsInternal) Unlink(
 	ctx context.Context,
 	op *fuseops.UnlinkOp) (err error) {
-	log.Print(fmt.Printf("Unlink child: "+op.Name+" parent: %d ", op.Parent))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
 
-func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, openDirOp *fuseops.OpenDirOp) error {
-	log.Print(fmt.Printf("openDir iNode id:%d ", openDirOp.Inode))
-	p, found := fs.fsEntryStore.Get(formKey(openDirOp.Inode))
+func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) (err error) {
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
 	if !found {
-		return fuse.ENOENT
+		err = fuse.ENOENT
+		return
 	}
-	fe := p.(fsEntry)
+	fe := typeAssertToFsEntry(p)
 	if isDir(fe) {
-		return fuse.ENOTDIR
+		err = fuse.ENOENT
+		return
 	}
 	return nil
 }
 
-func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, readDirOp *fuseops.ReadDirOp) error {
-
-	offset := int(readDirOp.Offset)
-	iNode := readDirOp.Inode
+func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) (err error) {
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+	offset := int(op.Offset)
+	iNode := op.Inode
 
 	children, found := fs.readDirMap[iNode]
 
 	if !found {
-		return fuse.ENOENT
+		err = fuse.ENOENT
+		return
 	}
 
 	if offset > len(children) {
-		return fuse.EIO
+		err = fuse.ENOENT
+		return
 	}
 
 	for i := offset; i < len(children); i++ {
-		n := fuseutil.WriteDirent(readDirOp.Dst[readDirOp.BytesRead:], children[i])
+		n := fuseutil.WriteDirent(op.Dst[op.BytesRead:], children[i])
 		if n == 0 {
 			break
 		}
-		readDirOp.BytesRead += n
+		op.BytesRead += n
 	}
-	log.Print(fmt.Printf("readDir iNode id:%d offset: %d bytes: %d ", readDirOp.Inode, readDirOp.Offset, readDirOp.BytesRead))
 	return nil
 }
 
 func (fs *readOnlyFsInternal) ReleaseDirHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseDirHandleOp) (err error) {
-	log.Print(fmt.Printf("ReleaseDirHandle iNode id:%d ", op.Handle))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	return
 }
 
 func (fs *readOnlyFsInternal) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
-	log.Print(fmt.Printf("OpenFile iNode id:%d handle:%d ", op.Inode, op.Handle))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	return
 }
 
 func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-	log.Print(fmt.Printf("ReadFile iNode id:%d, offset: %d ", op.Inode, op.Offset))
+	fs.opStart(op)
+	fs.opEnd(op, err)
 
 	// If file has not been mutated.
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
 	if !found {
-		return fuse.ENOENT
+		err = fuse.ENOENT
+		return
 	}
-	fe := p.(fsEntry)
+
+	fe := typeAssertToFsEntry(p)
+
 	reader, err := fs.bundle.ConsumableStore.GetAt(context.Background(), fe.fullPath)
 	if err != nil {
-		log.Print(err)
-		return fuse.EIO
+		err = fuse.EIO
+		return
 	}
 	n, err := reader.ReadAt(op.Dst, op.Offset)
-	if err != nil {
-		log.Print(err)
-		return fuse.EIO
+	if err != nil && err.Error() != "EOF" {
+		err = fuse.EIO
+		return
 	}
-	log.Print(fmt.Printf("Read: %d of %s ", n, fe.fullPath))
 	op.BytesRead = n
 	return nil
 }
@@ -224,7 +329,8 @@ func (fs *readOnlyFsInternal) ReadFile(
 func (fs *readOnlyFsInternal) WriteFile(
 	ctx context.Context,
 	op *fuseops.WriteFileOp) (err error) {
-	log.Print(fmt.Printf("WriteFile iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -232,7 +338,8 @@ func (fs *readOnlyFsInternal) WriteFile(
 func (fs *readOnlyFsInternal) SyncFile(
 	ctx context.Context,
 	op *fuseops.SyncFileOp) (err error) {
-	log.Print(fmt.Printf("SyncFile iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -240,7 +347,8 @@ func (fs *readOnlyFsInternal) SyncFile(
 func (fs *readOnlyFsInternal) FlushFile(
 	ctx context.Context,
 	op *fuseops.FlushFileOp) (err error) {
-	log.Print(fmt.Printf("FlushFile iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -248,14 +356,16 @@ func (fs *readOnlyFsInternal) FlushFile(
 func (fs *readOnlyFsInternal) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
-	log.Print(fmt.Printf("ReleaseFileHandle iNode id:%d ", op.Handle))
+	fs.opStart(op)
+	fs.opEnd(op, err)
 	return
 }
 
 func (fs *readOnlyFsInternal) ReadSymlink(
 	ctx context.Context,
 	op *fuseops.ReadSymlinkOp) (err error) {
-	log.Print(fmt.Printf("ReadSymlink iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -263,7 +373,8 @@ func (fs *readOnlyFsInternal) ReadSymlink(
 func (fs *readOnlyFsInternal) RemoveXattr(
 	ctx context.Context,
 	op *fuseops.RemoveXattrOp) (err error) {
-	log.Print(fmt.Printf("RemoveXattr iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -271,7 +382,8 @@ func (fs *readOnlyFsInternal) RemoveXattr(
 func (fs *readOnlyFsInternal) GetXattr(
 	ctx context.Context,
 	op *fuseops.GetXattrOp) (err error) {
-	log.Print(fmt.Printf("GetXattr iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -279,7 +391,8 @@ func (fs *readOnlyFsInternal) GetXattr(
 func (fs *readOnlyFsInternal) ListXattr(
 	ctx context.Context,
 	op *fuseops.ListXattrOp) (err error) {
-	log.Print(fmt.Printf("ListXattr iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -287,16 +400,20 @@ func (fs *readOnlyFsInternal) ListXattr(
 func (fs *readOnlyFsInternal) SetXattr(
 	ctx context.Context,
 	op *fuseops.SetXattrOp) (err error) {
-	log.Print(fmt.Printf("SetXattr iNode id:%d ", op.Inode))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
 
 func (fs *readOnlyFsInternal) Destroy() {
-	log.Print(fmt.Printf("Destroy"))
+	fs.l.Info("Destroy",
+		zap.String("repo", fs.bundle.RepoID),
+		zap.String("bundle", fs.bundle.BundleID),
+	)
 }
 
-func isDir(fsEntry fsEntry) bool {
+func isDir(fsEntry *fsEntry) bool {
 	return fsEntry.hash != ""
 }
 
@@ -359,16 +476,25 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 		return *iNode
 	}
 
+	fs.l.Info("Populating fs",
+		zap.String("repo", fs.bundle.RepoID),
+		zap.String("bundle ID", fs.bundle.BundleID),
+		zap.Int("entryCount", len(fs.bundle.BundleEntries)),
+	)
+	var count int
 	for _, bundleEntry := range fs.bundle.GetBundleEntries() {
-		bundleEntry := bundleEntry
+		be := bundleEntry
 		// Generate the fsEntry
-		newFsEntry := newDatamonFSEntry(&bundleEntry, bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), fileLinkCount)
+		newFsEntry := newDatamonFSEntry(&be, bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), fileLinkCount)
 
 		// Add parents if first visit
 		// If a parent has been visited, all the parent's parents in the path have been visited
-		nameWithPath := bundleEntry.NameWithPath
+		nameWithPath := be.NameWithPath
 		for {
 			parentPath := path.Dir(nameWithPath)
+			fs.l.Debug("Processing parent",
+				zap.String("parentPath", parentPath),
+				zap.String("fullPath", be.NameWithPath))
 			// entry under root
 			if parentPath == "" || parentPath == "." || parentPath == "/" {
 				nodesToAdd = append(nodesToAdd, fsNodeToAdd{
@@ -395,21 +521,32 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 
 			p, found := dirStoreTxn.Get([]byte(parentPath))
 			if !found {
-
+				fs.l.Debug("parentPath not found",
+					zap.String("parent", parentPath))
 				newFsEntry = newDatamonFSEntry(generateBundleDirEntry(parentPath), bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), dirLinkCount)
 
 				// Continue till we hit root or found
 				nameWithPath = parentPath
 				continue
 			} else {
-				parentDirEntry := p.(fsEntry)
-				if len(nodesToAdd) == 1 {
+				fs.l.Debug("parentPath found",
+					zap.String("parent", parentPath))
+				parentDirEntry := typeAssertToFsEntry(p)
+				if len(nodesToAdd) >= 1 {
 					nodesToAdd[len(nodesToAdd)-1].parentINode = parentDirEntry.iNode
 				}
 			}
+			fs.l.Debug("last node", zap.String("path", nodesToAdd[len(nodesToAdd)-1].fsEntry.fullPath),
+				zap.Uint64("childInode", uint64(nodesToAdd[len(nodesToAdd)-1].fsEntry.iNode)),
+				zap.Uint64("parentInode", uint64(nodesToAdd[len(nodesToAdd)-1].parentINode)))
 			break
 		}
 
+		fs.l.Debug("Nodes added",
+			zap.String("repo", fs.bundle.RepoID),
+			zap.String("bundle ID", fs.bundle.BundleID),
+			zap.Int("count", len(nodesToAdd)),
+		)
 		for _, nodeToAdd := range nodesToAdd {
 			if nodeToAdd.fsEntry.attributes.Nlink == dirLinkCount {
 				err = fs.insertDatamonFSDirEntry(
@@ -421,6 +558,7 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 				)
 
 			} else {
+				count++
 				err = fs.insertDatamonFSEntry(
 					lookupTreeTxn,
 					fsEntryStoreTxn,
@@ -439,6 +577,11 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 	fs.lookupTree = lookupTreeTxn.Commit()
 	fs.fsDirStore = dirStoreTxn.Commit()
 	fs.isReadOnly = true
+	fs.l.Info("Populating fs done",
+		zap.String("repo", fs.bundle.RepoID),
+		zap.String("bundle ID", fs.bundle.BundleID),
+		zap.Int("entryCount", count),
+	)
 	return &ReadOnlyFS{
 		fsInternal: fs,
 		server:     fuseutil.NewFileSystemServer(fs),
@@ -451,7 +594,9 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 	fsEntryStoreTxn *iradix.Txn,
 	parentInode fuseops.InodeID,
 	dirFsEntry fsEntry) error {
-
+	fs.l.Debug("Inserting FSDirEntry",
+		zap.String("fullPath", dirFsEntry.fullPath),
+		zap.Uint64("parentInode", uint64(parentInode)))
 	_, update := dirStoreTxn.Insert([]byte(dirFsEntry.fullPath), dirFsEntry)
 
 	if update {
@@ -470,6 +615,9 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 
 		_, update = lookupTreeTxn.Insert(key, dirFsEntry)
 		if update {
+			fs.l.Error("lookupTree updates are not expected",
+				zap.String("fullPath", dirFsEntry.fullPath),
+				zap.Uint64("parent iNode", uint64(parentInode)))
 			return errors.New("lookupTree updates are not expected: " + dirFsEntry.fullPath)
 		}
 
@@ -491,7 +639,11 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 	fsEntryStoreTxn *iradix.Txn,
 	parentInode fuseops.InodeID,
 	fsEntry fsEntry) error {
-
+	fs.l.Debug("adding",
+		zap.Uint64("parent", uint64(parentInode)),
+		zap.String("fullPath", fsEntry.fullPath),
+		zap.Uint64("childInode", uint64(fsEntry.iNode)),
+		zap.String("base", path.Base(fsEntry.fullPath)))
 	key := formKey(fsEntry.iNode)
 
 	_, update := fsEntryStoreTxn.Insert(key, fsEntry)
@@ -503,6 +655,9 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 
 	_, update = lookupTreeTxn.Insert(key, fsEntry)
 	if update {
+		fs.l.Error("lookupTree updates are not expected",
+			zap.String("fullPath", fsEntry.fullPath),
+			zap.Uint64("parent iNode", uint64(parentInode)))
 		return errors.New("lookupTree updates are not expected: " + fsEntry.fullPath)
 	}
 
@@ -538,6 +693,9 @@ type readOnlyFsInternal struct {
 
 	// readonly
 	isReadOnly bool
+
+	// logger
+	l *zap.Logger
 }
 
 // fsEntry is a node in the filesystem.

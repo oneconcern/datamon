@@ -3,7 +3,10 @@
 package cmd
 
 import (
+	"log"
 	"time"
+
+	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -44,8 +47,11 @@ var mountBundleCmd = &cobra.Command{
 			core.ConsumableStore(consumableStore),
 			core.MetaStore(metadataSource),
 		)
-
-		fs, err := core.NewReadOnlyFS(bundle)
+		logger, err := dlogger.GetLogger(logLevel)
+		if err != nil {
+			log.Fatalln("Failed to set log level:" + err.Error())
+		}
+		fs, err := core.NewReadOnlyFS(bundle, logger)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -65,6 +71,7 @@ func init() {
 	addBucketNameFlag(mountBundleCmd)
 	addBlobBucket(mountBundleCmd)
 	addBundleFlag(mountBundleCmd)
+	addLogLevel(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
 	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
 

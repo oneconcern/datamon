@@ -22,6 +22,12 @@ var uploadBundleCmd = &cobra.Command{
 	Short: "Upload a bundle",
 	Long:  "Upload a bundle consisting of all files stored in a directory",
 	Run: func(cmd *cobra.Command, args []string) {
+		if repoParams.ContributorEmail == "" {
+			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
+		}
+		if repoParams.ContributorName == "" {
+			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
+		}
 
 		fmt.Println(config.Credential)
 		MetaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)

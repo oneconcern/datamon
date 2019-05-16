@@ -133,12 +133,12 @@ func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 func Publish(ctx context.Context, bundle *Bundle) error {
 	err := PublishMetadata(ctx, bundle)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to publish, err:%s", err)
 	}
 
 	err = unpackDataFiles(ctx, bundle, "")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to unpack data files, err:%s", err)
 	}
 	return nil
 }
