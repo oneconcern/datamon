@@ -15,46 +15,39 @@ import (
 )
 
 // This is based on the server written in gcp-filestore-csi-driver
+// This is essentially a wrapper around the grpc server and setups up the right profile for receiving grpc requests.
 
 type NonBlockingGRPCServer interface {
-	Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer, l *zap.Logger)
+	Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer)
 	Wait()
-	Stop()
-	ForceStop()
 }
 
-func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
-	return &nonBlockingGRPCServer{}
+func NewNonBlockingGRPCServer(logger *zap.Logger) NonBlockingGRPCServer {
+	return &nonBlockingGRPCServer{
+		logger: logger,
+	}
 }
 
 type nonBlockingGRPCServer struct {
 	wg     sync.WaitGroup
 	server *grpc.Server
+	logger *zap.Logger
 }
 
-func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer, logger *zap.Logger) {
-
+func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	s.wg.Add(1)
-
-	go s.serve(endpoint, ids, cs, ns, logger)
+	go s.serve(endpoint, ids, cs, ns)
 }
 
 func (s *nonBlockingGRPCServer) Wait() {
 	s.wg.Wait()
 }
 
-func (s *nonBlockingGRPCServer) Stop() {
-	s.server.GracefulStop()
-}
-
-func (s *nonBlockingGRPCServer) ForceStop() {
-	s.server.Stop()
-}
-
-func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer, logger *zap.Logger) {
+func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		logger.Fatal(err.Error())
+		s.logger.Fatal(err.Error())
+		return
 	}
 
 	var addr string
@@ -62,22 +55,22 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	case "unix":
 		addr = u.Path
 		if err = os.Remove(addr); err != nil && !os.IsNotExist(err) {
-			logger.Fatal("failed to remove", zap.String("addr", addr), zap.Error(err))
+			s.logger.Fatal("failed to remove", zap.String("addr", addr), zap.Error(err))
 		}
 	case "tcp":
 		addr = u.Host
 	default:
-		logger.Fatal("endpoint scheme not supported", zap.String("scheme", u.Scheme))
+		s.logger.Fatal("endpoint scheme not supported", zap.String("scheme", u.Scheme))
 	}
 
 	listener, err := net.Listen(u.Scheme, addr)
 	if err != nil {
-		logger.Fatal("failed to listen", zap.Error(err))
+		s.logger.Fatal("failed to listen", zap.Error(err))
 	}
-	logger.Info("started listening", zap.String("scheme", u.Scheme), zap.String("addr", addr))
+	s.logger.Info("started listening", zap.String("scheme", u.Scheme), zap.String("addr", addr))
 
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(getInterceptor(logger)),
+		grpc.UnaryInterceptor(getInterceptor(s.logger)),
 	}
 	server := grpc.NewServer(opts...)
 	s.server = server
@@ -91,11 +84,11 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	if ns != nil {
 		csi.RegisterNodeServer(server, ns)
 	}
-	logger.Info("Listening for connections", zap.Any("addr", listener))
+	s.logger.Info("Listening for connections", zap.Any("addr", listener))
 
 	err = server.Serve(listener)
 	if err != nil {
-		logger.Fatal("Failed to start server", zap.Error(err))
+		s.logger.Fatal("Failed to start server", zap.Error(err))
 	}
 }
 

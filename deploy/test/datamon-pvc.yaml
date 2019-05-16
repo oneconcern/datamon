@@ -1,0 +1,14 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: datamon.test
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: datamon.test
+  resources:
+    requests:
+      storage: 1Ti
+  selector:
+    matchLabels:
+      release: "1KxavySkoXqThY0AcKa432oukop"

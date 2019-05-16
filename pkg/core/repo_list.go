@@ -35,3 +35,35 @@ func ListRepos(store storage.Store) ([]string, error) {
 
 	return keys, nil
 }
+
+func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescriptor, error) {
+	// Get a list
+	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", 1000000)
+	var repos = make([]model.RepoDescriptor, 0)
+	tokenHit := false
+	for _, k := range ks {
+		c := strings.SplitN(k, "/", 3)[1]
+		if c == token {
+			tokenHit = true
+		}
+		if !tokenHit {
+			continue
+		}
+		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(c))
+		if err != nil {
+			return nil, err
+		}
+		o, err := ioutil.ReadAll(r)
+		if err != nil {
+			return nil, err
+		}
+		var rd model.RepoDescriptor
+		err = yaml.Unmarshal(o, &rd)
+		if err != nil {
+			return nil, err
+		}
+		repos = append(repos, rd)
+	}
+
+	return repos, nil
+}

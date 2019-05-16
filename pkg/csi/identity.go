@@ -16,8 +16,8 @@ func newIdentityServer(driver *Driver) csi.IdentityServer { // nolint:deadcode,u
 
 func (s *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	return &csi.GetPluginInfoResponse{
-		Name:          s.driver.Config.Name,
-		VendorVersion: s.driver.Config.Version,
+		Name:          s.driver.config.Name,
+		VendorVersion: s.driver.config.Version,
 	}, nil
 }
 
