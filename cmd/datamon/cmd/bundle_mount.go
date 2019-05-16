@@ -72,6 +72,8 @@ func init() {
 	addBlobBucket(mountBundleCmd)
 	addBundleFlag(mountBundleCmd)
 	addLogLevel(mountBundleCmd)
+	// todo: #165 add --cpuprof to all commands via root
+	addCPUProfFlag(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
 	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
 

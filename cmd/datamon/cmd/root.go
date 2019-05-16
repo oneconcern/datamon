@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime/pprof"
 
 	"github.com/spf13/viper"
 
@@ -28,7 +29,13 @@ const (
 	credential       = "credential"
 	file             = "file"
 	loglevel         = "loglevel"
+	cpuprof          = "cpuprof"
 )
+
+// todo: "namespace" these with a struct{} as elsewhere
+var credFile string
+var logLevel string
+var cpuProf bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -42,11 +49,24 @@ Datamon works by providing a git like interface to manage data efficiently.
 It executes pipelines by scheduling the processors as serverless functions on either AWS lambda or on kubeless.
 
 `,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if cpuProf {
+			f, err := os.Create("cpu.prof")
+			if err != nil {
+				log.Fatal(err)
+			}
+			_ = pprof.StartCPUProfile(f)
+		}
+	},
+	// upstream api note:  *PostRun functions aren't called in case of a panic() in Run
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		if cpuProf {
+			pprof.StopCPUProfile()
+		}
+	},
 }
 
 var config *Config
-var credFile string
-var logLevel string
 
 // used to patch over calls to os.Exit() during test
 var logFatalln = log.Fatalln
@@ -107,4 +127,9 @@ func addCredentialFile(cmd *cobra.Command) string {
 func addLogLevel(cmd *cobra.Command) string {
 	cmd.Flags().StringVar(&logLevel, loglevel, "info", "The logging level")
 	return logLevel
+}
+
+func addCPUProfFlag(cmd *cobra.Command) bool {
+	cmd.Flags().BoolVar(&cpuProf, cpuprof, false, "Toggle runtime profiling")
+	return cpuProf
 }

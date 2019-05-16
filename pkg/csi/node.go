@@ -96,7 +96,8 @@ func (n *nodeServer) prepBundle(repo string, bundle string, volumeID string) err
 				zap.Error(err))
 			return status.Error(codes.Internal, "failed to initialize repo:bundle "+repo+":"+bundle)
 		}
-		downloadedBundle := downloadedBundle{
+
+		n.bundleMap[volumeID] = &downloadedBundle{
 			repo:     repo,
 			bundleID: bundle,
 			path:     "", // TODO
@@ -104,8 +105,6 @@ func (n *nodeServer) prepBundle(repo string, bundle string, volumeID string) err
 			fs:       fs,
 			mounted:  false,
 		}
-
-		n.bundleMap[volumeID] = &downloadedBundle
 		n.l.Info("volume ready to be published",
 			zap.String("volumeID", volumeID),
 			zap.String("repo", repo),
@@ -133,7 +132,7 @@ func (n *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		n.l.Info("latest commit for main branch", zap.String("repo", repo), zap.String("req", req.String()))
 	}
 
-	downloadedBundle, ok := n.bundleMap[req.VolumeId]
+	_, ok = n.bundleMap[req.VolumeId]
 	if !ok {
 		err := n.prepBundle(repo, bundle, req.VolumeId)
 		if err != nil {
@@ -142,7 +141,7 @@ func (n *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	} else {
 		n.l.Info("mounting an existing bundle", zap.String("req", req.String()))
 	}
-	downloadedBundle, ok = n.bundleMap[req.VolumeId]
+	downloadedBundle, ok := n.bundleMap[req.VolumeId]
 	if !ok {
 		return nil, status.Error(codes.Internal, "fsMap missing entry: "+req.String())
 	}
