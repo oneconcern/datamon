@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"math"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -16,26 +17,26 @@ import (
 
 	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 )
 
 const (
-	leafSize         = cafs.DefaultLeafSize
-	entryFilesCount  = 2
-	dataFilesCount   = 4
-	repo             = "bundle-test-repo"
-	bundleID         = "bundle123"
-	testRoot         = "../../testdata/core"
-	sourceDir        = "../../testdata/core/bundle/source/"
-	blobDir          = sourceDir + "/blob"
-	metaDir          = sourceDir + "/meta"
-	destinationDir   = "../../testdata/core/bundle/destination/"
-	reArchiveMetaDir = "../../testdata/core/bundle/destination2/meta"
-	reArchiveBlobDir = "../../testdata/core/bundle/destination2/blob"
-	original         = "../../testdata/core/internal/"
-	dataDir          = "dir/"
+	leafSize               = cafs.DefaultLeafSize
+	entryFilesCount        = 2
+	dataFilesCount         = 4
+	repo                   = "bundle-test-repo"
+	bundleID               = "bundle123"
+	testRoot               = "../../testdata/core"
+	sourceDir              = "../../testdata/core/bundle/source/"
+	blobDir                = sourceDir + "/blob"
+	metaDir                = sourceDir + "/meta"
+	destinationDir         = "../../testdata/core/bundle/destination/"
+	reArchiveMetaDir       = "../../testdata/core/bundle/destination2/meta"
+	reArchiveBlobDir       = "../../testdata/core/bundle/destination2/blob"
+	reBundleEntriesPerFile = 3
+	original               = "../../testdata/core/internal/"
+	dataDir                = "dir/"
 )
 
 var (
@@ -85,43 +86,90 @@ func TestBundle(t *testing.T) {
 
 	validatePublish(t, consumableStore)
 
+	/* bundle id is set on upload */
 	archiveBundle2 := New(bd,
 		Repo(repo),
 		MetaStore(reArchive),
 		ConsumableStore(consumableStore),
 		BlobStore(reArchiveBlob),
-		BundleID(bundleID),
 	)
 
 	require.NoError(t,
-		Upload(context.Background(), archiveBundle2))
+		implUpload(context.Background(), archiveBundle2, reBundleEntriesPerFile))
 
-	require.True(t, validateUpload(t))
+	require.True(t, validateUpload(t, bundle, archiveBundle2))
 }
 
 func validatePublish(t *testing.T, store storage.Store) {
 	// Check Bundle File
-	reader, err := store.Get(context.Background(), model.GetConsumablePathToBundle(bundleID))
-	require.NoError(t, err)
-
-	bundleDescriptorBuffer, err := ioutil.ReadAll(reader)
-	require.NoError(t, err)
-
-	var bundleDescriptor model.BundleDescriptor
-	err = yaml.Unmarshal(bundleDescriptorBuffer, &bundleDescriptor)
-	require.NoError(t, err)
-
-	require.True(t, validateBundleDescriptor(bundleDescriptor))
-
+	bundleDescriptor := readBundleDescriptor(t, store, model.GetConsumablePathToBundle(bundleID))
+	require.Equal(t, bundleDescriptor, generateBundleDescriptor())
 	// Check Files
 	validateDataFiles(t, original, destinationDir+dataDir)
 }
 
-func validateUpload(t *testing.T) bool {
+func validateUpload(t *testing.T, origBundle *Bundle, uploadedBundle *Bundle) bool {
 	// Check if the blobs are the same as download
 	require.True(t, validateDataFiles(t, blobDir, reArchiveBlobDir))
-	// Check if the bundle json and file list are what is expected.
+	// Check the file list contents
+	origFileList := readBundleFilelist(t, origBundle, entryFilesCount)
+	reEntryFilesCount := uint64(math.Ceil(float64(entryFilesCount*dataFilesCount) / float64(reBundleEntriesPerFile)))
+	reFileList := readBundleFilelist(t, uploadedBundle, reEntryFilesCount)
+	require.Equal(t, len(origFileList), len(reFileList))
+	// in particular, note that the file lists might not list the files in the same order.
+	origBundleEntries := make(map[string]model.BundleEntry)
+	for _, ent := range origFileList {
+		origBundleEntries[ent.Hash] = ent
+	}
+	for _, reEnt := range reFileList {
+		origEnt, exists := origBundleEntries[reEnt.Hash]
+		require.True(t, exists)
+		require.Equal(t, reEnt.NameWithPath, origEnt.NameWithPath)
+		// ??? unchecked values on on BundleEntry.  what values to test at this level of abstraction?
+	}
+	// Check Bundle File
+	pathToBundleDescriptor := model.GetArchivePathToBundle(uploadedBundle.RepoID, uploadedBundle.BundleID)
+	bundleDescriptor := readBundleDescriptor(t, uploadedBundle.MetaStore, pathToBundleDescriptor)
+	expectedBundleDescriptor := generateBundleDescriptor()
+	require.Equal(t, bundleDescriptor.Parents, expectedBundleDescriptor.Parents)
+	require.Equal(t, bundleDescriptor.LeafSize, expectedBundleDescriptor.LeafSize)
+	// ??? unchecked values on on BundleDescriptor.  what values to test at this level of abstraction?
 	return true
+}
+
+func readBundleFilelist(t *testing.T,
+	bundle *Bundle,
+	bundleEntriesFileCount uint64,
+) []model.BundleEntry {
+	var fileList []model.BundleEntry
+	for i := 0; i < int(bundleEntriesFileCount); i++ {
+		bundleEntriesReader, err := bundle.MetaStore.Get(context.Background(),
+			model.GetArchivePathToBundleFileList(repo, bundle.BundleID, uint64(i)))
+		require.NoError(t, err)
+		var bundleEntries model.BundleEntries
+		bundleEntriesBuffer, err := ioutil.ReadAll(bundleEntriesReader)
+		require.NoError(t, err)
+		require.NoError(t, yaml.Unmarshal(bundleEntriesBuffer, &bundleEntries))
+		fileList = append(fileList, bundleEntries.BundleEntries...)
+	}
+	// verify that the file count is correct
+	_, err := bundle.MetaStore.Get(context.Background(),
+		model.GetArchivePathToBundleFileList(repo, bundle.BundleID, bundleEntriesFileCount))
+	require.NotNil(t, err)
+	return fileList
+}
+
+func readBundleDescriptor(t *testing.T,
+	store storage.Store,
+	pathToBundle string) model.BundleDescriptor {
+	var bundleDescriptor model.BundleDescriptor
+	reader, err := store.Get(context.Background(), pathToBundle)
+	require.NoError(t, err)
+	bundleDescriptorBuffer, err := ioutil.ReadAll(reader)
+	require.NoError(t, err)
+	err = yaml.Unmarshal(bundleDescriptorBuffer, &bundleDescriptor)
+	require.NoError(t, err)
+	return bundleDescriptor
 }
 
 func getTimeStamp() *time.Time {
@@ -202,11 +250,6 @@ func generateBundleDescriptor() model.BundleDescriptor {
 		Contributors:           []model.Contributor{{Name: "dev", Email: "dev@dev.com"}},
 		BundleEntriesFileCount: entryFilesCount,
 	}
-}
-
-func validateBundleDescriptor(descriptor model.BundleDescriptor) bool {
-	expectedBundle := generateBundleDescriptor()
-	return reflect.DeepEqual(descriptor, expectedBundle)
 }
 
 func validateDataFiles(t *testing.T, expectedDir string, actualDir string) bool {

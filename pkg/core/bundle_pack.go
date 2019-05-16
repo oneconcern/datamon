@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	bundleEntriesPerFile = 1000
+	defaultBundleEntriesPerFile = 1000
 )
 
 type filePacked struct {
@@ -61,7 +61,7 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 	return nil
 }
 
-func uploadBundle(ctx context.Context, bundle *Bundle) error {
+func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
 	files, err := bundle.ConsumableStore.Keys(ctx)
@@ -132,7 +132,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle) error {
 				Size:         f.size})
 
 			// Write the bundle entry file if reached max or the last one
-			if count == 0 || len(fileList)%bundleEntriesPerFile == 0 {
+			if count == 0 || uint(len(fileList))%bundleEntriesPerFile == 0 {
 				err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:])
 				if err != nil {
 					fmt.Printf("Bundle upload failed.  Failed to upload bundle entries list %v", err)
