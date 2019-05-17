@@ -3,9 +3,9 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path"
-	"reflect"
 	"time"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
@@ -25,49 +25,44 @@ func (fs *readOnlyFsInternal) StatFS(
 }
 
 func (fs *readOnlyFsInternal) opStart(op interface{}) {
-	opType := reflect.TypeOf(op)
-	switch op.(type) {
+	switch t := op.(type) {
 	case *fuseops.ReadFileOp:
-		r := op.(*fuseops.ReadFileOp)
 		fs.l.Info("Start",
-			zap.String("Request", opType.String()),
+			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(r.Inode)),
+			zap.Uint64("inode", uint64(t.Inode)),
 		)
 		return
 	case *fuseops.WriteFileOp:
-		w := op.(*fuseops.WriteFileOp)
 		fs.l.Info("Start",
-			zap.String("Request", opType.String()),
+			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(w.Inode)),
+			zap.Uint64("inode", uint64(t.Inode)),
 		)
 		return
 	case *fuseops.ReadDirOp:
-		r := op.(*fuseops.ReadDirOp)
 		fs.l.Info("Start",
-			zap.String("Request", opType.String()),
+			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(r.Inode)),
+			zap.Uint64("inode", uint64(t.Inode)),
 		)
 		return
 	}
 	fs.l.Info("Start",
-		zap.String("Request", opType.String()),
+		zap.String("Request", fmt.Sprintf("%T", op)),
 		zap.String("repo", fs.bundle.RepoID),
 		zap.String("bundle", fs.bundle.BundleID),
 		zap.Any("op", op),
 	)
 }
 func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
-	opType := reflect.TypeOf(op)
 	switch t := op.(type) {
 	case *fuseops.ReadFileOp:
 		fs.l.Info("End",
-			zap.String("Request", opType.String()),
+			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
 			zap.Uint64("inode", uint64(t.Inode)),
@@ -76,7 +71,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		return
 	case *fuseops.WriteFileOp:
 		fs.l.Info("End",
-			zap.String("Request", opType.String()),
+			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
 			zap.Uint64("inode", uint64(t.Inode)),
@@ -85,7 +80,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		return
 	case *fuseops.ReadDirOp:
 		fs.l.Info("End",
-			zap.String("Request", opType.String()),
+			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
 			zap.Uint64("inode", uint64(t.Inode)),
@@ -94,7 +89,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		return
 	}
 	fs.l.Info("End",
-		zap.String("Request", reflect.TypeOf(op).String()),
+		zap.String("Request", fmt.Sprintf("%T", op)),
 		zap.String("repo", fs.bundle.RepoID),
 		zap.String("bundle", fs.bundle.BundleID),
 		zap.Any("op", op),

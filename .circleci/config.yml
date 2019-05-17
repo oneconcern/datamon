@@ -41,7 +41,7 @@ jobs:
       - run:
           name: Run golang linter
           command: |
-            golangci-lint run --build-tags fuse_cli --max-same-issues 0 --verbose
+            golangci-lint run --disable golint --build-tags fuse_cli --max-same-issues 0 --verbose
   go_build:
     working_directory: ~/project
     docker:
@@ -100,7 +100,7 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      # - go_lint:
-      #    context: "OC Common"
+      - go_lint:
+         context: "OC Common"
       - go_build:
           context: "OC Common"
