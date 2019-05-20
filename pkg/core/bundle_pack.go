@@ -61,6 +61,43 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 	return nil
 }
 
+type uploadBundleChans struct {
+	// recv data from goroutines about uploaded files
+	filePacked chan<- filePacked
+	error      chan<- errorHit
+	// broadcast to all goroutines not to block by closing this channel
+	done <-chan struct{}
+}
+
+func uploadBundleFile(
+	ctx context.Context,
+	file string,
+	cafsArchive cafs.Fs,
+	fileReader io.Reader,
+	chans uploadBundleChans) {
+	written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
+	if e != nil {
+		select {
+		case chans.error <- errorHit{
+			error: e,
+			file:  file,
+		}:
+		case <-chans.done:
+		}
+		return
+	}
+	select {
+	case chans.filePacked <- filePacked{
+		hash:      key.String(),
+		keys:      keys,
+		name:      file,
+		size:      uint64(written),
+		duplicate: duplicate,
+	}:
+	case <-chans.done:
+	}
+}
+
 func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
@@ -75,75 +112,67 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	if err != nil {
 		return err
 	}
-
-	fileList := make([]model.BundleEntry, 0)
-	var firstUnuploadBundleEntryIndex uint
 	// Upload the files and the bundle list
 	err = bundle.InitializeBundleID()
 	if err != nil {
 		return err
 	}
 
-	fC := make(chan filePacked, len(files))
-	eC := make(chan errorHit, len(files))
+	/* kick off file uploads */
+	filePackedC := make(chan filePacked)
+	errorHitC := make(chan errorHit)
+	doneC := make(chan struct{})
+	defer close(doneC)
 	var count int64
 	for _, file := range files {
 		// Check to see if the file is to be skipped.
 		if model.IsGeneratedFile(file) {
 			continue
 		}
-
 		var fileReader io.ReadCloser
 		fileReader, err = bundle.ConsumableStore.Get(ctx, file)
 		if err != nil {
 			return err
 		}
 		count++
-		go func(file string) {
-			written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
-			if e != nil {
-				eC <- errorHit{
-					error: e,
-					file:  file,
-				}
-				return
-			}
-
-			fC <- filePacked{
-				hash:      key.String(),
-				keys:      keys,
-				name:      file,
-				size:      uint64(written),
-				duplicate: duplicate,
-			}
-		}(file)
+		go uploadBundleFile(ctx, file, cafsArchive, fileReader, uploadBundleChans{
+			filePacked: filePackedC,
+			error:      errorHitC,
+			done:       doneC,
+		})
 	}
+	/* block on upload results */
+	filePackedList := make([]filePacked, 0)
 	for count > 0 {
 		select {
-		case f := <-fC:
+		case f := <-filePackedC:
 			log.Printf("Uploaded file:%s, duplicate:%t, key:%s, keys:%d", f.name, f.duplicate, f.hash, len(f.keys))
-
+			filePackedList = append(filePackedList, f)
 			count--
-
-			fileList = append(fileList, model.BundleEntry{
-				Hash:         f.hash,
-				NameWithPath: f.name,
-				FileMode:     0, // #TODO: #35 file mode support
-				Size:         f.size})
-
-			// Write the bundle entry file if reached max or the last one
-			if count == 0 || uint(len(fileList))%bundleEntriesPerFile == 0 {
-				err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:])
-				if err != nil {
-					fmt.Printf("Bundle upload failed.  Failed to upload bundle entries list %v", err)
-					return err
-				}
-				firstUnuploadBundleEntryIndex = uint(len(fileList))
-			}
-		case e := <-eC:
+		case e := <-errorHitC:
 			count--
 			fmt.Printf("Bundle upload failed. Failed to upload file %s err: %s", e.file, e.error)
 			return e.error
+		}
+	}
+	/* sync upload metadata */
+	fileList := make([]model.BundleEntry, 0)
+	var firstUnuploadBundleEntryIndex uint
+	for packedFileIdx, packedFile := range filePackedList {
+		fileList = append(fileList, model.BundleEntry{
+			Hash:         packedFile.hash,
+			NameWithPath: packedFile.name,
+			FileMode:     0, // #TODO: #35 file mode support
+			Size:         packedFile.size})
+
+		// Write the bundle entry file if reached max or the last one
+		if packedFileIdx == len(filePackedList)-1 || uint(1+packedFileIdx)%bundleEntriesPerFile == 0 {
+			err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:])
+			if err != nil {
+				fmt.Printf("Bundle upload failed.  Failed to upload bundle entries list %v", err)
+				return err
+			}
+			firstUnuploadBundleEntryIndex = uint(len(fileList))
 		}
 	}
 	err = uploadBundleDescriptor(ctx, bundle)
