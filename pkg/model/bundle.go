@@ -88,8 +88,18 @@ func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) 
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".json")
 }
 
+/* this function's design is converging on being able to return something meaningful
+ * given any path in the metadata archive, not just those corresponding to bundles.
+ *
+ * using type polymorphism (i.e. interfaces) on  the return value might make more sense
+ * as the design is built out.  with that in mind, its consumers might be better off using
+ * type inference on its return value until this note is addressed.
+ */
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	cs := strings.SplitN(archivePath, "/", 4)
+	if cs[2] == "repo.json" {
+		return ArchivePathComponents{Repo: cs[1]}, nil
+	}
 	return ArchivePathComponents{
 		Repo:            cs[1],
 		BundleID:        cs[2],

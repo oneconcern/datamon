@@ -16,8 +16,11 @@ func ListRepos(store storage.Store) ([]string, error) {
 	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", 1000000)
 	var keys = make([]string, 0)
 	for _, k := range ks {
-		c := strings.SplitN(k, "/", 3)[1]
-		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(c))
+		apc, err := model.GetArchivePathComponents(k)
+		if err != nil {
+			return nil, err
+		}
+		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(apc.Repo))
 		if err != nil {
 			return nil, err
 		}
@@ -30,7 +33,7 @@ func ListRepos(store storage.Store) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		keys = append(keys, c+" , "+rd.Description+" , "+rd.Contributor.Name+" , "+rd.Contributor.Email+" , "+rd.Timestamp.String())
+		keys = append(keys, apc.Repo+" , "+rd.Description+" , "+rd.Contributor.Name+" , "+rd.Contributor.Email+" , "+rd.Timestamp.String())
 	}
 
 	return keys, nil
