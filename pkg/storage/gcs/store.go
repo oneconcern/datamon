@@ -69,6 +69,8 @@ func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
 }
 
 type gcsReader struct {
+	g            *gcs
+	objectName   string
 	objectReader io.ReadCloser
 }
 
@@ -76,12 +78,21 @@ func (r *gcsReader) WriteTo(writer io.Writer) (n int64, err error) {
 	return storage.PipeIO(writer, r.objectReader)
 }
 
-func (r gcsReader) Close() error {
+func (r *gcsReader) Close() error {
 	return r.objectReader.Close()
 }
 
-func (r gcsReader) Read(p []byte) (n int, err error) {
-	return r.objectReader.Read(p)
+func (r *gcsReader) Read(p []byte) (n int, err error) {
+	read, err := r.objectReader.Read(p)
+	return read, err
+}
+
+func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
+	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.objectName).NewRangeReader(context.Background(), offset, int64(len(p)))
+	if err != nil {
+		return 0, err
+	}
+	return objectReader.Read(p)
 }
 
 func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error) {
@@ -89,8 +100,15 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 	if err != nil {
 		return nil, err
 	}
-	return gcsReader{
+	return &gcsReader{
 		objectReader: objectReader,
+	}, nil
+}
+
+func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
+	return &gcsReader{
+		g:          g,
+		objectName: objectName,
 	}, nil
 }
 
@@ -170,8 +188,4 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 
 func (g *gcs) Clear(context.Context) error {
 	return errors.New("unimplemented")
-}
-
-func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
-	return nil, errors.New("unimplemented")
 }
