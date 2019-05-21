@@ -86,6 +86,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 
 	fC := make(chan filePacked, len(files))
 	eC := make(chan errorHit, len(files))
+	cC := make(chan struct{}, 10)
 	var count int64
 	for _, file := range files {
 		// Check to see if the file is to be skipped.
@@ -99,7 +100,11 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 			return err
 		}
 		count++
+		cC <- struct{}{}
 		go func(file string) {
+			defer func() {
+				<-cC
+			}()
 			written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
 			if e != nil {
 				eC <- errorHit{

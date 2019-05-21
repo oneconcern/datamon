@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	maxGoRoutinesPerPut = 100
+	maxGoRoutinesPerPut = 10
+	maxCAFSFileSize     = 1024 * 1024 * 1024 * 300          // 300 Gig
+	sizeOfFlushChan     = maxCAFSFileSize / DefaultLeafSize // https://github.com/oneconcern/datamon/issues/171
 )
 
 // Writer interface for a content addressable FS
@@ -100,6 +102,7 @@ func pFlush(
 		wg.Done()
 		<-maxGoRoutines
 	}
+	defer done()
 	// Calculate hash value
 	hasher, err := blake2b.New(&blake2b.Config{
 		Size: blake2b.Size,
@@ -115,20 +118,17 @@ func pFlush(
 	})
 	if err != nil {
 		errC <- err
-		done()
 		return
 	}
 	_, err = hasher.Write(buffer)
 	if err != nil {
 		errC <- fmt.Errorf("flush segment hash: %v", err)
-		done()
 		return
 	}
 
 	leafKey, err := NewKey(hasher.Sum(nil))
 	if err != nil {
 		errC <- fmt.Errorf("flush key segment: %v", err)
-		done()
 		return
 	}
 
@@ -148,7 +148,6 @@ func pFlush(
 		}
 		if err != nil {
 			errC <- fmt.Errorf("write segment file: %v", err)
-			done()
 			return
 		}
 		fmt.Printf("Uploading blob:%s\n", leafKey.String())
@@ -159,7 +158,6 @@ func pFlush(
 		count: count,
 		key:   leafKey,
 	}
-	done()
 }
 
 func (w *fsWriter) flush(isLastNode bool) (int, error) {
