@@ -138,6 +138,10 @@ func (dfs *ReadOnlyFS) Unmount(path string) error {
 	return fuse.Unmount(path)
 }
 
+func (dfs *ReadOnlyFS) JoinMount(ctx context.Context) error {
+	return dfs.mfs.Join(ctx)
+}
+
 func (dfs *MutableFS) Unmount(path string) error {
 	// On unmount, walk the FS and create a bundle
 	_ = dfs.fsInternal.Commit()
@@ -145,4 +149,12 @@ func (dfs *MutableFS) Unmount(path string) error {
 	// dump the metadata to the local FS to manually recover.
 	//}
 	return fuse.Unmount(path)
+}
+
+func (dfs *MutableFS) JoinMount(ctx context.Context) error {
+	return dfs.mfs.Join(ctx)
+}
+
+func (dfs *MutableFS) Commit() error {
+	return dfs.fsInternal.Commit()
 }

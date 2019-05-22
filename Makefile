@@ -165,4 +165,4 @@ goimports:
 .PHONY: check
 ## Runs static code analysis checks (golangci-lint)
 check: gofmt goimports
-	@golangci-lint run --max-same-issues 0 --verbose
+	@golangci-lint run --build-tags fuse_cli --max-same-issues 0 --verbose

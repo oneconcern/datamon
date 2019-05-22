@@ -30,6 +30,7 @@ const (
 	file             = "file"
 	loglevel         = "loglevel"
 	cpuprof          = "cpuprof"
+	daemonize        = "daemonize"
 )
 
 // todo: "namespace" these with a struct{} as elsewhere

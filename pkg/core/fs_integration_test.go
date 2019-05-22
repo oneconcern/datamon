@@ -273,7 +273,6 @@ func (fs *testErrCaFs) Has(ctx context.Context, key cafs.Key, cfgs ...cafs.HasOp
 }
 
 /* os x fuse workarounds */
-
 func aferoWriteFile(fs afero.Fs, filename string, data []byte, perm os.FileMode) (err error) {
 	rc := 2
 	for i := 0; i < rc; i++ {
