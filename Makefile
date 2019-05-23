@@ -41,6 +41,20 @@ help:
 	} \
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
+.PHONY: build-and-push-fuse-sidecar
+## build sidecar container used in fuse demo
+build-and-push-fuse-sidecar:
+	@echo 'building fuse demo container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-fuse-sidecar \
+		-t gcr.io/onec-co/datamon-fuse-sidecar:${GITHUB_USER}-$$(date '+%Y%m%d') \
+		-t gcr.io/onec-co/datamon-fuse-sidecar:$(subst /,_,$(GIT_BRANCH)) \
+		--ssh default \
+		-f sidecar.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-fuse-sidecar
+
 .PHONY: fuse-demo-build-shell
 ## build shell container used in fuse demo
 fuse-demo-build-shell:
