@@ -10,6 +10,8 @@ import (
 	"io"
 	"log"
 
+	"go.uber.org/zap"
+
 	"github.com/oneconcern/datamon/pkg/storage"
 
 	"gopkg.in/yaml.v2"
@@ -61,10 +63,27 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 	return nil
 }
 
-func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+func (b *Bundle) skipFile(file string) bool {
+	exist, err := b.ConsumableStore.Has(context.Background(), file)
+	if err != nil {
+		b.l.Error("could not check if file exists",
+			zap.String("file", file),
+			zap.String("repo", b.RepoID),
+			zap.String("bundleID", b.BundleID))
+		exist = true // Code will decide later how to handle this file
+	}
+	return model.IsGeneratedFile(file) || (b.SkipOnError && !exist)
+}
+
+func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error)) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
-	files, err := bundle.ConsumableStore.Keys(ctx)
+	if getKeys == nil {
+		getKeys = func() ([]string, error) {
+			return bundle.ConsumableStore.Keys(context.Background())
+		}
+	}
+	files, err := getKeys()
 	if err != nil {
 		return err
 	}
@@ -77,7 +96,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	}
 
 	fileList := make([]model.BundleEntry, 0)
-	var firstUnuploadBundleEntryIndex uint
+	var firstUploadBundleEntryIndex uint
 	// Upload the files and the bundle list
 	err = bundle.InitializeBundleID()
 	if err != nil {
@@ -86,17 +105,30 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 
 	fC := make(chan filePacked, len(files))
 	eC := make(chan errorHit, len(files))
-	cC := make(chan struct{}, 10)
+	cC := make(chan struct{}, 20)
 	var count int64
 	for _, file := range files {
 		// Check to see if the file is to be skipped.
-		if model.IsGeneratedFile(file) {
+		if bundle.skipFile(file) {
+			bundle.l.Info("skipping file",
+				zap.String("file", file),
+				zap.String("repo", bundle.RepoID),
+				zap.String("bundleID", bundle.BundleID),
+			)
 			continue
 		}
 
 		var fileReader io.ReadCloser
 		fileReader, err = bundle.ConsumableStore.Get(ctx, file)
-		if err != nil {
+		if err != nil && bundle.SkipOnError {
+			bundle.l.Info("skipping file",
+				zap.String("file", file),
+				zap.String("repo", bundle.RepoID),
+				zap.String("bundleID", bundle.BundleID),
+				zap.Error(err),
+			)
+			continue
+		} else if err != nil {
 			return err
 		}
 		count++
@@ -138,12 +170,12 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 
 			// Write the bundle entry file if reached max or the last one
 			if count == 0 || uint(len(fileList))%bundleEntriesPerFile == 0 {
-				err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:])
+				err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUploadBundleEntryIndex:])
 				if err != nil {
 					fmt.Printf("Bundle upload failed.  Failed to upload bundle entries list %v", err)
 					return err
 				}
-				firstUnuploadBundleEntryIndex = uint(len(fileList))
+				firstUploadBundleEntryIndex = uint(len(fileList))
 			}
 		case e := <-eC:
 			count--
