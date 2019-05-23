@@ -93,9 +93,11 @@ func TestBundle(t *testing.T) {
 		ConsumableStore(consumableStore),
 		BlobStore(reArchiveBlob),
 	)
-
+	getKeys := func() ([]string, error) {
+		return bundle.ConsumableStore.Keys(context.Background())
+	}
 	require.NoError(t,
-		implUpload(context.Background(), archiveBundle2, reBundleEntriesPerFile))
+		implUpload(context.Background(), archiveBundle2, reBundleEntriesPerFile, getKeys))
 
 	require.True(t, validateUpload(t, bundle, archiveBundle2))
 }

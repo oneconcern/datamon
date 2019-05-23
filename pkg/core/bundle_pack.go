@@ -61,10 +61,10 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 	return nil
 }
 
-func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error)) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
-	files, err := bundle.ConsumableStore.Keys(ctx)
+	files, err := getKeys()
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 
 	fC := make(chan filePacked, len(files))
 	eC := make(chan errorHit, len(files))
-	cC := make(chan struct{}, 10)
+	cC := make(chan struct{}, 20)
 	var count int64
 	for _, file := range files {
 		// Check to see if the file is to be skipped.

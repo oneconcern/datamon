@@ -30,6 +30,7 @@ var bundleOptions struct {
 	File             string
 	Daemonize        bool
 	Stream           bool
+	FileList         string
 }
 
 func init() {
@@ -61,6 +62,11 @@ func addPathFlag(cmd *cobra.Command) string {
 func addCommitMessageFlag(cmd *cobra.Command) string {
 	cmd.Flags().StringVar(&bundleOptions.Message, message, "", "The message describing the new bundle")
 	return message
+}
+
+func addFileListFlag(cmd *cobra.Command) string {
+	cmd.Flags().StringVar(&bundleOptions.FileList, fileList, "", "Text file containing list of files separated by newline.")
+	return fileList
 }
 
 func addBundleFileFlag(cmd *cobra.Command) string {

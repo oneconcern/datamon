@@ -74,7 +74,7 @@ fuse-demo-build-sidecar:
 		--progress plain \
 		--build-arg github_user=$(GITHUB_USER) \
 		--build-arg github_token=$(GITHUB_TOKEN) \
-		-t gcr.io/onec-co/datamon-fuse-demo-sidecar \
+		-t gcr.io/onec-co/datamon-fuse-sidecar-ritesh \
 		--ssh default \
 		-f ./hack/fuse-demo/sidecar.Dockerfile \
 		.

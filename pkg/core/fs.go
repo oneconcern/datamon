@@ -123,9 +123,9 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
 	if err != nil {
 		return err
 	}
+	// Reminder: Options are OS specific
 	// options := make(map[string]string)
 	// options["allow_other"] = ""
-	// TODO plumb additional mount options
 	mountCfg := &fuse.MountConfig{
 		FSName:      dfs.fsInternal.bundle.RepoID,
 		VolumeName:  dfs.fsInternal.bundle.BundleID,

@@ -32,6 +32,7 @@ const (
 	cpuprof          = "cpuprof"
 	daemonize        = "daemonize"
 	stream           = "stream"
+	fileList         = "files"
 )
 
 // todo: "namespace" these with a struct{} as elsewhere
