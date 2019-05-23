@@ -148,8 +148,8 @@ func (d *defaultFs) writer(prefix string) Writer {
 		pather:        nil,
 		prefix:        prefix,
 		count:         0,
-		flushChan:     make(chan blobFlush, 100000),
-		errC:          make(chan error, 1000000),
+		flushChan:     make(chan blobFlush, sizeOfFlushChan),
+		errC:          make(chan error, sizeOfFlushChan),
 		maxGoRoutines: make(chan struct{}, maxGoRoutinesPerPut),
 		wg:            sync.WaitGroup{},
 	}
