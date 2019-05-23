@@ -429,8 +429,8 @@ func newDatamonFSEntry(bundleEntry *model.BundleEntry, time time.Time, id fuseop
 			Mtime:  time,
 			Ctime:  time,
 			Crtime: time,
-			Uid:    0, // TODO: Set to uid gid usable by container..
-			Gid:    0, // TODO: Same as above
+			Uid:    1020, // TODO: Set to uid gid usable by container..
+			Gid:    2000, // TODO: Same as above
 		},
 	}
 }
