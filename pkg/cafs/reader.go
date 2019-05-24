@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/minio/blake2b-simd"
@@ -157,6 +158,44 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 		}
 	}
 
+}
+
+func (r *chunkReader) calculateKeyAndOffset(off int64) (index int64, offset int64) {
+	index = off / int64(r.leafSize)
+	offset = off - (index * int64(r.leafSize))
+	return
+}
+
+func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
+
+	// Calculate first key and offset.
+	index, offset := r.calculateKeyAndOffset(off)
+	if index >= int64(len(r.keys)) {
+		return 0, nil
+	}
+	var read int
+	for {
+		// Fetch Blob
+		var rdr io.ReaderAt
+		key := r.keys[index]
+		rdr, err = r.fs.GetAt(context.Background(), key.StringWithPrefix(r.prefix))
+		if err != nil {
+			return
+		}
+
+		// Read first leaf
+
+		read, err = rdr.ReadAt(p[n:], offset)
+		n += read
+		index++
+		offset = 0
+		if err != nil && !strings.Contains(err.Error(), "EOF") {
+			return
+		}
+		if (len(p) == n) || (index >= int64(len(r.keys))) {
+			return
+		}
+	}
 }
 
 func (r *chunkReader) Read(data []byte) (int, error) {

@@ -7,6 +7,10 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/oneconcern/datamon/pkg/dlogger"
+
+	"go.uber.org/zap"
+
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"gopkg.in/yaml.v2"
 
@@ -23,28 +27,31 @@ type Bundle struct {
 	MetaStore        storage.Store
 	ConsumableStore  storage.Store
 	BlobStore        storage.Store
+	cafs             cafs.Fs
 	BundleDescriptor model.BundleDescriptor
 	BundleEntries    []model.BundleEntry
+	Streamed         bool
+	l                *zap.Logger
 }
 
 // SetBundleID for the bundle
-func (bundle *Bundle) setBundleID(id string) {
-	bundle.BundleID = id
-	bundle.BundleDescriptor.ID = id
+func (b *Bundle) setBundleID(id string) {
+	b.BundleID = id
+	b.BundleDescriptor.ID = id
 }
 
 // InitializeBundleID create and set a new bundle ID
-func (bundle *Bundle) InitializeBundleID() error {
+func (b *Bundle) InitializeBundleID() error {
 	id, err := ksuid.NewRandom()
 	if err != nil {
 		return err
 	}
-	bundle.setBundleID(id.String())
+	b.setBundleID(id.String())
 	return nil
 }
 
-func (bundle *Bundle) GetBundleEntries() []model.BundleEntry {
-	return bundle.BundleEntries
+func (b *Bundle) GetBundleEntries() []model.BundleEntry {
+	return b.BundleEntries
 }
 
 type BundleOption func(*Bundle)
@@ -113,6 +120,18 @@ func BundleID(bID string) BundleOption {
 	}
 }
 
+func Streaming(s bool) BundleOption {
+	return func(b *Bundle) {
+		b.Streamed = s
+	}
+}
+
+func Logger(l *zap.Logger) BundleOption {
+	return func(b *Bundle) {
+		b.l = l
+	}
+}
+
 func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b := Bundle{
 		RepoID:           "",
@@ -122,9 +141,22 @@ func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 		BlobStore:        nil,
 		BundleDescriptor: *bd,
 		BundleEntries:    make([]model.BundleEntry, 0, 1024),
+		Streamed:         false,
 	}
+
+	b.l, _ = dlogger.GetLogger("info")
+
 	for _, bApply := range bundleOps {
 		bApply(&b)
+	}
+	if b.Streamed {
+		ls := b.BundleDescriptor.LeafSize
+		fs, _ := cafs.New(
+			cafs.LeafSize(ls),
+			cafs.LeafTruncation(b.BundleDescriptor.Version < 1),
+			cafs.Backend(b.BlobStore),
+		)
+		b.cafs = fs
 	}
 	return &b
 }
@@ -135,10 +167,11 @@ func Publish(ctx context.Context, bundle *Bundle) error {
 	if err != nil {
 		return fmt.Errorf("failed to publish, err:%s", err)
 	}
-
-	err = unpackDataFiles(ctx, bundle, "")
-	if err != nil {
-		return fmt.Errorf("failed to unpack data files, err:%s", err)
+	if !bundle.Streamed {
+		err = unpackDataFiles(ctx, bundle, "")
+		if err != nil {
+			return fmt.Errorf("failed to unpack data files, err:%s", err)
+		}
 	}
 	return nil
 }

@@ -39,6 +39,7 @@ func TestChunkReader_SmallOnly(t *testing.T) {
 			continue
 		}
 		verifyChunkReader(t, blobs, tf)
+		verifyChunkReaderAt(t, blobs, tf)
 	}
 }
 
@@ -58,10 +59,33 @@ func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	require.Equal(t, expected, actual)
 }
 
+func verifyChunkReaderAt(t testing.TB, blobs storage.Store, tf testFile) {
+	rkey := keyFromFile(t, tf.RootHash)
+	offset := 11
+	r, err := newReader(blobs, rkey, leafSize, "")
+	require.NoError(t, err)
+	rdr := r.(io.ReaderAt)
+
+	b := make([]byte, 2*leafSize)
+	n, err := rdr.ReadAt(b, int64(offset))
+	if err != nil && !strings.Contains(err.Error(), "EOF") {
+		require.NoError(t, err)
+	}
+	expected := readTextFile(t, tf.Original)
+	count := len(expected) - offset
+	if int(2*leafSize) < len(expected) {
+		count = int(2 * leafSize)
+	}
+	actual := string(b)
+	require.Equal(t, count, n)
+	require.Equal(t, expected[offset:count], actual[:count-offset])
+}
+
 func TestChunkReader_All(t *testing.T) {
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(destDir, "cafs")))
 	for _, tf := range testFiles(destDir) {
 		verifyChunkReader(t, blobs, tf)
+		verifyChunkReaderAt(t, blobs, tf)
 	}
 }
 

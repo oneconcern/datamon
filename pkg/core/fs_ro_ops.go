@@ -32,6 +32,7 @@ func (fs *readOnlyFsInternal) opStart(op interface{}) {
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
 			zap.Uint64("inode", uint64(t.Inode)),
+			zap.Int("buffer", len(t.Dst)),
 		)
 		return
 	case *fuseops.WriteFileOp:
@@ -121,7 +122,7 @@ func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookU
 		err = fuse.ENOENT
 		return
 	}
-	fs.opEnd(op, err)
+	defer fs.opEnd(op, err)
 	return nil
 }
 
@@ -296,7 +297,7 @@ func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
 	fs.opStart(op)
-	fs.opEnd(op, err)
+	defer fs.opEnd(op, err)
 
 	// If file has not been mutated.
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
@@ -304,21 +305,12 @@ func (fs *readOnlyFsInternal) ReadFile(
 		err = fuse.ENOENT
 		return
 	}
-
 	fe := typeAssertToFsEntry(p)
+	fs.l.Debug("reading file", zap.String("file", fe.fullPath), zap.Uint64("inode", uint64(fe.iNode)))
 
-	reader, err := fs.bundle.ConsumableStore.GetAt(context.Background(), fe.fullPath)
-	if err != nil {
-		err = fuse.EIO
-		return
-	}
-	n, err := reader.ReadAt(op.Dst, op.Offset)
-	if err != nil && err.Error() != "EOF" {
-		err = fuse.EIO
-		return
-	}
+	n, err := fs.bundle.ReadAt(fe, op.Dst, op.Offset)
 	op.BytesRead = n
-	return nil
+	return err
 }
 
 func (fs *readOnlyFsInternal) WriteFile(
@@ -352,7 +344,7 @@ func (fs *readOnlyFsInternal) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
 	fs.opStart(op)
-	fs.opEnd(op, err)
+	defer fs.opEnd(op, err)
 	return
 }
 
@@ -369,7 +361,7 @@ func (fs *readOnlyFsInternal) RemoveXattr(
 	ctx context.Context,
 	op *fuseops.RemoveXattrOp) (err error) {
 	fs.opStart(op)
-	fs.opEnd(op, err)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
@@ -387,7 +379,7 @@ func (fs *readOnlyFsInternal) ListXattr(
 	ctx context.Context,
 	op *fuseops.ListXattrOp) (err error) {
 	fs.opStart(op)
-	fs.opEnd(op, err)
+	defer fs.opEnd(op, err)
 	err = fuse.ENOSYS
 	return
 }
