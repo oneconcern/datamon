@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,8 +29,8 @@ const (
 	firstINode       fuseops.InodeID = 1023
 	dirDefaultMode                   = 0777 | os.ModeDir
 	fileDefaultMode                  = 0666
-	dirReadOnlyMode                  = 0755 | os.ModeDir
-	fileReadOnlyMode                 = 0655
+	dirReadOnlyMode                  = 0555 | os.ModeDir
+	fileReadOnlyMode                 = 0444
 	defaultUID                       = 0
 	defaultGID                       = 0
 	dirInitialSize                   = 64
@@ -109,26 +110,43 @@ func NewMutableFS(bundle *Bundle, pathToStaging string) (*MutableFS, error) {
 	}, err
 }
 
+func prepPath(path string) error {
+	err := os.MkdirAll(path, dirDefaultMode)
+	if err != nil && strings.Contains(err.Error(), "file exists") {
+		return nil
+	}
+	return err
+}
+
 func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
+	err := prepPath(path)
+	if err != nil {
+		return err
+	}
+	// options := make(map[string]string)
+	// options["allow_other"] = ""
 	// TODO plumb additional mount options
 	mountCfg := &fuse.MountConfig{
 		FSName:      dfs.fsInternal.bundle.RepoID,
 		VolumeName:  dfs.fsInternal.bundle.BundleID,
 		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
+		// Options:     options,
 	}
-	var err error
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
 	return err
 }
 
 func (dfs *MutableFS) MountMutable(path string) error {
+	err := prepPath(path)
+	if err != nil {
+		return err
+	}
 	// TODO plumb additional mount options
 	mountCfg := &fuse.MountConfig{
 		FSName:      dfs.fsInternal.bundle.RepoID,
 		VolumeName:  dfs.fsInternal.bundle.BundleID,
 		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
 	}
-	var err error
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
 	return err
 }

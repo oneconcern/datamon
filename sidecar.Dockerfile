@@ -30,7 +30,7 @@ ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 FROM ubuntu:latest
 RUN apt-get update && apt-get install -y --no-install-recommends fuse &&\
   apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
+RUN echo "allow_root" >> /etc/fuse.conf
 
 COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip
@@ -40,5 +40,6 @@ ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 RUN useradd -u 1020 -ms /bin/bash developer
 RUN groupadd -g 2000 developers
 RUN usermod -g developers developer
+RUN chown -R developer:developers /usr/bin/datamon
 USER developer
 ENTRYPOINT [ "datamon" ]
