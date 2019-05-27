@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -21,7 +22,7 @@ Every bundle is an entry in the history of a repository at a point in time.
 `,
 }
 
-var bundleOptions struct {
+type BundleOptions struct {
 	ID               string
 	DataPath         string
 	Message          string
@@ -31,6 +32,8 @@ var bundleOptions struct {
 	Daemonize        bool
 	Stream           bool
 }
+
+var bundleOptions = BundleOptions{}
 
 func init() {
 	rootCmd.AddCommand(bundleCmd)
@@ -78,13 +81,28 @@ func addStreamFlag(cmd *cobra.Command) string {
 	return stream
 }
 
-func setLatestBundle(store storage.Store) error {
-	if bundleOptions.ID == "" {
+func setLatestOrLabelledBundle(store storage.Store) error {
+	switch {
+	case bundleOptions.ID != "" && labelOptions.Name != "":
+		return fmt.Errorf("--" + bundleID + " and --" + labelName + " flags are mutually exclusive")
+	case bundleOptions.ID == "" && labelOptions.Name == "":
 		key, err := core.GetLatestBundle(repoParams.RepoName, store)
 		if err != nil {
 			return err
 		}
 		bundleOptions.ID = key
+	case bundleOptions.ID == "" && labelOptions.Name != "":
+		label := core.NewLabel(nil,
+			core.LabelName(labelOptions.Name),
+		)
+		bundle := core.New(core.NewBDescriptor(),
+			core.Repo(repoParams.RepoName),
+			core.MetaStore(store),
+		)
+		if err := label.DownloadDescriptor(context.Background(), bundle, true); err != nil {
+			return err
+		}
+		bundleOptions.ID = label.Descriptor.BundleID
 	}
 	fmt.Printf("Using bundle: %s\n", bundleOptions.ID)
 	return nil

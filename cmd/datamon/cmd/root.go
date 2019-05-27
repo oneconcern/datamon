@@ -23,6 +23,7 @@ const (
 	repo             = "repo"
 	meta             = "meta"
 	blob             = "blob"
+	labelName        = "label"
 	description      = "description"
 	contributorEmail = "email"
 	contributorName  = "name"
@@ -93,6 +94,7 @@ func init() {
 func initConfig() {
 	viper.SetDefault("metadata", "datamon-meta-data")
 	viper.SetDefault("blob", "datamon-blob-data")
+	viper.SetDefault("label", "datamon-label-data")
 	if os.Getenv("DATAMON_CONFIG") != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(os.Getenv("DATAMON_CONFIG"))
