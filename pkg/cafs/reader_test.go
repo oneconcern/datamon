@@ -5,9 +5,12 @@ import (
 	"io"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	lru2 "github.com/hashicorp/golang-lru"
 
 	"github.com/oneconcern/datamon/internal"
 
@@ -39,12 +42,12 @@ func TestChunkReader_SmallOnly(t *testing.T) {
 			continue
 		}
 		verifyChunkReader(t, blobs, tf)
+		verifyChunkReaderAt(t, blobs, tf)
 	}
 }
 
 func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	rkey := keyFromFile(t, tf.RootHash)
-
 	rdr, err := newReader(blobs, rkey, leafSize, "")
 	require.NoError(t, err)
 	defer rdr.Close()
@@ -58,10 +61,35 @@ func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	require.Equal(t, expected, actual)
 }
 
+func verifyChunkReaderAt(t testing.TB, blobs storage.Store, tf testFile) {
+	rkey := keyFromFile(t, tf.RootHash)
+	offset := 11
+	lru, e := lru2.New(10)
+	require.NoError(t, e)
+	r, err := newReader(blobs, rkey, leafSize, "", SetCache(lru))
+	require.NoError(t, err)
+	rdr := r.(io.ReaderAt)
+
+	b := make([]byte, 2*leafSize)
+	n, err := rdr.ReadAt(b, int64(offset))
+	if err != nil && !strings.Contains(err.Error(), "EOF") {
+		require.NoError(t, err)
+	}
+	expected := readTextFile(t, tf.Original)
+	count := len(expected) - offset
+	if int(2*leafSize) < len(expected) {
+		count = int(2 * leafSize)
+	}
+	actual := string(b)
+	require.Equal(t, count, n)
+	require.Equal(t, expected[offset:count], actual[:count-offset])
+}
+
 func TestChunkReader_All(t *testing.T) {
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(destDir, "cafs")))
 	for _, tf := range testFiles(destDir) {
 		verifyChunkReader(t, blobs, tf)
+		verifyChunkReaderAt(t, blobs, tf)
 	}
 }
 
@@ -167,4 +195,69 @@ func TestWriteTo(t *testing.T) {
 	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriter.data[:64*1024])
 	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriter.data[64*1024:])
 	// Set truncation on and verify.
+}
+
+type oiCalculatorTests struct {
+	inOffset  int64
+	leafSize  uint32
+	outIndex  int64
+	outOffset int64
+}
+
+func TestOffsetIndexCalculator(t *testing.T) {
+	tests := []oiCalculatorTests{
+		{
+			inOffset:  0,
+			leafSize:  1,
+			outIndex:  0,
+			outOffset: 0,
+		},
+		{
+			inOffset:  1,
+			leafSize:  1,
+			outIndex:  1,
+			outOffset: 0,
+		},
+		{
+			inOffset:  2,
+			leafSize:  1,
+			outIndex:  2,
+			outOffset: 0,
+		},
+		{
+			inOffset:  0,
+			leafSize:  leafSize,
+			outIndex:  0,
+			outOffset: 0,
+		},
+		{
+			inOffset:  int64(leafSize) - 1,
+			leafSize:  leafSize,
+			outIndex:  0,
+			outOffset: int64(leafSize) - 1,
+		},
+		{
+			inOffset:  int64(leafSize),
+			leafSize:  leafSize,
+			outIndex:  1,
+			outOffset: 0,
+		},
+		{
+			inOffset:  int64(leafSize) * 10,
+			leafSize:  leafSize,
+			outIndex:  10, // 0-10 => 11th leaf
+			outOffset: 0,
+		},
+		{
+			inOffset:  int64(leafSize)*10 - 1,
+			leafSize:  leafSize,
+			outIndex:  9,                   // 0-9 => 10th leaf
+			outOffset: int64(leafSize) - 1, // last byte
+		},
+	}
+	for i, test := range tests {
+		index, offset := calculateKeyAndOffset(test.inOffset, test.leafSize)
+		require.Equal(t, test.outIndex, index, "Test number: "+strconv.Itoa(i))
+		require.Equal(t, test.outOffset, offset, "Test number "+strconv.Itoa(i))
+	}
 }

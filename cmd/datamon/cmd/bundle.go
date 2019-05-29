@@ -29,6 +29,7 @@ var bundleOptions struct {
 	MountPath        string
 	File             string
 	Daemonize        bool
+	Stream           bool
 }
 
 func init() {
@@ -70,6 +71,11 @@ func addBundleFileFlag(cmd *cobra.Command) string {
 func addDaemonizeFlag(cmd *cobra.Command) string {
 	cmd.Flags().BoolVar(&bundleOptions.Daemonize, daemonize, false, "Whether to run the command as a daemonized process")
 	return daemonize
+}
+
+func addStreamFlag(cmd *cobra.Command) string {
+	cmd.Flags().BoolVar(&bundleOptions.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
+	return stream
 }
 
 func setLatestBundle(store storage.Store) error {

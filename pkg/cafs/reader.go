@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/ioutil"
+	"strings"
 	"sync"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/minio/blake2b-simd"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -27,6 +31,12 @@ func Keys(keys []Key) ReaderOption {
 func VerifyHash(t bool) ReaderOption {
 	return func(reader *chunkReader) {
 		reader.verifyHash = t
+	}
+}
+
+func SetCache(lru *lru.Cache) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.lru = lru
 	}
 }
 
@@ -71,6 +81,7 @@ type chunkReader struct {
 	leafTruncation bool
 	currLeaf       []byte
 	verifyHash     bool
+	lru            *lru.Cache
 }
 
 func (r *chunkReader) Close() error {
@@ -157,6 +168,86 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 		}
 	}
 
+}
+
+func calculateKeyAndOffset(off int64, leafSize uint32) (index int64, offset int64) {
+	index = off / int64(leafSize)
+	offset = off % int64(leafSize)
+	return
+}
+
+func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
+
+	// Calculate first key and offset.
+	index, offset := calculateKeyAndOffset(off, r.leafSize)
+	if index >= int64(len(r.keys)) {
+		return 0, nil
+	}
+
+	var read int
+
+	// seekAhead makes sure the next blob in CAFS is already in memory when the reader reaches that blob.
+	seekAhead := func() {
+		if index < int64(len(r.keys)-1) {
+			nextIndex := index + 1
+			if r.lru.Contains(r.keys[nextIndex].StringWithPrefix(r.prefix)) {
+				return
+			}
+			go func(i int64) {
+				k := r.keys[i]
+
+				rdr, e := r.fs.Get(context.Background(), k.StringWithPrefix(r.prefix))
+				if e != nil {
+					return
+				}
+
+				var b []byte
+				b, e = ioutil.ReadAll(rdr)
+				if e != nil {
+					return
+				}
+				r.lru.Add(k.StringWithPrefix(r.prefix), b)
+			}(nextIndex)
+		}
+	}
+
+	for {
+		// Fetch Blob
+		var buffer []byte
+		key := r.keys[index]
+		if r.lru.Contains(key.StringWithPrefix(r.prefix)) {
+
+			b, _ := r.lru.Get(key.StringWithPrefix(r.prefix))
+			buffer = b.([]byte)
+			seekAhead()
+		} else {
+			var rdr io.Reader
+			rdr, err = r.fs.Get(context.Background(), key.StringWithPrefix(r.prefix))
+			if err != nil {
+				return
+			}
+
+			buffer, err = ioutil.ReadAll(rdr)
+			if err != nil {
+				return
+			}
+
+			r.lru.Add(key.StringWithPrefix(r.prefix), buffer)
+			seekAhead()
+		}
+
+		// Read first leaf
+		read = copy(p[n:], buffer[offset:])
+		n += read
+		index++
+		offset = 0
+		if err != nil && !strings.Contains(err.Error(), "EOF") {
+			return
+		}
+		if (len(p) == n) || (index >= int64(len(r.keys))) {
+			return
+		}
+	}
 }
 
 func (r *chunkReader) Read(data []byte) (int, error) {

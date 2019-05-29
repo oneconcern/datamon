@@ -1,12 +1,12 @@
 package cafs
 
 import (
-	"bytes"
 	"context"
-	"hash/crc32"
 	"io"
 	"log"
 	"sync"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"go.uber.org/zap"
 
@@ -19,12 +19,6 @@ import (
 const (
 	DefaultLeafSize = 2 * 1024 * 1024
 )
-
-func Backend(store storage.Store) Option {
-	return func(w *defaultFs) {
-		w.fs = store
-	}
-}
 
 // LeafSize configuration for the blake2b hashes
 func LeafSize(sz uint32) Option {
@@ -60,6 +54,12 @@ func Prefix(prefix string) Option {
 	}
 }
 
+func Backend(store storage.Store) Option {
+	return func(w *defaultFs) {
+		w.store.backend = store
+	}
+}
+
 type hasOpts struct {
 	OnlyRoots, GatherIncomplete bool
 	_                           struct{} // disallow unkeyed usage
@@ -71,6 +71,7 @@ type Option func(*defaultFs)
 // Fs implementations provide content-addressable filesystem operations
 type Fs interface {
 	Get(context.Context, Key) (io.ReadCloser, error)
+	GetAt(context.Context, Key) (io.ReaderAt, error)
 	Put(context.Context, io.Reader) (int64, Key, []byte, bool, error)
 	Delete(context.Context, Key) error
 	Clear(context.Context) error
@@ -81,24 +82,30 @@ type Fs interface {
 
 // New creates a new file system operations instance for a repository
 func New(opts ...Option) (Fs, error) {
+
 	f := &defaultFs{
-		fs:       localfs.New(nil),
+		store:    cafsStore{backend: localfs.New(nil)},
 		leafSize: uint32(5 * units.MiB),
 	}
-
+	f.lru, _ = lru.New(10)
 	for _, apply := range opts {
 		apply(f)
 	}
 	return f, nil
 }
 
+type cafsStore struct {
+	backend storage.Store // CAFS backing store
+}
+
 type defaultFs struct {
-	fs             storage.Store
+	store          cafsStore
 	leafSize       uint32
 	prefix         string
 	zl             zap.Logger //nolint:structcheck,unused
 	l              log.Logger //nolint:structcheck,unused
 	leafTruncation bool
+	lru            *lru.Cache
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
@@ -115,31 +122,38 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 	if err = w.Close(); err != nil {
 		return 0, Key{}, nil, false, err
 	}
-	found, _ := d.fs.Has(context.TODO(), d.prefix+key.String())
-	if !found {
-		crcFS, ok := d.fs.(storage.StoreCRC)
-		if ok {
-			buffer := append(keys, key[:]...)
-			crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
-			err = crcFS.PutCRC(context.TODO(), d.prefix+key.String(), bytes.NewReader(buffer), storage.OverWrite, crc)
-		} else {
-			err = d.fs.Put(ctx, d.prefix+key.String(), bytes.NewReader(append(keys, key[:]...)), storage.OverWrite)
-		}
-		if err != nil {
-			return 0, Key{}, nil, found, err
-		}
-	}
+	destinations := make([]storage.MultiStoreUnit, 0)
 
+	found, _ := d.store.backend.Has(ctx, d.prefix+key.String())
+	if !found {
+		destinations = append(destinations, storage.MultiStoreUnit{
+			Store:           d.store.backend,
+			TolerateFailure: false,
+		})
+	}
+	buffer := append(keys, key[:]...)
+	err = storage.MultiPut(ctx, destinations, key.String(), buffer, storage.OverWrite)
+	if err != nil {
+		return 0, Key{}, nil, found, err
+	}
 	return written, key, keys, found, nil
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
-	return newReader(d.fs, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation), VerifyHash(true))
+	return newReader(d.store.backend, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation), VerifyHash(true))
+}
+
+func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
+	r, err := newReader(d.store.backend, hash, d.leafSize, d.prefix,
+		TruncateLeaf(d.leafTruncation),
+		VerifyHash(true),
+		SetCache(d.lru))
+	return r.(io.ReaderAt), err
 }
 
 func (d *defaultFs) writer(prefix string) Writer {
 	return &fsWriter{
-		fs:            d.fs,
+		store:         d.store.backend,
 		leafSize:      d.leafSize,
 		leafs:         nil,
 		buf:           make([]byte, d.leafSize),
@@ -156,21 +170,21 @@ func (d *defaultFs) writer(prefix string) Writer {
 }
 
 func (d *defaultFs) Delete(ctx context.Context, hash Key) error {
-	keys, err := LeafsForHash(d.fs, hash, d.leafSize, d.prefix)
+	keys, err := LeafsForHash(d.store.backend, hash, d.leafSize, d.prefix)
 	if err != nil {
 		return err
 	}
 	for _, key := range keys {
-		if err = d.fs.Delete(ctx, key.String()); err != nil {
+		if err = d.store.backend.Delete(ctx, key.String()); err != nil {
 			return err
 		}
 	}
 
-	return d.fs.Delete(ctx, hash.String())
+	return d.store.backend.Delete(ctx, hash.String())
 }
 
 func (d *defaultFs) Clear(ctx context.Context) error {
-	return d.fs.Clear(ctx)
+	return d.store.backend.Clear(ctx)
 }
 
 func (d *defaultFs) Keys(ctx context.Context) ([]Key, error) {
@@ -178,7 +192,7 @@ func (d *defaultFs) Keys(ctx context.Context) ([]Key, error) {
 }
 
 func (d *defaultFs) keys(ctx context.Context, matches func(Key) bool) ([]Key, error) {
-	v, err := d.fs.Keys(ctx)
+	v, err := d.store.backend.Keys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +216,7 @@ func (d *defaultFs) RootKeys(ctx context.Context) ([]Key, error) {
 }
 
 func (d *defaultFs) matchOnlyObjectRoots(key Key) bool {
-	return IsRootKey(d.fs, key, d.leafSize)
+	return IsRootKey(d.store.backend, key, d.leafSize)
 }
 
 func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, []Key, error) {
@@ -211,7 +225,7 @@ func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, 
 		apply(&opts)
 	}
 
-	has, err := d.fs.Has(ctx, key.String())
+	has, err := d.store.backend.Has(ctx, key.String())
 	if err != nil {
 		return false, nil, err
 	}
@@ -224,7 +238,7 @@ func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, 
 		return has, nil, nil
 	}
 
-	ks, err := LeafsForHash(d.fs, key, d.leafSize, d.prefix)
+	ks, err := LeafsForHash(d.store.backend, key, d.leafSize, d.prefix)
 	if err != nil {
 		return false, nil, nil
 	}
@@ -235,7 +249,7 @@ func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, 
 	var keys []Key
 	if opts.GatherIncomplete {
 		for _, k := range ks {
-			if ok, err := d.fs.Has(ctx, k.String()); err != nil || !ok {
+			if ok, err := d.store.backend.Has(ctx, k.String()); err != nil || !ok {
 				keys = append(keys, k)
 			}
 		}

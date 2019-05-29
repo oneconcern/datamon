@@ -27,13 +27,13 @@ type Writer interface {
 }
 
 type fsWriter struct {
-	fs            storage.Store       // CAFS backing store
-	prefix        string              // Prefix for fs paths
+	store         storage.Store       // CAFS backing store
+	prefix        string              // Prefix for store paths
 	leafSize      uint32              // Size of chunks
 	leafs         []Key               // List of keys backing a file
 	buf           []byte              // Buffer stage a chunk == leafsize
 	offset        int                 // till where buffer is used
-	flushed       uint32              // writer has been flushed to fs
+	flushed       uint32              // writer has been flushed to store
 	pather        func(string) string // pathing logic
 	count         uint64              // total number of parallel writes
 	flushChan     chan blobFlush      // channel for parallel writes
@@ -70,7 +70,7 @@ func (w *fsWriter) Write(p []byte) (n int, err error) {
 				w.errC,
 				w.maxGoRoutines,
 				w.pather,
-				w.fs,
+				w.store,
 				&w.wg,
 			)
 			w.buf = make([]byte, w.leafSize) // new buffer
@@ -194,14 +194,14 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 		// w.pather = func(lks string) string { return filepath.Join(lks[:3], lks[3:6], lks[6:]) }
 		w.pather = func(lks string) string { return w.prefix + lks }
 	}
-	found, _ := w.fs.Has(context.TODO(), w.pather(leafKey.String()))
+	found, _ := w.store.Has(context.TODO(), w.pather(leafKey.String()))
 	if !found {
-		d, ok := w.fs.(storage.StoreCRC)
+		d, ok := w.store.(storage.StoreCRC)
 		if ok {
 			crc := crc32.Checksum(w.buf[:w.offset], crc32.MakeTable(crc32.Castagnoli))
 			err = d.PutCRC(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite, crc)
 		} else {
-			err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
+			err = w.store.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
 		}
 		if err != nil {
 			return 0, fmt.Errorf("write segment file: %v", err)

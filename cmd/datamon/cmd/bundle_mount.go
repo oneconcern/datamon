@@ -100,6 +100,7 @@ var mountBundleCmd = &cobra.Command{
 			core.BlobStore(blobStore),
 			core.ConsumableStore(consumableStore),
 			core.MetaStore(metadataSource),
+			core.Streaming(bundleOptions.Stream),
 		)
 		logger, err := dlogger.GetLogger(logLevel)
 		if err != nil {
@@ -131,6 +132,7 @@ func init() {
 	addBlobBucket(mountBundleCmd)
 	addBundleFlag(mountBundleCmd)
 	addLogLevel(mountBundleCmd)
+	addStreamFlag(mountBundleCmd)
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
