@@ -12,9 +12,6 @@ YELLOW := $(shell tput -Txterm setaf 3)
 WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
-VERSION=$(shell git describe --tags)
-COMMIT=$(shell git rev-parse HEAD)
-GITDIRTY=$(shell git diff --quiet || echo 'dirty')
 LOCAL_KUBECTX ?= "docker-for-desktop"
 TARGET_MAX_CHAR_NUM=25
 
@@ -23,6 +20,14 @@ VERSION=$(shell git describe --tags)
 COMMIT=$(shell git rev-parse HEAD)
 GITDIRTY=$(shell git diff --quiet || echo 'dirty')
 REPOSITORY ?= "gcr.io/onec-co"
+
+VERSION_INFO_IMPORT_PATH ?= github.com/oneconcern/datamon/cmd/datamon/cmd.
+BASE_LD_FLAGS ?= -s -w -linkmode external
+VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)Version=$(VERSION)'
+VERSION_LD_FLAG_DATE ?= -X '$(VERSION_INFO_IMPORT_PATH)BuildDate=$(shell date -u -R)'
+VERSION_LD_FLAG_COMMIT ?= -X '$(VERSION_INFO_IMPORT_PATH)GitCommit=$(COMMIT)'
+VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)GitState=$(GITDIRTY)'
+VERSION_LD_FLAGS ?= $(VERSION_LD_FLAG_VERSION) $(VERSION_LD_FLAG_DATE) $(VERSION_LD_FLAG_COMMIT) $(VERSION_LD_FLAG_VERSION) 
 
 ## Show help
 help:
@@ -93,6 +98,30 @@ build-datamon:
 		-t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') \
 		-t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) \
 		.
+
+.PHONY: build-datamon-binaries
+## Use cross-compilation in a docker container to build binaries
+build-datamon-binaries:
+	@echo 'building ${YELLOW}datamon${RESET} container'
+	@docker build \
+		--pull \
+		--build-arg version_import_path=$(VERSION_INFO_IMPORT_PATH) \
+		--build-arg version=$(VERSION) \
+		--build-arg commit=$(COMMIT) \
+		--build-arg dirty=$(GITDIRTY) \
+		-t datamon-binaries \
+		-f binaries.Dockerfile \
+		.
+	@./hack/release_from_docker_build.sh
+
+.PHONY: build-datamon-mac
+## Build datamon executable for mac os x (on mac os x)
+build-datamon-mac: export LDFLAGS=${BASE_LD_FLAGS} ${VERSION_LD_FLAGS}
+build-datamon-mac:
+	@echo 'building ${YELLOW}datamon${RESET} executable'
+	@echo "${VERSION_LD_FLAGS}"
+	@echo "${LDFLAGS}"
+	go build -o datamon.mac --ldflags "${LDFLAGS}" ./cmd/datamon
 
 ## demonstrate a fuse read-only filesystem
 fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
