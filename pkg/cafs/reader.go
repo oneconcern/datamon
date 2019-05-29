@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/ioutil"
 	"strings"
 	"sync"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/minio/blake2b-simd"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -28,6 +31,12 @@ func Keys(keys []Key) ReaderOption {
 func VerifyHash(t bool) ReaderOption {
 	return func(reader *chunkReader) {
 		reader.verifyHash = t
+	}
+}
+
+func SetCache(lru *lru.Cache) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.lru = lru
 	}
 }
 
@@ -72,6 +81,7 @@ type chunkReader struct {
 	leafTruncation bool
 	currLeaf       []byte
 	verifyHash     bool
+	lru            *lru.Cache
 }
 
 func (r *chunkReader) Close() error {
@@ -173,19 +183,60 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 	if index >= int64(len(r.keys)) {
 		return 0, nil
 	}
+
 	var read int
+
+	seekHead := func() {
+		if index < int64(len(r.keys)-1) {
+			go func(i int64) {
+				k := r.keys[i+1]
+				if r.lru.Contains(k.StringWithPrefix(r.prefix)) {
+					return
+				}
+
+				rdr, e := r.fs.Get(context.Background(), k.StringWithPrefix(r.prefix))
+				if e != nil {
+					return
+				}
+
+				var b []byte
+				b, err = ioutil.ReadAll(rdr)
+				if err != nil {
+					return
+				}
+				r.lru.Add(k.StringWithPrefix(r.prefix), b)
+			}(index)
+		}
+	}
+
 	for {
 		// Fetch Blob
-		var rdr io.ReaderAt
+		var buffer []byte
 		key := r.keys[index]
-		rdr, err = r.fs.GetAt(context.Background(), key.StringWithPrefix(r.prefix))
-		if err != nil {
-			return
+		if r.lru.Contains(key.StringWithPrefix(r.prefix)) {
+
+			b, _ := r.lru.Get(key.StringWithPrefix(r.prefix))
+			buffer = b.([]byte)
+			seekHead()
+		} else {
+
+			var rdr io.Reader
+			rdr, err = r.fs.Get(context.Background(), key.StringWithPrefix(r.prefix))
+			if err != nil {
+				return
+			}
+
+			buffer, err = ioutil.ReadAll(rdr)
+			if err != nil {
+				return
+			}
+
+			r.lru.Add(key.StringWithPrefix(r.prefix), buffer)
+			seekHead()
 		}
 
 		// Read first leaf
-
-		read, err = rdr.ReadAt(p[n:], offset)
+		read = copy(p[n:], buffer[offset:])
 		n += read
 		index++
 		offset = 0

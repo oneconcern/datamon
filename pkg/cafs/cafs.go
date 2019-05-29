@@ -6,6 +6,8 @@ import (
 	"log"
 	"sync"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"go.uber.org/zap"
 
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -80,11 +82,12 @@ type Fs interface {
 
 // New creates a new file system operations instance for a repository
 func New(opts ...Option) (Fs, error) {
+
 	f := &defaultFs{
 		store:    cafsStore{backend: localfs.New(nil)},
 		leafSize: uint32(5 * units.MiB),
 	}
-
+	f.lru, _ = lru.New(10)
 	for _, apply := range opts {
 		apply(f)
 	}
@@ -102,6 +105,7 @@ type defaultFs struct {
 	zl             zap.Logger //nolint:structcheck,unused
 	l              log.Logger //nolint:structcheck,unused
 	leafTruncation bool
+	lru            *lru.Cache
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
@@ -140,7 +144,10 @@ func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
 }
 
 func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
-	r, err := newReader(d.store.backend, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation), VerifyHash(true))
+	r, err := newReader(d.store.backend, hash, d.leafSize, d.prefix,
+		TruncateLeaf(d.leafTruncation),
+		VerifyHash(true),
+		SetCache(d.lru))
 	return r.(io.ReaderAt), err
 }
 

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	lru2 "github.com/hashicorp/golang-lru"
+
 	"github.com/oneconcern/datamon/internal"
 
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -45,7 +47,6 @@ func TestChunkReader_SmallOnly(t *testing.T) {
 
 func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	rkey := keyFromFile(t, tf.RootHash)
-
 	rdr, err := newReader(blobs, rkey, leafSize, "")
 	require.NoError(t, err)
 	defer rdr.Close()
@@ -62,7 +63,9 @@ func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 func verifyChunkReaderAt(t testing.TB, blobs storage.Store, tf testFile) {
 	rkey := keyFromFile(t, tf.RootHash)
 	offset := 11
-	r, err := newReader(blobs, rkey, leafSize, "")
+	lru, e := lru2.New(10)
+	require.NoError(t, e)
+	r, err := newReader(blobs, rkey, leafSize, "", SetCache(lru))
 	require.NoError(t, err)
 	rdr := r.(io.ReaderAt)
 

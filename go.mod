@@ -10,6 +10,7 @@ require (
 	github.com/container-storage-interface/spec v0.3.0
 	github.com/docker/go-units v0.3.3
 	github.com/hashicorp/go-immutable-radix v1.0.0
+	github.com/hashicorp/golang-lru v0.5.0
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20180417054321-cd3959611bcb
 	github.com/json-iterator/go v1.1.6

@@ -11,6 +11,8 @@ import (
 	"github.com/jacobsa/fuse"
 )
 
+const EOF = "EOF"
+
 func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int, err error) {
 	if !b.Streamed {
 
@@ -23,7 +25,7 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 		}
 
 		n, err = reader.ReadAt(destination, offset)
-		if err != nil && err.Error() != "EOF" {
+		if err != nil && err.Error() != EOF {
 			err = fuse.EIO
 			return
 		}
@@ -58,7 +60,7 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 		}
 
 		n, err = reader.ReadAt(destination, offset)
-		if err != nil && err.Error() != "EOF" {
+		if err != nil && err.Error() != EOF {
 			err = fuse.EIO
 			b.l.Error("filed to readAt",
 				zap.String("key", file.hash),

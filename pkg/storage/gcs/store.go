@@ -157,7 +157,7 @@ func (g *gcs) Delete(ctx context.Context, objectName string) error {
 }
 
 func (g *gcs) Keys(ctx context.Context) ([]string, error) {
-	keys, _, err := g.KeysPrefix(ctx, "", "", "", 0)
+	keys, _, err := g.KeysPrefix(ctx, "", "", "", 1000000)
 	if err != nil {
 		return nil, err
 	}
