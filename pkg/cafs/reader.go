@@ -170,29 +170,31 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 
 }
 
-func (r *chunkReader) calculateKeyAndOffset(off int64) (index int64, offset int64) {
-	index = off / int64(r.leafSize)
-	offset = off - (index * int64(r.leafSize))
+func calculateKeyAndOffset(off int64, leafSize uint32) (index int64, offset int64) {
+	index = off / int64(leafSize)
+	offset = off % int64(leafSize)
 	return
 }
 
 func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 
 	// Calculate first key and offset.
-	index, offset := r.calculateKeyAndOffset(off)
+	index, offset := calculateKeyAndOffset(off, r.leafSize)
 	if index >= int64(len(r.keys)) {
 		return 0, nil
 	}
 
 	var read int
 
-	seekHead := func() {
+	// seekAhead makes sure the next blob in CAFS is already in memory when the reader reaches that blob.
+	seekAhead := func() {
 		if index < int64(len(r.keys)-1) {
+			nextIndex := index + 1
+			if r.lru.Contains(r.keys[nextIndex].StringWithPrefix(r.prefix)) {
+				return
+			}
 			go func(i int64) {
-				k := r.keys[i+1]
-				if r.lru.Contains(k.StringWithPrefix(r.prefix)) {
-					return
-				}
+				k := r.keys[i]
 
 				rdr, e := r.fs.Get(context.Background(), k.StringWithPrefix(r.prefix))
 				if e != nil {
@@ -200,12 +202,12 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 				}
 
 				var b []byte
-				b, err = ioutil.ReadAll(rdr)
-				if err != nil {
+				b, e = ioutil.ReadAll(rdr)
+				if e != nil {
 					return
 				}
 				r.lru.Add(k.StringWithPrefix(r.prefix), b)
-			}(index)
+			}(nextIndex)
 		}
 	}
 
@@ -217,9 +219,8 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 
 			b, _ := r.lru.Get(key.StringWithPrefix(r.prefix))
 			buffer = b.([]byte)
-			seekHead()
+			seekAhead()
 		} else {
-
 			var rdr io.Reader
 			rdr, err = r.fs.Get(context.Background(), key.StringWithPrefix(r.prefix))
 			if err != nil {
@@ -232,7 +233,7 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 			}
 
 			r.lru.Add(key.StringWithPrefix(r.prefix), buffer)
-			seekHead()
+			seekAhead()
 		}
 
 		// Read first leaf

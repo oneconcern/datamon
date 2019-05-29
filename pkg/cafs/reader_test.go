@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -194,4 +195,69 @@ func TestWriteTo(t *testing.T) {
 	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriter.data[:64*1024])
 	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriter.data[64*1024:])
 	// Set truncation on and verify.
+}
+
+type oiCalculatorTests struct {
+	inOffset  int64
+	leafSize  uint32
+	outIndex  int64
+	outOffset int64
+}
+
+func TestOffsetIndexCalculator(t *testing.T) {
+	tests := []oiCalculatorTests{
+		{
+			inOffset:  0,
+			leafSize:  1,
+			outIndex:  0,
+			outOffset: 0,
+		},
+		{
+			inOffset:  1,
+			leafSize:  1,
+			outIndex:  1,
+			outOffset: 0,
+		},
+		{
+			inOffset:  2,
+			leafSize:  1,
+			outIndex:  2,
+			outOffset: 0,
+		},
+		{
+			inOffset:  0,
+			leafSize:  leafSize,
+			outIndex:  0,
+			outOffset: 0,
+		},
+		{
+			inOffset:  int64(leafSize) - 1,
+			leafSize:  leafSize,
+			outIndex:  0,
+			outOffset: int64(leafSize) - 1,
+		},
+		{
+			inOffset:  int64(leafSize),
+			leafSize:  leafSize,
+			outIndex:  1,
+			outOffset: 0,
+		},
+		{
+			inOffset:  int64(leafSize) * 10,
+			leafSize:  leafSize,
+			outIndex:  10, // 0-10 => 11th leaf
+			outOffset: 0,
+		},
+		{
+			inOffset:  int64(leafSize)*10 - 1,
+			leafSize:  leafSize,
+			outIndex:  9,                   // 0-9 => 10th leaf
+			outOffset: int64(leafSize) - 1, // last byte
+		},
+	}
+	for i, test := range tests {
+		index, offset := calculateKeyAndOffset(test.inOffset, test.leafSize)
+		require.Equal(t, test.outIndex, index, "Test number: "+strconv.Itoa(i))
+		require.Equal(t, test.outOffset, offset, "Test number "+strconv.Itoa(i))
+	}
 }
