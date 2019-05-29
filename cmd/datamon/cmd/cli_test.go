@@ -135,6 +135,9 @@ func setupTests(t *testing.T) func() {
 		os.RemoveAll(destinationDir)
 		deleteBucket(ctx, t, client, bucketMeta)
 		deleteBucket(ctx, t, client, bucketBlob)
+		repoParams = RepoParams{}
+		labelOptions = LabelOptions{}
+		bundleOptions = BundleOptions{}
 	}
 	return cleanup
 }
@@ -364,6 +367,48 @@ func TestUploadBundle_filePath(t *testing.T) {
 	}, "observe error on bundle upload path as file rather than directory", true)
 }
 
+func testUploadBundleLabel(t *testing.T, file uploadTree, label string) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		panic(err)
+	}
+	log.SetOutput(w)
+	//
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, file),
+		"--message", "The initial commit for the repo",
+		"--repo", repo1,
+		"--label", label,
+	}, "upload bundle at "+dirPathStr(t, file), false)
+	//
+	log.SetOutput(os.Stdout)
+	w.Close()
+	//
+	lb, err := ioutil.ReadAll(r)
+	require.NoError(t, err, "i/o error reading patched log from pipe")
+	ls := string(lb)
+	//
+	m, err := regexp.MatchString(`Uploaded bundle`, ls)
+	require.NoError(t, err, "regexp match error.  likely a programming mistake in tests.")
+	require.True(t, m, "expect confirmation message on upload")
+}
+
+func TestUploadBundleLabel(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create test repo", false)
+	file := testUploadTrees[0][0]
+	label := "testlabel"
+	testUploadBundleLabel(t, file, label)
+}
+
 type bundleListEntry struct {
 	rawLine string
 	hash    string
@@ -451,6 +496,133 @@ func TestListBundles(t *testing.T) {
 	}
 }
 
+type labelListEntry struct {
+	rawLine string
+	name    string
+	hash    string
+	time    time.Time
+}
+
+func listLabels(t *testing.T, repoName string) []labelListEntry {
+	r, w, err := os.Pipe()
+	if err != nil {
+		panic(err)
+	}
+	log.SetOutput(w)
+	runCmd(t, []string{"label",
+		"list",
+		"--repo", repoName,
+	}, "list labels", false)
+	log.SetOutput(os.Stdout)
+	w.Close()
+	//
+	lb, err := ioutil.ReadAll(r)
+	require.NoError(t, err, "i/o error reading patched log from pipe")
+	lles := make([]labelListEntry, 0)
+	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
+		sl := strings.Split(line, ",")
+		time, err := time.Parse(timeForm, strings.TrimSpace(sl[2]))
+		require.NoError(t, err, "couldn't parse label list time")
+		lle := labelListEntry{
+			rawLine: line,
+			name:    strings.TrimSpace(sl[0]),
+			hash:    strings.TrimSpace(sl[1]),
+			time:    time,
+		}
+		lles = append(lles, lle)
+	}
+	return lles
+}
+
+func TestListLabels(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create first test repo", false)
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo2,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create second test repo", false)
+	ll := listLabels(t, repo1)
+	require.Equal(t, len(ll), 0, "no labels created yet")
+	ll = listLabels(t, repo2)
+	require.Equal(t, 0, len(ll), "no labels created yet")
+	file := testUploadTrees[0][0]
+	label := internal.RandStringBytesMaskImprSrc(8)
+	testNow := time.Now()
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, file),
+		"--message", "label test bundle",
+		"--repo", repo1,
+		"--label", label,
+	}, "upload bundle at "+dirPathStr(t, file), false)
+	ll = listLabels(t, repo2)
+	require.Equal(t, 0, len(ll), "no labels in secondary repo")
+	ll = listLabels(t, repo1)
+	require.Equal(t, 1, len(ll), "label count in test repo")
+	labelEnt := ll[0]
+	require.Equal(t, label, labelEnt.name, "found expected name in label entry")
+	require.True(t, testNow.Sub(labelEnt.time).Seconds() < 3, "timestamp bounds after bundle create")
+	bll, err := listBundles(t, repo1)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 1, len(bll), "bundle count in test repo")
+	bundleEnt := bll[0]
+	require.Equal(t, labelEnt.hash, bundleEnt.hash, "found expected hash in label entry")
+}
+
+func TestSetLabel(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create first test repo", false)
+	ll := listLabels(t, repo1)
+	require.Equal(t, len(ll), 0, "no labels created yet")
+	file := testUploadTrees[0][0]
+	msg := internal.RandStringBytesMaskImprSrc(15)
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, file),
+		"--message", msg,
+		"--repo", repo1,
+	}, "upload bundle at "+dirPathStr(t, file), false)
+	ll = listLabels(t, repo1)
+	require.Equal(t, len(ll), 0, "no labels created yet")
+	bll, err := listBundles(t, repo1)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 1, len(bll), "bundle count in test repo")
+	bundleEnt := bll[0]
+	label := internal.RandStringBytesMaskImprSrc(8)
+	testNow := time.Now()
+	runCmd(t, []string{"label",
+		"set",
+		"--label", label,
+		"--bundle", bundleEnt.hash,
+		"--repo", repo1,
+	}, "set bundle label", false)
+	ll = listLabels(t, repo1)
+	require.NoError(t, err, "error out of listLabels() test helper")
+	require.Equal(t, 1, len(ll), "label count in test repo")
+	labelEnt := ll[0]
+	require.True(t, testNow.Sub(labelEnt.time).Seconds() < 3, "timestamp bounds after label set")
+	require.True(t, bundleEnt.time.Sub(labelEnt.time) < 0, "label set timestamp later than bundle upload timestamp")
+	require.Equal(t, label, labelEnt.name, "label entry name")
+	require.Equal(t, bundleEnt.hash, labelEnt.hash, "label entry hash")
+}
+
 func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 	msg := internal.RandStringBytesMaskImprSrc(15)
 	runCmd(t, []string{"bundle",
@@ -503,6 +675,54 @@ func TestDownloadBundles(t *testing.T) {
 	}, "create second test repo", false)
 	for i, tree := range testUploadTrees {
 		testDownloadBundle(t, tree, i+1)
+	}
+}
+
+func TestDownloadBundleByLabel(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create test repo", false)
+	files := testUploadTrees[0]
+	file := files[0]
+	label := internal.RandStringBytesMaskImprSrc(8)
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, file),
+		"--message", "label test bundle",
+		"--repo", repo1,
+		"--label", label,
+	}, "upload bundle at "+dirPathStr(t, file), false)
+	// dupe: testDownloadBundle()
+	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
+	dpc := "bundle-dl-" + label
+	dp, err := filepath.Abs(filepath.Join(consumedData, dpc))
+	if err != nil {
+		t.Errorf("couldn't build file path: %v", err)
+	}
+	exists, err := afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.False(t, exists, "no filesystem entry at destination path '"+dpc+"' before bundle download")
+	runCmd(t, []string{"bundle",
+		"download",
+		"--repo", repo1,
+		"--destination", dp,
+		"--label", label,
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
+	exists, err = afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	//
+	for _, file := range files {
+		expected := readTextFile(t, filePathStr(t, file))
+		actual := readTextFile(t, filepath.Join(dp, pathInBundle(file)))
+		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(file)+"' size")
+		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(file)+"' contents")
 	}
 }
 

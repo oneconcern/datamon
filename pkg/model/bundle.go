@@ -35,6 +35,7 @@ type ArchivePathComponents struct {
 	Repo            string
 	BundleID        string
 	ArchiveFileName string
+	LabelName       string
 }
 
 // List of files, directories (empty) skipped
@@ -97,6 +98,16 @@ func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) 
  */
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	cs := strings.SplitN(archivePath, "/", 4)
+	if cs[0] == "labels" {
+		labelBasenameComponents := strings.SplitN(cs[2], ".", 2)
+		if len(labelBasenameComponents) != 2 || labelBasenameComponents[1] != "json" {
+			return ArchivePathComponents{}, fmt.Errorf("expected label basename '%v' to have serialization extension", cs[2])
+		}
+		return ArchivePathComponents{
+			LabelName: labelBasenameComponents[0],
+			Repo:      cs[1],
+		}, nil
+	}
 	if cs[2] == "repo.json" {
 		return ArchivePathComponents{Repo: cs[1]}, nil
 	}
