@@ -3,7 +3,9 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // DieIfNotAccessible exits the process if the path is not accessible.
@@ -12,6 +14,15 @@ func DieIfNotAccessible(path string) {
 	if err != nil {
 		logFatalln(err)
 	}
+}
+
+func createPath(path string) {
+	err := os.MkdirAll(path, 0777)
+	fmt.Println(err)
+}
+
+func sanitizePath(path string) (string, error) {
+	return filepath.Abs(filepath.Clean(path))
 }
 
 func DieIfNotDirectory(path string) {
