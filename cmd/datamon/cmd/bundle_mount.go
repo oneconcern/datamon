@@ -77,7 +77,12 @@ var mountBundleCmd = &cobra.Command{
 			return
 		}
 
-		DieIfNotAccessible(bundleOptions.DataPath)
+		path, err := sanitizePath(bundleOptions.DataPath)
+		if err != nil {
+			log.Fatalf("Failed to sanitize destination: %s\n", bundleOptions.DataPath)
+			return
+		}
+		createPath(path)
 
 		metadataSource, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
@@ -87,7 +92,7 @@ var mountBundleCmd = &cobra.Command{
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
+		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
 
 		err = setLatestOrLabelledBundle(metadataSource)
 		if err != nil {

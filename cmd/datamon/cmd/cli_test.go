@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -90,10 +91,12 @@ type ExitMocks struct {
 }
 
 func (m *ExitMocks) Fatalf(format string, v ...interface{}) {
+	fmt.Println(format)
 	m.fatalCalls++
 }
 
 func (m *ExitMocks) Fatalln(v ...interface{}) {
+	fmt.Println(v...)
 	m.fatalCalls++
 }
 

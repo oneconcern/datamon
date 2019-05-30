@@ -37,8 +37,6 @@ func TestBundleMount(t *testing.T) {
 		pathBackingFs = "/tmp/mmfs"
 		pathToMount   = "/tmp/mmp"
 	)
-	require.NoError(t, os.Mkdir(pathBackingFs, 0777|os.ModeDir))
-	require.NoError(t, os.Mkdir(pathToMount, 0777|os.ModeDir))
 	defer os.RemoveAll(pathBackingFs)
 	defer os.RemoveAll(pathToMount)
 	cmd := exec.Command(
@@ -91,8 +89,6 @@ func TestBundleMutableMount(t *testing.T) {
 		pathBackingFs = "/tmp/mmfs"
 		pathToMount   = "/tmp/mmp"
 	)
-	require.NoError(t, os.Mkdir(pathBackingFs, 0777|os.ModeDir))
-	require.NoError(t, os.Mkdir(pathToMount, 0777|os.ModeDir))
 	defer os.RemoveAll(pathBackingFs)
 	defer os.RemoveAll(pathToMount)
 	rll, err := listBundles(t, repo1)
