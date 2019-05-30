@@ -33,7 +33,7 @@ func init() {
 	requiredFlags := []string{addRepoNameOptionFlag(LabelListCommand)}
 
 	for _, flag := range requiredFlags {
-		err := BundleListCommand.MarkFlagRequired(flag)
+		err := LabelListCommand.MarkFlagRequired(flag)
 		if err != nil {
 			logFatalln(err)
 		}
