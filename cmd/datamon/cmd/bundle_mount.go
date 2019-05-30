@@ -94,7 +94,7 @@ var mountBundleCmd = &cobra.Command{
 		}
 		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
 
-		err = setLatestBundle(metadataSource)
+		err = setLatestOrLabelledBundle(metadataSource)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -138,6 +138,7 @@ func init() {
 	addBundleFlag(mountBundleCmd)
 	addLogLevel(mountBundleCmd)
 	addStreamFlag(mountBundleCmd)
+	addLabelNameFlag(mountBundleCmd)
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))

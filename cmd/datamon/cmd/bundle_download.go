@@ -44,7 +44,7 @@ var BundleDownloadCmd = &cobra.Command{
 		}
 		destinationStore := localfs.New(fs)
 
-		err = setLatestBundle(sourceStore)
+		err = setLatestOrLabelledBundle(sourceStore)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -77,6 +77,8 @@ func init() {
 	// Blob bucket
 	addBlobBucket(BundleDownloadCmd)
 	addBucketNameFlag(BundleDownloadCmd)
+
+	addLabelNameFlag(BundleDownloadCmd)
 
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
