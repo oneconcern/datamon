@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"log"
-	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -152,21 +151,20 @@ func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
 }
 
 func (d *defaultFs) writer(prefix string) Writer {
-	return &fsWriter{
-		store:         d.store.backend,
-		leafSize:      d.leafSize,
-		leafs:         nil,
-		buf:           make([]byte, d.leafSize),
-		offset:        0,
-		flushed:       0,
-		pather:        nil,
-		prefix:        prefix,
-		count:         0,
-		flushChan:     make(chan blobFlush, sizeOfFlushChan),
-		errC:          make(chan error, sizeOfFlushChan),
-		maxGoRoutines: make(chan struct{}, maxGoRoutinesPerPut),
-		wg:            sync.WaitGroup{},
+	w := &fsWriter{
+		store:               d.store.backend,
+		leafSize:            d.leafSize,
+		buf:                 make([]byte, d.leafSize),
+		prefix:              prefix,
+		flushChan:           make(chan blobFlush),
+		errC:                make(chan error),
+		flushThreadDoneChan: make(chan struct{}),
+		maxGoRoutines:       make(chan struct{}, maxGoRoutinesPerPut),
+		blobFlushes:         make([]blobFlush, 0),
+		errors:              make([]error, 0),
 	}
+	go w.flushThread()
+	return w
 }
 
 func (d *defaultFs) Delete(ctx context.Context, hash Key) error {
