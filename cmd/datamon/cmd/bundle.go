@@ -31,6 +31,7 @@ var bundleOptions struct {
 	Daemonize        bool
 	Stream           bool
 	FileList         string
+	SkipOnError      bool
 }
 
 func init() {
@@ -81,6 +82,12 @@ func addDaemonizeFlag(cmd *cobra.Command) string {
 
 func addStreamFlag(cmd *cobra.Command) string {
 	cmd.Flags().BoolVar(&bundleOptions.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
+	return stream
+}
+
+func addSkipMissing(cmd *cobra.Command) string {
+	cmd.Flags().BoolVar(&bundleOptions.SkipOnError, skipOnError, false, "Skip files encounter errors while reading."+
+		"The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false")
 	return stream
 }
 

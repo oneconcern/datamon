@@ -65,6 +65,7 @@ var uploadBundleCmd = &cobra.Command{
 			core.BlobStore(blobStore),
 			core.ConsumableStore(sourceStore),
 			core.MetaStore(MetaStore),
+			core.SkipMissing(bundleOptions.SkipOnError),
 		)
 
 		var fn func() ([]string, error)
@@ -101,7 +102,7 @@ func init() {
 	requiredFlags = append(requiredFlags, addPathFlag(uploadBundleCmd))
 	requiredFlags = append(requiredFlags, addCommitMessageFlag(uploadBundleCmd))
 	addFileListFlag(uploadBundleCmd)
-
+	addSkipMissing(uploadBundleCmd)
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {

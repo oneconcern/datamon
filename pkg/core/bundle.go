@@ -32,6 +32,7 @@ type Bundle struct {
 	BundleEntries    []model.BundleEntry
 	Streamed         bool
 	l                *zap.Logger
+	SkipOnError      bool // When uploading files
 }
 
 // SetBundleID for the bundle
@@ -123,6 +124,12 @@ func BundleID(bID string) BundleOption {
 func Streaming(s bool) BundleOption {
 	return func(b *Bundle) {
 		b.Streamed = s
+	}
+}
+
+func SkipMissing(s bool) BundleOption {
+	return func(b *Bundle) {
+		b.SkipOnError = s
 	}
 }
 

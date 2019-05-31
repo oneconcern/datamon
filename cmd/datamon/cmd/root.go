@@ -33,6 +33,7 @@ const (
 	daemonize        = "daemonize"
 	stream           = "stream"
 	fileList         = "files"
+	skipOnError      = "skip-on-error"
 )
 
 // todo: "namespace" these with a struct{} as elsewhere
