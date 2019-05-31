@@ -21,7 +21,7 @@ var bundleFileList = &cobra.Command{
 		if err != nil {
 			logFatalln(err)
 		}
-		err = setLatestBundle(store)
+		err = setLatestOrLabelledBundle(store)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -54,6 +54,7 @@ func init() {
 
 	addBlobBucket(bundleFileList)
 	addBucketNameFlag(bundleFileList)
+	addLabelNameFlag(bundleFileList)
 
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)

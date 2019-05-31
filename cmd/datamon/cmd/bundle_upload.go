@@ -50,13 +50,13 @@ var uploadBundleCmd = &cobra.Command{
 			DieIfNotDirectory(bundleOptions.DataPath)
 			sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
 		}
+		contributors := []model.Contributor{{
+			Name:  repoParams.ContributorName,
+			Email: repoParams.ContributorEmail,
+		}}
 		bd := core.NewBDescriptor(
 			core.Message(bundleOptions.Message),
-			core.Contributors([]model.Contributor{{
-				Name:  repoParams.ContributorName,
-				Email: repoParams.ContributorEmail,
-			},
-			}),
+			core.Contributors(contributors),
 		)
 		bundle := core.New(bd,
 			core.Repo(repoParams.RepoName),
@@ -69,6 +69,20 @@ var uploadBundleCmd = &cobra.Command{
 		if err != nil {
 			logFatalln(err)
 		}
+
+		if labelOptions.Name == "" {
+			return
+		}
+		labelDescriptor := core.NewLabelDescriptor(
+			core.LabelContributors(contributors),
+		)
+		label := core.NewLabel(labelDescriptor,
+			core.LabelName(labelOptions.Name),
+		)
+		err = label.UploadDescriptor(context.Background(), bundle)
+		if err != nil {
+			logFatalln(err)
+		}
 	},
 }
 
@@ -77,6 +91,8 @@ func init() {
 	requiredFlags := []string{addRepoNameOptionFlag(uploadBundleCmd)}
 	requiredFlags = append(requiredFlags, addPathFlag(uploadBundleCmd))
 	requiredFlags = append(requiredFlags, addCommitMessageFlag(uploadBundleCmd))
+
+	addLabelNameFlag(uploadBundleCmd)
 
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
