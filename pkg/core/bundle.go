@@ -270,6 +270,6 @@ func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
 	return nil
 }
 
-func (bundle *Bundle) Exists(ctx context.Context) (bool, error) {
-	return bundle.MetaStore.Has(ctx, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID))
+func (b *Bundle) Exists(ctx context.Context) (bool, error) {
+	return b.MetaStore.Has(ctx, model.GetArchivePathToBundle(b.RepoID, b.BundleID))
 }

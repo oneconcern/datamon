@@ -71,12 +71,12 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
 		err = lsCRC.PutCRC(ctx,
 			model.GetArchivePathToLabel(bundle.RepoID, label.Name),
-			bytes.NewReader(buffer), storage.IfNotPresent, crc)
+			bytes.NewReader(buffer), storage.OverWrite, crc)
 
 	} else {
 		err = bundle.MetaStore.Put(ctx,
 			model.GetArchivePathToLabel(bundle.RepoID, label.Name),
-			bytes.NewReader(buffer), storage.IfNotPresent)
+			bytes.NewReader(buffer), storage.OverWrite)
 	}
 	if err != nil {
 		return err
