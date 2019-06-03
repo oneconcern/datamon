@@ -3,10 +3,8 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 )
 
 type errString string
@@ -45,23 +43,6 @@ type Store interface {
 
 type StoreCRC interface {
 	PutCRC(context.Context, string, io.Reader, bool, uint32) error
-}
-
-func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, destination string) ([]byte, error) {
-	reader, err := sStore.Get(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-	object, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-	err = dStore.Put(ctx, destination, bytes.NewReader(object), IfNotPresent)
-	if err != nil {
-		return nil, err
-	}
-	return object, err
 }
 
 func PipeIO(writer io.Writer, reader io.Reader) (n int64, err error) {

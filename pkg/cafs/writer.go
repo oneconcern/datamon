@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"sync"
 	"sync/atomic"
 
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -15,7 +14,7 @@ import (
 )
 
 const (
-	maxGoRoutinesPerPut = 100
+	maxGoRoutinesPerPut = 10
 )
 
 // Writer interface for a content addressable FS
@@ -25,19 +24,21 @@ type Writer interface {
 }
 
 type fsWriter struct {
-	fs            storage.Store       // CAFS backing store
-	prefix        string              // Prefix for fs paths
-	leafSize      uint32              // Size of chunks
-	leafs         []Key               // List of keys backing a file
-	buf           []byte              // Buffer stage a chunk == leafsize
-	offset        int                 // till where buffer is used
-	flushed       uint32              // writer has been flushed to fs
-	pather        func(string) string // pathing logic
-	count         uint64              // total number of parallel writes
-	flushChan     chan blobFlush      // channel for parallel writes
-	errC          chan error          // channel for errors during parallel writes
-	maxGoRoutines chan struct{}       // Max number of concurrent writes
-	wg            sync.WaitGroup      // Sync
+	store               storage.Store       // CAFS backing store
+	prefix              string              // Prefix for store paths
+	leafSize            uint32              // Size of chunks
+	leafs               []Key               // List of keys backing a file
+	buf                 []byte              // Buffer stage a chunk == leafsize
+	offset              int                 // till where buffer is used
+	flushed             uint32              // writer has been flushed to store
+	pather              func(string) string // pathing logic
+	count               uint64              // total number of parallel writes
+	flushChan           chan blobFlush      // channel for parallel writes
+	errC                chan error          // channel for errors during parallel writes
+	flushThreadDoneChan chan struct{}
+	maxGoRoutines       chan struct{} // Max number of concurrent writes
+	blobFlushes         []blobFlush
+	errors              []error
 }
 
 func (w *fsWriter) Write(p []byte) (n int, err error) {
@@ -55,7 +56,6 @@ func (w *fsWriter) Write(p []byte) (n int, err error) {
 		w.offset += c
 		written += c
 		if w.offset == len(w.buf) { // sizes line up, flush and continue
-			w.wg.Add(1)
 			w.count++ // next leaf
 			w.maxGoRoutines <- struct{}{}
 			go pFlush(
@@ -68,8 +68,7 @@ func (w *fsWriter) Write(p []byte) (n int, err error) {
 				w.errC,
 				w.maxGoRoutines,
 				w.pather,
-				w.fs,
-				&w.wg,
+				w.store,
 			)
 			w.buf = make([]byte, w.leafSize) // new buffer
 			w.offset = 0                     // new offset for new buffer
@@ -94,12 +93,10 @@ func pFlush(
 	maxGoRoutines chan struct{},
 	pather func(string) string,
 	destination storage.Store,
-	wg *sync.WaitGroup,
 ) {
-	done := func() {
-		wg.Done()
+	defer func() {
 		<-maxGoRoutines
-	}
+	}()
 	// Calculate hash value
 	hasher, err := blake2b.New(&blake2b.Config{
 		Size: blake2b.Size,
@@ -115,20 +112,17 @@ func pFlush(
 	})
 	if err != nil {
 		errC <- err
-		done()
 		return
 	}
 	_, err = hasher.Write(buffer)
 	if err != nil {
 		errC <- fmt.Errorf("flush segment hash: %v", err)
-		done()
 		return
 	}
 
 	leafKey, err := NewKey(hasher.Sum(nil))
 	if err != nil {
 		errC <- fmt.Errorf("flush key segment: %v", err)
-		done()
 		return
 	}
 
@@ -148,7 +142,6 @@ func pFlush(
 		}
 		if err != nil {
 			errC <- fmt.Errorf("write segment file: %v", err)
-			done()
 			return
 		}
 		fmt.Printf("Uploading blob:%s\n", leafKey.String())
@@ -159,7 +152,6 @@ func pFlush(
 		count: count,
 		key:   leafKey,
 	}
-	done()
 }
 
 func (w *fsWriter) flush(isLastNode bool) (int, error) {
@@ -196,14 +188,14 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 		// w.pather = func(lks string) string { return filepath.Join(lks[:3], lks[3:6], lks[6:]) }
 		w.pather = func(lks string) string { return w.prefix + lks }
 	}
-	found, _ := w.fs.Has(context.TODO(), w.pather(leafKey.String()))
+	found, _ := w.store.Has(context.TODO(), w.pather(leafKey.String()))
 	if !found {
-		d, ok := w.fs.(storage.StoreCRC)
+		d, ok := w.store.(storage.StoreCRC)
 		if ok {
 			crc := crc32.Checksum(w.buf[:w.offset], crc32.MakeTable(crc32.Castagnoli))
 			err = d.PutCRC(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite, crc)
 		} else {
-			err = w.fs.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
+			err = w.store.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
 		}
 		if err != nil {
 			return 0, fmt.Errorf("write segment file: %v", err)
@@ -219,27 +211,36 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 	return n, nil
 }
 
-func (w *fsWriter) Flush() (Key, []byte, error) {
-	w.leafs = make([]Key, w.count)
-	if w.count > 0 {
-		w.wg.Wait()
-		for {
-			select {
-			case bf := <-w.flushChan:
-				w.count--
-				w.leafs[bf.count-1] = bf.key
-				if w.count == 0 {
-					break
-				}
-			case err := <-w.errC:
-				return Key{}, nil, err
-
-			default:
+func (w *fsWriter) flushThread() {
+	var err error
+	var bf blobFlush
+	notDone := true
+	for notDone {
+		select {
+		case bf, notDone = <-w.flushChan:
+			if notDone {
+				w.blobFlushes = append(w.blobFlushes, bf)
 			}
-			if w.count == 0 {
-				break
-			}
+		case err = <-w.errC:
+			w.errors = append(w.errors, err)
 		}
+	}
+	w.flushThreadDoneChan <- struct{}{}
+}
+
+// don't Write() during Flush()
+func (w *fsWriter) Flush() (Key, []byte, error) {
+	for i := 0; i < cap(w.maxGoRoutines); i++ {
+		w.maxGoRoutines <- struct{}{}
+	}
+	close(w.flushChan)
+	<-w.flushThreadDoneChan
+	if len(w.errors) != 0 {
+		return Key{}, nil, w.errors[0]
+	}
+	w.leafs = make([]Key, len(w.blobFlushes))
+	for _, bf := range w.blobFlushes {
+		w.leafs[bf.count-1] = bf.key
 	}
 	atomic.StoreUint32(&w.flushed, 1)
 

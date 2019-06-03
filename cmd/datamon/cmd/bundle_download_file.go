@@ -32,7 +32,7 @@ var bundleDownloadFileCmd = &cobra.Command{
 		}
 		_ = os.MkdirAll(path, 0700)
 		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
-		err = setLatestBundle(metadataStore)
+		err = setLatestOrLabelledBundle(metadataStore)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -61,6 +61,7 @@ func init() {
 
 	addBlobBucket(bundleDownloadFileCmd)
 	addBucketNameFlag(bundleDownloadFileCmd)
+	addLabelNameFlag(bundleDownloadFileCmd)
 
 	for _, flag := range requiredFlags {
 		err := bundleDownloadFileCmd.MarkFlagRequired(flag)

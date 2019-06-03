@@ -3,8 +3,12 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"log"
-	"time"
+	"os"
+
+	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
 
@@ -16,26 +20,81 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func undaemonizeArgs(args []string) []string {
+	foregroundArgs := make([]string, 0)
+	for _, arg := range args {
+		if arg != "--"+daemonize {
+			foregroundArgs = append(foregroundArgs, arg)
+		}
+	}
+	return foregroundArgs
+}
+
+func runDaemonized() {
+	var path string
+	path, err := os.Executable()
+	if err != nil {
+		err = fmt.Errorf("os.Executable: %v", err)
+		logFatalln(err)
+	}
+
+	foregroundArgs := undaemonizeArgs(os.Args[1:])
+
+	// Pass along PATH so that the daemon can find fusermount on Linux.
+	env := []string{
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
+		fmt.Sprintf("HOME=%s", os.Getenv("HOME")),
+	}
+
+	// Pass along GOOGLE_APPLICATION_CREDENTIALS
+	if p, ok := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS"); ok {
+		env = append(env, fmt.Sprintf("GOOGLE_APPLICATION_CREDENTIALS=%s", p))
+	}
+
+	// Run.
+	err = daemonizer.Run(path, foregroundArgs, env, os.Stdout)
+	if err != nil {
+		err = fmt.Errorf("daemonize.Run: %v", err)
+		logFatalln(err)
+	}
+}
+
+func onDaemonError(err error) {
+	if errSig := daemonizer.SignalOutcome(err); errSig != nil {
+		logFatalln(fmt.Errorf("error SignalOutcome: %v, cause: %v", errSig, err))
+	}
+	logFatalln(err)
+}
+
 // Mount a read only view of a bundle
 var mountBundleCmd = &cobra.Command{
 	Use:   "mount",
 	Short: "Mount a bundle",
 	Long:  "Mount a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
+		if bundleOptions.Daemonize {
+			runDaemonized()
+			return
+		}
 
-		DieIfNotAccessible(bundleOptions.DataPath)
+		path, err := sanitizePath(bundleOptions.DataPath)
+		if err != nil {
+			log.Fatalf("Failed to sanitize destination: %s\n", bundleOptions.DataPath)
+			return
+		}
+		createPath(path)
 
 		metadataSource, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
-			logFatalln(err)
+			onDaemonError(err)
 		}
 		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
 		if err != nil {
-			logFatalln(err)
+			onDaemonError(err)
 		}
-		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
+		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
 
-		err = setLatestBundle(metadataSource)
+		err = setLatestOrLabelledBundle(metadataSource)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -46,6 +105,7 @@ var mountBundleCmd = &cobra.Command{
 			core.BlobStore(blobStore),
 			core.ConsumableStore(consumableStore),
 			core.MetaStore(metadataSource),
+			core.Streaming(bundleOptions.Stream),
 		)
 		logger, err := dlogger.GetLogger(logLevel)
 		if err != nil {
@@ -53,14 +113,18 @@ var mountBundleCmd = &cobra.Command{
 		}
 		fs, err := core.NewReadOnlyFS(bundle, logger)
 		if err != nil {
+			onDaemonError(err)
+		}
+		if err = fs.MountReadOnly(bundleOptions.MountPath); err != nil {
+			onDaemonError(err)
+		}
+
+		registerSIGINTHandlerMount(bundleOptions.MountPath)
+		if err = daemonizer.SignalOutcome(nil); err != nil {
 			logFatalln(err)
 		}
-		err = fs.MountReadOnly(bundleOptions.MountPath)
-		if err != nil {
+		if err = fs.JoinMount(context.Background()); err != nil {
 			logFatalln(err)
-		}
-		for {
-			time.Sleep(time.Hour)
 		}
 	},
 }
@@ -69,9 +133,12 @@ func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(mountBundleCmd)}
 	addBucketNameFlag(mountBundleCmd)
+	addDaemonizeFlag(mountBundleCmd)
 	addBlobBucket(mountBundleCmd)
 	addBundleFlag(mountBundleCmd)
 	addLogLevel(mountBundleCmd)
+	addStreamFlag(mountBundleCmd)
+	addLabelNameFlag(mountBundleCmd)
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))

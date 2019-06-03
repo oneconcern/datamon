@@ -23,6 +23,7 @@ const (
 	repo             = "repo"
 	meta             = "meta"
 	blob             = "blob"
+	labelName        = "label"
 	description      = "description"
 	contributorEmail = "email"
 	contributorName  = "name"
@@ -30,6 +31,10 @@ const (
 	file             = "file"
 	loglevel         = "loglevel"
 	cpuprof          = "cpuprof"
+	daemonize        = "daemonize"
+	stream           = "stream"
+	fileList         = "files"
+	skipOnError      = "skip-on-error"
 )
 
 // todo: "namespace" these with a struct{} as elsewhere
@@ -91,6 +96,7 @@ func init() {
 func initConfig() {
 	viper.SetDefault("metadata", "datamon-meta-data")
 	viper.SetDefault("blob", "datamon-blob-data")
+	viper.SetDefault("label", "datamon-label-data")
 	if os.Getenv("DATAMON_CONFIG") != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(os.Getenv("DATAMON_CONFIG"))

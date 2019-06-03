@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,8 +29,8 @@ const (
 	firstINode       fuseops.InodeID = 1023
 	dirDefaultMode                   = 0777 | os.ModeDir
 	fileDefaultMode                  = 0666
-	dirReadOnlyMode                  = 0755 | os.ModeDir
-	fileReadOnlyMode                 = 0655
+	dirReadOnlyMode                  = 0555 | os.ModeDir
+	fileReadOnlyMode                 = 0444
 	defaultUID                       = 0
 	defaultGID                       = 0
 	dirInitialSize                   = 64
@@ -109,26 +110,43 @@ func NewMutableFS(bundle *Bundle, pathToStaging string) (*MutableFS, error) {
 	}, err
 }
 
+func prepPath(path string) error {
+	err := os.MkdirAll(path, dirDefaultMode)
+	if err != nil && strings.Contains(err.Error(), "file exists") {
+		return nil
+	}
+	return err
+}
+
 func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
-	// TODO plumb additional mount options
+	err := prepPath(path)
+	if err != nil {
+		return err
+	}
+	// Reminder: Options are OS specific
+	// options := make(map[string]string)
+	// options["allow_other"] = ""
 	mountCfg := &fuse.MountConfig{
 		FSName:      dfs.fsInternal.bundle.RepoID,
 		VolumeName:  dfs.fsInternal.bundle.BundleID,
 		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
+		// Options:     options,
 	}
-	var err error
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
 	return err
 }
 
 func (dfs *MutableFS) MountMutable(path string) error {
+	err := prepPath(path)
+	if err != nil {
+		return err
+	}
 	// TODO plumb additional mount options
 	mountCfg := &fuse.MountConfig{
 		FSName:      dfs.fsInternal.bundle.RepoID,
 		VolumeName:  dfs.fsInternal.bundle.BundleID,
 		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
 	}
-	var err error
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
 	return err
 }
@@ -138,6 +156,10 @@ func (dfs *ReadOnlyFS) Unmount(path string) error {
 	return fuse.Unmount(path)
 }
 
+func (dfs *ReadOnlyFS) JoinMount(ctx context.Context) error {
+	return dfs.mfs.Join(ctx)
+}
+
 func (dfs *MutableFS) Unmount(path string) error {
 	// On unmount, walk the FS and create a bundle
 	_ = dfs.fsInternal.Commit()
@@ -145,4 +167,12 @@ func (dfs *MutableFS) Unmount(path string) error {
 	// dump the metadata to the local FS to manually recover.
 	//}
 	return fuse.Unmount(path)
+}
+
+func (dfs *MutableFS) JoinMount(ctx context.Context) error {
+	return dfs.mfs.Join(ctx)
+}
+
+func (dfs *MutableFS) Commit() error {
+	return dfs.fsInternal.Commit()
 }

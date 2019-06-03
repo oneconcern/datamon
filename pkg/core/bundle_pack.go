@@ -10,6 +10,8 @@ import (
 	"io"
 	"log"
 
+	"go.uber.org/zap"
+
 	"github.com/oneconcern/datamon/pkg/storage"
 
 	"gopkg.in/yaml.v2"
@@ -61,47 +63,27 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 	return nil
 }
 
-type uploadBundleChans struct {
-	// recv data from goroutines about uploaded files
-	filePacked chan<- filePacked
-	error      chan<- errorHit
-	// broadcast to all goroutines not to block by closing this channel
-	done <-chan struct{}
+func (b *Bundle) skipFile(file string) bool {
+	exist, err := b.ConsumableStore.Has(context.Background(), file)
+	if err != nil {
+		b.l.Error("could not check if file exists",
+			zap.String("file", file),
+			zap.String("repo", b.RepoID),
+			zap.String("bundleID", b.BundleID))
+		exist = true // Code will decide later how to handle this file
+	}
+	return model.IsGeneratedFile(file) || (b.SkipOnError && !exist)
 }
 
-func uploadBundleFile(
-	ctx context.Context,
-	file string,
-	cafsArchive cafs.Fs,
-	fileReader io.Reader,
-	chans uploadBundleChans) {
-	written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
-	if e != nil {
-		select {
-		case chans.error <- errorHit{
-			error: e,
-			file:  file,
-		}:
-		case <-chans.done:
-		}
-		return
-	}
-	select {
-	case chans.filePacked <- filePacked{
-		hash:      key.String(),
-		keys:      keys,
-		name:      file,
-		size:      uint64(written),
-		duplicate: duplicate,
-	}:
-	case <-chans.done:
-	}
-}
-
-func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error)) error {
 	// Walk the entire tree
 	// TODO: #53 handle large file count
-	files, err := bundle.ConsumableStore.Keys(ctx)
+	if getKeys == nil {
+		getKeys = func() ([]string, error) {
+			return bundle.ConsumableStore.Keys(context.Background())
+		}
+	}
+	files, err := getKeys()
 	if err != nil {
 		return err
 	}
@@ -112,67 +94,93 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	if err != nil {
 		return err
 	}
+
+	fileList := make([]model.BundleEntry, 0)
+	var firstUploadBundleEntryIndex uint
 	// Upload the files and the bundle list
 	err = bundle.InitializeBundleID()
 	if err != nil {
 		return err
 	}
 
-	/* kick off file uploads */
-	filePackedC := make(chan filePacked)
-	errorHitC := make(chan errorHit)
-	doneC := make(chan struct{})
-	defer close(doneC)
+	fC := make(chan filePacked, len(files))
+	eC := make(chan errorHit, len(files))
+	cC := make(chan struct{}, 20)
 	var count int64
 	for _, file := range files {
 		// Check to see if the file is to be skipped.
-		if model.IsGeneratedFile(file) {
+		if bundle.skipFile(file) {
+			bundle.l.Info("skipping file",
+				zap.String("file", file),
+				zap.String("repo", bundle.RepoID),
+				zap.String("bundleID", bundle.BundleID),
+			)
 			continue
 		}
+
 		var fileReader io.ReadCloser
 		fileReader, err = bundle.ConsumableStore.Get(ctx, file)
-		if err != nil {
+		if err != nil && bundle.SkipOnError {
+			bundle.l.Info("skipping file",
+				zap.String("file", file),
+				zap.String("repo", bundle.RepoID),
+				zap.String("bundleID", bundle.BundleID),
+				zap.Error(err),
+			)
+			continue
+		} else if err != nil {
 			return err
 		}
 		count++
-		go uploadBundleFile(ctx, file, cafsArchive, fileReader, uploadBundleChans{
-			filePacked: filePackedC,
-			error:      errorHitC,
-			done:       doneC,
-		})
+		cC <- struct{}{}
+		go func(file string) {
+			defer func() {
+				<-cC
+			}()
+			written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
+			if e != nil {
+				eC <- errorHit{
+					error: e,
+					file:  file,
+				}
+				return
+			}
+
+			fC <- filePacked{
+				hash:      key.String(),
+				keys:      keys,
+				name:      file,
+				size:      uint64(written),
+				duplicate: duplicate,
+			}
+		}(file)
 	}
-	/* block on upload results */
-	filePackedList := make([]filePacked, 0)
 	for count > 0 {
 		select {
-		case f := <-filePackedC:
+		case f := <-fC:
 			log.Printf("Uploaded file:%s, duplicate:%t, key:%s, keys:%d", f.name, f.duplicate, f.hash, len(f.keys))
-			filePackedList = append(filePackedList, f)
+
 			count--
-		case e := <-errorHitC:
+
+			fileList = append(fileList, model.BundleEntry{
+				Hash:         f.hash,
+				NameWithPath: f.name,
+				FileMode:     0, // #TODO: #35 file mode support
+				Size:         f.size})
+
+			// Write the bundle entry file if reached max or the last one
+			if count == 0 || uint(len(fileList))%bundleEntriesPerFile == 0 {
+				err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUploadBundleEntryIndex:])
+				if err != nil {
+					fmt.Printf("Bundle upload failed.  Failed to upload bundle entries list %v", err)
+					return err
+				}
+				firstUploadBundleEntryIndex = uint(len(fileList))
+			}
+		case e := <-eC:
 			count--
 			fmt.Printf("Bundle upload failed. Failed to upload file %s err: %s", e.file, e.error)
 			return e.error
-		}
-	}
-	/* sync upload metadata */
-	fileList := make([]model.BundleEntry, 0)
-	var firstUnuploadBundleEntryIndex uint
-	for packedFileIdx, packedFile := range filePackedList {
-		fileList = append(fileList, model.BundleEntry{
-			Hash:         packedFile.hash,
-			NameWithPath: packedFile.name,
-			FileMode:     0, // #TODO: #35 file mode support
-			Size:         packedFile.size})
-
-		// Write the bundle entry file if reached max or the last one
-		if packedFileIdx == len(filePackedList)-1 || uint(1+packedFileIdx)%bundleEntriesPerFile == 0 {
-			err = uploadBundleEntriesFileList(ctx, bundle, fileList[firstUnuploadBundleEntryIndex:])
-			if err != nil {
-				fmt.Printf("Bundle upload failed.  Failed to upload bundle entries list %v", err)
-				return err
-			}
-			firstUnuploadBundleEntryIndex = uint(len(fileList))
 		}
 	}
 	err = uploadBundleDescriptor(ctx, bundle)

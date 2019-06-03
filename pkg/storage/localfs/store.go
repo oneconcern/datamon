@@ -76,6 +76,7 @@ func (rc readCloser) Close() error {
 }
 
 func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
+	// TODO: Change this implementation to use rename to put file into place.
 	dir := filepath.Dir(key)
 	if dir != "" {
 		if err := l.fs.MkdirAll(filepath.Dir(key), 0700); err != nil {

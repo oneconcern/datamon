@@ -1,11 +1,5 @@
 FROM golang:alpine as base
 
-ARG github_user
-ARG github_token
-
-ENV GITHUB_USER ${github_user}
-ENV GITHUB_TOKEN ${github_token}
-
 ADD hack/create-netrc.sh /usr/bin/create-netrc
 
 RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
@@ -32,17 +26,6 @@ RUN cp /stage/usr/bin/datamon /usr/bin/datamon
 
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 
-# ENTRYPOINT [ "datamon" ]
-# CMD ["--help"]
-
-# omitting dist image during development/debug
-# #Build the dist image
-# FROM scratch
-# COPY --from=base /stage /
-# ENV ZONEINFO /zoneinfo.zip
-# ENTRYPOINT [ "datamon" ]
-# CMD ["--help"]
-
 # Build the dist image
 FROM ubuntu:latest
 RUN apt-get update && apt-get install -y --no-install-recommends fuse &&\
@@ -53,6 +36,7 @@ COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip
 
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
+
 RUN useradd -u 1020 -ms /bin/bash developer
 RUN groupadd -g 2000 developers
 RUN usermod -g developers developer
