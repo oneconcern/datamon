@@ -27,7 +27,7 @@ func (fs *readOnlyFsInternal) StatFS(
 func (fs *readOnlyFsInternal) opStart(op interface{}) {
 	switch t := op.(type) {
 	case *fuseops.ReadFileOp:
-		fs.l.Debug("Start",
+		fs.l.Info("Start",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
@@ -63,7 +63,7 @@ func (fs *readOnlyFsInternal) opStart(op interface{}) {
 func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 	switch t := op.(type) {
 	case *fuseops.ReadFileOp:
-		fs.l.Debug("End",
+		fs.l.Info("End",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
