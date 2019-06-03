@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -63,9 +65,28 @@ var uploadBundleCmd = &cobra.Command{
 			core.BlobStore(blobStore),
 			core.ConsumableStore(sourceStore),
 			core.MetaStore(MetaStore),
+			core.SkipMissing(bundleOptions.SkipOnError),
 		)
 
-		err = core.Upload(context.Background(), bundle)
+		var fn func() ([]string, error)
+
+		if bundleOptions.FileList != "" {
+			fn = func() ([]string, error) {
+				var file afero.File
+				file, err = os.Open(bundleOptions.FileList)
+				if err != nil {
+					return nil, fmt.Errorf("failed to open file: %s err:%s", bundleOptions.FileList, err.Error())
+				}
+				lineScanner := bufio.NewScanner(file)
+				files := make([]string, 0)
+				for lineScanner.Scan() {
+					files = append(files, lineScanner.Text())
+				}
+				return files, nil
+			}
+		}
+
+		err = core.Upload(context.Background(), bundle, fn)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -91,9 +112,9 @@ func init() {
 	requiredFlags := []string{addRepoNameOptionFlag(uploadBundleCmd)}
 	requiredFlags = append(requiredFlags, addPathFlag(uploadBundleCmd))
 	requiredFlags = append(requiredFlags, addCommitMessageFlag(uploadBundleCmd))
-
+	addFileListFlag(uploadBundleCmd)
 	addLabelNameFlag(uploadBundleCmd)
-
+	addSkipMissing(uploadBundleCmd)
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {

@@ -93,9 +93,8 @@ func TestBundle(t *testing.T) {
 		ConsumableStore(consumableStore),
 		BlobStore(reArchiveBlob),
 	)
-
 	require.NoError(t,
-		implUpload(context.Background(), archiveBundle2, reBundleEntriesPerFile))
+		implUpload(context.Background(), archiveBundle2, reBundleEntriesPerFile, nil))
 
 	require.True(t, validateUpload(t, bundle, archiveBundle2))
 }

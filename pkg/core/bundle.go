@@ -32,6 +32,7 @@ type Bundle struct {
 	BundleEntries    []model.BundleEntry
 	Streamed         bool
 	l                *zap.Logger
+	SkipOnError      bool // When uploading files
 }
 
 // SetBundleID for the bundle
@@ -126,6 +127,12 @@ func Streaming(s bool) BundleOption {
 	}
 }
 
+func SkipMissing(s bool) BundleOption {
+	return func(b *Bundle) {
+		b.SkipOnError = s
+	}
+}
+
 func Logger(l *zap.Logger) BundleOption {
 	return func(b *Bundle) {
 		b.l = l
@@ -191,17 +198,17 @@ func PublishMetadata(ctx context.Context, bundle *Bundle) error {
 }
 
 // Upload an bundle to archive
-func Upload(ctx context.Context, bundle *Bundle) error {
-	return implUpload(ctx, bundle, defaultBundleEntriesPerFile)
+func Upload(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error)) error {
+	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, getKeys)
 }
 
 // implementation of Upload() with some additional parameters for test
-func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error)) error {
 	err := RepoExists(bundle.RepoID, bundle.MetaStore)
 	if err != nil {
 		return err
 	}
-	return uploadBundle(ctx, bundle, bundleEntriesPerFile)
+	return uploadBundle(ctx, bundle, bundleEntriesPerFile, getKeys)
 }
 
 func PopulateFiles(ctx context.Context, bundle *Bundle) error {
