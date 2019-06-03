@@ -47,9 +47,9 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
 .PHONY: build-and-push-fuse-sidecar
-## build sidecar container used in fuse demo
+## build sidecar container used in Argo workflows
 build-and-push-fuse-sidecar:
-	@echo 'building fuse demo container'
+	@echo 'building fuse sidecar container'
 	docker build \
 		--progress plain \
 		-t gcr.io/onec-co/datamon-fuse-sidecar \
@@ -59,30 +59,6 @@ build-and-push-fuse-sidecar:
 		-f sidecar.Dockerfile \
 		.
 	docker push gcr.io/onec-co/datamon-fuse-sidecar
-
-.PHONY: fuse-demo-build-shell
-## build shell container used in fuse demo
-fuse-demo-build-shell:
-	@echo 'building fuse demo container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-fuse-demo-shell \
-		--ssh default \
-		-f ./hack/fuse-demo/shell.Dockerfile \
-		.
-
-.PHONY: fuse-demo-build-sidecar
-## build sidecar container used in fuse demo
-fuse-demo-build-sidecar:
-	@echo 'building fuse demo container'
-	docker build \
-		--progress plain \
-		--build-arg github_user=$(GITHUB_USER) \
-		--build-arg github_token=$(GITHUB_TOKEN) \
-		-t gcr.io/onec-co/datamon-fuse-demo-sidecar \
-		--ssh default \
-		-f ./hack/fuse-demo/sidecar.Dockerfile \
-		.
 
 .PHONY: build-datamon
 ## Build datamon docker container (datamon)
@@ -122,14 +98,6 @@ build-datamon-mac:
 	@echo "${VERSION_LD_FLAGS}"
 	@echo "${LDFLAGS}"
 	go build -o datamon.mac --ldflags "${LDFLAGS}" ./cmd/datamon
-
-## demonstrate a fuse read-only filesystem
-fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
-	@docker image push gcr.io/onec-co/datamon-fuse-demo-shell
-	@docker image push gcr.io/onec-co/datamon-fuse-demo-sidecar
-	@./hack/fuse-demo/create_ro_pod.sh
-	@sleep 8 # dumb timeout on container startup
-	@./hack/fuse-demo/run_shell.sh
 
 .PHONY: build-all
 ## Build all the containers
@@ -209,3 +177,62 @@ goimports:
 ## Runs static code analysis checks (golangci-lint)
 check: gofmt goimports
 	@golangci-lint run --build-tags fuse_cli --max-same-issues 0 --verbose
+
+### k8s demos
+
+# todo: scripts to datamon-fuse-sidecar Docker img, lint to CI
+.PHONY: lint-init-scripts
+## build shell container used in fuse demo
+fuse-demo-lint-init-scripts:
+	shellcheck hack/fuse-demo/wrap_*.sh
+
+.PHONY: fuse-demo-build-shell
+## build shell container used in fuse demo
+fuse-demo-build-shell:
+	@echo 'building fuse demo container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-fuse-demo-shell \
+		--ssh default \
+		-f ./hack/fuse-demo/shell.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-fuse-demo-shell
+
+## demonstrate a fuse read-only filesystem
+fuse-demo-ro: fuse-demo-build-shell
+	@docker image push gcr.io/onec-co/datamon-fuse-demo-shell
+	@./hack/fuse-demo/create_ro_pod.sh
+	@sleep 8 # dumb timeout on container startup
+	@./hack/fuse-demo/run_shell.sh
+
+.PHONY: fuse-demo-coord-build-app
+## build shell container used in fuse demo
+fuse-demo-coord-build-app:
+	@echo 'building fuse demo container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-fuse-demo-coord-app \
+		--ssh default \
+		-f ./hack/fuse-demo/coord-app.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-fuse-demo-coord-app
+
+.PHONY: fuse-demo-coord-build-datamon
+## build shell container used in fuse demo
+fuse-demo-coord-build-datamon:
+	@echo 'building fuse demo container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-fuse-demo-coord-datamon \
+		--ssh default \
+		-f ./hack/fuse-demo/coord-datamon.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-fuse-demo-coord-datamon
+
+## demonstrate a fuse read-only filesystem
+fuse-demo-coord: fuse-demo-coord-build-app fuse-demo-coord-build-datamon
+	@go build -o cmd/datamon/datamon ./cmd/datamon/
+	@date '+%s' > /tmp/datamon_fuse_demo_coord_start_timestamp
+	@./hack/fuse-demo/create_coord_pod.sh
+	@./hack/fuse-demo/follow_coord_logs.sh
+	@./hack/fuse-demo/verify_coord_bundle.sh

@@ -25,10 +25,10 @@ spec:
           name: fuse-mountpoint
           mountPropagation: "HostToContainer"
       - name: datamon-sidecar
-        image: gcr.io/onec-co/datamon-fuse-demo-sidecar:latest
+        image: gcr.io/onec-co/datamon-fuse-sidecar:v0.4
         imagePullPolicy: "Always"
         command: ["datamon"]
-        args: ["bundle", "mount", "--repo", "ransom-datamon-test-repo", "--destination", "/tmp", "--mount", "/tmp/mount"]
+        args: ["bundle", "mount", "--repo", "ransom-datamon-test-repo", "--label", "testlabel", "--destination", "/tmp", "--mount", "/tmp/mount", "--stream"]
         securityContext:
           privileged: true
         stdin: true
