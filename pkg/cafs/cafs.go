@@ -147,6 +147,9 @@ func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
 		TruncateLeaf(d.leafTruncation),
 		VerifyHash(true),
 		SetCache(d.lru))
+	if err != nil {
+		return nil, err
+	}
 	return r.(io.ReaderAt), err
 }
 
