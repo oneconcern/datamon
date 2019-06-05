@@ -27,7 +27,7 @@ VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)Version=$(VERSION)'
 VERSION_LD_FLAG_DATE ?= -X '$(VERSION_INFO_IMPORT_PATH)BuildDate=$(shell date -u -R)'
 VERSION_LD_FLAG_COMMIT ?= -X '$(VERSION_INFO_IMPORT_PATH)GitCommit=$(COMMIT)'
 VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)GitState=$(GITDIRTY)'
-VERSION_LD_FLAGS ?= $(VERSION_LD_FLAG_VERSION) $(VERSION_LD_FLAG_DATE) $(VERSION_LD_FLAG_COMMIT) $(VERSION_LD_FLAG_VERSION) 
+VERSION_LD_FLAGS ?= $(VERSION_LD_FLAG_VERSION) $(VERSION_LD_FLAG_DATE) $(VERSION_LD_FLAG_COMMIT) $(VERSION_LD_FLAG_VERSION)
 
 ## Show help
 help:
@@ -236,3 +236,21 @@ fuse-demo-coord: fuse-demo-coord-build-app fuse-demo-coord-build-datamon
 	@./hack/fuse-demo/create_coord_pod.sh
 	@./hack/fuse-demo/follow_coord_logs.sh
 	@./hack/fuse-demo/verify_coord_bundle.sh
+
+.PHONY: profile-metrics
+## Build the metrics collection binary and write output
+profile-metrics:
+	@go build -o out/metrics/metrics.out ./cmd/metrics
+	./hack/metrics/xtime.sh \
+		-l out/metrics/upload.log \
+		-t out/metrics/upload_time.log \
+		-- out/metrics/metrics.out \
+		--cpuprof out/metrics/cpu.prof \
+		--memprof out/metrics/mem.prof \
+		upload
+	@./hack/metrics/pprof_fmt_metrics.sh \
+		out/metrics/metrics.out \
+		out/metrics/cpu.prof \
+		out/metrics/mem.prof \
+		out/metrics
+
