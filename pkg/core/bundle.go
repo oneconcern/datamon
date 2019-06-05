@@ -198,7 +198,12 @@ func PublishMetadata(ctx context.Context, bundle *Bundle) error {
 }
 
 // Upload an bundle to archive
-func Upload(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error)) error {
+func Upload(ctx context.Context, bundle *Bundle) error {
+	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, nil)
+}
+
+// Upload specified keys (files) within a bundle's consumable store
+func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error)) error {
 	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, getKeys)
 }
 
