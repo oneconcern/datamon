@@ -68,10 +68,8 @@ var uploadBundleCmd = &cobra.Command{
 			core.SkipMissing(bundleOptions.SkipOnError),
 		)
 
-		var fn func() ([]string, error)
-
 		if bundleOptions.FileList != "" {
-			fn = func() ([]string, error) {
+			getKeys := func() ([]string, error) {
 				var file afero.File
 				file, err = os.Open(bundleOptions.FileList)
 				if err != nil {
@@ -84,9 +82,10 @@ var uploadBundleCmd = &cobra.Command{
 				}
 				return files, nil
 			}
+			err = core.UploadSpecificKeys(context.Background(), bundle, getKeys)
+		} else {
+			err = core.Upload(context.Background(), bundle)
 		}
-
-		err = core.Upload(context.Background(), bundle, fn)
 		if err != nil {
 			logFatalln(err)
 		}
