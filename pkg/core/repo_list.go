@@ -2,19 +2,23 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
-	"strings"
 
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	yaml "gopkg.in/yaml.v2"
 )
 
-func ListRepos(store storage.Store) ([]string, error) {
-	// TODO: Don;t format string here, return a paginated list of id<->bd
+const (
+	maxReposToList = 1000000
+)
+
+// todo: dedupe ListReposPaginated()
+func ListRepos(store storage.Store) ([]model.RepoDescriptor, error) {
 	// Get a list
-	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", 1000000)
-	var keys = make([]string, 0)
+	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
+	var repos = make([]model.RepoDescriptor, 0)
 	for _, k := range ks {
 		apc, err := model.GetArchivePathComponents(k)
 		if err != nil {
@@ -33,26 +37,32 @@ func ListRepos(store storage.Store) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		keys = append(keys, apc.Repo+" , "+rd.Description+" , "+rd.Contributor.Name+" , "+rd.Contributor.Email+" , "+rd.Timestamp.String())
+		if rd.Name != apc.Repo {
+			return nil, fmt.Errorf("repo names in descriptor '%v' and archive path '%v' don't match",
+				rd.Name, apc.Repo)
+		}
+		repos = append(repos, rd)
 	}
-
-	return keys, nil
+	return repos, nil
 }
 
 func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescriptor, error) {
 	// Get a list
-	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", 1000000)
+	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
 	var repos = make([]model.RepoDescriptor, 0)
 	tokenHit := false
 	for _, k := range ks {
-		c := strings.SplitN(k, "/", 3)[1]
-		if c == token {
+		apc, err := model.GetArchivePathComponents(k)
+		if err != nil {
+			return nil, err
+		}
+		if apc.Repo == token {
 			tokenHit = true
 		}
 		if !tokenHit {
 			continue
 		}
-		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(c))
+		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(apc.Repo))
 		if err != nil {
 			return nil, err
 		}
@@ -65,8 +75,11 @@ func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescript
 		if err != nil {
 			return nil, err
 		}
+		if rd.Name != apc.Repo {
+			return nil, fmt.Errorf("repo names in descriptor '%v' and archive path '%v' don't match",
+				rd.Name, apc.Repo)
+		}
 		repos = append(repos, rd)
 	}
-
 	return repos, nil
 }

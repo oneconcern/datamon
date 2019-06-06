@@ -178,7 +178,6 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 				firstUploadBundleEntryIndex = uint(len(fileList))
 			}
 		case e := <-eC:
-			count--
 			fmt.Printf("Bundle upload failed. Failed to upload file %s err: %s", e.file, e.error)
 			return e.error
 		}
