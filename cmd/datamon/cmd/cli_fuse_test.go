@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBundleMount(t *testing.T) {
+func testBundleMount(t *testing.T, testType string) {
 	cleanup := setupTests(t)
 	defer cleanup()
 	runCmd(t, []string{"repo",
@@ -39,16 +39,42 @@ func TestBundleMount(t *testing.T) {
 	)
 	defer os.RemoveAll(pathBackingFs)
 	defer os.RemoveAll(pathToMount)
-	cmd := exec.Command(
-		"../datamon",
-		"bundle", "mount",
-		"--repo", repo1,
-		"--bundle", rll[0].hash,
-		"--destination", pathBackingFs,
-		"--mount", pathToMount,
-		"--meta", params.repo.MetadataBucket,
-		"--blob", params.repo.BlobBucket,
-	)
+	var cmdParams []string
+	switch testType {
+	case "nostream-dest":
+		cmdParams = []string{
+			"bundle", "mount",
+			"--repo", repo1,
+			"--bundle", rll[0].hash,
+			"--destination", pathBackingFs,
+			"--mount", pathToMount,
+			"--meta", params.repo.MetadataBucket,
+			"--blob", params.repo.BlobBucket,
+			"--stream=false",
+		}
+	case "stream-dest":
+		cmdParams = []string{
+			"bundle", "mount",
+			"--repo", repo1,
+			"--bundle", rll[0].hash,
+			"--destination", pathBackingFs,
+			"--mount", pathToMount,
+			"--meta", params.repo.MetadataBucket,
+			"--blob", params.repo.BlobBucket,
+		}
+	case "nostream-nodest":
+		cmdParams = []string{
+			"bundle", "mount",
+			"--repo", repo1,
+			"--bundle", rll[0].hash,
+			"--mount", pathToMount,
+			"--meta", params.repo.MetadataBucket,
+			"--blob", params.repo.BlobBucket,
+		}
+	default:
+		require.True(t, false, "unexpected test type '"+testType+"'")
+	}
+	cmd := exec.Command("../datamon", cmdParams...)
 	require.NoError(t, cmd.Start())
 	time.Sleep(5 * time.Second)
 	for _, file := range testUploadTrees[1] {
@@ -60,6 +86,18 @@ func TestBundleMount(t *testing.T) {
 	require.NoError(t, cmd.Process.Kill())
 	err = cmd.Wait()
 	require.Equal(t, "signal: killed", err.Error(), "cmd exit with killed error")
+}
+
+func TestBundleMount(t *testing.T) {
+	testBundleMount(t, "stream-dest")
+}
+
+func TestBundleMountNoStream(t *testing.T) {
+	testBundleMount(t, "nostream-dest")
+}
+
+func TestBundleMountNoStreamNoDest(t *testing.T) {
+	testBundleMount(t, "nostream-nodest")
 }
 
 func mutableMountOutputToBundleID(t *testing.T, out string) string {

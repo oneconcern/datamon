@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -77,12 +78,23 @@ var mountBundleCmd = &cobra.Command{
 			return
 		}
 
-		path, err := sanitizePath(params.bundle.DataPath)
-		if err != nil {
-			log.Fatalf("Failed to sanitize destination: %s\n", params.bundle.DataPath)
-			return
+		var err error
+
+		var consumableStorePath string
+		if params.bundle.DataPath == "" {
+			consumableStorePath, err = ioutil.TempDir("", "datamon-mount-destination")
+			if err != nil {
+				log.Fatalf("Couldn't create temporary directory: %v\n", err)
+				return
+			}
+		} else {
+			consumableStorePath, err = sanitizePath(params.bundle.DataPath)
+			if err != nil {
+				log.Fatalf("Failed to sanitize destination: %s\n", params.bundle.DataPath)
+				return
+			}
+			createPath(consumableStorePath)
 		}
-		createPath(path)
 
 		metadataSource, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
@@ -92,7 +104,7 @@ var mountBundleCmd = &cobra.Command{
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
+		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath))
 
 		err = setLatestOrLabelledBundle(metadataSource)
 		if err != nil {
@@ -141,7 +153,7 @@ func init() {
 	addLabelNameFlag(mountBundleCmd)
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
-	requiredFlags = append(requiredFlags, addDataPathFlag(mountBundleCmd))
+	addDataPathFlag(mountBundleCmd)
 	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
 
 	for _, flag := range requiredFlags {
