@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"log"
+	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -14,16 +16,23 @@ var LabelListCommand = &cobra.Command{
 	Short: "List labels",
 	Long:  "List the labels in a repo",
 	Run: func(cmd *cobra.Command, args []string) {
+		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`
+		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
 		metaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		keys, err := core.ListLabels(repoParams.RepoName, metaStore)
+		labelDescriptors, err := core.ListLabels(repoParams.RepoName, metaStore)
 		if err != nil {
 			logFatalln(err)
 		}
-		for _, key := range keys {
-			log.Println(key)
+		for _, ld := range labelDescriptors {
+			var buf bytes.Buffer
+			err := listLineTemplate.Execute(&buf, ld)
+			if err != nil {
+				log.Println("executing template:", err)
+			}
+			log.Println(buf.String())
 		}
 	},
 }

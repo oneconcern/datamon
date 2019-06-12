@@ -11,18 +11,22 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-func ListBundles(repo string, store storage.Store) ([]string, error) {
-	// TODO: Don;t format string here, return a paginated list of id<->bd
+const (
+	maxBundlesToList = 1000000
+)
+
+// TODO: return a paginated list of id<->bd (separate function in repo_list.go)
+func ListBundles(repo string, store storage.Store) ([]model.BundleDescriptor, error) {
 	// Get a list
 	e := RepoExists(repo, store)
 	if e != nil {
 		return nil, e
 	}
-	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", 1000000)
+	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", maxBundlesToList)
 	if err != nil {
 		return nil, err
 	}
-	var keys = make([]string, 0)
+	bds := make([]model.BundleDescriptor, 0)
 	for _, k := range ks {
 		apc, err := model.GetArchivePathComponents(k)
 		if err != nil {
@@ -31,8 +35,7 @@ func ListBundles(repo string, store storage.Store) ([]string, error) {
 		if apc.ArchiveFileName != "bundle.json" {
 			continue
 		}
-		c := apc.BundleID
-		r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, c))
+		r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, apc.BundleID))
 		if err != nil {
 			return nil, err
 		}
@@ -45,10 +48,14 @@ func ListBundles(repo string, store storage.Store) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		keys = append(keys, c+" , "+bd.Timestamp.String()+" , "+bd.Message)
+		if bd.ID != apc.BundleID {
+			return nil, fmt.Errorf("bundle IDs in descriptor '%v' and archive path '%v' don't match",
+				bd.ID, apc.BundleID)
+		}
+		bds = append(bds, bd)
 	}
 
-	return keys, nil
+	return bds, nil
 }
 
 func GetLatestBundle(repo string, store storage.Store) (string, error) {

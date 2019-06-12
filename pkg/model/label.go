@@ -6,6 +6,7 @@ import (
 )
 
 type LabelDescriptor struct {
+	Name         string        `json:"name,omitempty" yaml:"name,omitempty"`
 	BundleID     string        `json:"id" yaml:"id"`
 	Timestamp    time.Time     `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
 	Contributors []Contributor `json:"contributors" yaml:"contributors"`

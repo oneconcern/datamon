@@ -14,7 +14,6 @@ import (
 )
 
 type Label struct {
-	Name       string
 	Descriptor model.LabelDescriptor
 }
 
@@ -38,8 +37,8 @@ func NewLabelDescriptor(descriptorOps ...LabelDescriptorOption) *model.LabelDesc
 }
 
 func LabelName(name string) LabelOption {
-	return func(b *Label) {
-		b.Name = name
+	return func(l *Label) {
+		l.Descriptor.Name = name
 	}
 }
 
@@ -70,12 +69,12 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 	if ok {
 		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
 		err = lsCRC.PutCRC(ctx,
-			model.GetArchivePathToLabel(bundle.RepoID, label.Name),
+			model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name),
 			bytes.NewReader(buffer), storage.OverWrite, crc)
 
 	} else {
 		err = bundle.MetaStore.Put(ctx,
-			model.GetArchivePathToLabel(bundle.RepoID, label.Name),
+			model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name),
 			bytes.NewReader(buffer), storage.OverWrite)
 	}
 	if err != nil {
@@ -91,7 +90,7 @@ func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, chec
 			return e
 		}
 	}
-	rdr, err := bundle.MetaStore.Get(context.Background(), model.GetArchivePathToLabel(bundle.RepoID, label.Name))
+	rdr, err := bundle.MetaStore.Get(context.Background(), model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name))
 	if err != nil {
 		return err
 	}
