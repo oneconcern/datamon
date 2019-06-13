@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go v1.18.6
 	github.com/container-storage-interface/spec v0.3.0
 	github.com/docker/go-units v0.3.3
+	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/hashicorp/go-immutable-radix v1.0.0
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
