@@ -1,0 +1,33 @@
+{{template "base" .}}
+{{define "content"}}
+{{with .Data}}
+<h3>Bundles in <b>{{ .RepoName }}</b></h3>
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Timestamp</th>
+      <th>Message</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{ $RepoName := .RepoName }}
+    {{range .Bundles}}
+    <tr>
+      <td>
+        <a href='{{ urlFor "bundles.list_files" $RepoName .ID }}'>
+          {{.ID}}
+        </a>
+      </td>
+      <td>
+        {{formatTimestamp .Timestamp}}
+      </td>
+      <td>
+        {{.Message}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}
