@@ -128,6 +128,7 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 		return 0, nil
 	}
 	// Start a go routine for each key and give the offset to write at.
+	concurrencyControl := make(chan struct{}, 3)
 	for index, key := range r.keys {
 		wg.Add(1)
 		var truncation uint32
@@ -135,9 +136,8 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 			truncation = 32 * 1024 // Buffer size used by io.Copy
 		}
 		i := int64(index) * int64(r.leafSize-truncation)
-		concurrencyControl := make(chan struct{}, 3)
+		concurrencyControl <- struct{}{}
 		go func(writeAt int64, writer io.WriterAt, key Key, cafs storage.Store, wg *sync.WaitGroup) {
-			concurrencyControl <- struct{}{}
 			defer func() {
 				<-concurrencyControl
 				wg.Done()
