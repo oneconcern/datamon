@@ -135,8 +135,13 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 			truncation = 32 * 1024 // Buffer size used by io.Copy
 		}
 		i := int64(index) * int64(r.leafSize-truncation)
+		concurrencyControl := make(chan struct{}, 3)
 		go func(writeAt int64, writer io.WriterAt, key Key, cafs storage.Store, wg *sync.WaitGroup) {
-			defer wg.Done()
+			concurrencyControl <- struct{}{}
+			defer func() {
+				<-concurrencyControl
+				wg.Done()
+			}()
 			rdr, err := cafs.Get(context.Background(), key.StringWithPrefix(r.prefix)) // thread safe
 			if err != nil {
 				errC <- err
