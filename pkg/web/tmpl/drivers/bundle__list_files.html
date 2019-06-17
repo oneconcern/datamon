@@ -1,0 +1,30 @@
+{{template "base" .}}
+{{define "content"}}
+{{with .Data}}
+<h3>Bundle <b>{{ .BundleID }}</b> in <b>{{ .RepoName }}</b></h3>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Size</th>
+      <th>Hash</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .BundleEntries}}
+    <tr>
+      <td>
+        {{.NameWithPath}}
+      </td>
+      <td>
+        {{.Size}}
+      </td>
+      <td>
+        {{.Hash}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

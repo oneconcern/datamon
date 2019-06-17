@@ -2,21 +2,26 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-func ListLabels(repo string, metaStore storage.Store) ([]string, error) {
+const (
+	maxLabelsToList = 1000000
+)
+
+func ListLabels(repo string, metaStore storage.Store) ([]model.LabelDescriptor, error) {
 	e := RepoExists(repo, metaStore)
 	if e != nil {
 		return nil, e
 	}
-	ks, _, err := metaStore.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToLabels(repo), "", 1000000)
+	ks, _, err := metaStore.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToLabels(repo), "", maxLabelsToList)
 	if err != nil {
 		return nil, err
 	}
-	var keys = make([]string, 0)
+	labelDescriptors := make([]model.LabelDescriptor, 0)
 	bundle := New(NewBDescriptor(),
 		Repo(repo),
 		MetaStore(metaStore),
@@ -34,7 +39,13 @@ func ListLabels(repo string, metaStore storage.Store) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		keys = append(keys, labelName+" , "+label.Descriptor.BundleID+" , "+label.Descriptor.Timestamp.String())
+		if label.Descriptor.Name == "" {
+			label.Descriptor.Name = apc.LabelName
+		} else if label.Descriptor.Name != apc.LabelName {
+			return nil, fmt.Errorf("label names in descriptor '%v' and archive path '%v' don't match",
+				label.Descriptor.Name, apc.LabelName)
+		}
+		labelDescriptors = append(labelDescriptors, label.Descriptor)
 	}
-	return keys, nil
+	return labelDescriptors, nil
 }

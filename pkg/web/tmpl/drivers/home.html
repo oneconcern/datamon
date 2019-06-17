@@ -1,0 +1,43 @@
+{{template "base" .}}
+{{define "content"}}
+{{with .Data}}
+<h1>Homepage</h1>
+<h3>{{ .Greeting }}</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Description</th>
+      <th>Contributor Name</th>
+      <th>Email</th>
+      <th>Timestamp</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Repos}}
+    <tr>
+      <td>
+        <a href='{{ urlFor "repo.list_bundles" .Name }}'>
+          {{.Name}}
+        </a>
+      </td>
+      <td>
+        {{.Description}}
+      </td>
+      {{with .Contributor}}
+      <td>
+        {{.Name}}
+      </td>
+      <td>
+        {{.Email}}
+      </td>
+      {{end}}
+      <td>
+        {{formatTimestamp .Timestamp}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

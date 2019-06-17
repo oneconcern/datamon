@@ -56,7 +56,7 @@ type errorHit struct {
 	file  string
 }
 
-const maxConcurrentDownloads = 100
+const maxConcurrentDownloads = 10
 
 func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 	ls := bundle.BundleDescriptor.LeafSize

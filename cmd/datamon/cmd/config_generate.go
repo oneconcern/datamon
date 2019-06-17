@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/user"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 
@@ -37,8 +38,8 @@ var configGen = &cobra.Command{
 		if e != nil {
 			logFatalln(e)
 		}
-		_ = os.Mkdir(user.HomeDir+"/.datamon", 0700)
-		err = ioutil.WriteFile(user.HomeDir+"/.datamon/datamon.yaml", o, 0600)
+		_ = os.Mkdir(filepath.Join(user.HomeDir, ".datamon"), 0777)
+		err = ioutil.WriteFile(filepath.Join(user.HomeDir, ".datamon", "datamon.yaml"), o, 0666)
 		if err != nil {
 			logFatalln(err)
 		}
