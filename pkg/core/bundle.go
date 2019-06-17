@@ -24,17 +24,18 @@ var MemProfDir string
 
 // ArchiveBundle represents the bundle in it's archive state
 type Bundle struct {
-	RepoID           string
-	BundleID         string
-	MetaStore        storage.Store
-	ConsumableStore  storage.Store
-	BlobStore        storage.Store
-	cafs             cafs.Fs
-	BundleDescriptor model.BundleDescriptor
-	BundleEntries    []model.BundleEntry
-	Streamed         bool
-	l                *zap.Logger
-	SkipOnError      bool // When uploading files
+	RepoID                string
+	BundleID              string
+	MetaStore             storage.Store
+	ConsumableStore       storage.Store
+	BlobStore             storage.Store
+	cafs                  cafs.Fs
+	BundleDescriptor      model.BundleDescriptor
+	BundleEntries         []model.BundleEntry
+	Streamed              bool
+	l                     *zap.Logger
+	SkipOnError           bool // When uploading files
+	concurrentFileUploads int
 }
 
 // SetBundleID for the bundle
@@ -141,16 +142,23 @@ func Logger(l *zap.Logger) BundleOption {
 	}
 }
 
+func ConcurrentFileUploads(concurrentFileUploads int) BundleOption {
+	return func(b *Bundle) {
+		b.concurrentFileUploads = concurrentFileUploads
+	}
+}
+
 func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b := Bundle{
-		RepoID:           "",
-		BundleID:         "",
-		MetaStore:        nil,
-		ConsumableStore:  nil,
-		BlobStore:        nil,
-		BundleDescriptor: *bd,
-		BundleEntries:    make([]model.BundleEntry, 0, 1024),
-		Streamed:         false,
+		RepoID:                "",
+		BundleID:              "",
+		MetaStore:             nil,
+		ConsumableStore:       nil,
+		BlobStore:             nil,
+		BundleDescriptor:      *bd,
+		BundleEntries:         make([]model.BundleEntry, 0, 1024),
+		Streamed:              false,
+		concurrentFileUploads: 20,
 	}
 
 	b.l, _ = dlogger.GetLogger("info")

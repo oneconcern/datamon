@@ -320,6 +320,7 @@ func testUploadBundle(t *testing.T, file uploadTree) {
 		"--path", dirPathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
+		"--num-file-uploads", "20",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	//
 	log.SetOutput(os.Stdout)
@@ -365,6 +366,7 @@ func TestUploadBundle_filePath(t *testing.T) {
 		"--path", filePathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
+		"--num-file-uploads", "20",
 	}, "observe error on bundle upload path as file rather than directory", true)
 }
 
@@ -381,6 +383,7 @@ func testUploadBundleLabel(t *testing.T, file uploadTree, label string) {
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
 		"--label", label,
+		"--num-file-uploads", "20",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	//
 	log.SetOutput(os.Stdout)
@@ -458,6 +461,7 @@ func testListBundle(t *testing.T, file uploadTree, bcnt int) {
 		"--path", dirPathStr(t, file),
 		"--message", msg,
 		"--repo", repo1,
+		"--num-file-uploads", "20",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	ll, err := listBundles(t, repo2)
 	require.NoError(t, err, "error out of listBundles() test helper")
@@ -565,6 +569,7 @@ func TestListLabels(t *testing.T) {
 		"--message", "label test bundle",
 		"--repo", repo1,
 		"--label", label,
+		"--num-file-uploads", "20",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	ll = listLabels(t, repo2)
 	require.Equal(t, 0, len(ll), "no labels in secondary repo")
@@ -599,6 +604,7 @@ func TestSetLabel(t *testing.T) {
 		"--path", dirPathStr(t, file),
 		"--message", msg,
 		"--repo", repo1,
+		"--num-file-uploads", "20",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	ll = listLabels(t, repo1)
 	require.Equal(t, len(ll), 0, "no labels created yet")
@@ -631,6 +637,7 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
+		"--num-file-uploads", "20",
 	}, "upload bundle at "+dirPathStr(t, files[0]), false)
 
 	ll, err := listBundles(t, repo1)
@@ -698,6 +705,7 @@ func TestDownloadBundleByLabel(t *testing.T) {
 		"--message", "label test bundle",
 		"--repo", repo1,
 		"--label", label,
+		"--num-file-uploads", "20",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	// dupe: testDownloadBundle()
 	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
@@ -794,6 +802,7 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
+		"--num-file-uploads", "20",
 	}, "create second test repo", false)
 
 	rll, err := listBundles(t, repo1)
@@ -873,6 +882,7 @@ func testBundleDownloadFiles(t *testing.T, files []uploadTree, bcnt int) {
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
+		"--num-file-uploads", "20",
 	}, "upload bundle in order to test downloading individual files", false)
 	rll, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")

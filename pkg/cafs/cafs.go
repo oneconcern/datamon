@@ -59,6 +59,12 @@ func Backend(store storage.Store) Option {
 	}
 }
 
+func ConcurrentFlushes(concurrentFlushes int) Option {
+	return func(w *defaultFs) {
+		w.concurrentFlushes = concurrentFlushes
+	}
+}
+
 type hasOpts struct {
 	OnlyRoots, GatherIncomplete bool
 	_                           struct{} // disallow unkeyed usage
@@ -83,8 +89,9 @@ type Fs interface {
 func New(opts ...Option) (Fs, error) {
 
 	f := &defaultFs{
-		store:    cafsStore{backend: localfs.New(nil)},
-		leafSize: uint32(5 * units.MiB),
+		store:             cafsStore{backend: localfs.New(nil)},
+		leafSize:          uint32(5 * units.MiB),
+		concurrentFlushes: 10,
 	}
 	f.lru, _ = lru.New(10)
 	for _, apply := range opts {
@@ -98,13 +105,14 @@ type cafsStore struct {
 }
 
 type defaultFs struct {
-	store          cafsStore
-	leafSize       uint32
-	prefix         string
-	zl             zap.Logger //nolint:structcheck,unused
-	l              log.Logger //nolint:structcheck,unused
-	leafTruncation bool
-	lru            *lru.Cache
+	store             cafsStore
+	leafSize          uint32
+	prefix            string
+	zl                zap.Logger //nolint:structcheck,unused
+	l                 log.Logger //nolint:structcheck,unused
+	leafTruncation    bool
+	lru               *lru.Cache
+	concurrentFlushes int
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
@@ -154,6 +162,10 @@ func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
 }
 
 func (d *defaultFs) writer(prefix string) Writer {
+	maxGoRoutines := d.concurrentFlushes
+	if maxGoRoutines < 1 {
+		maxGoRoutines = 1
+	}
 	w := &fsWriter{
 		store:               d.store.backend,
 		leafSize:            d.leafSize,
@@ -162,7 +174,7 @@ func (d *defaultFs) writer(prefix string) Writer {
 		flushChan:           make(chan blobFlush),
 		errC:                make(chan error),
 		flushThreadDoneChan: make(chan struct{}),
-		maxGoRoutines:       make(chan struct{}, maxGoRoutinesPerPut),
+		maxGoRoutines:       make(chan struct{}, maxGoRoutines),
 		blobFlushes:         make([]blobFlush, 0),
 		errors:              make([]error, 0),
 	}

@@ -25,6 +25,7 @@ import (
 
 const (
 	defaultBundleEntriesPerFile = 1000
+	fileUploadsPerFlush         = 4
 )
 
 type filePacked struct {
@@ -93,6 +94,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	cafsArchive, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
 		cafs.Backend(bundle.BlobStore),
+		cafs.ConcurrentFlushes(bundle.concurrentFileUploads/fileUploadsPerFlush),
 	)
 	if err != nil {
 		return err
@@ -108,7 +110,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 
 	fC := make(chan filePacked, len(files))
 	eC := make(chan errorHit, len(files))
-	cC := make(chan struct{}, 20)
+	cC := make(chan struct{}, bundle.concurrentFileUploads)
 	var count int64
 	for _, file := range files {
 		// Check to see if the file is to be skipped.
