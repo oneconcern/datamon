@@ -37,6 +37,13 @@ ENV ZONEINFO /zoneinfo.zip
 
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 
+ADD hack/fuse-demo/wrap_datamon.sh .
+ADD hack/fuse-demo/wrap_application.sh .
+
+# USER root
+RUN chmod a+x wrap_datamon.sh
+# USER developer
+
 RUN useradd -u 1020 -ms /bin/bash developer
 RUN groupadd -g 2000 developers
 RUN usermod -g developers developer

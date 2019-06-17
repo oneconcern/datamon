@@ -111,6 +111,90 @@ with a label that already exists overwrites the commit hash previously associate
 label:  There can be at most one commit hash associated with a label.  Conversely,
 multiple labels can refer to the same bundle via its commit hash.
 
+# Kubernetes sidecar guide
+
+Current use of Datamon at One Concern with respect to intra-Argo workflow usage relies on the
+[kubernetes sidecar](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/)
+pattern where a shared volume is used as the transport layer for application layer
+communication to coordinate between the _main container_, where a data-science program
+accesses data provided by Datamon and produces data for Datamon to upload, and the
+_sidecar container_, where Datamon provides data for access (via streaming through
+main memory directly from GCS) and then, after the main container is done outputting
+data to a shared Kubernetes volume, uploads the results of the data-science program
+to GCS.  Ensuring that, for example, the streaming data is ready for access (sidecar to
+main-container messaging) as well as notification that the data-science program has
+produced output data to upload (main-container to sidecar messaging), is the responsibility
+of a couple of shell scripts that both ship inside the `gcr.io/onec-co/datamon-fuse-sidecar`
+container, which is versioned along with
+[github releases](https://github.com/oneconcern/datamon/releases/)
+of the desktop binary:  to access release `0.4` as listed on the github releases page,
+use the tag `v0.4` as in `gcr.io/onec-co/datamon-fuse-sidecar:v0.4` when
+writing Dockerfiles or Kubernetes-like YAML that accesses the sidecar container image.
+
+Users need only place the `wrap_application.sh` script located in the root directory
+of the sidecar container within the main container.  This can be accomplished via
+an `initContainer` without duplicating version of the Datamon sidecar image in
+both the main application Dockerfile as well as the YAML.  When using a block-storage GCS
+product, we might've specified a data-science application's Argo DAG node with something
+like
+
+```yaml
+command: ["app"]
+args: ["param1", "param2"]
+```
+
+whereas with `wrap_application.sh` in place, this would be something to the effect of
+
+```yaml
+command: ["/path/to/wrap_application.sh"]
+args: ["-c", "/path/to/coordination_directory", "--", "app", "param1", "param2"]
+```
+
+That is, `wrap_application.sh` has the following usage
+
+```shell
+wrap_application.sh -c <coordination_directory> -- <application_command>
+```
+
+where `<coordination_directory>` is an empty directory in a shared volume
+(an
+[`emptyDir`](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir)
+using memory-backed storage suffices).  In the case of Argo workflows in particular,
+the empty directory (and not necessarily the volume) ought to be specific to a
+particular DAG node (i.e. Kubernetes pod).  Each node uses a unique directory.
+Meanwhile, `<application_command>` is the data-science application command exactly as it
+would appear without the wrapper script.
+That is, the wrapper script, relies the
+[conventional UNIX syntax](http://zsh.sourceforge.net/Guide/zshguide02.html#l11)
+for stating that options to a command are done being declared.
+
+Meanwhile, `wrap_datamon.sh` similarly accepts a single `-c` option to specify the
+location of the coordination directory.
+Additionally, `wrap_datamon.sh` accepts a `-d` option.  The parameters to this option are
+among the standard Datamon CLI commands:
+
+* `config`
+* `bundle mount`
+* `bundle upload`
+
+Multiple (or none) `bundle mount` and `bundle upload` commands may be specified,
+and at most one `config` command is allowed so that an example `wrap_datamon.sh`
+YAML might be
+
+```yaml
+command: ["./wrap_datamon.sh"]
+args: ["-c", "/tmp/coord", "-d", "config create --name \"Coord\" --email coord-bot@oneconcern.com", "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo", "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --destination /tmp --mount /tmp/mount --stream"]
+```
+
+or from the shell
+
+```shell
+./wrap_datamon.sh -c /tmp/coord -d 'config create --name "Coord" --email coord-bot@oneconcern.com' -d 'bundle upload --path /tmp/upload --message "result of container coordination demo" --repo ransom-datamon-test-repo --label coordemo' -d 'bundle mount --repo ransom-datamon-test-repo --label testlabel --destination /tmp --mount /tmp/mount --stream'
+```
+
+where, in particular, the `-d` (Datamon) options passed to the shell wrapper are
+scalars.
+
 # Feature requests and bugs
 
 Please file GitHub issues for features desired in addition to any bugs encountered.
