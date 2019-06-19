@@ -13,10 +13,6 @@ import (
 	"github.com/minio/blake2b-simd"
 )
 
-const (
-	maxGoRoutinesPerPut = 10
-)
-
 // Writer interface for a content addressable FS
 type Writer interface {
 	io.WriteCloser

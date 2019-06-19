@@ -8,16 +8,17 @@ import (
 
 type paramsT struct {
 	bundle struct {
-		ID               string
-		DataPath         string
-		Message          string
-		ContributorEmail string
-		MountPath        string
-		File             string
-		Daemonize        bool
-		Stream           bool
-		FileList         string
-		SkipOnError      bool
+		ID                    string
+		DataPath              string
+		Message               string
+		ContributorEmail      string
+		MountPath             string
+		File                  string
+		Daemonize             bool
+		Stream                bool
+		FileList              string
+		SkipOnError           bool
+		ConcurrentFileUploads int
 	}
 	web struct {
 		port int
@@ -105,6 +106,14 @@ func addSkipMissingFlag(cmd *cobra.Command) string {
 	cmd.Flags().BoolVar(&params.bundle.SkipOnError, skipOnError, false, "Skip files encounter errors while reading."+
 		"The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false")
 	return skipOnError
+}
+
+func addConcurrentFileUploadsFlag(cmd *cobra.Command) string {
+	concurrentFileUploads := "num-file-uploads"
+	cmd.Flags().IntVar(&params.bundle.ConcurrentFileUploads, concurrentFileUploads, 20,
+		"Number of files to upload at a time.  "+
+			"If uploads consume too much memory, turn this value down.")
+	return concurrentFileUploads
 }
 
 func addWebPortFlag(cmd *cobra.Command) string {
