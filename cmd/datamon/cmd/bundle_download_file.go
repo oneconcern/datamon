@@ -18,15 +18,15 @@ var bundleDownloadFileCmd = &cobra.Command{
 	Long:  "Download a readonly, non-interactive view of a single file from a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		metadataStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		metadataStore, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
+		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		path, err := filepath.Abs(filepath.Clean(bundleOptions.DataPath))
+		path, err := filepath.Abs(filepath.Clean(params.bundle.DataPath))
 		if err != nil {
 			logFatalf("Failed path validation: %s", err)
 		}
@@ -38,14 +38,14 @@ var bundleDownloadFileCmd = &cobra.Command{
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
-			core.Repo(repoParams.RepoName),
+			core.Repo(params.repo.RepoName),
 			core.MetaStore(metadataStore),
 			core.ConsumableStore(destinationStore),
 			core.BlobStore(blobStore),
-			core.BundleID(bundleOptions.ID),
+			core.BundleID(params.bundle.ID),
 		)
 
-		err = core.PublishFile(context.Background(), bundle, bundleOptions.File)
+		err = core.PublishFile(context.Background(), bundle, params.bundle.File)
 		if err != nil {
 			logFatalln(err)
 		}

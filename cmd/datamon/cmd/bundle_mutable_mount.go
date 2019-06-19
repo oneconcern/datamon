@@ -23,55 +23,55 @@ var mutableMountBundleCmd = &cobra.Command{
 	Short: "Create a bundle incrementally with filesystem operations",
 	Long:  "Write directories and files to the mountpoint.  Unmount or send SIGINT to this process to save.",
 	Run: func(cmd *cobra.Command, args []string) {
-		if repoParams.ContributorEmail == "" {
+		if params.repo.ContributorEmail == "" {
 			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
 		}
-		if repoParams.ContributorName == "" {
+		if params.repo.ContributorName == "" {
 			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
 		}
 
-		if bundleOptions.Daemonize {
+		if params.bundle.Daemonize {
 			runDaemonized()
 			return
 		}
 
-		DieIfNotDirectory(bundleOptions.DataPath)
+		DieIfNotDirectory(params.bundle.DataPath)
 
-		metadataSource, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		metadataSource, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			onDaemonError(err)
 		}
-		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
+		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
+		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), params.bundle.DataPath))
 
 		bd := core.NewBDescriptor(
-			core.Message(bundleOptions.Message),
+			core.Message(params.bundle.Message),
 			core.Contributors([]model.Contributor{{
-				Name:  repoParams.ContributorName,
-				Email: repoParams.ContributorEmail,
+				Name:  params.repo.ContributorName,
+				Email: params.repo.ContributorEmail,
 			},
 			}),
 		)
 		bundle := core.New(bd,
-			core.Repo(repoParams.RepoName),
+			core.Repo(params.repo.RepoName),
 			core.BlobStore(blobStore),
 			core.ConsumableStore(consumableStore),
 			core.MetaStore(metadataSource),
 		)
 
-		fs, err := core.NewMutableFS(bundle, bundleOptions.DataPath)
+		fs, err := core.NewMutableFS(bundle, params.bundle.DataPath)
 		if err != nil {
 			onDaemonError(err)
 		}
-		err = fs.MountMutable(bundleOptions.MountPath)
+		err = fs.MountMutable(params.bundle.MountPath)
 		if err != nil {
 			onDaemonError(err)
 		}
 
-		registerSIGINTHandlerMount(bundleOptions.MountPath)
+		registerSIGINTHandlerMount(params.bundle.MountPath)
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			logFatalln(err)
 		}

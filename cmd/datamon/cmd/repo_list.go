@@ -17,7 +17,7 @@ var repoList = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		const listLineTemplateString = `{{.Name}} , {{.Description}} , {{with .Contributor}}{{.Name}} , {{.Email}}{{end}} , {{.Timestamp}}`
 		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
-		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}

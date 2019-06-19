@@ -23,7 +23,7 @@ import (
 func undaemonizeArgs(args []string) []string {
 	foregroundArgs := make([]string, 0)
 	for _, arg := range args {
-		if arg != "--"+daemonize {
+		if arg != "--"+addDaemonizeFlag(nil) {
 			foregroundArgs = append(foregroundArgs, arg)
 		}
 	}
@@ -72,23 +72,23 @@ var mountBundleCmd = &cobra.Command{
 	Short: "Mount a bundle",
 	Long:  "Mount a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
-		if bundleOptions.Daemonize {
+		if params.bundle.Daemonize {
 			runDaemonized()
 			return
 		}
 
-		path, err := sanitizePath(bundleOptions.DataPath)
+		path, err := sanitizePath(params.bundle.DataPath)
 		if err != nil {
-			log.Fatalf("Failed to sanitize destination: %s\n", bundleOptions.DataPath)
+			log.Fatalf("Failed to sanitize destination: %s\n", params.bundle.DataPath)
 			return
 		}
 		createPath(path)
 
-		metadataSource, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		metadataSource, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			onDaemonError(err)
 		}
-		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
+		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
 		if err != nil {
 			onDaemonError(err)
 		}
@@ -100,14 +100,14 @@ var mountBundleCmd = &cobra.Command{
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
-			core.Repo(repoParams.RepoName),
-			core.BundleID(bundleOptions.ID),
+			core.Repo(params.repo.RepoName),
+			core.BundleID(params.bundle.ID),
 			core.BlobStore(blobStore),
 			core.ConsumableStore(consumableStore),
 			core.MetaStore(metadataSource),
-			core.Streaming(bundleOptions.Stream),
+			core.Streaming(params.bundle.Stream),
 		)
-		logger, err := dlogger.GetLogger(logLevel)
+		logger, err := dlogger.GetLogger(params.root.logLevel)
 		if err != nil {
 			log.Fatalln("Failed to set log level:" + err.Error())
 		}
@@ -115,11 +115,11 @@ var mountBundleCmd = &cobra.Command{
 		if err != nil {
 			onDaemonError(err)
 		}
-		if err = fs.MountReadOnly(bundleOptions.MountPath); err != nil {
+		if err = fs.MountReadOnly(params.bundle.MountPath); err != nil {
 			onDaemonError(err)
 		}
 
-		registerSIGINTHandlerMount(bundleOptions.MountPath)
+		registerSIGINTHandlerMount(params.bundle.MountPath)
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			logFatalln(err)
 		}

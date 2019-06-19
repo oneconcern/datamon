@@ -19,24 +19,24 @@ var repoCreate = &cobra.Command{
 	Long: "Create a repo. Repo names must not contain special characters. " +
 		"Allowed characters Unicode characters, digits and hyphen. Example: dm-test-repo-1",
 	Run: func(cmd *cobra.Command, args []string) {
-		if repoParams.ContributorEmail == "" {
+		if params.repo.ContributorEmail == "" {
 			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
 		}
-		if repoParams.ContributorName == "" {
+		if params.repo.ContributorName == "" {
 			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
 		}
-		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
 
 		repo := model.RepoDescriptor{
-			Name:        repoParams.RepoName,
-			Description: repoParams.Description,
+			Name:        params.repo.RepoName,
+			Description: params.repo.Description,
 			Timestamp:   time.Now(),
 			Contributor: model.Contributor{
-				Email: repoParams.ContributorEmail,
-				Name:  repoParams.ContributorName,
+				Email: params.repo.ContributorEmail,
+				Name:  params.repo.ContributorName,
 			},
 		}
 		err = core.CreateRepo(repo, store)

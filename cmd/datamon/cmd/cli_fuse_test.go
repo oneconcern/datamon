@@ -46,8 +46,8 @@ func TestBundleMount(t *testing.T) {
 		"--bundle", rll[0].hash,
 		"--destination", pathBackingFs,
 		"--mount", pathToMount,
-		"--meta", repoParams.MetadataBucket,
-		"--blob", repoParams.BlobBucket,
+		"--meta", params.repo.MetadataBucket,
+		"--blob", params.repo.BlobBucket,
 	)
 	require.NoError(t, cmd.Start())
 	time.Sleep(5 * time.Second)
@@ -101,8 +101,8 @@ func TestBundleMutableMount(t *testing.T) {
 		"--message", "mutabletest",
 		"--destination", pathBackingFs,
 		"--mount", pathToMount,
-		"--meta", repoParams.MetadataBucket,
-		"--blob", repoParams.BlobBucket,
+		"--meta", params.repo.MetadataBucket,
+		"--blob", params.repo.BlobBucket,
 	)
 	rdr, err := cmd.StdoutPipe()
 	require.NoError(t, err)

@@ -17,7 +17,7 @@ var bundleFileList = &cobra.Command{
 	Long:  "List all the files in a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -26,8 +26,8 @@ var bundleFileList = &cobra.Command{
 			logFatalln(err)
 		}
 		bundle := core.Bundle{
-			RepoID:           repoParams.RepoName,
-			BundleID:         bundleOptions.ID,
+			RepoID:           params.repo.RepoName,
+			BundleID:         params.bundle.ID,
 			MetaStore:        store,
 			ConsumableStore:  nil,
 			BlobStore:        nil,

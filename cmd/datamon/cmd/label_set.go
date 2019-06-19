@@ -15,22 +15,22 @@ var SetLabelCommand = &cobra.Command{
 	Short: "Set labels",
 	Long:  "Set the label corresponding to a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
-		if repoParams.ContributorEmail == "" {
+		if params.repo.ContributorEmail == "" {
 			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
 		}
-		if repoParams.ContributorName == "" {
+		if params.repo.ContributorName == "" {
 			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
 		}
 
-		metaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		metaStore, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
 
 		bundle := core.New(core.NewBDescriptor(),
-			core.Repo(repoParams.RepoName),
+			core.Repo(params.repo.RepoName),
 			core.MetaStore(metaStore),
-			core.BundleID(bundleOptions.ID),
+			core.BundleID(params.bundle.ID),
 		)
 		bundleExists, err := bundle.Exists(context.Background())
 		if err != nil {
@@ -41,15 +41,15 @@ var SetLabelCommand = &cobra.Command{
 		}
 
 		contributors := []model.Contributor{{
-			Name:  repoParams.ContributorName,
-			Email: repoParams.ContributorEmail,
+			Name:  params.repo.ContributorName,
+			Email: params.repo.ContributorEmail,
 		}}
 
 		labelDescriptor := core.NewLabelDescriptor(
 			core.LabelContributors(contributors),
 		)
 		label := core.NewLabel(labelDescriptor,
-			core.LabelName(labelOptions.Name),
+			core.LabelName(params.label.Name),
 		)
 		err = label.UploadDescriptor(context.Background(), bundle)
 		if err != nil {

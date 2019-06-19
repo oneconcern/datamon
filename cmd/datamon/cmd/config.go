@@ -27,27 +27,27 @@ func newConfig() (*Config, error) {
 	return &config, nil
 }
 
-func (c *Config) setContributor(params *RepoParams) {
-	if params.ContributorEmail == "" {
-		params.ContributorEmail = config.Email
+func (c *Config) setContributor(params *paramsT) {
+	if params.repo.ContributorEmail == "" {
+		params.repo.ContributorEmail = config.Email
 	}
 
-	if params.ContributorName == "" {
-		params.ContributorName = config.Name
+	if params.repo.ContributorName == "" {
+		params.repo.ContributorName = config.Name
 	}
 }
 
-func (c *Config) setRepoParams(params *RepoParams) {
+func (c *Config) setRepoParams(params *paramsT) {
 	c.setContributor(params)
-	if params.MetadataBucket == "" {
-		params.MetadataBucket = config.Metadata
-		if params.MetadataBucket == "" {
+	if params.repo.MetadataBucket == "" {
+		params.repo.MetadataBucket = config.Metadata
+		if params.repo.MetadataBucket == "" {
 			log.Fatalln(fmt.Errorf("metadata bucket not set in config or as a cli param"))
 		}
 	}
-	if params.BlobBucket == "" {
-		params.BlobBucket = config.Blob
-		if params.BlobBucket == "" {
+	if params.repo.BlobBucket == "" {
+		params.repo.BlobBucket = config.Blob
+		if params.repo.BlobBucket == "" {
 			log.Fatalln(fmt.Errorf("blob bucket not set in config or as a cli param"))
 		}
 	}
