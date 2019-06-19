@@ -9,6 +9,9 @@ import (
 	"hash/crc32"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
+	"runtime/pprof"
 
 	"go.uber.org/zap"
 
@@ -154,6 +157,19 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 				duplicate: duplicate,
 			}
 		}(file)
+	}
+	if MemProfDir != "" {
+		var f *os.File
+		path := filepath.Join(MemProfDir, "upload_bundle.mem.prof")
+		f, err = os.Create(path)
+		if err != nil {
+			return err
+		}
+		err = pprof.Lookup("heap").WriteTo(f, 0)
+		if err != nil {
+			return err
+		}
+		f.Close()
 	}
 	for count > 0 {
 		select {

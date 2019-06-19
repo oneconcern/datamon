@@ -20,6 +20,8 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
+var MemProfDir string
+
 // ArchiveBundle represents the bundle in it's archive state
 type Bundle struct {
 	RepoID           string
