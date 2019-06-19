@@ -20,15 +20,15 @@ var BundleDownloadCmd = &cobra.Command{
 		" the latest bundle will be downloaded",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		sourceStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		sourceStore, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
+		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		path, err := sanitizePath(bundleOptions.DataPath)
+		path, err := sanitizePath(params.bundle.DataPath)
 		fmt.Println("Using path: " + path)
 		if err != nil {
 			logFatalln("Failed path validation: " + err.Error())
@@ -50,11 +50,11 @@ var BundleDownloadCmd = &cobra.Command{
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
-			core.Repo(repoParams.RepoName),
+			core.Repo(params.repo.RepoName),
 			core.MetaStore(sourceStore),
 			core.ConsumableStore(destinationStore),
 			core.BlobStore(blobStore),
-			core.BundleID(bundleOptions.ID),
+			core.BundleID(params.bundle.ID),
 		)
 
 		err = core.Publish(context.Background(), bundle)

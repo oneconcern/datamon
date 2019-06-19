@@ -24,56 +24,56 @@ var uploadBundleCmd = &cobra.Command{
 	Short: "Upload a bundle",
 	Long:  "Upload a bundle consisting of all files stored in a directory",
 	Run: func(cmd *cobra.Command, args []string) {
-		if repoParams.ContributorEmail == "" {
+		if params.repo.ContributorEmail == "" {
 			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
 		}
-		if repoParams.ContributorName == "" {
+		if params.repo.ContributorName == "" {
 			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
 		}
 
 		fmt.Println(config.Credential)
-		MetaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		MetaStore, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		blobStore, err := gcs.New(repoParams.BlobBucket, config.Credential)
+		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
 		var sourceStore storage.Store
-		if strings.HasPrefix(bundleOptions.DataPath, "gs://") {
-			fmt.Println(bundleOptions.DataPath[4:])
-			sourceStore, err = gcs.New(bundleOptions.DataPath[5:], config.Credential)
+		if strings.HasPrefix(params.bundle.DataPath, "gs://") {
+			fmt.Println(params.bundle.DataPath[4:])
+			sourceStore, err = gcs.New(params.bundle.DataPath[5:], config.Credential)
 			if err != nil {
 				logFatalln(err)
 			}
 		} else {
-			DieIfNotAccessible(bundleOptions.DataPath)
-			DieIfNotDirectory(bundleOptions.DataPath)
-			sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), bundleOptions.DataPath))
+			DieIfNotAccessible(params.bundle.DataPath)
+			DieIfNotDirectory(params.bundle.DataPath)
+			sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), params.bundle.DataPath))
 		}
 		contributors := []model.Contributor{{
-			Name:  repoParams.ContributorName,
-			Email: repoParams.ContributorEmail,
+			Name:  params.repo.ContributorName,
+			Email: params.repo.ContributorEmail,
 		}}
 		bd := core.NewBDescriptor(
-			core.Message(bundleOptions.Message),
+			core.Message(params.bundle.Message),
 			core.Contributors(contributors),
 		)
 		bundle := core.New(bd,
-			core.Repo(repoParams.RepoName),
+			core.Repo(params.repo.RepoName),
 			core.BlobStore(blobStore),
 			core.ConsumableStore(sourceStore),
 			core.MetaStore(MetaStore),
-			core.SkipMissing(bundleOptions.SkipOnError),
+			core.SkipMissing(params.bundle.SkipOnError),
 		)
 
-		if bundleOptions.FileList != "" {
+		if params.bundle.FileList != "" {
 			getKeys := func() ([]string, error) {
 				var file afero.File
-				file, err = os.Open(bundleOptions.FileList)
+				file, err = os.Open(params.bundle.FileList)
 				if err != nil {
-					return nil, fmt.Errorf("failed to open file: %s err:%s", bundleOptions.FileList, err.Error())
+					return nil, fmt.Errorf("failed to open file: %s err:%s", params.bundle.FileList, err.Error())
 				}
 				lineScanner := bufio.NewScanner(file)
 				files := make([]string, 0)
@@ -90,14 +90,14 @@ var uploadBundleCmd = &cobra.Command{
 			logFatalln(err)
 		}
 
-		if labelOptions.Name == "" {
+		if params.label.Name == "" {
 			return
 		}
 		labelDescriptor := core.NewLabelDescriptor(
 			core.LabelContributors(contributors),
 		)
 		label := core.NewLabel(labelDescriptor,
-			core.LabelName(labelOptions.Name),
+			core.LabelName(params.label.Name),
 		)
 		err = label.UploadDescriptor(context.Background(), bundle)
 		if err != nil {
@@ -113,7 +113,7 @@ func init() {
 	requiredFlags = append(requiredFlags, addCommitMessageFlag(uploadBundleCmd))
 	addFileListFlag(uploadBundleCmd)
 	addLabelNameFlag(uploadBundleCmd)
-	addSkipMissing(uploadBundleCmd)
+	addSkipMissingFlag(uploadBundleCmd)
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {

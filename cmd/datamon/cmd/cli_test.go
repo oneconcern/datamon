@@ -131,16 +131,14 @@ func setupTests(t *testing.T) func() {
 	require.NoError(t, err, "couldn't create metadata bucket")
 	err = client.Bucket(bucketBlob).Create(ctx, "onec-co", nil)
 	require.NoError(t, err, "couldn't create blob bucket")
-	repoParams.MetadataBucket = bucketMeta
-	repoParams.BlobBucket = bucketBlob
+	params.repo.MetadataBucket = bucketMeta
+	params.repo.BlobBucket = bucketBlob
 	createAllTestUploadTrees(t)
 	cleanup := func() {
 		os.RemoveAll(destinationDir)
 		deleteBucket(ctx, t, client, bucketMeta)
 		deleteBucket(ctx, t, client, bucketBlob)
-		repoParams = RepoParams{}
-		labelOptions = LabelOptions{}
-		bundleOptions = BundleOptions{}
+		params = paramsT{}
 	}
 	return cleanup
 }

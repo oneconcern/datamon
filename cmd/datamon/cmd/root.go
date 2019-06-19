@@ -13,35 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Global list of flags
-const (
-	bundleID         = "bundle"
-	destination      = "destination"
-	mount            = "mount"
-	path             = "path"
-	message          = "message"
-	repo             = "repo"
-	meta             = "meta"
-	blob             = "blob"
-	labelName        = "label"
-	description      = "description"
-	contributorEmail = "email"
-	contributorName  = "name"
-	credential       = "credential"
-	file             = "file"
-	loglevel         = "loglevel"
-	cpuprof          = "cpuprof"
-	daemonize        = "daemonize"
-	stream           = "stream"
-	fileList         = "files"
-	skipOnError      = "skip-on-error"
-)
-
-// todo: "namespace" these with a struct{} as elsewhere
-var credFile string
-var logLevel string
-var cpuProf bool
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "datamon",
@@ -55,7 +26,7 @@ It executes pipelines by scheduling the processors as serverless functions on ei
 
 `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if cpuProf {
+		if params.root.cpuProf {
 			f, err := os.Create("cpu.prof")
 			if err != nil {
 				log.Fatal(err)
@@ -65,7 +36,7 @@ It executes pipelines by scheduling the processors as serverless functions on ei
 	},
 	// upstream api note:  *PostRun functions aren't called in case of a panic() in Run
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		if cpuProf {
+		if params.root.cpuProf {
 			pprof.StopCPUProfile()
 		}
 	},
@@ -117,25 +88,10 @@ func initConfig() {
 	if err != nil {
 		logFatalln(err)
 	}
-	config.setRepoParams(&repoParams)
+	config.setRepoParams(&params)
 	if config.Credential != "" {
 		// Always pick the config file. There can be a duplicate bucket name in a different project, avoid wrong environment
 		// variable from dev testing from screwing things up..
 		_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.Credential)
 	}
-}
-
-func addCredentialFile(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&credFile, credential, "", "The path to the credential file")
-	return contributorName
-}
-
-func addLogLevel(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&logLevel, loglevel, "info", "The logging level")
-	return logLevel
-}
-
-func addCPUProfFlag(cmd *cobra.Command) bool {
-	cmd.Flags().BoolVar(&cpuProf, cpuprof, false, "Toggle runtime profiling")
-	return cpuProf
 }

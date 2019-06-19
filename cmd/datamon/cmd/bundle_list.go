@@ -18,11 +18,11 @@ var BundleListCommand = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
 		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
-		store, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		bundleDescriptors, err := core.ListBundles(repoParams.RepoName, store)
+		bundleDescriptors, err := core.ListBundles(params.repo.RepoName, store)
 		if err != nil {
 			logFatalln(err)
 		}
