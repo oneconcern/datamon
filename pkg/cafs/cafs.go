@@ -65,6 +65,12 @@ func ConcurrentFlushes(concurrentFlushes int) Option {
 	}
 }
 
+func ReaderConcurrentChunkWrites(readerConcurrentChunkWrites int) Option {
+	return func(w *defaultFs) {
+		w.readerConcurrentChunkWrites = readerConcurrentChunkWrites
+	}
+}
+
 type hasOpts struct {
 	OnlyRoots, GatherIncomplete bool
 	_                           struct{} // disallow unkeyed usage
@@ -89,9 +95,10 @@ type Fs interface {
 func New(opts ...Option) (Fs, error) {
 
 	f := &defaultFs{
-		store:             cafsStore{backend: localfs.New(nil)},
-		leafSize:          uint32(5 * units.MiB),
-		concurrentFlushes: 10,
+		store:                       cafsStore{backend: localfs.New(nil)},
+		leafSize:                    uint32(5 * units.MiB),
+		concurrentFlushes:           10,
+		readerConcurrentChunkWrites: 3,
 	}
 	f.lru, _ = lru.New(10)
 	for _, apply := range opts {
@@ -105,14 +112,15 @@ type cafsStore struct {
 }
 
 type defaultFs struct {
-	store             cafsStore
-	leafSize          uint32
-	prefix            string
-	zl                zap.Logger //nolint:structcheck,unused
-	l                 log.Logger //nolint:structcheck,unused
-	leafTruncation    bool
-	lru               *lru.Cache
-	concurrentFlushes int
+	store                       cafsStore
+	leafSize                    uint32
+	prefix                      string
+	zl                          zap.Logger //nolint:structcheck,unused
+	l                           log.Logger //nolint:structcheck,unused
+	leafTruncation              bool
+	lru                         *lru.Cache
+	concurrentFlushes           int
+	readerConcurrentChunkWrites int
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
@@ -147,18 +155,19 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
-	return newReader(d.store.backend, hash, d.leafSize, d.prefix, TruncateLeaf(d.leafTruncation), VerifyHash(true))
+	return d.reader(hash)
 }
 
 func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
-	r, err := newReader(d.store.backend, hash, d.leafSize, d.prefix,
+	return d.reader(hash)
+}
+
+func (d *defaultFs) reader(hash Key) (Reader, error) {
+	return newReader(d.store.backend, hash, d.leafSize, d.prefix,
 		TruncateLeaf(d.leafTruncation),
 		VerifyHash(true),
+		ConcurrentChunkWrites(d.readerConcurrentChunkWrites),
 		SetCache(d.lru))
-	if err != nil {
-		return nil, err
-	}
-	return r.(io.ReaderAt), err
 }
 
 func (d *defaultFs) writer(prefix string) Writer {

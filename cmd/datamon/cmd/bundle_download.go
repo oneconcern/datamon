@@ -13,6 +13,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	fileDownloadsByConcurrencyFactor = 10
+)
+
 var BundleDownloadCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Download a bundle",
@@ -55,6 +59,7 @@ var BundleDownloadCmd = &cobra.Command{
 			core.ConsumableStore(destinationStore),
 			core.BlobStore(blobStore),
 			core.BundleID(params.bundle.ID),
+			core.ConcurrentFileDownloads(params.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor),
 		)
 
 		err = core.Publish(context.Background(), bundle)
@@ -79,6 +84,8 @@ func init() {
 	addBucketNameFlag(BundleDownloadCmd)
 
 	addLabelNameFlag(BundleDownloadCmd)
+
+	addConcurrencyFactorFlag(BundleDownloadCmd)
 
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)

@@ -24,18 +24,19 @@ var MemProfDir string
 
 // ArchiveBundle represents the bundle in it's archive state
 type Bundle struct {
-	RepoID                string
-	BundleID              string
-	MetaStore             storage.Store
-	ConsumableStore       storage.Store
-	BlobStore             storage.Store
-	cafs                  cafs.Fs
-	BundleDescriptor      model.BundleDescriptor
-	BundleEntries         []model.BundleEntry
-	Streamed              bool
-	l                     *zap.Logger
-	SkipOnError           bool // When uploading files
-	concurrentFileUploads int
+	RepoID                  string
+	BundleID                string
+	MetaStore               storage.Store
+	ConsumableStore         storage.Store
+	BlobStore               storage.Store
+	cafs                    cafs.Fs
+	BundleDescriptor        model.BundleDescriptor
+	BundleEntries           []model.BundleEntry
+	Streamed                bool
+	l                       *zap.Logger
+	SkipOnError             bool // When uploading files
+	concurrentFileUploads   int
+	concurrentFileDownloads int
 }
 
 // SetBundleID for the bundle
@@ -148,17 +149,24 @@ func ConcurrentFileUploads(concurrentFileUploads int) BundleOption {
 	}
 }
 
+func ConcurrentFileDownloads(concurrentFileDownloads int) BundleOption {
+	return func(b *Bundle) {
+		b.concurrentFileDownloads = concurrentFileDownloads
+	}
+}
+
 func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b := Bundle{
-		RepoID:                "",
-		BundleID:              "",
-		MetaStore:             nil,
-		ConsumableStore:       nil,
-		BlobStore:             nil,
-		BundleDescriptor:      *bd,
-		BundleEntries:         make([]model.BundleEntry, 0, 1024),
-		Streamed:              false,
-		concurrentFileUploads: 20,
+		RepoID:                  "",
+		BundleID:                "",
+		MetaStore:               nil,
+		ConsumableStore:         nil,
+		BlobStore:               nil,
+		BundleDescriptor:        *bd,
+		BundleEntries:           make([]model.BundleEntry, 0, 1024),
+		Streamed:                false,
+		concurrentFileUploads:   20,
+		concurrentFileDownloads: 10,
 	}
 
 	b.l, _ = dlogger.GetLogger("info")

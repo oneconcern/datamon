@@ -14,6 +14,11 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
+type Reader interface {
+	io.ReadCloser
+	io.ReaderAt
+}
+
 type ReaderOption func(reader *chunkReader)
 
 func TruncateLeaf(t bool) ReaderOption {
@@ -40,12 +45,19 @@ func SetCache(lru *lru.Cache) ReaderOption {
 	}
 }
 
-func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string, opts ...ReaderOption) (io.ReadCloser, error) {
+func ConcurrentChunkWrites(concurrentChunkWrites int) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.concurrentChunkWrites = concurrentChunkWrites
+	}
+}
+
+func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string, opts ...ReaderOption) (Reader, error) {
 	c := &chunkReader{
-		fs:       blobs,
-		hash:     hash,
-		leafSize: leafSize,
-		currLeaf: make([]byte, 0),
+		fs:                    blobs,
+		hash:                  hash,
+		leafSize:              leafSize,
+		currLeaf:              make([]byte, 0),
+		concurrentChunkWrites: 3,
 	}
 
 	for _, apply := range opts {
@@ -75,13 +87,14 @@ type chunkReader struct {
 	keys     []Key
 	idx      int
 
-	rdr            io.ReadCloser
-	readSoFar      int
-	lastChunk      bool
-	leafTruncation bool
-	currLeaf       []byte
-	verifyHash     bool
-	lru            *lru.Cache
+	rdr                   io.ReadCloser
+	readSoFar             int
+	lastChunk             bool
+	leafTruncation        bool
+	currLeaf              []byte
+	verifyHash            bool
+	lru                   *lru.Cache
+	concurrentChunkWrites int
 }
 
 func (r *chunkReader) Close() error {
@@ -128,7 +141,11 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 		return 0, nil
 	}
 	// Start a go routine for each key and give the offset to write at.
-	concurrencyControl := make(chan struct{}, 3)
+	concurrentChunkWrites := r.concurrentChunkWrites
+	if concurrentChunkWrites < 1 {
+		concurrentChunkWrites = 1
+	}
+	concurrencyControl := make(chan struct{}, concurrentChunkWrites)
 	for index, key := range r.keys {
 		wg.Add(1)
 		var truncation uint32
