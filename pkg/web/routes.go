@@ -5,9 +5,7 @@ import (
 	"errors"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +16,8 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/gobuffalo/packd"
+	"github.com/gobuffalo/packr/v2"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
 )
 
@@ -59,38 +59,42 @@ func loadTemplates() (appTemplates, error) {
 			return t.UTC().Format(time.UnixDate)
 		},
 	}
-	tmplH, err := template.ParseGlob(
-		filepath.Join("pkg", "web", "tmpl", "helpers", "*.html"),
-	)
-	if err != nil {
-		return nil, err
+	helpersBox := packr.New("helperTmpls", "./tmpl/helpers")
+	tmplH := template.New(helpersBox.Path)
+	for _, name := range helpersBox.List() {
+		if !strings.HasSuffix(name, ".html") {
+			continue
+		}
+		tStr, err := helpersBox.FindString(name)
+		if err != nil {
+			return nil, err
+		}
+		tmplH, err = tmplH.Parse(tStr)
+		if err != nil {
+			return nil, err
+		}
 	}
 	tmplH = tmplH.Funcs(funcMap)
 	tmpl := make(map[string]*template.Template)
-	driversPath := filepath.Join("pkg", "web", "tmpl", "drivers")
-	files, err := ioutil.ReadDir(driversPath)
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range files {
-		filename := file.Name()
-		if !strings.HasSuffix(filename, ".html") {
+	driversBox := packr.New("driverTmpls", "./tmpl/drivers")
+	for _, name := range driversBox.List() {
+		if !strings.HasSuffix(name, ".html") {
 			continue
 		}
 		tmplHClone, err := tmplH.Clone()
 		if err != nil {
 			return tmpl, err
 		}
-		fileBytes, err := ioutil.ReadFile(
-			filepath.Join(driversPath, file.Name()),
-		)
+		tStr, err := driversBox.FindString(name)
+
+		if err != nil {
+			return nil, err
+		}
+		t, err := tmplHClone.New("driver").Parse(tStr)
 		if err != nil {
 			return tmpl, err
 		}
-		t, err := tmplHClone.New("driver").Parse(string(fileBytes))
-		if err != nil {
-			return tmpl, err
-		}
+		filename := name
 		tmpl[filename] = t
 	}
 	return tmpl, nil
@@ -206,26 +210,23 @@ func InitRouter(srv *Server) http.Handler {
 	r.Get(reverse.Add("bundles.list_files", "/repo/{repoName}/bundles/{bundleID}", "{repoName}", "{bundleID}"),
 		srv.HandleBundleListFiles())
 
-	fileServer(r, "/assets", http.Dir("./pkg/web/public/assets"))
+	fileServer(r, "/assets", packr.New("static", "./public/assets"))
 
 	return r
 }
 
 // sets up a http.FileServer handler to serve
 // static files from a http.FileSystem.
-func fileServer(r chi.Router, path string, root http.FileSystem) {
+func fileServer(r chi.Router, path string, box packd.HTTPBox) {
 	if strings.ContainsAny(path, "{}*") {
 		panic("FileServer does not permit URL parameters.")
 	}
-
-	fs := http.StripPrefix(path, http.FileServer(root))
-
+	fs := http.StripPrefix(path, http.FileServer(box))
 	if path != "/" && path[len(path)-1] != '/' {
 		r.Get(path, http.RedirectHandler(path+"/", http.StatusMovedPermanently).ServeHTTP)
 		path += "/"
 	}
 	path += "*"
-
 	r.Get(path, http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			fs.ServeHTTP(w, r)
