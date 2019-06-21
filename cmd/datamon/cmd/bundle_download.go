@@ -45,7 +45,8 @@ var BundleDownloadCmd = &cobra.Command{
 			core.ConsumableStore(destinationStore),
 			core.BlobStore(remoteStores.blob),
 			core.BundleID(params.bundle.ID),
-			core.ConcurrentFileDownloads(params.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor),
+			core.ConcurrentFileDownloads(
+				params.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor),
 			core.ConcurrentFilelistDownloads(
 				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
 		)

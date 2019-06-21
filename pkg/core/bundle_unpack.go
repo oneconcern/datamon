@@ -5,6 +5,8 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -18,15 +20,72 @@ const (
 	fileDownloadsPerConcurrentChunks = 3
 )
 
-func unpackBundleDescriptor(ctx context.Context, bundle *Bundle) error {
+func getBundleIDFromPath(path string) (string, error) {
+	info, err := model.GetConsumableStorePathMetadata(path)
+	if err != nil {
+		return "", err
+	}
+	if info.Type != model.ConsumableStorePathTypeDescriptor {
+		return "", nil
+	}
+	return info.BundleID, nil
+}
 
-	bundleDescriptorBuffer, err := storage.ReadTee(ctx,
-		bundle.MetaStore, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
-		bundle.ConsumableStore, model.GetConsumablePathToBundle(bundle.BundleID))
+func setBundleIDFromConsumableStore(ctx context.Context, bundle *Bundle) error {
+	var bundleID string
+	keys, err := bundle.ConsumableStore.Keys(ctx)
 	if err != nil {
 		return err
 	}
+	for _, key := range keys {
+		bundleID, err = getBundleIDFromPath(key)
+		if err != nil {
+			return err
+		}
+		if bundleID != "" {
+			bundle.BundleID = bundleID
+			return nil
+		}
+	}
+	return fmt.Errorf("didn't find bundle descriptor")
+}
 
+func unpackBundleDescriptor(ctx context.Context, bundle *Bundle, publish bool) error {
+	var err error
+	var bundleDescriptorBuffer []byte
+	var rdr io.Reader
+	switch {
+	case publish:
+		if bundle.MetaStore == nil || bundle.ConsumableStore == nil {
+			return fmt.Errorf("can't publish without both meta and consumable stores")
+		}
+
+		bundleDescriptorBuffer, err = storage.ReadTee(ctx,
+			bundle.MetaStore, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
+			bundle.ConsumableStore, model.GetConsumablePathToBundle(bundle.BundleID))
+		if err != nil {
+			return err
+		}
+
+	case bundle.MetaStore != nil:
+		rdr, err = bundle.MetaStore.Get(ctx, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID))
+		if err != nil {
+			return err
+		}
+		bundleDescriptorBuffer, err = ioutil.ReadAll(rdr)
+		if err != nil {
+			return err
+		}
+	default:
+		rdr, err = bundle.ConsumableStore.Get(ctx, model.GetConsumablePathToBundle(bundle.BundleID))
+		if err != nil {
+			return err
+		}
+		bundleDescriptorBuffer, err = ioutil.ReadAll(rdr)
+		if err != nil {
+			return err
+		}
+	}
 	// Unmarshal the file
 	err = yaml.Unmarshal(bundleDescriptorBuffer, &bundle.BundleDescriptor)
 	if err != nil {
@@ -49,9 +108,13 @@ type downloadBundleFileListChans struct {
 
 func downloadBundleFileListFile(ctx context.Context, bundle *Bundle,
 	chans downloadBundleFileListChans,
+	publish bool,
 	i uint64,
 ) {
 	var bundleEntries model.BundleEntries
+	var err error
+	var bundleEntriesBuffer []byte
+	var rdr io.Reader
 
 	sendErr := func(err error) {
 		chans.error <- err
@@ -64,12 +127,45 @@ func downloadBundleFileListFile(ctx context.Context, bundle *Bundle,
 		zap.Uint64("curr entry", i),
 		zap.Uint64("tot entries", bundle.BundleDescriptor.BundleEntriesFileCount),
 	)
-	bundleEntriesBuffer, err := storage.ReadTee(ctx,
-		bundle.MetaStore, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i),
-		bundle.ConsumableStore, model.GetConsumablePathToBundleFileList(bundle.BundleID, i))
-	if err != nil {
-		sendErr(err)
-		return
+
+	archivePathToBundleFileList := model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i)
+	consumablePathToBundleFileList := model.GetConsumablePathToBundleFileList(bundle.BundleID, i)
+
+	switch {
+	case publish:
+		if bundle.MetaStore == nil || bundle.ConsumableStore == nil {
+			sendErr(fmt.Errorf("can't publish without both meta and consumable stores"))
+			return
+		}
+		bundleEntriesBuffer, err = storage.ReadTee(ctx,
+			bundle.MetaStore, archivePathToBundleFileList,
+			bundle.ConsumableStore, consumablePathToBundleFileList)
+		if err != nil {
+			sendErr(err)
+			return
+		}
+	case bundle.MetaStore != nil:
+		rdr, err = bundle.MetaStore.Get(ctx, archivePathToBundleFileList)
+		if err != nil {
+			sendErr(err)
+			return
+		}
+		bundleEntriesBuffer, err = ioutil.ReadAll(rdr)
+		if err != nil {
+			sendErr(err)
+			return
+		}
+	default:
+		rdr, err = bundle.ConsumableStore.Get(ctx, consumablePathToBundleFileList)
+		if err != nil {
+			sendErr(err)
+			return
+		}
+		bundleEntriesBuffer, err = ioutil.ReadAll(rdr)
+		if err != nil {
+			sendErr(err)
+			return
+		}
 	}
 	err = yaml.Unmarshal(bundleEntriesBuffer, &bundleEntries)
 	if err != nil {
@@ -77,18 +173,18 @@ func downloadBundleFileListFile(ctx context.Context, bundle *Bundle,
 		return
 	}
 	chans.bundleEntries <- bundleEntriesRes{bundleEntries: bundleEntries, idx: i}
-
 }
 
 func downloadBundleFileList(ctx context.Context, bundle *Bundle,
 	chans downloadBundleFileListChans,
+	publish bool,
 ) {
 	var i uint64
 	concurrencyControl := make(chan struct{}, bundle.concurrentFilelistDownloads)
 	chans.concurrencyControl = concurrencyControl
 	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
 		concurrencyControl <- struct{}{}
-		go downloadBundleFileListFile(ctx, bundle, chans, i)
+		go downloadBundleFileListFile(ctx, bundle, chans, publish, i)
 	}
 	for i := 0; i < cap(concurrencyControl); i++ {
 		concurrencyControl <- struct{}{}
@@ -96,7 +192,14 @@ func downloadBundleFileList(ctx context.Context, bundle *Bundle,
 	chans.doneOk <- struct{}{}
 }
 
-func unpackBundleFileList(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+func unpackBundleFileList(ctx context.Context, bundle *Bundle,
+	publish bool,
+	bundleEntriesPerFile uint,
+) error {
+
+	bundle.l.Info("kicking off filelist download",
+		zap.Int("concurrent Filelist Downloads", bundle.concurrentFilelistDownloads),
+	)
 
 	bundleEntriesC := make(chan bundleEntriesRes)
 	errorC := make(chan error)
@@ -109,7 +212,7 @@ func unpackBundleFileList(ctx context.Context, bundle *Bundle, bundleEntriesPerF
 		bundleEntries: bundleEntriesC,
 		error:         errorC,
 		doneOk:        doneOkC,
-	})
+	}, publish)
 
 	// prealloc
 	maxBundleEntries := bundle.BundleDescriptor.BundleEntriesFileCount * uint64(bundleEntriesPerFile)

@@ -162,13 +162,21 @@ func setupTests(t *testing.T) func() {
 		os.RemoveAll(destinationDir)
 		deleteBucket(ctx, t, client, bucketMeta)
 		deleteBucket(ctx, t, client, bucketBlob)
-		params = paramsT{}
 	}
 	return cleanup
 }
 
 func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool) {
 	fatalCallsBefore := exitMocks.fatalCalls()
+	bucketMeta := params.repo.MetadataBucket
+	bucketBlob := params.repo.BlobBucket
+	contributorEmail := params.repo.ContributorEmail
+	contributorName := params.repo.ContributorName
+	params = paramsT{}
+	params.repo.MetadataBucket = bucketMeta
+	params.repo.BlobBucket = bucketBlob
+	params.repo.ContributorEmail = contributorEmail
+	params.repo.ContributorName = contributorName
 	rootCmd.SetArgs(cmd)
 	require.NoError(t, rootCmd.Execute(), "error executing '"+strings.Join(cmd, " ")+"' : "+intentMsg)
 	if expectError {
@@ -698,7 +706,6 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		"--repo", repo1,
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, files[0]), false)
-
 	ll, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, bcnt, len(ll), "bundle count in test repo")
@@ -706,9 +713,7 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
 	dpc := "bundle-dl-" + ll[len(ll)-1].hash
 	dp, err := filepath.Abs(filepath.Join(consumedData, dpc))
-	if err != nil {
-		t.Errorf("couldn't build file path: %v", err)
-	}
+	require.NoError(t, err, "couldn't build file path")
 	exists, err := afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
 	require.False(t, exists, "no filesystem entry at destination path '"+dpc+"' before bundle upload")
@@ -744,6 +749,142 @@ func TestDownloadBundles(t *testing.T) {
 	for i, tree := range testUploadTrees {
 		testDownloadBundle(t, tree, i+1)
 	}
+}
+
+type diffEntrySide struct {
+	hash string
+	size string
+}
+
+type diffEntry struct {
+	rawLine    string
+	typeLetter string
+	name       string
+	remote     diffEntrySide
+	local      diffEntrySide
+}
+
+func TestDiffBundle(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	files := testUploadTrees[1]
+	label := internal.RandStringBytesMaskImprSrc(8)
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create second test repo", false)
+	//
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, files[0]),
+		"--message", "diff orig",
+		"--label", label,
+		"--repo", repo1,
+		"--concurrency-factor", "20",
+	}, "upload bundle at "+dirPathStr(t, files[0]), false)
+	//
+	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
+	dpc := "bundle-diff"
+	dp, err := filepath.Abs(filepath.Join(consumedData, dpc))
+	require.NoError(t, err, "couldn't build file path")
+	exists, err := afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.False(t, exists, "no filesystem entry at destination path '"+dpc+"' before bundle upload")
+	runCmd(t, []string{"bundle",
+		"download",
+		"--repo", repo1,
+		"--destination", dp,
+		"--label", label,
+		"--concurrency-factor", concurrencyFactor,
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
+	exists, err = afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	//
+	srcFS := afero.NewBasePathFs(afero.NewOsFs(), dirPathStr(t, files[0]))
+	delFile := files[0]
+	difFile := files[1]
+	addFileName := "add"
+	f, err := srcFS.OpenFile(addFileName, os.O_CREATE|os.O_WRONLY|os.O_SYNC|0600, 0600)
+	require.NoError(t, err, "open file to add")
+	_, err = f.WriteString("additional")
+	require.NoError(t, err, "write to additional file")
+	require.NoError(t, f.Close(), "close add file")
+	require.NoError(t, srcFS.Remove(pathInBundle(delFile)), "remove file from downloaded bundle")
+	require.NoError(t, srcFS.Remove(pathInBundle(difFile)), "remove file to change")
+	f, err = srcFS.OpenFile(pathInBundle(difFile), os.O_CREATE|os.O_WRONLY|os.O_SYNC|0600, 0600)
+	require.NoError(t, err, "open file to change")
+	_, err = f.WriteString(internal.RandStringBytesMaskImprSrc(10))
+	require.NoError(t, err, "write to changed file")
+	require.NoError(t, f.Close(), "close changed file")
+	//
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, files[0]),
+		"--message", "diff update",
+		"--label", label,
+		"--repo", repo1,
+		"--concurrency-factor", concurrencyFactor,
+	}, "upload bundle at "+dirPathStr(t, files[0]), false)
+	r, w, err := os.Pipe()
+	if err != nil {
+		panic(err)
+	}
+	log.SetOutput(w)
+	runCmd(t, []string{"bundle",
+		"diff",
+		"--repo", repo1,
+		"--destination", dp,
+		"--label", label,
+		"--concurrency-factor", concurrencyFactor,
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
+	log.SetOutput(os.Stdout)
+	w.Close()
+	//
+	lb, err := ioutil.ReadAll(r)
+	require.NoError(t, err, "i/o error reading patched log from pipe")
+	des := make([]diffEntry, 0)
+	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
+		sl := strings.Split(line, ",")
+		de := diffEntry{
+			rawLine:    line,
+			typeLetter: strings.TrimSpace(sl[0]),
+			name:       strings.TrimSpace(sl[1]),
+			local: diffEntrySide{
+				size: strings.TrimSpace(sl[2]),
+				hash: strings.TrimSpace(sl[3]),
+			},
+			remote: diffEntrySide{
+				size: strings.TrimSpace(sl[4]),
+				hash: strings.TrimSpace(sl[5]),
+			},
+		}
+		des = append(des, de)
+	}
+	require.Equal(t, len(des), 3, "found expected number of diff entries")
+	desm := make(map[string]diffEntry)
+	for _, de := range des {
+		desm[de.name] = de
+	}
+	require.Equal(t, len(desm), 3, "diff entries have unique names")
+	de, ok := desm[addFileName]
+	require.True(t, ok, "found add file entry")
+	require.Equal(t, de.typeLetter, "A", "found correct type on add file entry")
+	require.Equal(t, de.remote.hash, "", "no remote hash on add file entry")
+	require.NotEqual(t, de.local.hash, "", "local hash on add file entry")
+	de, ok = desm[pathInBundle(difFile)]
+	require.True(t, ok, "found update file entry")
+	require.Equal(t, de.typeLetter, "U", "found correct type on update file entry")
+	require.NotEqual(t, de.remote.hash, "", "remote hash on update file entry")
+	require.NotEqual(t, de.local.hash, "", "local hash on update file entry")
+	de, ok = desm[pathInBundle(delFile)]
+	require.True(t, ok, "found delete file entry")
+	require.Equal(t, de.typeLetter, "D", "found correct type on delete file entry")
+	require.NotEqual(t, de.remote.hash, "", "remote hash on delete file entry")
+	require.Equal(t, de.local.hash, "", "no local hash on delete file entry")
 }
 
 func TestDownloadBundleByLabel(t *testing.T) {
