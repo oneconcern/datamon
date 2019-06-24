@@ -97,7 +97,10 @@ build-datamon-mac:
 	@echo 'building ${YELLOW}datamon${RESET} executable'
 	@echo "${VERSION_LD_FLAGS}"
 	@echo "${LDFLAGS}"
-	go build -o datamon.mac --ldflags "${LDFLAGS}" ./cmd/datamon
+	go get -u github.com/gobuffalo/packr/v2/packr2
+	(cd pkg/web && packr2)
+	go build -o out/datamon.mac --ldflags "${LDFLAGS}" ./cmd/datamon
+	(cd pkg/web && packr2 clean)
 
 .PHONY: build-all
 ## Build all the containers
@@ -253,4 +256,3 @@ profile-metrics:
 		out/metrics/cpu.prof \
 		out/metrics/mem.prof \
 		out/metrics
-

@@ -6,6 +6,8 @@ RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
   cp /etc/ssl/certs/ca-certificates.crt /stage/etc/ssl/certs/ca-certificates.crt &&\
   cp /etc/mime.types /stage/etc/mime.types
 
+RUN go get -u github.com/gobuffalo/packr/v2/packr2
+
 # https://golang.org/src/time/zoneinfo.go Copy the zoneinfo installed by musl-dev
 WORKDIR /usr/share/zoneinfo
 RUN zip -r -0 /stage/zoneinfo.zip .
@@ -24,6 +26,8 @@ ADD . /datamon
 WORKDIR /datamon
 
 RUN go mod download -json
+
+RUN cd ./pkg/web && packr2
 
 RUN LDFLAGS='-s -w -linkmode external -extldflags "-static"' && \
   LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}Version=${VERSION}'" && \
