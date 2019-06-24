@@ -5,6 +5,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"log"
 
 	daemonizer "github.com/jacobsa/daemonize"
 
@@ -34,8 +36,22 @@ var mutableMountBundleCmd = &cobra.Command{
 			runDaemonized()
 			return
 		}
-
-		DieIfNotDirectory(params.bundle.DataPath)
+		var err error
+		var consumableStorePath string
+		if params.bundle.DataPath == "" {
+			consumableStorePath, err = ioutil.TempDir("", "datamon-mount-destination")
+			if err != nil {
+				log.Fatalf("Couldn't create temporary directory: %v\n", err)
+				return
+			}
+		} else {
+			consumableStorePath, err = sanitizePath(params.bundle.DataPath)
+			if err != nil {
+				log.Fatalf("Failed to sanitize destination: %s\n", params.bundle.DataPath)
+				return
+			}
+			createPath(consumableStorePath)
+		}
 
 		metadataSource, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
@@ -45,7 +61,7 @@ var mutableMountBundleCmd = &cobra.Command{
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), params.bundle.DataPath))
+		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath))
 
 		bd := core.NewBDescriptor(
 			core.Message(params.bundle.Message),
@@ -91,7 +107,7 @@ func init() {
 	addBucketNameFlag(mutableMountBundleCmd)
 	addDaemonizeFlag(mutableMountBundleCmd)
 	addBlobBucket(mutableMountBundleCmd)
-	requiredFlags = append(requiredFlags, addDataPathFlag(mutableMountBundleCmd))
+	addDataPathFlag(mutableMountBundleCmd)
 	requiredFlags = append(requiredFlags, addMountPathFlag(mutableMountBundleCmd))
 	requiredFlags = append(requiredFlags, addCommitMessageFlag(mutableMountBundleCmd))
 
