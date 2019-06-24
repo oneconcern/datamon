@@ -221,7 +221,7 @@ func implPublish(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint,
 		return fmt.Errorf("failed to publish, err:%s", err)
 	}
 	if !bundle.Streamed {
-		err = unpackDataFiles(ctx, bundle, selectionPredicate)
+		err = unpackDataFiles(ctx, bundle, nil, selectionPredicate)
 		if err != nil {
 			return fmt.Errorf("failed to unpack data files, err:%s", err)
 		}
@@ -239,6 +239,15 @@ func implPublishMetadata(ctx context.Context, bundle *Bundle,
 	publish bool,
 	bundleEntriesPerFile uint,
 ) error {
+	if bundle.BundleID == "" {
+		if bundle.ConsumableStore != nil {
+			if err := setBundleIDFromConsumableStore(ctx, bundle); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("no bundle id set and consumable store not present")
+		}
+	}
 	if err := unpackBundleDescriptor(ctx, bundle, publish); err != nil {
 		return err
 	}
@@ -316,4 +325,17 @@ func Diff(ctx context.Context, bundleExisting *Bundle, bundleAdditional *Bundle)
 		return BundleDiff{}, err
 	}
 	return diffBundles(bundleExisting, bundleAdditional)
+}
+
+func Update(ctx context.Context, bundleSrc *Bundle, bundleDest *Bundle) error {
+	if err := implPublishMetadata(ctx, bundleSrc, false, defaultBundleEntriesPerFile); err != nil {
+		return err
+	}
+	if err := implPublishMetadata(ctx, bundleDest, false, defaultBundleEntriesPerFile); err != nil {
+		return err
+	}
+	if err := unpackDataFiles(ctx, bundleSrc, bundleDest, nil); err != nil {
+		return err
+	}
+	return nil
 }

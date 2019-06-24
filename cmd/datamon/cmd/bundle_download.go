@@ -29,7 +29,7 @@ var BundleDownloadCmd = &cobra.Command{
 		if err != nil {
 			logFatalln(err)
 		}
-		destinationStore, err := paramsToDestStore(params, true, "")
+		destinationStore, err := paramsToDestStore(params, destTEmpty, "")
 		if err != nil {
 			logFatalln(err)
 		}

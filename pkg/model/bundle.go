@@ -76,6 +76,14 @@ type ConsumableStorePathMetadata struct {
 	Index    uint64
 }
 
+type ConsumableStorePathMetadataErr struct {
+	msg string
+}
+
+func (e ConsumableStorePathMetadataErr) Error() string {
+	return e.msg
+}
+
 /**
  * this function is the inverse of GetConsumablePath* functions.
  * the GetConsumablePath* functions return bundle.ConsumableStore keys (paths)
@@ -89,7 +97,8 @@ func GetConsumableStorePathMetadata(path string) (ConsumableStorePathMetadata, e
 	info := ConsumableStorePathMetadata{}
 	metaMatch := metaRe.FindStringSubmatch(path)
 	if metaMatch == nil {
-		return ConsumableStorePathMetadata{}, fmt.Errorf("not a metadata path '%v'", path)
+		return ConsumableStorePathMetadata{},
+			ConsumableStorePathMetadataErr{msg: fmt.Sprintf("not a metadata path '%v'", path)}
 	}
 	metaName := metaMatch[1]
 	flMatch := flRe.FindStringSubmatch(metaName)

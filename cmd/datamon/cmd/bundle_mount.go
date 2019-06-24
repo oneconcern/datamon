@@ -93,7 +93,7 @@ var mountBundleCmd = &cobra.Command{
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore, err := paramsToDestStore(params, false, "datamon-mount-destination")
+		consumableStore, err := paramsToDestStore(params, destTEmpty, "datamon-mount-destination")
 		if err != nil {
 			onDaemonError(err)
 		}
