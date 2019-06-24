@@ -13,12 +13,6 @@ const (
 	webPort = "port"
 )
 
-type WebParams struct {
-	port int
-}
-
-var webParams = WebParams{}
-
 var webSrv = &cobra.Command{
 	Use:   "web",
 	Short: "Webserver",
@@ -26,24 +20,19 @@ var webSrv = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("begin webserver")
 		s, err := web.NewServer(web.ServerParams{
-			MetadataBucket: repoParams.MetadataBucket,
+			MetadataBucket: params.repo.MetadataBucket,
 			Credential:     config.Credential,
 		})
 		if err != nil {
 			logFatalf("server init error %v", err)
 		}
 		r := web.InitRouter(s)
-		fmt.Printf("serving on %d...\n", webParams.port)
-		err = http.ListenAndServe(fmt.Sprintf(":%d", webParams.port), r)
+		fmt.Printf("serving on %d...\n", params.web.port)
+		err = http.ListenAndServe(fmt.Sprintf(":%d", params.web.port), r)
 		if err != nil {
 			logFatalf("server listen error %v", err)
 		}
 	},
-}
-
-func addWebPortFlag(cmd *cobra.Command) string {
-	cmd.Flags().IntVar(&webParams.port, webPort, 3003, "Port number for the web server")
-	return repo
 }
 
 func init() {

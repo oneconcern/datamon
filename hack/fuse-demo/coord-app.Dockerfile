@@ -40,7 +40,11 @@ RUN useradd -u 1020 -ms /bin/bash developer
 RUN groupadd -g 2000 developers
 RUN usermod -g developers developer
 RUN chown -R developer:developers /bin/tini
+
+ADD hack/fuse-demo/mock_application.sh .
+RUN chmod a+x mock_application.sh
+
 USER developer
 
-ENTRYPOINT [ "/bin/tini", "--"]
-CMD ["zsh"]
+ENTRYPOINT [ "/tmp/coord/.scripts/wrap_application.sh"]
+CMD [ "./mock_application.sh"]

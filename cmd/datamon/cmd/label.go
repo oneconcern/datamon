@@ -14,17 +14,6 @@ bundle ids.
 `,
 }
 
-type LabelOptions struct {
-	Name string
-}
-
-var labelOptions = LabelOptions{}
-
 func init() {
 	rootCmd.AddCommand(labelCmd)
-}
-
-func addLabelNameFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&labelOptions.Name, labelName, "", "The human-readable name of a label")
-	return path
 }

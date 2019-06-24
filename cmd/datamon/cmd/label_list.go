@@ -18,11 +18,11 @@ var LabelListCommand = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`
 		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
-		metaStore, err := gcs.New(repoParams.MetadataBucket, config.Credential)
+		metaStore, err := gcs.New(params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
 		}
-		labelDescriptors, err := core.ListLabels(repoParams.RepoName, metaStore)
+		labelDescriptors, err := core.ListLabels(params.repo.RepoName, metaStore)
 		if err != nil {
 			logFatalln(err)
 		}

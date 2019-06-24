@@ -222,9 +222,7 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 		// Fetch Blob
 		var buffer []byte
 		key := r.keys[index]
-		if r.lru.Contains(key.StringWithPrefix(r.prefix)) {
-
-			b, _ := r.lru.Get(key.StringWithPrefix(r.prefix))
+		if b, ok := r.lru.Get(key.StringWithPrefix(r.prefix)); ok {
 			buffer = b.([]byte)
 			seekAhead()
 		} else {

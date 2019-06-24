@@ -26,6 +26,7 @@ jobs:
             sudo apt-get update -y
             sudo apt-get install -y git build-essential
             sudo apt-get install -y google-cloud-sdk
+            sudo apt-get install -y shellcheck
       - run:
           name: Install go tools
           command: |
@@ -42,6 +43,7 @@ jobs:
           name: Run golang linter
           command: |
             golangci-lint run --disable golint --build-tags fuse_cli --max-same-issues 0 --verbose
+            shellcheck hack/fuse-demo/wrap_*.sh
   go_build:
     working_directory: ~/project
     docker:

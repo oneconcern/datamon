@@ -17,10 +17,10 @@ var configGen = &cobra.Command{
 	Short: "Create a config",
 	Long:  "Create a config to use for datamon. Config file will be placed in $HOME/.datamon/datamon.yaml",
 	Run: func(cmd *cobra.Command, args []string) {
-		if repoParams.ContributorEmail == "" {
+		if params.repo.ContributorEmail == "" {
 			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
 		}
-		if repoParams.ContributorName == "" {
+		if params.repo.ContributorName == "" {
 			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
 		}
 		user, err := user.Current()
@@ -28,11 +28,11 @@ var configGen = &cobra.Command{
 			logFatalln("Could not get home directory for user")
 		}
 		config := Config{
-			Email:      repoParams.ContributorEmail,
-			Name:       repoParams.ContributorName,
-			Metadata:   repoParams.MetadataBucket,
-			Blob:       repoParams.BlobBucket,
-			Credential: credFile,
+			Email:      params.repo.ContributorEmail,
+			Name:       params.repo.ContributorName,
+			Metadata:   params.repo.MetadataBucket,
+			Blob:       params.repo.BlobBucket,
+			Credential: params.root.credFile,
 		}
 		o, e := yaml.Marshal(config)
 		if e != nil {

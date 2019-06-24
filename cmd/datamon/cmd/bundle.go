@@ -22,101 +22,35 @@ Every bundle is an entry in the history of a repository at a point in time.
 `,
 }
 
-type BundleOptions struct {
-	ID               string
-	DataPath         string
-	Message          string
-	ContributorEmail string
-	MountPath        string
-	File             string
-	Daemonize        bool
-	Stream           bool
-	FileList         string
-	SkipOnError      bool
-}
-
-var bundleOptions = BundleOptions{}
-
 func init() {
 	rootCmd.AddCommand(bundleCmd)
 	addBucketNameFlag(bundleCmd)
 	addBlobBucket(bundleCmd)
 }
 
-func addBundleFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.ID, bundleID, "", "The hash id for the bundle, if not specified the latest bundle will be used")
-	return bundleID
-}
-
-func addDataPathFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.DataPath, destination, "", "The path to the download dir")
-	return destination
-}
-
-func addMountPathFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.MountPath, mount, "", "The path to the mount dir")
-	return mount
-}
-
-func addPathFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
-	return path
-}
-
-func addCommitMessageFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.Message, message, "", "The message describing the new bundle")
-	return message
-}
-
-func addFileListFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.FileList, fileList, "", "Text file containing list of files separated by newline.")
-	return fileList
-}
-
-func addBundleFileFlag(cmd *cobra.Command) string {
-	cmd.Flags().StringVar(&bundleOptions.File, file, "", "The file to download from the bundle")
-	return file
-}
-
-func addDaemonizeFlag(cmd *cobra.Command) string {
-	cmd.Flags().BoolVar(&bundleOptions.Daemonize, daemonize, false, "Whether to run the command as a daemonized process")
-	return daemonize
-}
-
-func addStreamFlag(cmd *cobra.Command) string {
-	cmd.Flags().BoolVar(&bundleOptions.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
-	return stream
-}
-
-func addSkipMissing(cmd *cobra.Command) string {
-	cmd.Flags().BoolVar(&bundleOptions.SkipOnError, skipOnError, false, "Skip files encounter errors while reading."+
-		"The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false")
-	return stream
-}
-
 func setLatestOrLabelledBundle(store storage.Store) error {
 	switch {
-	case bundleOptions.ID != "" && labelOptions.Name != "":
-		return fmt.Errorf("--" + bundleID + " and --" + labelName + " flags are mutually exclusive")
-	case bundleOptions.ID == "" && labelOptions.Name == "":
-		key, err := core.GetLatestBundle(repoParams.RepoName, store)
+	case params.bundle.ID != "" && params.label.Name != "":
+		return fmt.Errorf("--" + addBundleFlag(nil) + " and --" + addLabelNameFlag(nil) + " flags are mutually exclusive")
+	case params.bundle.ID == "" && params.label.Name == "":
+		key, err := core.GetLatestBundle(params.repo.RepoName, store)
 		if err != nil {
 			return err
 		}
-		bundleOptions.ID = key
-	case bundleOptions.ID == "" && labelOptions.Name != "":
+		params.bundle.ID = key
+	case params.bundle.ID == "" && params.label.Name != "":
 		label := core.NewLabel(nil,
-			core.LabelName(labelOptions.Name),
+			core.LabelName(params.label.Name),
 		)
 		bundle := core.New(core.NewBDescriptor(),
-			core.Repo(repoParams.RepoName),
+			core.Repo(params.repo.RepoName),
 			core.MetaStore(store),
 		)
 		if err := label.DownloadDescriptor(context.Background(), bundle, true); err != nil {
 			return err
 		}
-		bundleOptions.ID = label.Descriptor.BundleID
+		params.bundle.ID = label.Descriptor.BundleID
 	}
-	fmt.Printf("Using bundle: %s\n", bundleOptions.ID)
+	fmt.Printf("Using bundle: %s\n", params.bundle.ID)
 	return nil
 }
