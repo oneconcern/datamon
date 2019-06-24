@@ -30,12 +30,13 @@ import (
 )
 
 const (
-	destinationDir = "../../../testdata/cli"
-	sourceData     = destinationDir + "/data"
-	consumedData   = destinationDir + "/downloads"
-	repo1          = "test-repo1"
-	repo2          = "test-repo2"
-	timeForm       = "2006-01-02 15:04:05.999999999 -0700 MST"
+	destinationDir    = "../../../testdata/cli"
+	sourceData        = destinationDir + "/data"
+	consumedData      = destinationDir + "/downloads"
+	repo1             = "test-repo1"
+	repo2             = "test-repo2"
+	timeForm          = "2006-01-02 15:04:05.999999999 -0700 MST"
+	concurrencyFactor = "100"
 )
 
 type uploadTree struct {
@@ -320,7 +321,7 @@ func testUploadBundle(t *testing.T, file uploadTree) {
 		"--path", dirPathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	//
 	log.SetOutput(os.Stdout)
@@ -366,7 +367,7 @@ func TestUploadBundle_filePath(t *testing.T) {
 		"--path", filePathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "observe error on bundle upload path as file rather than directory", true)
 }
 
@@ -383,7 +384,7 @@ func testUploadBundleLabel(t *testing.T, file uploadTree, label string) {
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
 		"--label", label,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	//
 	log.SetOutput(os.Stdout)
@@ -461,7 +462,7 @@ func testListBundle(t *testing.T, file uploadTree, bcnt int) {
 		"--path", dirPathStr(t, file),
 		"--message", msg,
 		"--repo", repo1,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	ll, err := listBundles(t, repo2)
 	require.NoError(t, err, "error out of listBundles() test helper")
@@ -569,7 +570,7 @@ func TestListLabels(t *testing.T) {
 		"--message", "label test bundle",
 		"--repo", repo1,
 		"--label", label,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	ll = listLabels(t, repo2)
 	require.Equal(t, 0, len(ll), "no labels in secondary repo")
@@ -604,7 +605,7 @@ func TestSetLabel(t *testing.T) {
 		"--path", dirPathStr(t, file),
 		"--message", msg,
 		"--repo", repo1,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	ll = listLabels(t, repo1)
 	require.Equal(t, len(ll), 0, "no labels created yet")
@@ -637,7 +638,7 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, files[0]), false)
 
 	ll, err := listBundles(t, repo1)
@@ -658,6 +659,7 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		"--repo", repo1,
 		"--destination", dp,
 		"--bundle", ll[len(ll)-1].hash,
+		"--concurrency-factor", concurrencyFactor,
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
@@ -705,7 +707,7 @@ func TestDownloadBundleByLabel(t *testing.T) {
 		"--message", "label test bundle",
 		"--repo", repo1,
 		"--label", label,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	// dupe: testDownloadBundle()
 	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
@@ -722,6 +724,7 @@ func TestDownloadBundleByLabel(t *testing.T) {
 		"--repo", repo1,
 		"--destination", dp,
 		"--label", label,
+		"--concurrency-factor", concurrencyFactor,
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
@@ -802,7 +805,7 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "create second test repo", false)
 
 	rll, err := listBundles(t, repo1)
@@ -882,7 +885,7 @@ func testBundleDownloadFiles(t *testing.T, files []uploadTree, bcnt int) {
 		"--path", dirPathStr(t, files[0]),
 		"--message", msg,
 		"--repo", repo1,
-		"--num-file-uploads", "20",
+		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle in order to test downloading individual files", false)
 	rll, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")

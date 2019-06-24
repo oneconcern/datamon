@@ -13,6 +13,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	fileDownloadsPerConcurrentChunks = 3
+)
+
 func unpackBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 
 	bundleDescriptorBuffer, err := storage.ReadTee(ctx,
@@ -56,14 +60,13 @@ type errorHit struct {
 	file  string
 }
 
-const maxConcurrentDownloads = 10
-
 func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 	ls := bundle.BundleDescriptor.LeafSize
 	fs, err := cafs.New(
 		cafs.LeafSize(ls),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Backend(bundle.BlobStore),
+		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
 	)
 
 	if err != nil {
@@ -71,7 +74,11 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 	}
 	var wg sync.WaitGroup
 	errC := make(chan errorHit, len(bundle.BundleEntries))
-	concurrencyControl := make(chan struct{}, maxConcurrentDownloads)
+	concurrentFileDownloads := bundle.concurrentFileDownloads
+	if concurrentFileDownloads < 1 {
+		concurrentFileDownloads = 1
+	}
+	concurrencyControl := make(chan struct{}, concurrentFileDownloads)
 	fmt.Printf("Downloading %d files\n", len(bundle.BundleEntries))
 	for _, b := range bundle.BundleEntries {
 		if file != "" && file != b.NameWithPath {

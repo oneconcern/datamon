@@ -8,17 +8,17 @@ import (
 
 type paramsT struct {
 	bundle struct {
-		ID                    string
-		DataPath              string
-		Message               string
-		ContributorEmail      string
-		MountPath             string
-		File                  string
-		Daemonize             bool
-		Stream                bool
-		FileList              string
-		SkipOnError           bool
-		ConcurrentFileUploads int
+		ID                string
+		DataPath          string
+		Message           string
+		ContributorEmail  string
+		MountPath         string
+		File              string
+		Daemonize         bool
+		Stream            bool
+		FileList          string
+		SkipOnError       bool
+		ConcurrencyFactor int
 	}
 	web struct {
 		port int
@@ -108,12 +108,12 @@ func addSkipMissingFlag(cmd *cobra.Command) string {
 	return skipOnError
 }
 
-func addConcurrentFileUploadsFlag(cmd *cobra.Command) string {
-	concurrentFileUploads := "num-file-uploads"
-	cmd.Flags().IntVar(&params.bundle.ConcurrentFileUploads, concurrentFileUploads, 20,
-		"Number of files to upload at a time.  "+
-			"If uploads consume too much memory, turn this value down.")
-	return concurrentFileUploads
+func addConcurrencyFactorFlag(cmd *cobra.Command) string {
+	concurrencyFactor := "concurrency-factor"
+	cmd.Flags().IntVar(&params.bundle.ConcurrencyFactor, concurrencyFactor, 100,
+		"Heuristic on the amount of concurrency used by various operations.  "+
+			"Turn this value down to use less memory, increase for faster operations.")
+	return concurrencyFactor
 }
 
 func addWebPortFlag(cmd *cobra.Command) string {
