@@ -109,7 +109,7 @@ func uploadBundleFile(
 	defer func() {
 		<-chans.concurrencyControl
 	}()
-	written, key, keys, duplicate, e := cafsArchive.Put(ctx, fileReader)
+	putRes, e := cafsArchive.Put(ctx, fileReader)
 	if e != nil {
 		select {
 		case chans.error <- errorHit{
@@ -123,11 +123,11 @@ func uploadBundleFile(
 
 	select {
 	case chans.filePacked <- filePacked{
-		hash:      key.String(),
-		keys:      keys,
+		hash:      putRes.Key.String(),
+		keys:      putRes.Keys,
 		name:      file,
-		size:      uint64(written),
-		duplicate: duplicate,
+		size:      uint64(putRes.Written),
+		duplicate: putRes.Found,
 	}:
 	case <-chans.done:
 	}

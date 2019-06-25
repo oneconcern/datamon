@@ -54,7 +54,10 @@ func UploadToBlob(sourceStore storage.Store, backupStore storage.Store, cafs caf
 			incC(errC)
 			continue
 		}
-		size, key, _, duplicate, err := cafs.Put(context.Background(), reader)
+		putRes, err := cafs.Put(context.Background(), reader)
+		size := putRes.Written
+		key := putRes.Key
+		duplicate := putRes.Found
 		if err != nil {
 			logger.Error("Failed to upload blob", zap.String("file", file), zap.Error(err))
 			incC(errC)

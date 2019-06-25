@@ -624,7 +624,7 @@ func commitFileUpload(
 		return
 	}
 	// written, key, keys, duplicate, err =
-	written, key, _, _, err := caFs.Put(ctx, file)
+	putRes, err := caFs.Put(ctx, file)
 	if err != nil {
 		select {
 		case chans.error <- err:
@@ -636,10 +636,10 @@ func commitFileUpload(
 		return
 	}
 	be := model.BundleEntry{
-		Hash:         key.String(),
+		Hash:         putRes.Key.String(),
 		NameWithPath: uploadTask.name,
 		FileMode:     0, // #TODO: #35 file mode support
-		Size:         uint64(written),
+		Size:         uint64(putRes.Written),
 	}
 	select {
 	case chans.bundleEntry <- be:
