@@ -79,11 +79,18 @@ type hasOpts struct {
 // Option to configure content addressable FS components
 type Option func(*defaultFs)
 
+type PutRes struct {
+	Written int64
+	Key     Key
+	Keys    []byte
+	Found   bool
+}
+
 // Fs implementations provide content-addressable filesystem operations
 type Fs interface {
 	Get(context.Context, Key) (io.ReadCloser, error)
 	GetAt(context.Context, Key) (io.ReaderAt, error)
-	Put(context.Context, io.Reader) (int64, Key, []byte, bool, error)
+	Put(context.Context, io.Reader) (PutRes, error)
 	Delete(context.Context, Key) error
 	Clear(context.Context) error
 	Keys(context.Context) ([]Key, error)
@@ -123,19 +130,19 @@ type defaultFs struct {
 	readerConcurrentChunkWrites int
 }
 
-func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte, bool, error) {
+func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
 	w := d.writer(d.prefix)
 	defer w.Close()
 	written, err := io.Copy(w, src)
 	if err != nil {
-		return 0, Key{}, nil, false, err
+		return PutRes{}, err
 	}
 	key, keys, err := w.Flush()
 	if err != nil {
-		return 0, Key{}, nil, false, err
+		return PutRes{}, err
 	}
 	if err = w.Close(); err != nil {
-		return 0, Key{}, nil, false, err
+		return PutRes{}, err
 	}
 	destinations := make([]storage.MultiStoreUnit, 0)
 
@@ -149,9 +156,14 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (int64, Key, []byte,
 	buffer := append(keys, key[:]...)
 	err = storage.MultiPut(ctx, destinations, key.String(), buffer, storage.OverWrite)
 	if err != nil {
-		return 0, Key{}, nil, found, err
+		return PutRes{Found: found}, err
 	}
-	return written, key, keys, found, nil
+	return PutRes{
+		Written: written,
+		Key:     key,
+		Keys:    keys,
+		Found:   found,
+	}, nil
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {

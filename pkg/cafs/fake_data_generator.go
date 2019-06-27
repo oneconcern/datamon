@@ -74,9 +74,9 @@ func GenerateCAFSChunks(src string, fs Fs) (*Key, error) {
 	}
 	defer sourceFile.Close()
 
-	_, key, _, _, err := fs.Put(context.Background(), sourceFile)
+	putRes, err := fs.Put(context.Background(), sourceFile)
 	if err != nil {
 		return nil, err
 	}
-	return &key, nil
+	return &putRes.Key, nil
 }

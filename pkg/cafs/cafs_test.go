@@ -46,6 +46,11 @@ func TestCAFS_Get(t *testing.T) {
 }
 
 func TestCAFS_Put(t *testing.T) {
+
+	putRes2Tuple := func(res PutRes) (int64, Key, []byte, bool) {
+		return res.Written, res.Key, res.Keys, res.Found
+	}
+
 	td, err := ioutil.TempDir("", "tpt-cafs-put")
 	require.NoError(t, err)
 	defer os.RemoveAll(td)
@@ -61,7 +66,8 @@ func TestCAFS_Put(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	written, rk, _, _, err := fs.Put(context.Background(), f)
+	putRes, err := fs.Put(context.Background(), f)
+	written, rk, _, _ := putRes2Tuple(putRes)
 	require.NoError(t, err)
 	fileInfo, err := f.Stat()
 	require.NoError(t, err)
@@ -72,7 +78,8 @@ func TestCAFS_Put(t *testing.T) {
 	f, err = os.Open(orig)
 	require.NoError(t, err)
 	defer f.Close()
-	written, rk2, _, _, err := fs.Put(context.Background(), f)
+	putRes, err = fs.Put(context.Background(), f)
+	written, rk2, _, _ := putRes2Tuple(putRes)
 	require.NoError(t, err)
 	fileInfo, err = f.Stat()
 	require.NoError(t, err)
