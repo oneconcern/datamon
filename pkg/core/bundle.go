@@ -74,6 +74,10 @@ func Contributors(c []model.Contributor) BundleDescriptorOption {
 	}
 }
 
+func Contributor(c model.Contributor) BundleDescriptorOption {
+	return Contributors([]model.Contributor{c})
+}
+
 func Parents(p []string) BundleDescriptorOption {
 	return func(b *model.BundleDescriptor) {
 		b.Parents = p

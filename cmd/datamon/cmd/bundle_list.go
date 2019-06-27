@@ -6,7 +6,6 @@ import (
 	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 
 	"github.com/spf13/cobra"
 )
@@ -18,11 +17,11 @@ var BundleListCommand = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
 		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
-		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+		remoteStores, err := paramsToRemoteCmdStores(params)
 		if err != nil {
 			logFatalln(err)
 		}
-		bundleDescriptors, err := core.ListBundles(params.repo.RepoName, store)
+		bundleDescriptors, err := core.ListBundles(params.repo.RepoName, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}

@@ -5,18 +5,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
 	daemonizer "github.com/jacobsa/daemonize"
 
-	"github.com/oneconcern/datamon/pkg/dlogger"
-
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
-	"github.com/oneconcern/datamon/pkg/storage/localfs"
-	"github.com/spf13/afero"
+	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"github.com/spf13/cobra"
 )
@@ -31,6 +26,18 @@ func undaemonizeArgs(args []string) []string {
 	return foregroundArgs
 }
 
+/**
+ * call this function followed by return at any point in a Run: func in order to run the command as a pseudo-daemonized process.
+ * conceptually, pseudo-daemonization is akin to usual daemon processes in C wherein fork() does the job
+ * of splitting the process in two within the control-flow of the given process, copying or sharing memory segments as needed.
+ *
+ * Go doesn't fork() because of the runtime.  only exec() is available.  so what pseudo-daemonization means is exec()ing
+ * the selfsame binary in a goroutine with some additional IPC communication via pipes to simulate a meaningful fork()-like
+ * return value indicating whether the process started successfully without blocking on the exec()ed process's exit code.
+ *
+ * specifically, `daemonizer.SignalOutcome(nil)` is used to in Run() to bracket the daemonized process and the end of the
+ * initialization code.
+ */
 func runDaemonized() {
 	var path string
 	path, err := os.Executable()
@@ -60,6 +67,10 @@ func runDaemonized() {
 	}
 }
 
+/**
+ * in between runDaemonized() and SignalOutcome(), call this function instead of logFatalln() or similar
+ * in case of errors
+ */
 func onDaemonError(err error) {
 	if errSig := daemonizer.SignalOutcome(err); errSig != nil {
 		logFatalln(fmt.Errorf("error SignalOutcome: %v, cause: %v", errSig, err))
@@ -73,40 +84,21 @@ var mountBundleCmd = &cobra.Command{
 	Short: "Mount a bundle",
 	Long:  "Mount a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
+		// cf. comments on runDaemonized
 		if params.bundle.Daemonize {
 			runDaemonized()
 			return
 		}
-
-		var err error
-
-		var consumableStorePath string
-		if params.bundle.DataPath == "" {
-			consumableStorePath, err = ioutil.TempDir("", "datamon-mount-destination")
-			if err != nil {
-				log.Fatalf("Couldn't create temporary directory: %v\n", err)
-				return
-			}
-		} else {
-			consumableStorePath, err = sanitizePath(params.bundle.DataPath)
-			if err != nil {
-				log.Fatalf("Failed to sanitize destination: %s\n", params.bundle.DataPath)
-				return
-			}
-			createPath(consumableStorePath)
-		}
-
-		metadataSource, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+		remoteStores, err := paramsToRemoteCmdStores(params)
 		if err != nil {
 			onDaemonError(err)
 		}
-		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
+		consumableStore, err := paramsToDestStore(params, false, "datamon-mount-destination")
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath))
 
-		err = setLatestOrLabelledBundle(metadataSource)
+		err = setLatestOrLabelledBundle(remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -114,9 +106,9 @@ var mountBundleCmd = &cobra.Command{
 		bundle := core.New(bd,
 			core.Repo(params.repo.RepoName),
 			core.BundleID(params.bundle.ID),
-			core.BlobStore(blobStore),
+			core.BlobStore(remoteStores.blob),
 			core.ConsumableStore(consumableStore),
-			core.MetaStore(metadataSource),
+			core.MetaStore(remoteStores.meta),
 			core.Streaming(params.bundle.Stream),
 		)
 		logger, err := dlogger.GetLogger(params.root.logLevel)

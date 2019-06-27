@@ -4,12 +4,8 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
-	"github.com/oneconcern/datamon/pkg/storage/localfs"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
@@ -23,41 +19,25 @@ var BundleDownloadCmd = &cobra.Command{
 	Long: "Download a readonly, non-interactive view of the entire data that is part of a bundle. If --bundle is not specified" +
 		" the latest bundle will be downloaded",
 	Run: func(cmd *cobra.Command, args []string) {
-
-		sourceStore, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+		remoteStores, err := paramsToRemoteCmdStores(params)
 		if err != nil {
 			logFatalln(err)
 		}
-		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
+		destinationStore, err := paramsToDestStore(params, true, "")
 		if err != nil {
 			logFatalln(err)
 		}
-		path, err := sanitizePath(params.bundle.DataPath)
-		fmt.Println("Using path: " + path)
-		if err != nil {
-			logFatalln("Failed path validation: " + err.Error())
-		}
-		createPath(path)
-		fs := afero.NewBasePathFs(afero.NewOsFs(), path+"/")
-		empty, err := afero.IsEmpty(fs, "/")
-		if err != nil {
-			logFatalln("Failed path validation: " + err.Error())
-		}
-		if !empty {
-			logFatalf("%s should be empty", path)
-		}
-		destinationStore := localfs.New(fs)
 
-		err = setLatestOrLabelledBundle(sourceStore)
+		err = setLatestOrLabelledBundle(remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
 			core.Repo(params.repo.RepoName),
-			core.MetaStore(sourceStore),
+			core.MetaStore(remoteStores.meta),
 			core.ConsumableStore(destinationStore),
-			core.BlobStore(blobStore),
+			core.BlobStore(remoteStores.blob),
 			core.BundleID(params.bundle.ID),
 			core.ConcurrentFileDownloads(params.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor),
 		)
