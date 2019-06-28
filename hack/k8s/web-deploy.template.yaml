@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datamon-web-deploy
+spec:
+  selector:
+    matchLabels:
+      app: datamon-web-deploy
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: datamon-web-deploy
+    spec:
+      containers:
+      - name: datamon-web
+        image: gcr.io/onec-co/datamon-fuse-sidecar:v0.5
+        imagePullPolicy: "Always"
+        command: ["datamon"]
+        args: ["web", "--port", "3003"]
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /tmp/gac
+          name: google-application-credentials
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /tmp/gac/google-application-credentials.json
+      volumes:
+      - name: google-application-credentials
+        secret:
+          secretName: google-application-credentials
+      volumes:
+      - name: google-application-credentials
+        secret:
+          secretName: google-application-credentials
