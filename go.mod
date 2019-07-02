@@ -10,8 +10,9 @@ require (
 	github.com/container-storage-interface/spec v0.3.0
 	github.com/docker/go-units v0.3.3
 	github.com/go-chi/chi v4.0.2+incompatible
+	github.com/gobuffalo/logger v1.0.1 // indirect
 	github.com/gobuffalo/packd v0.3.0
-	github.com/gobuffalo/packr/v2 v2.5.1
+	github.com/gobuffalo/packr/v2 v2.5.2
 	github.com/hashicorp/go-immutable-radix v1.0.0
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
@@ -19,7 +20,7 @@ require (
 	github.com/jacobsa/fuse v0.0.0-20180417054321-cd3959611bcb
 	github.com/json-iterator/go v1.1.6
 	github.com/karrick/godirwalk v1.10.12
-	github.com/kr/pty v1.1.5 // indirect
+	github.com/kr/pty v1.1.8 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/markbates/oncer v0.0.0-20181203154359-bf2de49a0be2 // indirect
 	github.com/markbates/safe v1.0.1 // indirect
@@ -35,10 +36,11 @@ require (
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.9.1
-	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
-	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0 // indirect
+	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
+	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
+	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190625160430-252024b82959 // indirect
+	golang.org/x/tools v0.0.0-20190702152245-7e72c71c505f // indirect
 	google.golang.org/api v0.2.0
 	google.golang.org/grpc v1.19.0
 	gopkg.in/yaml.v2 v2.2.2

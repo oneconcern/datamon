@@ -17,7 +17,7 @@ spec:
         image: gcr.io/onec-co/datamon-fuse-demo-shell:latest
         imagePullPolicy: "Always"
         command: ["/bin/tini"]
-        args: ["--", "/bin/bash"]
+        args: ["--", "/bin/zsh"]
         stdin: true
         tty: true
         volumeMounts:
@@ -25,10 +25,15 @@ spec:
           name: fuse-mountpoint
           mountPropagation: "HostToContainer"
       - name: datamon-sidecar
-        image: gcr.io/onec-co/datamon-fuse-sidecar:v0.4
+        image: gcr.io/onec-co/datamon-fuse-demo-sidecar:latest
         imagePullPolicy: "Always"
         command: ["datamon"]
-        args: ["bundle", "mount", "--repo", "ransom-datamon-test-repo", "--label", "testlabel", "--destination", "/tmp", "--mount", "/tmp/mount", "--stream"]
+        args: ["bundle", "mount",
+        "--repo", "$REPO_NAME",
+        "--bundle", "$BUNDLE_ID",
+        "--destination", "/tmp",
+        "--mount", "/tmp/mount",
+        "--stream"]
         securityContext:
           privileged: true
         stdin: true

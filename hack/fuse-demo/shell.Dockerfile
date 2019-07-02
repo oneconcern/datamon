@@ -5,6 +5,8 @@ RUN apt-get update &&\
     apt-get install -y \
         curl \
         ca-certificates \
+        zsh \
+        htop \
         gnupg &&\
     apt-get autoremove -yqq &&\
     apt-get clean -y &&\
