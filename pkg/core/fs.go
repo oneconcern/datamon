@@ -60,17 +60,16 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 		l.Error("bundle is nil", zap.Error(err))
 		return nil, err
 	}
-	fs := &readOnlyFsInternal{
+	fsInternal := &readOnlyFsInternal{
 		bundle:       bundle,
 		readDirMap:   make(map[fuseops.InodeID][]fuseutil.Dirent),
 		fsEntryStore: iradix.New(),
 		lookupTree:   iradix.New(),
-		fsDirStore:   iradix.New(),
 		l:            l,
 	}
 
 	// Extract the meta information needed.
-	err := Publish(context.Background(), fs.bundle)
+	err := Publish(context.Background(), fsInternal.bundle)
 	if err != nil {
 		l.Error("Failed to publish bundle", zap.String("id", bundle.BundleID),
 			zap.Error(err))
@@ -79,7 +78,15 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 	// TODO: Introduce streaming and caching
 	// Populate the filesystem.
 	l.Info("initializing read-only fs internal")
-	return fs.populateFS(bundle)
+	fsExternal, err := fsInternal.populateFS(bundle)
+	if err != nil {
+		return nil, err
+	}
+	// nil is the preferred idiom for empty slices
+	// https://github.com/golang/go/wiki/CodeReviewComments#declaring-empty-slices
+	// todo: verify whether this line successfully frees memory
+	bundle.BundleEntries = nil
+	return fsExternal, nil
 }
 
 // NewMutableFS creates a new instance of the datamon filesystem.
