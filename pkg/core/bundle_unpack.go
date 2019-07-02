@@ -10,6 +10,8 @@ import (
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
+
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 )
 
@@ -38,6 +40,10 @@ func unpackBundleFileList(ctx context.Context, bundle *Bundle) error {
 	// Download the files json
 	var i uint64
 	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
+		bundle.l.Info("downloading bundle entry",
+			zap.Uint64("curr entry", i),
+			zap.Uint64("tot entries", bundle.BundleDescriptor.BundleEntriesFileCount),
+		)
 		bundleEntriesBuffer, err := storage.ReadTee(ctx,
 			bundle.MetaStore, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i),
 			bundle.ConsumableStore, model.GetConsumablePathToBundleFileList(bundle.BundleID, i))

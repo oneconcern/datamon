@@ -13,4 +13,4 @@ done
 
 echo "pod started, following logs of $pod_name"
 
-kubectl logs "$pod_name" -f -c datamon-sidecar
+kubectl logs "$pod_name" -f -c datamon-sidecar |humanlog

@@ -465,13 +465,13 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 		return *iNode
 	}
 
-	fs.l.Info("Populating fs",
+	fs.l.Info("top populateFS()",
 		zap.String("repo", fs.bundle.RepoID),
 		zap.String("bundle ID", fs.bundle.BundleID),
 		zap.Int("entryCount", len(fs.bundle.BundleEntries)),
 	)
 	var count int
-	for _, bundleEntry := range fs.bundle.GetBundleEntries() {
+	for _, bundleEntry := range fs.bundle.BundleEntries {
 		be := bundleEntry
 		// Generate the fsEntry
 		newFsEntry := newDatamonFSEntry(&be, bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), fileLinkCount)

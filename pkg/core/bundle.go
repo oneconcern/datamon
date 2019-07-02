@@ -55,10 +55,6 @@ func (b *Bundle) InitializeBundleID() error {
 	return nil
 }
 
-func (b *Bundle) GetBundleEntries() []model.BundleEntry {
-	return b.BundleEntries
-}
-
 type BundleOption func(*Bundle)
 type BundleDescriptorOption func(descriptor *model.BundleDescriptor)
 
@@ -193,21 +189,26 @@ func Publish(ctx context.Context, bundle *Bundle) error {
 		return fmt.Errorf("failed to publish, err:%s", err)
 	}
 	if !bundle.Streamed {
+		bundle.l.Info("downloading bundle blob data")
 		err = unpackDataFiles(ctx, bundle, "")
 		if err != nil {
 			return fmt.Errorf("failed to unpack data files, err:%s", err)
 		}
+	} else {
+		bundle.l.Info("skipping bundle blob data download on streaming")
 	}
 	return nil
 }
 
 // PublishMetadata from the archive to the consumable store
 func PublishMetadata(ctx context.Context, bundle *Bundle) error {
+	bundle.l.Info("reading bundle descriptor")
 	err := unpackBundleDescriptor(ctx, bundle)
 	if err != nil {
 		return err
 	}
 
+	bundle.l.Info("reading bundle filelist")
 	err = unpackBundleFileList(ctx, bundle)
 	if err != nil {
 		return err

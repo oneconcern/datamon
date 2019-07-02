@@ -78,6 +78,7 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 	}
 	// TODO: Introduce streaming and caching
 	// Populate the filesystem.
+	l.Info("initializing read-only fs internal")
 	return fs.populateFS(bundle)
 }
 
