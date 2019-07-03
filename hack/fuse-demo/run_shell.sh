@@ -24,4 +24,4 @@ fi
 
 kubectl exec -it "$pod_name" \
         -c "$container_name" \
-        -- "/bin/bash"
+        -- "/bin/zsh"

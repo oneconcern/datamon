@@ -7,6 +7,10 @@ RUN apt-get update &&\
         ca-certificates \
         zsh \
         htop \
+        rsync \
+        less \
+        watch \
+        man \
         gnupg &&\
     apt-get autoremove -yqq &&\
     apt-get clean -y &&\
@@ -43,6 +47,8 @@ RUN groupadd -g 2000 developers
 RUN usermod -g developers developer
 RUN chown -R developer:developers /bin/tini
 USER developer
+
+RUN touch ~/.zshrc
 
 ENTRYPOINT [ "/bin/tini", "--"]
 CMD ["zsh"]

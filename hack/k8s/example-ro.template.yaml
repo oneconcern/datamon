@@ -49,16 +49,25 @@ spec:
           value: /tmp/gac/google-application-credentials.json
         resources:
           requests:
-            memory: "20G"
+            memory: "27G"
       volumes:
       - name: fuse-mountpoint
         emptyDir: {}
       - name: google-application-credentials
         secret:
           secretName: google-application-credentials
+
+      # tolerations:
+      # - key: "oneconcern.com/flood"
+      #   operator: Equal
+      #   value: "inundation"
+      # nodeSelector:
+      #   kubernetes.io/role: "flood-pipeline"
+
       tolerations:
-      - key: "oneconcern.com/flood"
-        operator: Equal
-        value: "inundation"
+        - key: "oneconcern.com/dedicated"
+          operator: Equal
+          value: "geodude"
       nodeSelector:
-        kubernetes.io/role: "flood-pipeline"
+          kubernetes.io/role: "geodude"
+

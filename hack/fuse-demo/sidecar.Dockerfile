@@ -19,3 +19,5 @@ RUN apt-get update &&\
         /var/cache/debconf/*-old
 
 USER developer
+
+RUN touch ~/.zshrc
