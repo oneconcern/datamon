@@ -6,6 +6,7 @@ RUN apt-get update &&\
     curl -sL https://deb.nodesource.com/setup_10.x  | bash &&\
     apt-get install -y \
         zsh \
+        golang-go \
         htop &&\
     apt-get autoremove -yqq &&\
     apt-get clean -y &&\
@@ -17,6 +18,9 @@ RUN apt-get update &&\
         /usr/share/doc/* \
         /usr/share/locale/* \
         /var/cache/debconf/*-old
+
+# allow pprof `list` command
+ADD . /datamon
 
 USER developer
 

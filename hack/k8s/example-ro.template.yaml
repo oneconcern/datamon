@@ -57,17 +57,17 @@ spec:
         secret:
           secretName: google-application-credentials
 
-      # tolerations:
-      # - key: "oneconcern.com/flood"
-      #   operator: Equal
-      #   value: "inundation"
-      # nodeSelector:
-      #   kubernetes.io/role: "flood-pipeline"
-
       tolerations:
-        - key: "oneconcern.com/dedicated"
-          operator: Equal
-          value: "geodude"
+      - key: "oneconcern.com/flood"
+        operator: Equal
+        value: "inundation"
       nodeSelector:
-          kubernetes.io/role: "geodude"
+        kubernetes.io/role: "flood-pipeline"
+
+      # tolerations:
+      #   - key: "oneconcern.com/dedicated"
+      #     operator: Equal
+      #     value: "geodude"
+      # nodeSelector:
+      #     kubernetes.io/role: "geodude"
 

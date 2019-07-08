@@ -8,6 +8,10 @@ import (
 	"path"
 	"time"
 
+	"path/filepath"
+	"runtime/pprof"
+//	"strconv"
+
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"go.uber.org/zap"
 
@@ -295,9 +299,18 @@ func (fs *readOnlyFsInternal) OpenFile(
 	return
 }
 
+// var fuseRoReadFileProfIdx int = 0
+
+var fuseRoReadFileConcurrencyControlC chan struct{}
+
 func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
+	if fuseRoReadFileConcurrencyControlC == nil {
+		fuseRoReadFileConcurrencyControlC = make(chan struct{}, 32)
+	}
+	fuseRoReadFileConcurrencyControlC <- struct{}{}
+	defer func() { <-fuseRoReadFileConcurrencyControlC }()
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
 
@@ -314,6 +327,30 @@ func (fs *readOnlyFsInternal) ReadFile(
 	)
 
 	n, err := fs.bundle.ReadAt(fe, op.Dst, op.Offset)
+
+	fs.l.Info("read file",
+		zap.String("file", fe.fullPath),
+		zap.String("hash", fe.hash),
+		zap.Int("buffer size", len(op.Dst)),
+		zap.Int("reported bytes read", n),
+		zap.Error(err),
+	)
+
+	var f *os.File
+	path := filepath.Join("/home/developer/", 
+		"read_file-" + 
+//		strconv.Itoa(fuseRoReadFileProfIdx++) + "-" + 
+		fe.hash + ".mem.prof")
+	f, err = os.Create(path)
+	if err != nil {
+		return err
+	}
+	err = pprof.Lookup("heap").WriteTo(f, 0)
+	if err != nil {
+		return err
+	}
+	f.Close()
+
 	op.BytesRead = n
 	return err
 }
