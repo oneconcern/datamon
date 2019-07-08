@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 	"time"
+	"strconv"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/dlogger"
@@ -20,6 +21,10 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
+
+type bundleReadAtRes struct {
+	err error
+}
 
 var bundleReadAtCmd = &cobra.Command{
 	Use:   "bundle-readat",
@@ -38,7 +43,8 @@ var bundleReadAtCmd = &cobra.Command{
 			nextFileName := fmt.Sprintf("testfile_%v", i)
 			sourceStoreFilenames = append(sourceStoreFilenames, nextFileName)
 		}
-		sourceStore := newGenStoreRand(sourceStoreFilenames, int64(1024*1))
+		sourceStoreMax := 1024*1024*1
+		sourceStore := newGenStoreRand(sourceStoreFilenames, int64(sourceStoreMax))
 
 		metaStoreLocal := localfs.New(afero.NewBasePathFs(afero.NewOsFs(),
 			filepath.Join(localStoresPath, "meta")))
@@ -99,27 +105,64 @@ var bundleReadAtCmd = &cobra.Command{
 			log.Fatalln(fmt.Errorf("didn't find expected number of entries in stream bundle %v/%v",
 				len(streamBundle.BundleEntries), len(sourceStoreFilenames)))
 		}
-		bundleEntry := streamBundle.BundleEntries[0]
-		destination := make([]byte, 0)
-		_, err = core.BundleReadAtImpl(streamBundle,
-			bundleEntry.NameWithPath, bundleEntry.Hash,
-			destination, 0)
-		if err != nil {
-			log.Fatalln(err)
-		}
+
 
 		// dupe: bundle_pack.go
-		var f *os.File
-		path := filepath.Join(params.root.memProfPath, "bundlereadat.mem.prof")
-		f, err = os.Create(path)
-		if err != nil {
-			log.Fatalln(err)
+		writeMemProf := func(profName string) {
+			var f *os.File
+			path := filepath.Join(params.root.memProfPath, profName + ".mem.prof")
+			f, err = os.Create(path)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			err = pprof.Lookup("heap").WriteTo(f, 0)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			f.Close()
 		}
-		err = pprof.Lookup("heap").WriteTo(f, 0)
-		if err != nil {
-			log.Fatalln(err)
+
+		bundleReadAtResC := make(chan bundleReadAtRes, 0)
+
+		go func() {
+			concurrencyControlC := make(chan struct{}, len(streamBundle.BundleEntries))
+			for bundleEntryIdx, bundleEntry := range streamBundle.BundleEntries {
+				concurrencyControlC <- struct{}{}
+				go func() {
+					defer func() { <-concurrencyControlC }()
+					for i :=0; i < 1024 * 3; i++ {
+						destination := make([]byte, 0)
+						time.Sleep(time.Millisecond * time.Duration(bundleEntryIdx))
+						_, err = core.BundleReadAtImpl(streamBundle,
+							"",
+							bundleEntry.Hash,
+							destination, 0)
+						if err != nil {
+							bundleReadAtResC <- bundleReadAtRes{err: err}
+							return
+						}
+					}
+//					writeMemProf("bundlereadat-i-" + strconv.Itoa(bundleEntryIdx))
+					bundleReadAtResC <- bundleReadAtRes{}
+				}()
+			}
+			for i := 0; i < cap(concurrencyControlC); i++ {
+				concurrencyControlC <- struct{}{}
+			}
+			close(bundleReadAtResC)
+		}()
+
+		writeMemProf("bundlereadat-initial")
+		for i := 0; ; i++ {
+			res, more := <-bundleReadAtResC
+			if !more { break }
+			if res.err != nil {
+				log.Fatalln(res.err)
+			}
+			writeMemProf("bundlereadat-" + strconv.Itoa(i))
 		}
-		f.Close()
+		writeMemProf("bundlereadat-final")
+
 	},
 }
 
