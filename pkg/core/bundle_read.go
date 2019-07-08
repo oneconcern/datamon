@@ -13,12 +13,15 @@ import (
 
 const EOF = "EOF"
 
-func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int, err error) {
+// public in order to gather profiling metrics
+func BundleReadAtImpl(b *Bundle,
+	fileFullPath string, fileHash string,
+	destination []byte, offset int64) (n int, err error) {
 	if !b.Streamed {
 
 		var reader io.ReaderAt
 
-		reader, err = b.ConsumableStore.GetAt(context.Background(), file.fullPath)
+		reader, err = b.ConsumableStore.GetAt(context.Background(), fileFullPath)
 		if err != nil {
 			err = fuse.EIO
 			return
@@ -37,13 +40,13 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 		var reader io.ReaderAt
 		var key cafs.Key
 
-		key, err = cafs.KeyFromString(file.hash)
+		key, err = cafs.KeyFromString(fileHash)
 		if err != nil {
 			b.l.Error("failed to create cafs key",
-				zap.String("key", file.hash),
+				zap.String("key", fileHash),
 				zap.String("bundleID", b.BundleID),
 				zap.String("repo", b.RepoID),
-				zap.String("file", file.fullPath),
+				zap.String("file", fileFullPath),
 			)
 			return
 		}
@@ -51,10 +54,10 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 		reader, err = b.cafs.GetAt(context.Background(), key)
 		if err != nil {
 			b.l.Error("filed to getAt",
-				zap.String("key", file.hash),
+				zap.String("key", fileHash),
 				zap.String("bundleID", b.BundleID),
 				zap.String("repo", b.RepoID),
-				zap.String("file", file.fullPath),
+				zap.String("file", fileFullPath),
 			)
 			return
 		}
@@ -63,13 +66,19 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 		if err != nil && err.Error() != EOF {
 			err = fuse.EIO
 			b.l.Error("filed to readAt",
-				zap.String("key", file.hash),
+				zap.String("key", fileHash),
 				zap.String("bundleID", b.BundleID),
 				zap.String("repo", b.RepoID),
-				zap.String("file", file.fullPath),
+				zap.String("file", fileFullPath),
 			)
 			return
 		}
 		return
 	}
+}
+
+func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int, err error) {
+	return BundleReadAtImpl(b,
+		file.fullPath, file.hash,
+		destination, offset)
 }

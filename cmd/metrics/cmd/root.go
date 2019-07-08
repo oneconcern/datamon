@@ -26,21 +26,22 @@ this executable exists to gather performance metrics, memory and cpu usage for e
 	TraverseChildren: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if params.root.cpuProfPath != "" {
-			if _, err := os.Stat(params.root.memProfPath); os.IsNotExist(err) {
-				if err := os.Mkdir(params.root.memProfPath, 0777); err != nil {
-					log.Fatal(err)
-				}
-			} else {
-				if err := os.RemoveAll(params.root.memProfPath); err != nil {
-					log.Fatal(err)
-				}
-			}
-			core.MemProfDir = params.root.memProfPath
 			f, err := os.Create(params.root.cpuProfPath)
 			if err != nil {
 				log.Fatal(err)
 			}
 			_ = pprof.StartCPUProfile(f)
+		}
+		if params.root.memProfPath != "" {
+			if _, err := os.Stat(params.root.memProfPath); !os.IsNotExist(err) {
+				if err := os.RemoveAll(params.root.memProfPath); err != nil {
+					log.Fatal(err)
+				}
+			}
+			if err := os.Mkdir(params.root.memProfPath, 0777); err != nil {
+				log.Fatal(err)
+			}
+			core.MemProfDir = params.root.memProfPath
 		}
 	},
 	// upstream api note:  *PostRun functions aren't called in case of a panic() in Run
