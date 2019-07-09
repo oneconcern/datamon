@@ -296,6 +296,7 @@ func (fs *readOnlyFsInternal) OpenFile(
 	op *fuseops.OpenFileOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+	op.KeepPageCache = true
 	return
 }
 
