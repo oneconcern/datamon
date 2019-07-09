@@ -336,20 +336,23 @@ func (fs *readOnlyFsInternal) ReadFile(
 		zap.Error(err),
 	)
 
-	var f *os.File
-	path := filepath.Join("/home/developer/", 
-		"read_file-" + 
-//		strconv.Itoa(fuseRoReadFileProfIdx++) + "-" + 
-		fe.hash + ".mem.prof")
-	f, err = os.Create(path)
-	if err != nil {
-		return err
+	const memprofdest = "/home/developer/"
+	if _, err := os.Stat(memprofdest); !os.IsNotExist(err) {
+		var f *os.File
+		path := filepath.Join(memprofdest, 
+			"read_file-" + 
+	//		strconv.Itoa(fuseRoReadFileProfIdx++) + "-" + 
+			fe.hash + ".mem.prof")
+		f, err = os.Create(path)
+		if err != nil {
+			return err
+		}
+		err = pprof.Lookup("heap").WriteTo(f, 0)
+		if err != nil {
+			return err
+		}
+		f.Close()
 	}
-	err = pprof.Lookup("heap").WriteTo(f, 0)
-	if err != nil {
-		return err
-	}
-	f.Close()
 
 	op.BytesRead = n
 	return err

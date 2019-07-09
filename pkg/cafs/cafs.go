@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -107,7 +108,11 @@ func New(opts ...Option) (Fs, error) {
 		concurrentFlushes:           10,
 		readerConcurrentChunkWrites: 3,
 	}
-	f.lru, _ = lru.New(10)
+	f.leafPool = newLeafFreelist()
+	f.lru, _ = lru.NewWithEvict(10, func(lruKey interface{}, lruVal interface{}) {
+		lbuf := lruVal.(*leafBuffer)
+		f.leafPool.put(lbuf)
+	})
 	for _, apply := range opts {
 		apply(f)
 	}
@@ -118,6 +123,45 @@ type cafsStore struct {
 	backend storage.Store // CAFS backing store
 }
 
+type leafBuffer struct{
+	buf [2 * DefaultLeafSize]byte
+	slice []byte
+}
+
+type leafFreelist struct{
+	list []*leafBuffer
+	mu sync.Mutex
+}
+
+func newLeafFreelist() *leafFreelist {
+	return &leafFreelist{
+		list: make([]*leafBuffer, 0),
+	}
+}
+
+func (l* leafFreelist) get() *leafBuffer {
+	var x *leafBuffer
+	l.mu.Lock()
+	ll := len(l.list)
+	if ll != 0 {
+		x = l.list[ll-1]
+		l.list = l.list[:ll-1]
+	}
+	l.mu.Unlock()
+	if x == nil {
+		x = new(leafBuffer)
+	}
+	x.slice = x.buf[:]
+	x.slice = x.slice[:0]
+	return x
+}
+
+func (l* leafFreelist) put(lb *leafBuffer) {
+	l.mu.Lock()
+	l.list = append(l.list, lb)
+	l.mu.Unlock()
+}
+
 type defaultFs struct {
 	store                       cafsStore
 	leafSize                    uint32
@@ -126,6 +170,7 @@ type defaultFs struct {
 	l                           log.Logger //nolint:structcheck,unused
 	leafTruncation              bool
 	lru                         *lru.Cache
+	leafPool *leafFreelist
 	concurrentFlushes           int
 	readerConcurrentChunkWrites int
 }
@@ -179,7 +224,9 @@ func (d *defaultFs) reader(hash Key) (Reader, error) {
 		TruncateLeaf(d.leafTruncation),
 		VerifyHash(true),
 		ConcurrentChunkWrites(d.readerConcurrentChunkWrites),
-		SetCache(d.lru))
+		SetCache(d.lru),
+		SetLeafPool(d.leafPool),
+	)
 }
 
 func (d *defaultFs) writer(prefix string) Writer {

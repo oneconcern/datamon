@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
+	"fmt"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -42,6 +42,12 @@ func VerifyHash(t bool) ReaderOption {
 func SetCache(lru *lru.Cache) ReaderOption {
 	return func(reader *chunkReader) {
 		reader.lru = lru
+	}
+}
+
+func SetLeafPool(leafPool *leafFreelist) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.leafPool = leafPool
 	}
 }
 
@@ -94,6 +100,7 @@ type chunkReader struct {
 	currLeaf              []byte
 	verifyHash            bool
 	lru                   *lru.Cache
+	leafPool *leafFreelist
 	concurrentChunkWrites int
 }
 
@@ -200,6 +207,33 @@ func calculateKeyAndOffset(off int64, leafSize uint32) (index int64, offset int6
 	return
 }
 
+func chunkReaderReadAtHelperReadLeaf(r *chunkReader, k Key) (
+	*leafBuffer,
+	error) {
+
+	rdr, e := r.fs.Get(context.Background(), k.StringWithPrefix(r.prefix))
+	if e != nil {
+		return nil, e
+	}
+
+	lb := r.leafPool.get()
+	var n int
+	for {
+		m, e := rdr.Read(lb.slice[n:cap(lb.slice)])
+		if m < 0 {
+			panic(fmt.Errorf("read negative number of bytes"))
+		}
+		n += m
+		lb.slice = lb.slice[:n]
+		if e == io.EOF {
+			return lb, nil // e is EOF, so return nil explicitly
+		}
+		if e != nil {
+			return lb, e
+		}
+	}
+}
+
 func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 
 	// Calculate first key and offset.
@@ -219,15 +253,8 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 			}
 			go func(i int64) {
 				k := r.keys[i]
-
-				rdr, e := r.fs.Get(context.Background(), k.StringWithPrefix(r.prefix))
-				if e != nil {
-					return
-				}
-
-				var b []byte
-				b, e = ioutil.ReadAll(rdr)
-				if e != nil {
+				b, err := chunkReaderReadAtHelperReadLeaf(r, k)
+				if err != nil {
 					return
 				}
 				r.lru.Add(k.StringWithPrefix(r.prefix), b)
@@ -237,29 +264,22 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 
 	for {
 		// Fetch Blob
-		var buffer []byte
+		var buffer *leafBuffer
 		key := r.keys[index]
 		if b, ok := r.lru.Get(key.StringWithPrefix(r.prefix)); ok {
-			buffer = b.([]byte)
+			buffer = b.(*leafBuffer)
 			seekAhead()
 		} else {
-			var rdr io.Reader
-			rdr, err = r.fs.Get(context.Background(), key.StringWithPrefix(r.prefix))
+			buffer, err = chunkReaderReadAtHelperReadLeaf(r, key)
 			if err != nil {
 				return
 			}
-
-			buffer, err = ioutil.ReadAll(rdr)
-			if err != nil {
-				return
-			}
-
 			r.lru.Add(key.StringWithPrefix(r.prefix), buffer)
 			seekAhead()
 		}
 
 		// Read first leaf
-		read = copy(p[n:], buffer[offset:])
+		read = copy(p[n:], buffer.slice[offset:])
 		n += read
 		index++
 		offset = 0
