@@ -382,7 +382,7 @@ func (fs *readOnlyFsInternal) FlushFile(
 	op *fuseops.FlushFileOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
+//	err = fuse.ENOSYS
 	return
 }
 
@@ -417,7 +417,7 @@ func (fs *readOnlyFsInternal) GetXattr(
 	op *fuseops.GetXattrOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
+//	err = fuse.ENOSYS
 	return
 }
 
@@ -426,7 +426,7 @@ func (fs *readOnlyFsInternal) ListXattr(
 	op *fuseops.ListXattrOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
+//	err = fuse.ENOSYS
 	return
 }
 

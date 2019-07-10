@@ -7,6 +7,7 @@ RUN apt-get update &&\
     apt-get install -y \
         zsh \
         golang-go \
+        procps \
         htop &&\
     apt-get autoremove -yqq &&\
     apt-get clean -y &&\

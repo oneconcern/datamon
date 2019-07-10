@@ -27,10 +27,13 @@ RUN cp /stage/usr/bin/datamon /usr/bin/datamon
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 
 # Build the dist image
-FROM ubuntu:latest
+FROM debian:latest
 RUN apt-get update && apt-get install -y --no-install-recommends fuse &&\
   apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 RUN echo "allow_root" >> /etc/fuse.conf
+
+RUN echo "direct_io" >> /etc/fuse.conf
+RUN echo "sync_read" >> /etc/fuse.conf
 
 COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip

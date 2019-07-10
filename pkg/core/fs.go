@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"path/filepath"
 
 	"github.com/jacobsa/fuse/fuseops"
 
@@ -131,14 +132,37 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
 	if err != nil {
 		return err
 	}
+
+	const logdest = "/home/developer/"
+
+	var errorLogger *log.Logger
+	var debugLogger *log.Logger
+
+	if _, err := os.Stat(logdest); !os.IsNotExist(err) {
+		var f *os.File
+		f, err = os.Create(filepath.Join(logdest, "fuseerr.log"))
+		if err != nil {
+			return err
+		}
+		errorLogger = log.New(f, "", log.Flags())
+		f, err = os.Create(filepath.Join(logdest, "fusedbg.log"))
+		if err != nil {
+			return err
+		}
+		debugLogger = log.New(f, "", log.Flags())
+	} else {
+		errorLogger = log.New(os.Stderr, "fuse: ", log.Flags())
+	}
+
 	// Reminder: Options are OS specific
 	// options := make(map[string]string)
 	// options["allow_other"] = ""
 	mountCfg := &fuse.MountConfig{
 		FSName:      dfs.fsInternal.bundle.RepoID,
 		VolumeName:  dfs.fsInternal.bundle.BundleID,
-		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
-		// Options:     options,
+		ErrorLogger: errorLogger,
+		DebugLogger: debugLogger,
+		// Options:     debugLogger,
 	}
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
 	return err
