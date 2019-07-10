@@ -46,7 +46,7 @@ func mempollMaybeprof(mstats runtime.MemStats, minAllocMB uint64) {
 				return
 			}
 			defer fprof.Close()
-			runtime.GC()
+//			runtime.GC()
 			err = pprof.Lookup("heap").WriteTo(fprof, 0)
 			if err != nil {
 				return
@@ -87,11 +87,13 @@ func mempollgoroutine(logger *zap.Logger) {
 	for {
 		runtime.ReadMemStats(&mstats)
 		if msSinceLog >= loopLogMs {
+/*
 			logger.Info("mempoll",
 				zap.Uint64("MiB for heap (un-GC)", mstats.Alloc / 1024 / 1024),
 				zap.Uint64("MiB for heap (max ever)", mstats.HeapSys / 1024 / 1024),
 				zap.Int("num go routines", runtime.NumGoroutine()),
 			)
+*/
 			msSinceLog = 0
 		}
 		if mstats.HeapSys > maxHeapThusFar {

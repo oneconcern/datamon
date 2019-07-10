@@ -176,6 +176,7 @@ func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 			cafs.LeafSize(ls),
 			cafs.LeafTruncation(b.BundleDescriptor.Version < 1),
 			cafs.Backend(b.BlobStore),
+			cafs.Logger(b.l),
 		)
 		b.cafs = fs
 	}

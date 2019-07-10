@@ -66,6 +66,12 @@ func ConcurrentFlushes(concurrentFlushes int) Option {
 	}
 }
 
+func Logger(l *zap.Logger) Option {
+	return func(w *defaultFs) {
+		w.zl = l
+	}
+}
+
 func ReaderConcurrentChunkWrites(readerConcurrentChunkWrites int) Option {
 	return func(w *defaultFs) {
 		w.readerConcurrentChunkWrites = readerConcurrentChunkWrites
@@ -109,12 +115,16 @@ func New(opts ...Option) (Fs, error) {
 		readerConcurrentChunkWrites: 3,
 	}
 	f.leafPool = newLeafFreelist()
+	for _, apply := range opts {
+		apply(f)
+	}
 	f.lru, _ = lru.NewWithEvict(10, func(lruKey interface{}, lruVal interface{}) {
+		f.zl.Info("evicting lru cache entry")
 		lbuf := lruVal.(*leafBuffer)
 		f.leafPool.put(lbuf)
 	})
-	for _, apply := range opts {
-		apply(f)
+	if f.zl != nil {
+		f.leafPool.l = f.zl
 	}
 	return f, nil
 }
@@ -131,6 +141,7 @@ type leafBuffer struct{
 type leafFreelist struct{
 	list []*leafBuffer
 	mu sync.Mutex
+	l                          *zap.Logger
 }
 
 func newLeafFreelist() *leafFreelist {
@@ -148,6 +159,12 @@ func (l* leafFreelist) get() *leafBuffer {
 		l.list = l.list[:ll-1]
 	}
 	l.mu.Unlock()
+
+	l.l.Info("leaf free list get",
+		zap.Int("num entries", ll),
+		zap.Bool("allocating more", x == nil),
+	)
+
 	if x == nil {
 		x = new(leafBuffer)
 	}
@@ -158,15 +175,20 @@ func (l* leafFreelist) get() *leafBuffer {
 
 func (l* leafFreelist) put(lb *leafBuffer) {
 	l.mu.Lock()
+	ll := len(l.list)
 	l.list = append(l.list, lb)
 	l.mu.Unlock()
+
+	l.l.Info("leaf free list put",
+		zap.Int("num entries", ll),
+	)
 }
 
 type defaultFs struct {
 	store                       cafsStore
 	leafSize                    uint32
 	prefix                      string
-	zl                          zap.Logger //nolint:structcheck,unused
+	zl                          *zap.Logger
 	l                           log.Logger //nolint:structcheck,unused
 	leafTruncation              bool
 	lru                         *lru.Cache

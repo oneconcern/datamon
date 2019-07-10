@@ -352,13 +352,11 @@ func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
 
-/*
 	if fuseRoReadFileConcurrencyControlC == nil {
-		fuseRoReadFileConcurrencyControlC = make(chan struct{}, 32)
+		fuseRoReadFileConcurrencyControlC = make(chan struct{}, 2)
 	}
 	fuseRoReadFileConcurrencyControlC <- struct{}{}
 	defer func() { <-fuseRoReadFileConcurrencyControlC }()
-*/
 
 //	fs.opStart(op)
 //	defer fs.opEnd(op, err)
