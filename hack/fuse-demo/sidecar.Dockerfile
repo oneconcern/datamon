@@ -2,11 +2,12 @@ FROM gcr.io/onec-co/datamon-fuse-sidecar:latest
 
 USER root
 
+# golang-go \
+
 RUN apt-get update &&\
     curl -sL https://deb.nodesource.com/setup_10.x  | bash &&\
     apt-get install -y \
         zsh \
-        golang-go \
         procps \
         htop &&\
     apt-get autoremove -yqq &&\
@@ -21,7 +22,7 @@ RUN apt-get update &&\
         /var/cache/debconf/*-old
 
 # allow pprof `list` command
-ADD . /datamon
+# ADD . /datamon
 
 USER developer
 
