@@ -9,6 +9,14 @@ import (
 	"log"
 	"os"
 
+	"runtime"
+//	"runtime/debug"
+	"path/filepath"
+	"runtime/pprof"
+	"time"
+	"go.uber.org/zap"
+	"strconv"
+
 	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
@@ -20,6 +28,86 @@ import (
 
 	"github.com/spf13/cobra"
 )
+
+func mempollMaybeprof(mstats runtime.MemStats, minAllocMB uint64) {
+	const memprofdest = "/home/developer/"
+	if mstats.Alloc / 1024 / 1024 < minAllocMB {
+		return
+	}
+	if _, err := os.Stat(memprofdest); !os.IsNotExist(err) {
+		basePath := filepath.Join(memprofdest, "mem_poll-" + strconv.Itoa(int(minAllocMB)))
+		profPath := basePath + ".mem.prof"
+		allocPath := basePath + ".alloc.prof"
+//		dumpPath := basePath + ".heapdump"
+		if _, err := os.Stat(profPath); os.IsNotExist(err) {
+			var fprof *os.File
+			fprof, err = os.Create(profPath)
+			if err != nil {
+				return
+			}
+			defer fprof.Close()
+			runtime.GC()
+			err = pprof.Lookup("heap").WriteTo(fprof, 0)
+			if err != nil {
+				return
+			}
+		}
+		if _, err := os.Stat(allocPath); os.IsNotExist(err) {
+			var falloc *os.File
+			falloc, err = os.Create(allocPath)
+			if err != nil {
+				return
+			}
+			defer falloc.Close()
+			err = pprof.Lookup("allocs").WriteTo(falloc, 0)
+			if err != nil {
+				return
+			}
+		}
+/*
+		if _, err := os.Stat(dumpPath); os.IsNotExist(err) {
+			var fdump *os.File
+			fdump, err = os.Create(dumpPath)
+			if err != nil {
+				return
+			}
+			defer fdump.Close()
+			debug.WriteHeapDump(fdump.Fd())
+		}
+*/
+	}
+}
+
+func mempollgoroutine(logger *zap.Logger) {
+	var maxHeapThusFar uint64
+	var mstats runtime.MemStats
+	const pollMs = 50
+	const loopLogMs = 1000
+	var msSinceLog int
+	for {
+		runtime.ReadMemStats(&mstats)
+		if msSinceLog >= loopLogMs {
+			logger.Info("mempoll",
+				zap.Uint64("MiB for heap (un-GC)", mstats.Alloc / 1024 / 1024),
+				zap.Uint64("MiB for heap (max ever)", mstats.HeapSys / 1024 / 1024),
+				zap.Int("num go routines", runtime.NumGoroutine()),
+			)
+			msSinceLog = 0
+		}
+		if mstats.HeapSys > maxHeapThusFar {
+			maxHeapThusFar = mstats.HeapSys
+			logger.Info("grew heap",
+				zap.Uint64("MiB for heap (un-GC)", mstats.Alloc / 1024 / 1024),
+				zap.Uint64("MiB for heap (max ever)", mstats.HeapSys / 1024 / 1024),
+			)
+		}
+		for i := 12; i < 26; i++ {
+			mempollMaybeprof(mstats, uint64(i * 1000))
+		}
+		time.Sleep(time.Duration(pollMs) * time.Millisecond)
+		msSinceLog += pollMs
+	}
+}
 
 func undaemonizeArgs(args []string) []string {
 	foregroundArgs := make([]string, 0)
@@ -135,6 +223,9 @@ var mountBundleCmd = &cobra.Command{
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			logFatalln(err)
 		}
+
+		mempollgoroutine(logger)
+
 		if err = fs.JoinMount(context.Background()); err != nil {
 			logFatalln(err)
 		}

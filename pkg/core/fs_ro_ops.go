@@ -8,9 +8,10 @@ import (
 	"path"
 	"time"
 
+	"runtime"
 	"path/filepath"
 	"runtime/pprof"
-//	"strconv"
+	"strconv"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"go.uber.org/zap"
@@ -57,12 +58,14 @@ func (fs *readOnlyFsInternal) opStart(op interface{}) {
 		)
 		return
 	}
+/*
 	fs.l.Info("Start",
 		zap.String("Request", fmt.Sprintf("%T", op)),
 		zap.String("repo", fs.bundle.RepoID),
 		zap.String("bundle", fs.bundle.BundleID),
 		zap.Any("op", op),
 	)
+*/
 }
 func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 	switch t := op.(type) {
@@ -95,6 +98,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		)
 		return
 	}
+/*
 	fs.l.Info("End",
 		zap.String("Request", fmt.Sprintf("%T", op)),
 		zap.String("repo", fs.bundle.RepoID),
@@ -102,6 +106,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		zap.Any("op", op),
 		zap.Error(err),
 	)
+*/
 }
 func typeAssertToFsEntry(p interface{}) *fsEntry {
 	fe := p.(fsEntry)
@@ -256,8 +261,8 @@ func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp
 }
 
 func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+//	fs.opStart(op)
+//	defer fs.opEnd(op, err)
 	offset := int(op.Offset)
 	iNode := op.Inode
 
@@ -294,9 +299,24 @@ func (fs *readOnlyFsInternal) ReleaseDirHandle(
 func (fs *readOnlyFsInternal) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+//	fs.opStart(op)
+
 	op.KeepPageCache = true
+	op.UseDirectIO = true
+
+/*
+	var mstats runtime.MemStats
+	runtime.ReadMemStats(&mstats)
+
+	fs.l.Info("open file",
+		zap.Uint64("MiB from os", mstats.Sys / 1024 / 1024),
+		zap.Uint64("MiB for heap (un-GC)", mstats.Alloc / 1024 / 1024),
+		zap.Uint64("MiB for heap (max ever)", mstats.HeapSys / 1024 / 1024),
+	)
+*/
+
+
+//	defer fs.opEnd(op, err)
 	return
 }
 
@@ -304,16 +324,44 @@ func (fs *readOnlyFsInternal) OpenFile(
 
 var fuseRoReadFileConcurrencyControlC chan struct{}
 
+func readFileMaybeProf(mstats runtime.MemStats, minAllocMB uint64, minHeapSysMB uint64) {
+	const memprofdest = "/home/developer/"
+	if mstats.Alloc / 1024 / 1024 < minAllocMB && mstats.HeapSys / 1024 / 1024 < minHeapSysMB {
+		return
+	}
+	if _, err := os.Stat(memprofdest); !os.IsNotExist(err) {
+		profPath := filepath.Join(memprofdest,
+			"read_file-" + strconv.Itoa(int(minAllocMB)) + "-" + strconv.Itoa(int(minHeapSysMB)) + ".mem.prof")
+		if _, err := os.Stat(profPath); os.IsNotExist(err) {
+			var f *os.File
+			f, err = os.Create(profPath)
+			if err != nil {
+				return
+			}
+			defer f.Close()
+			runtime.GC()
+			err = pprof.Lookup("heap").WriteTo(f, 0)
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
 func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
+
+/*
 	if fuseRoReadFileConcurrencyControlC == nil {
 		fuseRoReadFileConcurrencyControlC = make(chan struct{}, 32)
 	}
 	fuseRoReadFileConcurrencyControlC <- struct{}{}
 	defer func() { <-fuseRoReadFileConcurrencyControlC }()
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+*/
+
+//	fs.opStart(op)
+//	defer fs.opEnd(op, err)
 
 	// If file has not been mutated.
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
@@ -329,30 +377,27 @@ func (fs *readOnlyFsInternal) ReadFile(
 
 	n, err := fs.bundle.ReadAt(fe, op.Dst, op.Offset)
 
+	var mstats runtime.MemStats
+	runtime.ReadMemStats(&mstats)
+
+/*
 	fs.l.Info("read file",
 		zap.String("file", fe.fullPath),
 		zap.String("hash", fe.hash),
 		zap.Int("buffer size", len(op.Dst)),
 		zap.Int("reported bytes read", n),
 		zap.Error(err),
+		zap.Uint64("MiB from os", mstats.Sys / 1024 / 1024),
+		zap.Uint64("MiB for heap (un-GC)", mstats.Alloc / 1024 / 1024),
+		zap.Uint64("MiB for heap (max ever)", mstats.HeapSys / 1024 / 1024),
 	)
+*/
 
-	const memprofdest = "/home/developer/"
-	if _, err := os.Stat(memprofdest); !os.IsNotExist(err) {
-		var f *os.File
-		path := filepath.Join(memprofdest, 
-			"read_file-" + 
-	//		strconv.Itoa(fuseRoReadFileProfIdx++) + "-" + 
-			fe.hash + ".mem.prof")
-		f, err = os.Create(path)
-		if err != nil {
-			return err
-		}
-		err = pprof.Lookup("heap").WriteTo(f, 0)
-		if err != nil {
-			return err
-		}
-		f.Close()
+	for i := 21; i < 25; i++ {
+		readFileMaybeProf(mstats, 0, uint64(i * 1000))
+	}
+	for i := 12; i < 21; i++ {
+		readFileMaybeProf(mstats, uint64(i * 1000), 0)
 	}
 
 	op.BytesRead = n
@@ -389,8 +434,20 @@ func (fs *readOnlyFsInternal) FlushFile(
 func (fs *readOnlyFsInternal) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+//	fs.opStart(op)
+
+/*
+	var mstats runtime.MemStats
+	runtime.ReadMemStats(&mstats)
+
+	fs.l.Info("close file",
+		zap.Uint64("MiB from os", mstats.Sys / 1024 / 1024),
+		zap.Uint64("MiB for heap (un-GC)", mstats.Alloc / 1024 / 1024),
+		zap.Uint64("MiB for heap (max ever)", mstats.HeapSys / 1024 / 1024),
+	)
+*/
+
+//	defer fs.opEnd(op, err)
 	return
 }
 

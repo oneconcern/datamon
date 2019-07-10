@@ -61,7 +61,6 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 		defer func() {
 			rClose, ok := reader.(io.Closer)
 			if ok {
-				b.l.Info("Closing the reader")
 				rClose.Close()
 			}
 		}()
