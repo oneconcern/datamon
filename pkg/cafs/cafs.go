@@ -2,6 +2,7 @@ package cafs
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 
@@ -17,6 +18,7 @@ import (
 
 const (
 	DefaultLeafSize = 2 * 1024 * 1024
+	MaxLeafSize     = 5 * 1024 * 1024
 )
 
 // LeafSize configuration for the blake2b hashes
@@ -107,9 +109,17 @@ func New(opts ...Option) (Fs, error) {
 		concurrentFlushes:           10,
 		readerConcurrentChunkWrites: 3,
 	}
+	f.leafPool = newLeafFreelist()
+	f.lru, _ = lru.NewWithEvict(10, func(lruKey interface{}, lruVal interface{}) {
+		lbuf := lruVal.(*leafBuffer)
+		f.leafPool.put(lbuf)
+	})
 	f.lru, _ = lru.New(10)
 	for _, apply := range opts {
 		apply(f)
+	}
+	if f.leafSize > MaxLeafSize {
+		return nil, fmt.Errorf("%v exceeds maximum cafs leaf size %v", f.leafSize, MaxLeafSize)
 	}
 	return f, nil
 }
@@ -126,6 +136,7 @@ type defaultFs struct {
 	l                           log.Logger //nolint:structcheck,unused
 	leafTruncation              bool
 	lru                         *lru.Cache
+	leafPool                    *leafFreelist
 	concurrentFlushes           int
 	readerConcurrentChunkWrites int
 }
@@ -179,7 +190,9 @@ func (d *defaultFs) reader(hash Key) (Reader, error) {
 		TruncateLeaf(d.leafTruncation),
 		VerifyHash(true),
 		ConcurrentChunkWrites(d.readerConcurrentChunkWrites),
-		SetCache(d.lru))
+		SetCache(d.lru),
+		SetLeafPool(d.leafPool),
+	)
 }
 
 func (d *defaultFs) writer(prefix string) Writer {
