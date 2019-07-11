@@ -38,7 +38,6 @@ func mempollMaybeprof(mstats runtime.MemStats, minAllocMB uint64) {
 		basePath := filepath.Join(memprofdest, "mem_poll-" + strconv.Itoa(int(minAllocMB)))
 		profPath := basePath + ".mem.prof"
 		allocPath := basePath + ".alloc.prof"
-//		dumpPath := basePath + ".heapdump"
 		if _, err := os.Stat(profPath); os.IsNotExist(err) {
 			var fprof *os.File
 			fprof, err = os.Create(profPath)
@@ -46,7 +45,6 @@ func mempollMaybeprof(mstats runtime.MemStats, minAllocMB uint64) {
 				return
 			}
 			defer fprof.Close()
-//			runtime.GC()
 			err = pprof.Lookup("heap").WriteTo(fprof, 0)
 			if err != nil {
 				return
@@ -64,17 +62,6 @@ func mempollMaybeprof(mstats runtime.MemStats, minAllocMB uint64) {
 				return
 			}
 		}
-/*
-		if _, err := os.Stat(dumpPath); os.IsNotExist(err) {
-			var fdump *os.File
-			fdump, err = os.Create(dumpPath)
-			if err != nil {
-				return
-			}
-			defer fdump.Close()
-			debug.WriteHeapDump(fdump.Fd())
-		}
-*/
 	}
 }
 

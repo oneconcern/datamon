@@ -10,6 +10,8 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
+	"go.uber.org/zap"
+
 	"github.com/minio/blake2b-simd"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
@@ -57,13 +59,16 @@ func ConcurrentChunkWrites(concurrentChunkWrites int) ReaderOption {
 	}
 }
 
-func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string, opts ...ReaderOption) (Reader, error) {
+func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string,
+	zl *zap.Logger,
+	opts ...ReaderOption) (Reader, error) {
 	c := &chunkReader{
 		fs:                    blobs,
 		hash:                  hash,
 		leafSize:              leafSize,
 		currLeaf:              make([]byte, 0),
 		concurrentChunkWrites: 3,
+		zl: zl,
 	}
 
 	for _, apply := range opts {
@@ -101,6 +106,7 @@ type chunkReader struct {
 	verifyHash            bool
 	lru                   *lru.Cache
 	leafPool *leafFreelist
+	zl *zap.Logger
 	concurrentChunkWrites int
 }
 
@@ -229,6 +235,7 @@ func chunkReaderReadAtHelperReadLeaf(r *chunkReader, k Key) (
 			return lb, nil // e is EOF, so return nil explicitly
 		}
 		if e != nil {
+			r.leafPool.put(lb)
 			return lb, e
 		}
 	}
@@ -244,22 +251,37 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 
 	var read int
 
+	addToCache := func(key Key, buffer *leafBuffer) {
+		if buffer == nil {
+			r.zl.Info("attempted to add nil buffer to cache")
+			return
+		}
+		r.zl.Info("adding element to lru cache")
+		alreadyContained, evictionOnAdd := r.lru.ContainsOrAdd(key.StringWithPrefix(r.prefix), buffer)
+		if evictionOnAdd {
+			r.zl.Info("lru cache evict on add")
+		}
+		if alreadyContained {
+			r.zl.Info("lru cache add key already contained in cache")
+			r.leafPool.put(buffer)
+		}
+	}
+
 	// seekAhead makes sure the next blob in CAFS is already in memory when the reader reaches that blob.
 	seekAhead := func() {
-		if index < int64(len(r.keys)-1) {
-			nextIndex := index + 1
-			if r.lru.Contains(r.keys[nextIndex].StringWithPrefix(r.prefix)) {
+		nextIndex := index + 1
+		if nextIndex >= int64(len(r.keys)) { return }
+		if r.lru.Contains(r.keys[nextIndex].StringWithPrefix(r.prefix)) {
+			return
+		}
+		go func(i int64) {
+			k := r.keys[i]
+			b, err := chunkReaderReadAtHelperReadLeaf(r, k)
+			if err != nil {
 				return
 			}
-			go func(i int64) {
-				k := r.keys[i]
-				b, err := chunkReaderReadAtHelperReadLeaf(r, k)
-				if err != nil {
-					return
-				}
-				r.lru.Add(k.StringWithPrefix(r.prefix), b)
-			}(nextIndex)
-		}
+			addToCache(k, b)
+		}(nextIndex)
 	}
 
 	for {
@@ -268,15 +290,14 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 		key := r.keys[index]
 		if b, ok := r.lru.Get(key.StringWithPrefix(r.prefix)); ok {
 			buffer = b.(*leafBuffer)
-			seekAhead()
 		} else {
 			buffer, err = chunkReaderReadAtHelperReadLeaf(r, key)
 			if err != nil {
 				return
 			}
-			r.lru.Add(key.StringWithPrefix(r.prefix), buffer)
-			seekAhead()
+			addToCache(key, buffer)
 		}
+		seekAhead()
 
 		// Read first leaf
 		read = copy(p[n:], buffer.slice[offset:])

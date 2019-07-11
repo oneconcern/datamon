@@ -324,23 +324,39 @@ func (fs *readOnlyFsInternal) OpenFile(
 
 var fuseRoReadFileConcurrencyControlC chan struct{}
 
+func init() {
+	fuseRoReadFileConcurrencyControlC = make(chan struct{}, 8)
+}
+
 func readFileMaybeProf(mstats runtime.MemStats, minAllocMB uint64, minHeapSysMB uint64) {
 	const memprofdest = "/home/developer/"
-	if mstats.Alloc / 1024 / 1024 < minAllocMB && mstats.HeapSys / 1024 / 1024 < minHeapSysMB {
+	if mstats.Alloc / 1024 / 1024 < minAllocMB || mstats.HeapSys / 1024 / 1024 < minHeapSysMB {
 		return
 	}
 	if _, err := os.Stat(memprofdest); !os.IsNotExist(err) {
-		profPath := filepath.Join(memprofdest,
-			"read_file-" + strconv.Itoa(int(minAllocMB)) + "-" + strconv.Itoa(int(minHeapSysMB)) + ".mem.prof")
+		basePath := filepath.Join(memprofdest, "read_file-" + strconv.Itoa(int(minAllocMB)))
+		profPath := basePath + ".mem.prof"
+		allocPath := basePath + ".alloc.prof"
 		if _, err := os.Stat(profPath); os.IsNotExist(err) {
-			var f *os.File
-			f, err = os.Create(profPath)
+			var fprof *os.File
+			fprof, err = os.Create(profPath)
 			if err != nil {
 				return
 			}
-			defer f.Close()
-			runtime.GC()
-			err = pprof.Lookup("heap").WriteTo(f, 0)
+			defer fprof.Close()
+			err = pprof.Lookup("heap").WriteTo(fprof, 0)
+			if err != nil {
+				return
+			}
+		}
+		if _, err := os.Stat(allocPath); os.IsNotExist(err) {
+			var falloc *os.File
+			falloc, err = os.Create(allocPath)
+			if err != nil {
+				return
+			}
+			defer falloc.Close()
+			err = pprof.Lookup("allocs").WriteTo(falloc, 0)
 			if err != nil {
 				return
 			}
@@ -352,11 +368,8 @@ func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
 
-	if fuseRoReadFileConcurrencyControlC == nil {
-		fuseRoReadFileConcurrencyControlC = make(chan struct{}, 2)
-	}
-	fuseRoReadFileConcurrencyControlC <- struct{}{}
-	defer func() { <-fuseRoReadFileConcurrencyControlC }()
+//	fuseRoReadFileConcurrencyControlC <- struct{}{}
+//	defer func() { <-fuseRoReadFileConcurrencyControlC }()
 
 //	fs.opStart(op)
 //	defer fs.opEnd(op, err)
@@ -374,6 +387,7 @@ func (fs *readOnlyFsInternal) ReadFile(
 	)
 
 	n, err := fs.bundle.ReadAt(fe, op.Dst, op.Offset)
+	op.BytesRead = n
 
 	var mstats runtime.MemStats
 	runtime.ReadMemStats(&mstats)
@@ -398,7 +412,6 @@ func (fs *readOnlyFsInternal) ReadFile(
 		readFileMaybeProf(mstats, uint64(i * 1000), 0)
 	}
 
-	op.BytesRead = n
 	return err
 }
 

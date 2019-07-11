@@ -162,10 +162,10 @@ func (l* leafFreelist) get() *leafBuffer {
 
 	l.l.Info("leaf free list get",
 		zap.Int("num entries", ll),
-		zap.Bool("allocating more", x == nil),
 	)
 
 	if x == nil {
+		l.l.Info("leaf free list alloc")
 		x = new(leafBuffer)
 	}
 	x.slice = x.buf[:]
@@ -242,7 +242,7 @@ func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
 }
 
 func (d *defaultFs) reader(hash Key) (Reader, error) {
-	return newReader(d.store.backend, hash, d.leafSize, d.prefix,
+	return newReader(d.store.backend, hash, d.leafSize, d.prefix, d.zl,
 		TruncateLeaf(d.leafTruncation),
 		VerifyHash(true),
 		ConcurrentChunkWrites(d.readerConcurrentChunkWrites),
