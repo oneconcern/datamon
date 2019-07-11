@@ -110,6 +110,8 @@ var mountBundleCmd = &cobra.Command{
 			core.ConsumableStore(consumableStore),
 			core.MetaStore(remoteStores.meta),
 			core.Streaming(params.bundle.Stream),
+			core.ConcurrentFilelistDownloads(
+				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
 		)
 		logger, err := dlogger.GetLogger(params.root.logLevel)
 		if err != nil {
@@ -143,6 +145,7 @@ func init() {
 	addLogLevel(mountBundleCmd)
 	addStreamFlag(mountBundleCmd)
 	addLabelNameFlag(mountBundleCmd)
+	addConcurrencyFactorFlag(mountBundleCmd)
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	addDataPathFlag(mountBundleCmd)

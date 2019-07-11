@@ -26,7 +26,10 @@ import (
 var pathToMount = "/tmp/mount/"
 
 func TestMount(t *testing.T) {
-	require.NoError(t, Setup(t))
+	var bundleEntriesFileCount uint64 = 2
+	var dataFilesCount uint64 = 4
+	cleanup := setupFakeDataBundle(t, bundleEntriesFileCount, dataFilesCount)
+	defer cleanup()
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
@@ -54,7 +57,10 @@ func TestMount(t *testing.T) {
 }
 
 func TestMutableMount(t *testing.T) {
-	require.NoError(t, Setup(t))
+	var bundleEntriesFileCount uint64 = 2
+	var dataFilesCount uint64 = 4
+	cleanup := setupFakeDataBundle(t, bundleEntriesFileCount, dataFilesCount)
+	defer cleanup()
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
@@ -125,7 +131,8 @@ var testUploadTree = uploadTree{
 // todo: setup and cleanup.  in particular, defer s'th to ensure fs unmounted
 
 func TestMutableMountWrite(t *testing.T) {
-	setupEmptyBundle(t)
+	cleanup := setupEmptyBundle(t)
+	defer cleanup()
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
@@ -194,7 +201,8 @@ func TestMutableMountWrite(t *testing.T) {
  * as the storage backing the cafs.
  */
 func TestMutableMountCommitError(t *testing.T) {
-	setupEmptyBundle(t)
+	cleanup := setupEmptyBundle(t)
+	defer cleanup()
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
@@ -244,12 +252,16 @@ type testErrCaFs struct {
 	errMsg string
 }
 
-func (fs *testErrCaFs) Put(ctx context.Context, src io.Reader) (int64, cafs.Key, []byte, bool, error) {
-	return 0, cafs.Key{}, make([]byte, 0), false, errors.New(fs.errMsg)
+func (fs *testErrCaFs) Put(ctx context.Context, src io.Reader) (cafs.PutRes, error) {
+	return cafs.PutRes{}, errors.New(fs.errMsg)
 }
 
 func (fs *testErrCaFs) Get(ctx context.Context, hash cafs.Key) (io.ReadCloser, error) {
 	return fs.fsImpl.Get(ctx, hash)
+}
+
+func (fs *testErrCaFs) GetAt(ctx context.Context, hash cafs.Key) (io.ReaderAt, error) {
+	return fs.fsImpl.GetAt(ctx, hash)
 }
 
 func (fs *testErrCaFs) Delete(ctx context.Context, hash cafs.Key) error {
@@ -297,7 +309,8 @@ func aferoMkdirAll(afs afero.Fs, name string, mode os.FileMode) (err error) {
 }
 
 func TestMutableMountMkdir(t *testing.T) {
-	setupEmptyBundle(t)
+	cleanup := setupEmptyBundle(t)
+	defer cleanup()
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
@@ -329,10 +342,14 @@ func TestMutableMountMkdir(t *testing.T) {
 	}
 }
 
-func setupEmptyBundle(t *testing.T) {
+func setupEmptyBundle(t *testing.T) func() {
+	cleanup := func() {
+		require.NoError(t, os.RemoveAll(testRoot))
+	}
 	cleanup()
 	require.NoError(t, os.MkdirAll(original, 0700))
 	require.NoError(t, os.MkdirAll(blobDir, 0700))
 	require.NoError(t, os.MkdirAll(metaDir, 0700))
 	require.NoError(t, os.MkdirAll(destinationDir, 0700))
+	return cleanup
 }

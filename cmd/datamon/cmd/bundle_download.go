@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	fileDownloadsByConcurrencyFactor = 10
+	fileDownloadsByConcurrencyFactor     = 10
+	filelistDownloadsByConcurrencyFactor = 10
 )
 
 var BundleDownloadCmd = &cobra.Command{
@@ -40,6 +41,8 @@ var BundleDownloadCmd = &cobra.Command{
 			core.BlobStore(remoteStores.blob),
 			core.BundleID(params.bundle.ID),
 			core.ConcurrentFileDownloads(params.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor),
+			core.ConcurrentFilelistDownloads(
+				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
 		)
 
 		err = core.Publish(context.Background(), bundle)
