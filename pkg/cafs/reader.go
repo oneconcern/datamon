@@ -3,8 +3,8 @@ package cafs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
 
@@ -51,6 +51,12 @@ func ConcurrentChunkWrites(concurrentChunkWrites int) ReaderOption {
 	}
 }
 
+func SetLeafPool(leafPool *leafFreelist) ReaderOption {
+	return func(reader *chunkReader) {
+		reader.leafPool = leafPool
+	}
+}
+
 func newReader(blobs storage.Store, hash Key, leafSize uint32, prefix string, opts ...ReaderOption) (Reader, error) {
 	c := &chunkReader{
 		fs:                    blobs,
@@ -94,6 +100,7 @@ type chunkReader struct {
 	currLeaf              []byte
 	verifyHash            bool
 	lru                   *lru.Cache
+	leafPool              *leafFreelist
 	concurrentChunkWrites int
 }
 
@@ -200,7 +207,32 @@ func calculateKeyAndOffset(off int64, leafSize uint32) (index int64, offset int6
 	return
 }
 
-func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
+func (r *chunkReader) ReadAt(p []byte, off int64) (totread int, err error) {
+
+	readLeaf := func(k Key) (*leafBuffer, error) {
+		rdr, e := r.fs.Get(context.Background(), k.StringWithPrefix(r.prefix))
+		if e != nil {
+			return nil, e
+		}
+		lb := r.leafPool.get()
+		if len(lb.slice) != 0 {
+			return nil, fmt.Errorf("non-zero slice length out of leaf-pool")
+		}
+		for {
+			m, e := rdr.Read(lb.slice[len(lb.slice):cap(lb.slice)])
+			if m < 0 {
+				panic(fmt.Errorf("read negative number of bytes"))
+			}
+			lb.slice = lb.slice[:len(lb.slice)+m]
+			if e == io.EOF {
+				return lb, nil // e is EOF, so return nil explicitly
+			}
+			if e != nil {
+				r.leafPool.put(lb)
+				return lb, e
+			}
+		}
+	}
 
 	// Calculate first key and offset.
 	index, offset := calculateKeyAndOffset(off, r.leafSize)
@@ -208,65 +240,61 @@ func (r *chunkReader) ReadAt(p []byte, off int64) (n int, err error) {
 		return 0, nil
 	}
 
-	var read int
+	var leafread int
+
+	addToCache := func(key Key, buffer *leafBuffer) {
+		if buffer == nil {
+			return
+		}
+		alreadyContained, _ := r.lru.ContainsOrAdd(key.StringWithPrefix(r.prefix), buffer)
+		if alreadyContained {
+			r.leafPool.put(buffer)
+		}
+	}
 
 	// seekAhead makes sure the next blob in CAFS is already in memory when the reader reaches that blob.
 	seekAhead := func() {
-		if index < int64(len(r.keys)-1) {
-			nextIndex := index + 1
-			if r.lru.Contains(r.keys[nextIndex].StringWithPrefix(r.prefix)) {
+		nextIndex := index + 1
+		if nextIndex >= int64(len(r.keys)) {
+			return
+		}
+		if r.lru.Contains(r.keys[nextIndex].StringWithPrefix(r.prefix)) {
+			return
+		}
+		go func(i int64) {
+			k := r.keys[i]
+			b, e := readLeaf(k)
+			if e != nil {
 				return
 			}
-			go func(i int64) {
-				k := r.keys[i]
-
-				rdr, e := r.fs.Get(context.Background(), k.StringWithPrefix(r.prefix))
-				if e != nil {
-					return
-				}
-
-				var b []byte
-				b, e = ioutil.ReadAll(rdr)
-				if e != nil {
-					return
-				}
-				r.lru.Add(k.StringWithPrefix(r.prefix), b)
-			}(nextIndex)
-		}
+			addToCache(k, b)
+		}(nextIndex)
 	}
 
 	for {
 		// Fetch Blob
-		var buffer []byte
+		var buffer *leafBuffer
 		key := r.keys[index]
 		if b, ok := r.lru.Get(key.StringWithPrefix(r.prefix)); ok {
-			buffer = b.([]byte)
-			seekAhead()
+			buffer = b.(*leafBuffer)
 		} else {
-			var rdr io.Reader
-			rdr, err = r.fs.Get(context.Background(), key.StringWithPrefix(r.prefix))
+			buffer, err = readLeaf(key)
 			if err != nil {
 				return
 			}
-
-			buffer, err = ioutil.ReadAll(rdr)
-			if err != nil {
-				return
-			}
-
-			r.lru.Add(key.StringWithPrefix(r.prefix), buffer)
-			seekAhead()
+			addToCache(key, buffer)
 		}
+		seekAhead()
 
 		// Read first leaf
-		read = copy(p[n:], buffer[offset:])
-		n += read
+		leafread = copy(p[totread:], buffer.slice[offset:])
+		totread += leafread
 		index++
 		offset = 0
 		if err != nil && !strings.Contains(err.Error(), "EOF") {
 			return
 		}
-		if (len(p) == n) || (index >= int64(len(r.keys))) {
+		if (len(p) == totread) || (index >= int64(len(r.keys))) {
 			return
 		}
 	}
