@@ -9,13 +9,11 @@ import (
 	"time"
 
 	"runtime"
-	"path/filepath"
-	"runtime/pprof"
-	"strconv"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"go.uber.org/zap"
 
+	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/jacobsa/fuse"
@@ -300,6 +298,7 @@ func (fs *readOnlyFsInternal) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
 //	fs.opStart(op)
+//	defer fs.opEnd(op, err)
 
 	op.KeepPageCache = true
 	op.UseDirectIO = true
@@ -316,61 +315,12 @@ func (fs *readOnlyFsInternal) OpenFile(
 */
 
 
-//	defer fs.opEnd(op, err)
 	return
-}
-
-// var fuseRoReadFileProfIdx int = 0
-
-var fuseRoReadFileConcurrencyControlC chan struct{}
-
-func init() {
-	fuseRoReadFileConcurrencyControlC = make(chan struct{}, 8)
-}
-
-func readFileMaybeProf(mstats runtime.MemStats, minAllocMB uint64, minHeapSysMB uint64) {
-	const memprofdest = "/home/developer/"
-	if mstats.Alloc / 1024 / 1024 < minAllocMB || mstats.HeapSys / 1024 / 1024 < minHeapSysMB {
-		return
-	}
-	if _, err := os.Stat(memprofdest); !os.IsNotExist(err) {
-		basePath := filepath.Join(memprofdest, "read_file-" + strconv.Itoa(int(minAllocMB)))
-		profPath := basePath + ".mem.prof"
-		allocPath := basePath + ".alloc.prof"
-		if _, err := os.Stat(profPath); os.IsNotExist(err) {
-			var fprof *os.File
-			fprof, err = os.Create(profPath)
-			if err != nil {
-				return
-			}
-			defer fprof.Close()
-			err = pprof.Lookup("heap").WriteTo(fprof, 0)
-			if err != nil {
-				return
-			}
-		}
-		if _, err := os.Stat(allocPath); os.IsNotExist(err) {
-			var falloc *os.File
-			falloc, err = os.Create(allocPath)
-			if err != nil {
-				return
-			}
-			defer falloc.Close()
-			err = pprof.Lookup("allocs").WriteTo(falloc, 0)
-			if err != nil {
-				return
-			}
-		}
-	}
 }
 
 func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-
-//	fuseRoReadFileConcurrencyControlC <- struct{}{}
-//	defer func() { <-fuseRoReadFileConcurrencyControlC }()
-
 //	fs.opStart(op)
 //	defer fs.opEnd(op, err)
 
@@ -405,11 +355,19 @@ func (fs *readOnlyFsInternal) ReadFile(
 	)
 */
 
+	minMBs := make([]internal.MinProfMB, 0)
 	for i := 21; i < 25; i++ {
-		readFileMaybeProf(mstats, 0, uint64(i * 1000))
+		minMBs = append(minMBs, internal.MinProfMB{HeapSys: uint64(i*1000)})
 	}
 	for i := 12; i < 21; i++ {
-		readFileMaybeProf(mstats, uint64(i * 1000), 0)
+		minMBs = append(minMBs, internal.MinProfMB{Alloc: uint64(i*1000)})
+	}
+	for _, minMB := range minMBs {
+		internal.MaybeMemProf(internal.MaybeMemProfParams{
+			MemStats: &mstats,
+			MinMB: minMB,
+			NamePrefix: "read_file",
+		})
 	}
 
 	return err
