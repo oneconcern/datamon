@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"text/template"
+
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +16,13 @@ bundle ids.
 `,
 }
 
+var labelDescriptorTemplate *template.Template
+
 func init() {
 	rootCmd.AddCommand(labelCmd)
+
+	labelDescriptorTemplate = func() *template.Template {
+		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`
+		return template.Must(template.New("list line").Parse(listLineTemplateString))
+	}()
 }

@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"log"
-	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -15,8 +14,6 @@ var LabelListCommand = &cobra.Command{
 	Short: "List labels",
 	Long:  "List the labels in a repo",
 	Run: func(cmd *cobra.Command, args []string) {
-		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`
-		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
 		remoteStores, err := paramsToRemoteCmdStores(params)
 		if err != nil {
 			logFatalln(err)
@@ -27,7 +24,7 @@ var LabelListCommand = &cobra.Command{
 		}
 		for _, ld := range labelDescriptors {
 			var buf bytes.Buffer
-			err := listLineTemplate.Execute(&buf, ld)
+			err := labelDescriptorTemplate.Execute(&buf, ld)
 			if err != nil {
 				log.Println("executing template:", err)
 			}

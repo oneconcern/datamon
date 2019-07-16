@@ -25,6 +25,7 @@ import (
 	"github.com/oneconcern/datamon/internal"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -88,17 +89,32 @@ var testUploadTrees = [][]uploadTree{{
 
 type ExitMocks struct {
 	mock.Mock
-	fatalCalls int
+	exitStatuses []int
 }
 
 func (m *ExitMocks) Fatalf(format string, v ...interface{}) {
 	fmt.Println(format)
-	m.fatalCalls++
+	m.exitStatuses = append(m.exitStatuses, 1)
 }
 
 func (m *ExitMocks) Fatalln(v ...interface{}) {
 	fmt.Println(v...)
-	m.fatalCalls++
+	m.exitStatuses = append(m.exitStatuses, 1)
+}
+
+func (m *ExitMocks) Exit(code int) {
+	m.exitStatuses = append(m.exitStatuses, code)
+}
+
+func (m *ExitMocks) fatalCalls() int {
+	return len(m.exitStatuses)
+}
+
+func NewExitMocks() *ExitMocks {
+	exitMocks := ExitMocks{
+		exitStatuses: make([]int, 0),
+	}
+	return &exitMocks
 }
 
 // https://github.com/stretchr/testify/issues/610
@@ -114,14 +130,21 @@ func MakeFatallnMock(m *ExitMocks) func(...interface{}) {
 	}
 }
 
+func MakeExitMock(m *ExitMocks) func(int) {
+	return func(code int) {
+		m.Exit(code)
+	}
+}
+
 var exitMocks *ExitMocks
 
 func setupTests(t *testing.T) func() {
 	os.RemoveAll(destinationDir)
 	ctx := context.Background()
-	exitMocks = new(ExitMocks)
+	exitMocks = NewExitMocks()
 	logFatalf = MakeFatalfMock(exitMocks)
 	logFatalln = MakeFatallnMock(exitMocks)
+	osExit = MakeExitMock(exitMocks)
 	btag := internal.RandStringBytesMaskImprSrc(15)
 	bucketMeta := "datamontestmeta-" + btag
 	bucketBlob := "datamontestblob-" + btag
@@ -145,14 +168,14 @@ func setupTests(t *testing.T) func() {
 }
 
 func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool) {
-	fatalCallsBefore := exitMocks.fatalCalls
+	fatalCallsBefore := exitMocks.fatalCalls()
 	rootCmd.SetArgs(cmd)
 	require.NoError(t, rootCmd.Execute(), "error executing '"+strings.Join(cmd, " ")+"' : "+intentMsg)
 	if expectError {
-		require.Equal(t, fatalCallsBefore+1, exitMocks.fatalCalls,
+		require.Equal(t, fatalCallsBefore+1, exitMocks.fatalCalls(),
 			"ran '"+strings.Join(cmd, " ")+"' expecting error and didn't see one in mocks : "+intentMsg)
 	} else {
-		require.Equal(t, fatalCallsBefore, exitMocks.fatalCalls,
+		require.Equal(t, fatalCallsBefore, exitMocks.fatalCalls(),
 			"unexpected error in mocks on '"+strings.Join(cmd, " ")+"' : "+intentMsg)
 	}
 }
@@ -500,6 +523,41 @@ func TestListBundles(t *testing.T) {
 	for i, tree := range testUploadTrees {
 		testListBundle(t, tree[0], i+1)
 	}
+}
+
+func TestGetLabel(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	label := internal.RandStringBytesMaskImprSrc(8)
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create first test repo", false)
+	runCmd(t, []string{"label",
+		"get",
+		"--repo", repo1,
+		"--label", label,
+	}, "list labels", true)
+	require.Equal(t, int(unix.ENOENT), exitMocks.exitStatuses[len(exitMocks.exitStatuses)-1],
+		"ENOENT on nonexistant label")
+	files := testUploadTrees[0]
+	file := files[0]
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, file),
+		"--message", "label test bundle",
+		"--repo", repo1,
+		"--label", label,
+		"--concurrency-factor", concurrencyFactor,
+	}, "upload bundle at "+dirPathStr(t, file), false)
+	runCmd(t, []string{"label",
+		"get",
+		"--repo", repo1,
+		"--label", label,
+	}, "list labels", false)
 }
 
 type labelListEntry struct {

@@ -20,6 +20,14 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
+type errString string
+
+func (e errString) Error() string { return string(e) }
+
+const (
+	ErrNotFound errString = "not found"
+)
+
 var MemProfDir string
 
 // ArchiveBundle represents the bundle in it's archive state

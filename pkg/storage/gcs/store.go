@@ -58,7 +58,7 @@ func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
 	}
 	_, err = client.Bucket(g.bucket).Object(objectName).Attrs(ctx)
 	if err != nil {
-		if err != gcsStorage.ErrObjectNotExist {
+		if err == gcsStorage.ErrObjectNotExist {
 			return false, nil
 		}
 		return false, err

@@ -124,7 +124,7 @@ run_datamon_cmd() {
     while [ -n "$params_param_rem" ]; do
         params_param_rem=$(echo "$params_param_rem" |sed 's/^ //')
         if echo "$params_param_rem" |grep -q "^'"; then
-            next_param=$(echo "$params_param_rem" |sed "s/^'\([^']*\)'.*/\1/")
+            next_param=$(echo "$params_param_rem" |sed "s/^'\\([^']*\\)'.*/\\1/")
             if [ -z "$next_param" ]; then
                 echo "unterminated quote in params string" 1>&2
                 exit 1
