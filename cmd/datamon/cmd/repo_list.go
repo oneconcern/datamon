@@ -6,7 +6,6 @@ import (
 	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/spf13/cobra"
 )
 
@@ -17,11 +16,11 @@ var repoList = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		const listLineTemplateString = `{{.Name}} , {{.Description}} , {{with .Contributor}}{{.Name}} , {{.Email}}{{end}} , {{.Timestamp}}`
 		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
-		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+		remoteStores, err := paramsToRemoteCmdStores(params)
 		if err != nil {
 			logFatalln(err)
 		}
-		repos, err := core.ListRepos(store)
+		repos, err := core.ListRepos(remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}

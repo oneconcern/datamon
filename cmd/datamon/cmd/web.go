@@ -19,6 +19,7 @@ var webSrv = &cobra.Command{
 	Long:  "A webserver process to browse Datamon data",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("begin webserver")
+		// todo: pass storage.Store
 		s, err := web.NewServer(web.ServerParams{
 			MetadataBucket: params.repo.MetadataBucket,
 			Credential:     config.Credential,

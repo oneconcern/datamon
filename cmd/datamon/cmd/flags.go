@@ -3,6 +3,15 @@
 package cmd
 
 import (
+	"fmt"
+	"io/ioutil"
+	"strings"
+
+	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/gcs"
+	"github.com/oneconcern/datamon/pkg/storage/localfs"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
@@ -180,4 +189,122 @@ func addCPUProfFlag(cmd *cobra.Command) string {
 	cpuprof := "cpuprof"
 	cmd.Flags().BoolVar(&params.root.cpuProf, cpuprof, false, "Toggle runtime profiling")
 	return cpuprof
+}
+
+/** parameters struct to other formats */
+
+type cmdStoresRemote struct {
+	meta storage.Store
+	blob storage.Store
+}
+
+func paramsToRemoteCmdStores(params paramsT) (cmdStoresRemote, error) {
+	stores := cmdStoresRemote{}
+	meta, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+	if err != nil {
+		return cmdStoresRemote{}, err
+	}
+	stores.meta = meta
+	if params.repo.BlobBucket != "" {
+		blob, err := gcs.New(params.repo.BlobBucket, config.Credential)
+		if err != nil {
+			return cmdStoresRemote{}, err
+		}
+		stores.blob = blob
+	}
+	return stores, nil
+}
+
+func paramsToSrcStore(params paramsT, create bool) (storage.Store, error) {
+	var err error
+	var consumableStorePath string
+
+	switch {
+	case params.bundle.DataPath == "":
+		consumableStorePath, err = ioutil.TempDir("", "datamon-mount-destination")
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create temporary directory: %v", err)
+		}
+	case strings.HasPrefix(params.bundle.DataPath, "gs://"):
+		consumableStorePath = params.bundle.DataPath
+	default:
+		consumableStorePath, err = sanitizePath(params.bundle.DataPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sanitize destination: %v: %v",
+				params.bundle.DataPath, err)
+		}
+	}
+
+	if create {
+		createPath(consumableStorePath)
+	}
+
+	var sourceStore storage.Store
+	if strings.HasPrefix(consumableStorePath, "gs://") {
+		fmt.Println(consumableStorePath[4:])
+		sourceStore, err = gcs.New(consumableStorePath[5:], config.Credential)
+		if err != nil {
+			return sourceStore, err
+		}
+	} else {
+		DieIfNotAccessible(consumableStorePath)
+		DieIfNotDirectory(consumableStorePath)
+		sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath))
+	}
+	return sourceStore, nil
+}
+
+func paramsToDestStore(params paramsT,
+	nonemptyErr bool,
+	tmpdirPrefix string,
+) (storage.Store, error) {
+	var err error
+	var consumableStorePath string
+	var destStore storage.Store
+
+	if params.bundle.DataPath == "" && tmpdirPrefix != "" {
+		consumableStorePath, err = ioutil.TempDir("", tmpdirPrefix)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create temporary directory: %v", err)
+		}
+	} else {
+		consumableStorePath, err = sanitizePath(params.bundle.DataPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sanitize destination: %s", params.bundle.DataPath)
+		}
+		createPath(consumableStorePath)
+	}
+
+	fs := afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath)
+
+	if nonemptyErr {
+		var empty bool
+		empty, err = afero.IsEmpty(fs, "/")
+		if err != nil {
+			return nil, fmt.Errorf("failed path validation: %v", err)
+		}
+		if !empty {
+			return nil, fmt.Errorf("%s should be empty", consumableStorePath)
+		}
+	}
+
+	destStore = localfs.New(fs)
+
+	return destStore, nil
+}
+
+func paramsToContributor(params paramsT) (model.Contributor, error) {
+	if params.repo.ContributorEmail == "" {
+		return model.Contributor{}, fmt.Errorf(
+			"contributor email must be set in config or as a cli param")
+	}
+	if params.repo.ContributorName == "" {
+		return model.Contributor{}, fmt.Errorf(
+			"contributor name must be set in config or as a cli param")
+	}
+
+	return model.Contributor{
+		Email: params.repo.ContributorEmail,
+		Name:  params.repo.ContributorName,
+	}, nil
 }
