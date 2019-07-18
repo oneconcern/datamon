@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -17,11 +16,9 @@ var configGen = &cobra.Command{
 	Short: "Create a config",
 	Long:  "Create a config to use for datamon. Config file will be placed in $HOME/.datamon/datamon.yaml",
 	Run: func(cmd *cobra.Command, args []string) {
-		if params.repo.ContributorEmail == "" {
-			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
-		}
-		if params.repo.ContributorName == "" {
-			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
+		_, err := paramsToContributor(params)
+		if err != nil {
+			logFatalln(err)
 		}
 		user, err := user.Current()
 		if user == nil || err != nil {

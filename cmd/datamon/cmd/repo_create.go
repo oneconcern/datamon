@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"fmt"
 	"time"
-
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -19,27 +16,21 @@ var repoCreate = &cobra.Command{
 	Long: "Create a repo. Repo names must not contain special characters. " +
 		"Allowed characters Unicode characters, digits and hyphen. Example: dm-test-repo-1",
 	Run: func(cmd *cobra.Command, args []string) {
-		if params.repo.ContributorEmail == "" {
-			logFatalln(fmt.Errorf("contributor email must be set in config or as a cli param"))
-		}
-		if params.repo.ContributorName == "" {
-			logFatalln(fmt.Errorf("contributor name must be set in config or as a cli param"))
-		}
-		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+		contributor, err := paramsToContributor(params)
 		if err != nil {
 			logFatalln(err)
 		}
-
+		remoteStores, err := paramsToRemoteCmdStores(params)
+		if err != nil {
+			logFatalln(err)
+		}
 		repo := model.RepoDescriptor{
 			Name:        params.repo.RepoName,
 			Description: params.repo.Description,
 			Timestamp:   time.Now(),
-			Contributor: model.Contributor{
-				Email: params.repo.ContributorEmail,
-				Name:  params.repo.ContributorName,
-			},
+			Contributor: contributor,
 		}
-		err = core.CreateRepo(repo, store)
+		err = core.CreateRepo(repo, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}

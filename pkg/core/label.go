@@ -26,6 +26,10 @@ func LabelContributors(c []model.Contributor) LabelDescriptorOption {
 	}
 }
 
+func LabelContributor(c model.Contributor) LabelDescriptorOption {
+	return LabelContributors([]model.Contributor{c})
+}
+
 func NewLabelDescriptor(descriptorOps ...LabelDescriptorOption) *model.LabelDescriptor {
 	ld := model.LabelDescriptor{
 		Timestamp: time.Now(),

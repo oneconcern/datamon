@@ -7,7 +7,6 @@ import (
 	"github.com/oneconcern/datamon/pkg/core"
 
 	"github.com/oneconcern/datamon/pkg/model"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/spf13/cobra"
 )
 
@@ -16,19 +15,18 @@ var bundleFileList = &cobra.Command{
 	Short: "List files in a bundle",
 	Long:  "List all the files in a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
-
-		store, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+		remoteStores, err := paramsToRemoteCmdStores(params)
 		if err != nil {
 			logFatalln(err)
 		}
-		err = setLatestOrLabelledBundle(store)
+		err = setLatestOrLabelledBundle(remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
 		bundle := core.Bundle{
 			RepoID:           params.repo.RepoName,
 			BundleID:         params.bundle.ID,
-			MetaStore:        store,
+			MetaStore:        remoteStores.meta,
 			ConsumableStore:  nil,
 			BlobStore:        nil,
 			BundleDescriptor: model.BundleDescriptor{},

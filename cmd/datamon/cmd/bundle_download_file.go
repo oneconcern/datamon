@@ -2,13 +2,8 @@ package cmd
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
-	"github.com/oneconcern/datamon/pkg/storage/localfs"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
@@ -17,31 +12,25 @@ var bundleDownloadFileCmd = &cobra.Command{
 	Short: "Download a file from bundle",
 	Long:  "Download a readonly, non-interactive view of a single file from a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
+		remoteStores, err := paramsToRemoteCmdStores(params)
+		if err != nil {
+			logFatalln(err)
+		}
+		destinationStore, err := paramsToDestStore(params, false, "")
+		if err != nil {
+			logFatalln(err)
+		}
 
-		metadataStore, err := gcs.New(params.repo.MetadataBucket, config.Credential)
-		if err != nil {
-			logFatalln(err)
-		}
-		blobStore, err := gcs.New(params.repo.BlobBucket, config.Credential)
-		if err != nil {
-			logFatalln(err)
-		}
-		path, err := filepath.Abs(filepath.Clean(params.bundle.DataPath))
-		if err != nil {
-			logFatalf("Failed path validation: %s", err)
-		}
-		_ = os.MkdirAll(path, 0700)
-		destinationStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), path))
-		err = setLatestOrLabelledBundle(metadataStore)
+		err = setLatestOrLabelledBundle(remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
 			core.Repo(params.repo.RepoName),
-			core.MetaStore(metadataStore),
+			core.MetaStore(remoteStores.meta),
 			core.ConsumableStore(destinationStore),
-			core.BlobStore(blobStore),
+			core.BlobStore(remoteStores.blob),
 			core.BundleID(params.bundle.ID),
 		)
 
