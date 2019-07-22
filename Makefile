@@ -46,6 +46,20 @@ help:
 	} \
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
+.PHONY: build-and-push-circleci-builder
+## build sidecar container used in Argo workflows
+build-and-push-circleci-builder:
+	@echo 'building fuse sidecar container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-circleci-builder \
+		-t gcr.io/onec-co/datamon-circleci-builder:${GITHUB_USER}-$$(date '+%Y%m%d') \
+		-t gcr.io/onec-co/datamon-circleci-builder:$(subst /,_,$(GIT_BRANCH)) \
+		--ssh default \
+		-f circleci.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-circleci-builder
+
 .PHONY: build-and-push-fuse-sidecar
 ## build sidecar container used in Argo workflows
 build-and-push-fuse-sidecar:

@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datamon-circleci-builder
+spec:
+  selector:
+    matchLabels:
+      app: datamon-circleci-builder
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: datamon-circleci-builder
+    spec:
+      containers:
+      - name: shell
+        image: gcr.io/onec-co/datamon-circleci-builder:latest
+        imagePullPolicy: "Always"
+        command: ["/bin/tini"]
+        args: ["--", "/bin/zsh"]
+        stdin: true
+        tty: true
