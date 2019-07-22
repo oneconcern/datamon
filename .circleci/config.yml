@@ -3,7 +3,11 @@ jobs:
   go_lint:
     working_directory: ~/project
     docker:
-      - image: circleci/golang
+
+      # - image: circleci/golang
+
+      - image: gcr.io/onec-co/datamon-circleci-builder
+
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: access-key
@@ -14,19 +18,23 @@ jobs:
         command:
           - server
           - data
+
+
     steps:
-      - run:
-          name: Install packages
-          command: |
-            sudo apt-get update -y
-            sudo apt-get install lsb-release
-            export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
-            echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-            curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
-            sudo apt-get update -y
-            sudo apt-get install -y git build-essential
-            sudo apt-get install -y google-cloud-sdk
-            sudo apt-get install -y shellcheck
+
+      # - run:
+      #     name: Install packages
+      #     command: |
+      #       sudo apt-get update -y
+      #       sudo apt-get install lsb-release
+      #       export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
+      #       echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+      #       curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+      #       sudo apt-get update -y
+      #       sudo apt-get install -y git build-essential
+      #       sudo apt-get install -y google-cloud-sdk
+      #       sudo apt-get install -y shellcheck
+
       - run:
           name: Install go tools
           command: |
