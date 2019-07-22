@@ -149,7 +149,7 @@ func setupTests(t *testing.T) func() {
 	bucketMeta := "datamontestmeta-" + btag
 	bucketBlob := "datamontestblob-" + btag
 
-	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
+	client, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err, "couldn't create bucket client")
 	err = client.Bucket(bucketMeta).Create(ctx, "onec-co", nil)
 	require.NoError(t, err, "couldn't create metadata bucket")

@@ -112,7 +112,7 @@ type Server struct {
 
 func (s *Server) metadataStore() storage.Store {
 	var err error
-	store, err := gcs.New(s.params.MetadataBucket, s.params.Credential)
+	store, err := gcs.New(context.TODO(), s.params.MetadataBucket, s.params.Credential)
 	if err != nil {
 		panic(err)
 	}

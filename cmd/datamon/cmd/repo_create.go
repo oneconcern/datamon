@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -16,11 +17,12 @@ var repoCreate = &cobra.Command{
 	Long: "Create a repo. Repo names must not contain special characters. " +
 		"Allowed characters Unicode characters, digits and hyphen. Example: dm-test-repo-1",
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
 			logFatalln(err)
 		}
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}

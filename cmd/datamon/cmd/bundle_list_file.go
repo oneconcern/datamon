@@ -15,11 +15,12 @@ var bundleFileList = &cobra.Command{
 	Short: "List files in a bundle",
 	Long:  "List all the files in a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		ctx := context.Background()
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
-		err = setLatestOrLabelledBundle(remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -32,7 +33,7 @@ var bundleFileList = &cobra.Command{
 			BundleDescriptor: model.BundleDescriptor{},
 			BundleEntries:    nil,
 		}
-		err = core.PopulateFiles(context.Background(), &bundle)
+		err = core.PopulateFiles(ctx, &bundle)
 		if err != nil {
 			logFatalln(err)
 		}

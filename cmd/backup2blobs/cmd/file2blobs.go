@@ -157,11 +157,11 @@ var upload = &cobra.Command{
 	Long:  `Tool to bulk import files into CAFS with a record of the files in the backing store.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		localStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), params.pathToMount))
-		backupStore, err := gcs.New(params.backendStoreBucket, "")
+		backupStore, err := gcs.New(context.TODO(), params.backendStoreBucket, "")
 		if err != nil {
 			log.Fatalln(err)
 		}
-		cafsStore, err := gcs.New(params.blobStoreBucket, "")
+		cafsStore, err := gcs.New(context.TODO(), params.blobStoreBucket, "")
 		if err != nil {
 			log.Fatalln(err)
 		}

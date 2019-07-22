@@ -18,6 +18,7 @@ var mutableMountBundleCmd = &cobra.Command{
 	Short: "Create a bundle incrementally with filesystem operations",
 	Long:  "Write directories and files to the mountpoint.  Unmount or send SIGINT to this process to save.",
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
 			logFatalln(err)
@@ -27,11 +28,11 @@ var mutableMountBundleCmd = &cobra.Command{
 			runDaemonized()
 			return
 		}
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			onDaemonError(err)
 		}
-		consumableStore, err := paramsToSrcStore(params, true)
+		consumableStore, err := paramsToSrcStore(ctx, params, true)
 		if err != nil {
 			onDaemonError(err)
 		}
@@ -58,7 +59,7 @@ var mutableMountBundleCmd = &cobra.Command{
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			logFatalln(err)
 		}
-		if err = fs.JoinMount(context.Background()); err != nil {
+		if err = fs.JoinMount(ctx); err != nil {
 			logFatalln(err)
 		}
 		if err = fs.Commit(); err != nil {

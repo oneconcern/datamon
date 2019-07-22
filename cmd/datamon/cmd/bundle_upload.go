@@ -21,15 +21,16 @@ var uploadBundleCmd = &cobra.Command{
 	Short: "Upload a bundle",
 	Long:  "Upload a bundle consisting of all files stored in a directory",
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
 			logFatalln(err)
 		}
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
-		sourceStore, err := paramsToSrcStore(params, false)
+		sourceStore, err := paramsToSrcStore(ctx, params, false)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -60,9 +61,9 @@ var uploadBundleCmd = &cobra.Command{
 				}
 				return files, nil
 			}
-			err = core.UploadSpecificKeys(context.Background(), bundle, getKeys)
+			err = core.UploadSpecificKeys(ctx, bundle, getKeys)
 		} else {
-			err = core.Upload(context.Background(), bundle)
+			err = core.Upload(ctx, bundle)
 		}
 		if err != nil {
 			logFatalln(err)
@@ -77,7 +78,7 @@ var uploadBundleCmd = &cobra.Command{
 		label := core.NewLabel(labelDescriptor,
 			core.LabelName(params.label.Name),
 		)
-		err = label.UploadDescriptor(context.Background(), bundle)
+		err = label.UploadDescriptor(ctx, bundle)
 		if err != nil {
 			logFatalln(err)
 		}

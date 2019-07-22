@@ -87,11 +87,11 @@ var uploadCmd = &cobra.Command{
 		}
 		defer deleteBuckets()
 
-		metaStore, err := gcs.New(gcsParams.MetadataBucket, gcsParams.Credential)
+		metaStore, err := gcs.New(context.TODO(), gcsParams.MetadataBucket, gcsParams.Credential)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		blobStore, err := gcs.New(gcsParams.BlobBucket, gcsParams.Credential)
+		blobStore, err := gcs.New(context.TODO(), gcsParams.BlobBucket, gcsParams.Credential)
 		if err != nil {
 			log.Fatalln(err)
 		}

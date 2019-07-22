@@ -20,7 +20,8 @@ var GetLabelCommand = &cobra.Command{
 Prints corresponding bundle information if the label exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		ctx := context.Background()
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -31,7 +32,7 @@ exits with ENOENT status otherwise.`,
 		label := core.NewLabel(core.NewLabelDescriptor(),
 			core.LabelName(params.label.Name),
 		)
-		err = label.DownloadDescriptor(context.Background(), bundle, true)
+		err = label.DownloadDescriptor(ctx, bundle, true)
 		if err == core.ErrNotFound {
 			fmt.Fprintf(os.Stderr, "didn't find label '%v'\n", params.label.Name)
 			osExit(int(unix.ENOENT))

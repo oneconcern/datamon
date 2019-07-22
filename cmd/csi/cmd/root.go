@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -48,11 +49,11 @@ var rootCmd = &cobra.Command{
 			Logger:        logger,
 			LocalFS:       csiOpts.localFS,
 		}
-		metadataStore, err := gcs.New(csiOpts.metadataBucket, csiOpts.credentialFile)
+		metadataStore, err := gcs.New(context.TODO(), csiOpts.metadataBucket, csiOpts.credentialFile)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		blobStore, err := gcs.New(csiOpts.blobBucket, csiOpts.credentialFile)
+		blobStore, err := gcs.New(context.TODO(), csiOpts.blobBucket, csiOpts.credentialFile)
 		if err != nil {
 			log.Fatalln(err)
 		}

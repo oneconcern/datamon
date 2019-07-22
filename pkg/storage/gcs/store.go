@@ -5,6 +5,7 @@ package gcs
 import (
 	"context"
 	"errors"
+	"io"
 
 	"google.golang.org/api/iterator"
 
@@ -12,34 +13,34 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/storage"
 	"google.golang.org/api/option"
-
-	"io"
 )
 
 type gcs struct {
 	client         *gcsStorage.Client
 	readOnlyClient *gcsStorage.Client
 	bucket         string
+	ctx            context.Context
 }
 
-func New(bucket string, credentialFile string) (storage.Store, error) {
+func New(ctx context.Context, bucket string, credentialFile string) (storage.Store, error) {
 	googleStore := new(gcs)
+	googleStore.ctx = ctx
 	googleStore.bucket = bucket
 	var err error
 	if credentialFile != "" {
 		c := option.WithCredentialsFile(credentialFile)
-		googleStore.readOnlyClient, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeReadOnly), c)
+		googleStore.readOnlyClient, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeReadOnly), c)
 	} else {
-		googleStore.readOnlyClient, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeReadOnly))
+		googleStore.readOnlyClient, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeReadOnly))
 	}
 	if err != nil {
 		return nil, err
 	}
 	if credentialFile != "" {
 		c := option.WithCredentialsFile(credentialFile)
-		googleStore.client, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl), c)
+		googleStore.client, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl), c)
 	} else {
-		googleStore.client, err = gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
+		googleStore.client, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl))
 	}
 	if err != nil {
 		return nil, err
@@ -52,11 +53,8 @@ func (g *gcs) String() string {
 }
 
 func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
-	client, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeReadOnly))
-	if err != nil {
-		return false, err
-	}
-	_, err = client.Bucket(g.bucket).Object(objectName).Attrs(ctx)
+	client := g.readOnlyClient
+	_, err := client.Bucket(g.bucket).Object(objectName).Attrs(ctx)
 	if err != nil {
 		if err == gcsStorage.ErrObjectNotExist {
 			return false, nil
@@ -86,7 +84,8 @@ func (r *gcsReader) Read(p []byte) (n int, err error) {
 }
 
 func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
-	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.objectName).NewRangeReader(context.Background(), offset, int64(len(p)))
+	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.objectName).NewRangeReader(
+		r.g.ctx, offset, int64(len(p)))
 	if err != nil {
 		return 0, err
 	}
@@ -99,6 +98,7 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 		return nil, err
 	}
 	return &gcsReader{
+		g:            g,
 		objectReader: objectReader,
 	}, nil
 }
@@ -125,7 +125,9 @@ func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, does
 	// Put if not present
 	var writer *gcsStorage.Writer
 	if doesNotExist {
-		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: doesNotExist}).NewWriter(ctx)
+		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
+			DoesNotExist: doesNotExist,
+		}).NewWriter(ctx)
 	} else {
 		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
 	}
@@ -140,7 +142,9 @@ func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, d
 	// Put if not present
 	var writer *gcsStorage.Writer
 	if doesNotExist {
-		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{DoesNotExist: doesNotExist}).NewWriter(ctx)
+		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
+			DoesNotExist: doesNotExist,
+		}).NewWriter(ctx)
 	} else {
 		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
 	}
@@ -157,14 +161,25 @@ func (g *gcs) Delete(ctx context.Context, objectName string) error {
 }
 
 func (g *gcs) Keys(ctx context.Context) ([]string, error) {
-	keys, _, err := g.KeysPrefix(ctx, "", "", "", 1000000)
-	if err != nil {
-		return nil, err
+	const keysPerQuery = 1000000
+	var pageToken string
+	nextPageToken := "sentinel" /* could be any nonempty string to start */
+	keys := make([]string, 0)
+	for nextPageToken != "" {
+		var keysCurr []string
+		var err error
+		keysCurr, nextPageToken, err = g.KeysPrefix(ctx, pageToken, "", "", keysPerQuery)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, keysCurr...)
+		pageToken = nextPageToken
 	}
-
 	return keys, nil
 }
 
+// todo: consider KeysPrefix returning all keys, not pages,
+//   and expanding api surface to include paged results for both keys and keys according to prefix
 func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error) {
 
 	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})

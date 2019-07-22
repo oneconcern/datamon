@@ -20,7 +20,8 @@ var BundleDownloadCmd = &cobra.Command{
 	Long: "Download a readonly, non-interactive view of the entire data that is part of a bundle. If --bundle is not specified" +
 		" the latest bundle will be downloaded",
 	Run: func(cmd *cobra.Command, args []string) {
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		ctx := context.Background()
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -29,7 +30,7 @@ var BundleDownloadCmd = &cobra.Command{
 			logFatalln(err)
 		}
 
-		err = setLatestOrLabelledBundle(remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -45,7 +46,7 @@ var BundleDownloadCmd = &cobra.Command{
 				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
 		)
 
-		err = core.Publish(context.Background(), bundle)
+		err = core.Publish(ctx, bundle)
 		if err != nil {
 			logFatalln(err)
 		}
