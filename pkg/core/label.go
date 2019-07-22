@@ -94,7 +94,15 @@ func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, chec
 			return e
 		}
 	}
-	rdr, err := bundle.MetaStore.Get(context.Background(), model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name))
+	archivePath := model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name)
+	has, err := bundle.MetaStore.Has(context.Background(), archivePath)
+	if err != nil {
+		return err
+	}
+	if !has {
+		return ErrNotFound
+	}
+	rdr, err := bundle.MetaStore.Get(context.Background(), archivePath)
 	if err != nil {
 		return err
 	}
