@@ -1,5 +1,20 @@
 #! /bin/zsh
 
+container_name=demo-shell
+
+while getopts s opt; do
+    case $opt in
+        (s)
+            container_name='datamon-sidecar'
+            ;;
+        (\?)
+            print Bad option, aborting.
+            exit 1
+            ;;
+    esac
+done
+(( OPTIND > 1 )) && shift $(( OPTIND - 1 ))
+
 pod_name=$(kubectl get pods -l app=datamon-ro-demo | grep Running | sed 's/ .*//')
 
 if [[ -z $pod_name ]]; then
@@ -7,12 +22,6 @@ if [[ -z $pod_name ]]; then
 	exit 1
 fi
 
-container_name=demo-shell
-
-if [ -z "$1" ]; then
-    container_name='datamon-sidecar'
-fi
-
 kubectl exec -it "$pod_name" \
         -c "$container_name" \
-        -- "/bin/bash"
+        -- "/bin/zsh"

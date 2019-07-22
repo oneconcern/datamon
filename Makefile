@@ -169,7 +169,7 @@ runtests:
 .PHONY: gofmt
 ## Run gofmt on the cmd and pkg packages
 gofmt:
-	@gofmt -s -w ./cmd ./pkg
+	@gofmt -s -w ./cmd ./pkg ./internal
 
 .PHONY: goimports
 ## Run goimports on the cmd and pkg packages
@@ -201,8 +201,20 @@ fuse-demo-build-shell:
 		.
 	docker push gcr.io/onec-co/datamon-fuse-demo-shell
 
+.PHONY: fuse-demo-build-sidecar
+## build sidecar container used in fuse demo
+fuse-demo-build-sidecar:
+	@echo 'building fuse demo container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-fuse-demo-sidecar \
+		--ssh default \
+		-f ./hack/fuse-demo/sidecar.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-fuse-demo-sidecar
+
 ## demonstrate a fuse read-only filesystem
-fuse-demo-ro: fuse-demo-build-shell
+fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
 	@docker image push gcr.io/onec-co/datamon-fuse-demo-shell
 	@./hack/fuse-demo/create_ro_pod.sh
 	@sleep 8 # dumb timeout on container startup
