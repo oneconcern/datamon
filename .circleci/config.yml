@@ -44,6 +44,10 @@ jobs:
           command: |
             golangci-lint run --disable golint --build-tags fuse_cli --max-same-issues 0 --verbose
             shellcheck hack/fuse-demo/wrap_*.sh
+      - run:
+          name: Ensure metrics
+          command: |
+            go build -o datamon.metrics ./cmd/metrics
   go_build:
     working_directory: ~/project
     docker:
