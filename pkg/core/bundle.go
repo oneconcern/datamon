@@ -205,7 +205,7 @@ func Publish(ctx context.Context, bundle *Bundle) error {
 		return fmt.Errorf("failed to publish, err:%s", err)
 	}
 	if !bundle.Streamed {
-		err = unpackDataFiles(ctx, bundle, "")
+		err = unpackDataFiles(ctx, bundle)
 		if err != nil {
 			return fmt.Errorf("failed to unpack data files, err:%s", err)
 		}
@@ -298,7 +298,7 @@ func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
 		return err
 	}
 
-	err = unpackDataFiles(ctx, bundle, file)
+	err = unpackDataFile(ctx, bundle, file)
 	if err != nil {
 		return err
 	}
