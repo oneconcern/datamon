@@ -38,7 +38,7 @@ func setup(t testing.TB) (storage.Store, func()) {
 	err = client.Bucket(bucket).Create(ctx, "onec-co", nil)
 	require.NoError(t, err)
 
-	gcs, err := New(bucket, "") // Use GOOGLE_APPLICATION_CREDENTIALS env variable
+	gcs, err := New(context.TODO(), bucket, "") // Use GOOGLE_APPLICATION_CREDENTIALS env variable
 	require.NoError(t, err)
 
 	err = gcs.Put(ctx, testObject1, bytes.NewBufferString(testObject1Content), storage.IfNotPresent)

@@ -12,7 +12,8 @@ var bundleDownloadFileCmd = &cobra.Command{
 	Short: "Download a file from bundle",
 	Long:  "Download a readonly, non-interactive view of a single file from a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		ctx := context.Background()
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -21,7 +22,7 @@ var bundleDownloadFileCmd = &cobra.Command{
 			logFatalln(err)
 		}
 
-		err = setLatestOrLabelledBundle(remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -34,7 +35,7 @@ var bundleDownloadFileCmd = &cobra.Command{
 			core.BundleID(params.bundle.ID),
 		)
 
-		err = core.PublishFile(context.Background(), bundle, params.bundle.File)
+		err = core.PublishFile(ctx, bundle, params.bundle.File)
 		if err != nil {
 			logFatalln(err)
 		}

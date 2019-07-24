@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"text/template"
 
@@ -16,8 +17,9 @@ var BundleListCommand = &cobra.Command{
 	Long:  "List the bundles in a repo",
 	Run: func(cmd *cobra.Command, args []string) {
 		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
+		ctx := context.Background()
 		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}

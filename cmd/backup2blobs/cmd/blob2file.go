@@ -129,13 +129,13 @@ var download = &cobra.Command{
 		// Create CAFS based on the blob store
 		localStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), b2fParams.destination))
 
-		backupStore, err := gcs.New(b2fParams.backendStoreBucket, "")
+		backupStore, err := gcs.New(context.TODO(), b2fParams.backendStoreBucket, "")
 
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		cafsStore, err := gcs.New(b2fParams.blobStoreBucket, "")
+		cafsStore, err := gcs.New(context.TODO(), b2fParams.blobStoreBucket, "")
 		if err != nil {
 			log.Fatalln(err)
 		}

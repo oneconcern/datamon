@@ -13,11 +13,12 @@ var SetLabelCommand = &cobra.Command{
 	Short: "Set labels",
 	Long:  "Set the label corresponding to a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
 			logFatalln(err)
 		}
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -26,7 +27,7 @@ var SetLabelCommand = &cobra.Command{
 			core.MetaStore(remoteStores.meta),
 			core.BundleID(params.bundle.ID),
 		)
-		bundleExists, err := bundle.Exists(context.Background())
+		bundleExists, err := bundle.Exists(ctx)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -39,7 +40,7 @@ var SetLabelCommand = &cobra.Command{
 		label := core.NewLabel(labelDescriptor,
 			core.LabelName(params.label.Name),
 		)
-		err = label.UploadDescriptor(context.Background(), bundle)
+		err = label.UploadDescriptor(ctx, bundle)
 		if err != nil {
 			logFatalln(err)
 		}

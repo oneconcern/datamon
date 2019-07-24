@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -198,15 +199,15 @@ type cmdStoresRemote struct {
 	blob storage.Store
 }
 
-func paramsToRemoteCmdStores(params paramsT) (cmdStoresRemote, error) {
+func paramsToRemoteCmdStores(ctx context.Context, params paramsT) (cmdStoresRemote, error) {
 	stores := cmdStoresRemote{}
-	meta, err := gcs.New(params.repo.MetadataBucket, config.Credential)
+	meta, err := gcs.New(ctx, params.repo.MetadataBucket, config.Credential)
 	if err != nil {
 		return cmdStoresRemote{}, err
 	}
 	stores.meta = meta
 	if params.repo.BlobBucket != "" {
-		blob, err := gcs.New(params.repo.BlobBucket, config.Credential)
+		blob, err := gcs.New(ctx, params.repo.BlobBucket, config.Credential)
 		if err != nil {
 			return cmdStoresRemote{}, err
 		}
@@ -215,7 +216,7 @@ func paramsToRemoteCmdStores(params paramsT) (cmdStoresRemote, error) {
 	return stores, nil
 }
 
-func paramsToSrcStore(params paramsT, create bool) (storage.Store, error) {
+func paramsToSrcStore(ctx context.Context, params paramsT, create bool) (storage.Store, error) {
 	var err error
 	var consumableStorePath string
 
@@ -242,7 +243,7 @@ func paramsToSrcStore(params paramsT, create bool) (storage.Store, error) {
 	var sourceStore storage.Store
 	if strings.HasPrefix(consumableStorePath, "gs://") {
 		fmt.Println(consumableStorePath[4:])
-		sourceStore, err = gcs.New(consumableStorePath[5:], config.Credential)
+		sourceStore, err = gcs.New(ctx, consumableStorePath[5:], config.Credential)
 		if err != nil {
 			return sourceStore, err
 		}

@@ -84,12 +84,13 @@ var mountBundleCmd = &cobra.Command{
 	Short: "Mount a bundle",
 	Long:  "Mount a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		// cf. comments on runDaemonized
 		if params.bundle.Daemonize {
 			runDaemonized()
 			return
 		}
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			onDaemonError(err)
 		}
@@ -98,7 +99,7 @@ var mountBundleCmd = &cobra.Command{
 			onDaemonError(err)
 		}
 
-		err = setLatestOrLabelledBundle(remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
 		}
@@ -129,7 +130,7 @@ var mountBundleCmd = &cobra.Command{
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			logFatalln(err)
 		}
-		if err = fs.JoinMount(context.Background()); err != nil {
+		if err = fs.JoinMount(ctx); err != nil {
 			logFatalln(err)
 		}
 	},

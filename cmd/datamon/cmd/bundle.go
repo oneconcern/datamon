@@ -28,7 +28,7 @@ func init() {
 	addBlobBucket(bundleCmd)
 }
 
-func setLatestOrLabelledBundle(store storage.Store) error {
+func setLatestOrLabelledBundle(ctx context.Context, store storage.Store) error {
 	switch {
 	case params.bundle.ID != "" && params.label.Name != "":
 		return fmt.Errorf("--" + addBundleFlag(nil) + " and --" + addLabelNameFlag(nil) + " flags are mutually exclusive")
@@ -46,7 +46,7 @@ func setLatestOrLabelledBundle(store storage.Store) error {
 			core.Repo(params.repo.RepoName),
 			core.MetaStore(store),
 		)
-		if err := label.DownloadDescriptor(context.Background(), bundle, true); err != nil {
+		if err := label.DownloadDescriptor(ctx, bundle, true); err != nil {
 			return err
 		}
 		params.bundle.ID = label.Descriptor.BundleID

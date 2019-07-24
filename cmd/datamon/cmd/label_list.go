@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -14,7 +15,8 @@ var LabelListCommand = &cobra.Command{
 	Short: "List labels",
 	Long:  "List the labels in a repo",
 	Run: func(cmd *cobra.Command, args []string) {
-		remoteStores, err := paramsToRemoteCmdStores(params)
+		ctx := context.Background()
+		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
