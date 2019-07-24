@@ -32,19 +32,20 @@ var MemProfDir string
 
 // ArchiveBundle represents the bundle in it's archive state
 type Bundle struct {
-	RepoID                  string
-	BundleID                string
-	MetaStore               storage.Store
-	ConsumableStore         storage.Store
-	BlobStore               storage.Store
-	cafs                    cafs.Fs
-	BundleDescriptor        model.BundleDescriptor
-	BundleEntries           []model.BundleEntry
-	Streamed                bool
-	l                       *zap.Logger
-	SkipOnError             bool // When uploading files
-	concurrentFileUploads   int
-	concurrentFileDownloads int
+	RepoID                      string
+	BundleID                    string
+	MetaStore                   storage.Store
+	ConsumableStore             storage.Store
+	BlobStore                   storage.Store
+	cafs                        cafs.Fs
+	BundleDescriptor            model.BundleDescriptor
+	BundleEntries               []model.BundleEntry
+	Streamed                    bool
+	l                           *zap.Logger
+	SkipOnError                 bool // When uploading files
+	concurrentFileUploads       int
+	concurrentFileDownloads     int
+	concurrentFilelistDownloads int
 }
 
 // SetBundleID for the bundle
@@ -167,18 +168,25 @@ func ConcurrentFileDownloads(concurrentFileDownloads int) BundleOption {
 	}
 }
 
+func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
+	return func(b *Bundle) {
+		b.concurrentFilelistDownloads = concurrentFilelistDownloads
+	}
+}
+
 func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b := Bundle{
-		RepoID:                  "",
-		BundleID:                "",
-		MetaStore:               nil,
-		ConsumableStore:         nil,
-		BlobStore:               nil,
-		BundleDescriptor:        *bd,
-		BundleEntries:           make([]model.BundleEntry, 0, 1024),
-		Streamed:                false,
-		concurrentFileUploads:   20,
-		concurrentFileDownloads: 10,
+		RepoID:                      "",
+		BundleID:                    "",
+		MetaStore:                   nil,
+		ConsumableStore:             nil,
+		BlobStore:                   nil,
+		BundleDescriptor:            *bd,
+		BundleEntries:               make([]model.BundleEntry, 0, 1024),
+		Streamed:                    false,
+		concurrentFileUploads:       20,
+		concurrentFileDownloads:     10,
+		concurrentFilelistDownloads: 10,
 	}
 
 	b.l, _ = dlogger.GetLogger("info")
@@ -200,7 +208,12 @@ func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 
 // Publish an bundle to a consumable store
 func Publish(ctx context.Context, bundle *Bundle) error {
-	err := PublishMetadata(ctx, bundle)
+	return implPublish(ctx, bundle, defaultBundleEntriesPerFile)
+}
+
+// implementation of Publish() with some additional parameters for test
+func implPublish(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+	err := implPublishMetadata(ctx, bundle, bundleEntriesPerFile)
 	if err != nil {
 		return fmt.Errorf("failed to publish, err:%s", err)
 	}
@@ -215,12 +228,17 @@ func Publish(ctx context.Context, bundle *Bundle) error {
 
 // PublishMetadata from the archive to the consumable store
 func PublishMetadata(ctx context.Context, bundle *Bundle) error {
+	return implPublishMetadata(ctx, bundle, defaultBundleEntriesPerFile)
+}
+
+// implementation of PublishMetadata() with some additional parameters for test
+func implPublishMetadata(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
 	err := unpackBundleDescriptor(ctx, bundle)
 	if err != nil {
 		return err
 	}
 
-	err = unpackBundleFileList(ctx, bundle)
+	err = unpackBundleFileList(ctx, bundle, bundleEntriesPerFile)
 	if err != nil {
 		return err
 	}

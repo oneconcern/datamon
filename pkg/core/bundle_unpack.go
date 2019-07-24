@@ -6,11 +6,11 @@ import (
 	"context"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
+
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 )
 
@@ -35,24 +35,121 @@ func unpackBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 	return nil
 }
 
-func unpackBundleFileList(ctx context.Context, bundle *Bundle) error {
-	// Download the files json
-	var i uint64
-	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
-		bundleEntriesBuffer, err := storage.ReadTee(ctx,
-			bundle.MetaStore, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i),
-			bundle.ConsumableStore, model.GetConsumablePathToBundleFileList(bundle.BundleID, i))
-		if err != nil {
-			return err
+type bundleEntriesRes struct {
+	bundleEntries model.BundleEntries
+	idx           uint64
+}
+
+type downloadBundleFileListChans struct {
+	bundleEntries      chan<- bundleEntriesRes
+	error              chan<- error
+	done               <-chan struct{}
+	doneOk             chan<- struct{}
+	concurrencyControl <-chan struct{}
+}
+
+func downloadBundleFileListFile(ctx context.Context, bundle *Bundle,
+	chans downloadBundleFileListChans,
+	i uint64,
+) {
+	var bundleEntries model.BundleEntries
+
+	sendErr := func(err error) {
+		select {
+		case chans.error <- err:
+		case <-chans.done:
 		}
-		var bundleEntries model.BundleEntries
-		err = yaml.Unmarshal(bundleEntriesBuffer, &bundleEntries)
-		if err != nil {
-			return err
-		}
-		bundle.BundleEntries = append(bundle.BundleEntries, bundleEntries.BundleEntries...)
 	}
-	// Link the file
+	defer func() {
+		<-chans.concurrencyControl
+	}()
+
+	bundle.l.Info("downloading bundle entry",
+		zap.Uint64("curr entry", i),
+		zap.Uint64("tot entries", bundle.BundleDescriptor.BundleEntriesFileCount),
+	)
+	bundleEntriesBuffer, err := storage.ReadTee(ctx,
+		bundle.MetaStore, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i),
+		bundle.ConsumableStore, model.GetConsumablePathToBundleFileList(bundle.BundleID, i))
+	if err != nil {
+		sendErr(err)
+		return
+	}
+	err = yaml.Unmarshal(bundleEntriesBuffer, &bundleEntries)
+	if err != nil {
+		sendErr(err)
+		return
+	}
+	select {
+	case chans.bundleEntries <- bundleEntriesRes{bundleEntries: bundleEntries, idx: i}:
+	case <-chans.done:
+	}
+
+}
+
+func downloadBundleFileList(ctx context.Context, bundle *Bundle,
+	chans downloadBundleFileListChans,
+) {
+	var i uint64
+	concurrencyControl := make(chan struct{}, bundle.concurrentFilelistDownloads)
+	chans.concurrencyControl = concurrencyControl
+	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
+		concurrencyControl <- struct{}{}
+		go downloadBundleFileListFile(ctx, bundle, chans, i)
+	}
+	for i := 0; i < cap(concurrencyControl); i++ {
+		concurrencyControl <- struct{}{}
+	}
+	chans.doneOk <- struct{}{}
+}
+
+func unpackBundleFileList(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+
+	bundleEntriesC := make(chan bundleEntriesRes)
+	errorC := make(chan error)
+	doneC := make(chan struct{})
+	doneOkC := make(chan struct{})
+
+	defer close(doneC)
+
+	go downloadBundleFileList(ctx, bundle, downloadBundleFileListChans{
+		bundleEntries: bundleEntriesC,
+		error:         errorC,
+		done:          doneC,
+		doneOk:        doneOkC,
+	})
+
+	// prealloc
+	maxBundleEntries := bundle.BundleDescriptor.BundleEntriesFileCount * uint64(bundleEntriesPerFile)
+	bundle.l.Info("preallocating bundle entries",
+		zap.Uint64("max entries", maxBundleEntries),
+	)
+	bundle.BundleEntries = make([]model.BundleEntry, maxBundleEntries)
+
+	var gotDoneSignal bool
+	for !gotDoneSignal {
+		select {
+		case res := <-bundleEntriesC:
+			startIdx := int(res.idx) * int(bundleEntriesPerFile)
+			copy(bundle.BundleEntries[startIdx:], res.bundleEntries.BundleEntries)
+			if res.idx+1 == bundle.BundleDescriptor.BundleEntriesFileCount {
+				missingEntries := int(bundleEntriesPerFile) - len(res.bundleEntries.BundleEntries)
+				if missingEntries < 0 {
+					return fmt.Errorf("%v is greater than expected number of bundler entries %v",
+						len(res.bundleEntries.BundleEntries), bundleEntriesPerFile)
+				}
+				bundle.BundleEntries = bundle.BundleEntries[:len(bundle.BundleEntries)-missingEntries]
+			} else if uint(len(res.bundleEntries.BundleEntries)) != bundleEntriesPerFile {
+				return fmt.Errorf("%v is not expected number of bundler entries %v",
+					len(res.bundleEntries.BundleEntries), bundleEntriesPerFile)
+			}
+		case err := <-errorC:
+			bundle.l.Error("Unpack bundle filelist failed", zap.Error(err))
+			return err
+		case <-doneOkC:
+			gotDoneSignal = true
+		}
+	}
 	return nil
 }
 
