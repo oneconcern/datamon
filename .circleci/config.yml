@@ -43,7 +43,11 @@ jobs:
           name: Run golang linter
           command: |
             golangci-lint run --disable golint --build-tags fuse_cli --max-same-issues 0 --verbose
+      - run:
+          name: Lint shell scripts
+          command: |
             shellcheck hack/fuse-demo/wrap_*.sh
+            shellcheck deploy/datamon.sh
       - run:
           name: Ensure metrics
           command: |

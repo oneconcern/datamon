@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 ### datamon.sh
 # push updates to users of github.com/oneconcern/datamon via polling
@@ -22,13 +22,37 @@ CONFIRM_INSTALL=
 
 ## escape codes to color messages from this script
 # these are used to distinguish debug output from this script from that of datamon itself.
-COL_RED='\033[0;31m'
+# COL_RED='\033[0;31m'
 COL_CYAN='\033[0;36m'
 COL_NC='\033[0m'
 
 ## setup variables used by the script
 # github api
 REL_URL=https://api.github.com/repos/oneconcern/datamon/releases/latest
+
+ensure_aux() {
+    if ! command -v "$*" > /dev/null 2>&1; then
+        echo "required auxilliary program '$*' not installed" 1>&2
+        exit 1
+    fi
+}
+
+ensure_aux wget
+ensure_aux curl
+#
+ensure_aux bc
+ensure_aux md5
+#
+ensure_aux find
+ensure_aux date
+ensure_aux grep
+ensure_aux sort
+ensure_aux tail
+ensure_aux mkdir
+ensure_aux cat
+ensure_aux uname
+ensure_aux cut
+ensure_aux tr
 
 # used to map kernel type to binary type
 if [ "$(uname)" = "Darwin" ]; then
@@ -67,8 +91,10 @@ dbg_print() {
 
 # emulate zsh (read -q) functionality to implement yes-no prompts
 yn_read() {
-    echo -n "$1" "[y/N]"
-    read -s -n 1 YN_RES
+    echo "$1" "[y/N]"
+    # this `read` with the -n flag is the only bash-ism in the script.
+    # consider using readline or similar aux to toggle back to POSIX sh
+    read -r -s -n 1 YN_RES
     if [ "$YN_RES" = "Y" ] || [ "$YN_RES" = "y" ]; then
         return 0
     fi
@@ -107,7 +133,8 @@ if [ -z "$SEM_VER_PREV" ] || [ "$TIME_DIFF" -gt "$POLL_INTERVAL" ]; then
             (cd /tmp && \
                  wget "$HASH_URL")
             HASH_EXPECTED=$(grep "${archive_tag}" /tmp/datamon.dsc |cut -d ' ' -f 1)
-            HASH_ACTUAL=$(md5sum "$DL_DIR/datamon.${archive_tag}.tgz" |cut -d ' ' -f 1)
+            rm /tmp/datamon.dsc*
+            HASH_ACTUAL=$(md5 "$DL_DIR/datamon.${archive_tag}.tgz" |cut -d'=' -f 2 |tr -d ' ')
             if [ "$HASH_EXPECTED" = "$HASH_ACTUAL" ]; then
                 dbg_print 'hashes match'
             else
