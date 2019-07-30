@@ -62,8 +62,7 @@ func Execute() {
 func init() {
 	var err error
 	log.SetFlags(0)
-	logLevel := "info"
-	logger, err = dlogger.GetLogger(logLevel)
+	logger, err = dlogger.GetLogger(dlogger.LogLevelDebug)
 	if err != nil {
 		log.Fatalln("Failed to set log level:" + err.Error())
 	}
