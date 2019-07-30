@@ -43,7 +43,6 @@ type bundleEntriesRes struct {
 type downloadBundleFileListChans struct {
 	bundleEntries      chan<- bundleEntriesRes
 	error              chan<- error
-	done               <-chan struct{}
 	doneOk             chan<- struct{}
 	concurrencyControl <-chan struct{}
 }
@@ -55,10 +54,7 @@ func downloadBundleFileListFile(ctx context.Context, bundle *Bundle,
 	var bundleEntries model.BundleEntries
 
 	sendErr := func(err error) {
-		select {
-		case chans.error <- err:
-		case <-chans.done:
-		}
+		chans.error <- err
 	}
 	defer func() {
 		<-chans.concurrencyControl
@@ -80,10 +76,7 @@ func downloadBundleFileListFile(ctx context.Context, bundle *Bundle,
 		sendErr(err)
 		return
 	}
-	select {
-	case chans.bundleEntries <- bundleEntriesRes{bundleEntries: bundleEntries, idx: i}:
-	case <-chans.done:
-	}
+	chans.bundleEntries <- bundleEntriesRes{bundleEntries: bundleEntries, idx: i}
 
 }
 
@@ -115,7 +108,6 @@ func unpackBundleFileList(ctx context.Context, bundle *Bundle, bundleEntriesPerF
 	go downloadBundleFileList(ctx, bundle, downloadBundleFileListChans{
 		bundleEntries: bundleEntriesC,
 		error:         errorC,
-		done:          doneC,
 		doneOk:        doneOkC,
 	})
 
@@ -160,7 +152,6 @@ type errorHit struct {
 
 type downloadBundleChans struct {
 	error              chan<- errorHit
-	done               <-chan struct{}
 	doneOk             chan<- struct{}
 	concurrencyControl <-chan struct{}
 }
@@ -198,12 +189,9 @@ func downloadBundleEntry(ctx context.Context, bundleEntry model.BundleEntry,
 		<-chans.concurrencyControl
 	}()
 	reportError := func(err error) {
-		select {
-		case chans.error <- errorHit{
+		chans.error <- errorHit{
 			err,
 			bundleEntry.NameWithPath,
-		}:
-		case <-chans.done:
 		}
 	}
 	err := downloadBundleEntrySync(ctx, bundleEntry, bundle, fs)
@@ -245,16 +233,13 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 		return err
 	}
 	errC := make(chan errorHit)
-	doneC := make(chan struct{})
 	doneOkC := make(chan struct{})
-	defer close(doneC)
 	go downloadBundleEntries(
 		ctx,
 		bundle,
 		fs,
 		downloadBundleChans{
 			error:  errC,
-			done:   doneC,
 			doneOk: doneOkC,
 		})
 	select {
