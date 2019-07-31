@@ -60,6 +60,25 @@ build-and-push-fuse-sidecar:
 		.
 	docker push gcr.io/onec-co/datamon-fuse-sidecar
 
+
+.PHONY: build-and-push-datamover
+## build sidecar container used in Argo workflows
+build-and-push-datamover:
+	@echo 'building fuse sidecar container'
+	docker build \
+		--progress plain \
+		--build-arg version_import_path=$(VERSION_INFO_IMPORT_PATH) \
+		--build-arg version=$(VERSION) \
+		--build-arg commit=$(COMMIT) \
+		--build-arg dirty=$(GITDIRTY) \
+		-t gcr.io/onec-co/datamon-datamover \
+		-t gcr.io/onec-co/datamon-datamover:${GITHUB_USER}-$$(date '+%Y%m%d') \
+		-t gcr.io/onec-co/datamon-datamover:$(subst /,_,$(GIT_BRANCH)) \
+		--ssh default \
+		-f datamover.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-datamover
+
 .PHONY: build-datamon
 ## Build datamon docker container (datamon)
 build-datamon:

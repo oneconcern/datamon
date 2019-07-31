@@ -117,6 +117,20 @@ func walkDirConcurrently(rootDir string) {
 	wg.Wait()
 }
 
+func generateParamsToOutputFile() (*os.File, error) {
+	var file *os.File
+	var err error
+	if generateParams.output != "-" {
+		file, err = os.Create(generateParams.output)
+	} else {
+		file = os.Stdout
+	}
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
 func processFiles(fileChan chan string, wg *sync.WaitGroup) {
 	fileList := iradix.New()
 	fileListTxn := fileList.Txn()
@@ -126,16 +140,17 @@ func processFiles(fileChan chan string, wg *sync.WaitGroup) {
 		if !ok {
 			break
 		}
-		fileListTxn.Insert(model.UnsafeStringToBytes(strings.TrimPrefix(fileEnt, filepath.Clean(generateParams.parentDir)+"/")+"\n"), nil)
+		fileListTxn.Insert(model.UnsafeStringToBytes(strings.TrimPrefix(
+			fileEnt, filepath.Clean(generateParams.parentDir)+"/")+"\n"), nil)
 		count++
 		if count%10000 == 0 {
-			log.Printf("Processed count:%d files, last file:%s", count, strings.TrimPrefix(fileEnt, filepath.Clean(generateParams.parentDir)+"/"))
+			log.Printf("Processed count:%d files, last file:%s", count, strings.TrimPrefix(
+				fileEnt, filepath.Clean(generateParams.parentDir)+"/"))
 		}
 	}
-
 	fileList = fileListTxn.Commit()
 	iterator := fileList.Root().Iterator()
-	file, err := os.Create(generateParams.output)
+	file, err := generateParamsToOutputFile()
 	if err != nil {
 		log.Fatalf("failed to open file:%s err:%s", generateParams.output, err)
 	}
@@ -244,7 +259,7 @@ var generateFileListCmd = &cobra.Command{
 		logError := log.New(os.Stderr, "", 0)
 		log := log.New(os.Stdout, "", 0)
 		count := 0
-		file, err := os.Create(generateParams.output)
+		file, err := generateParamsToOutputFile()
 		if err != nil {
 			log.Fatalf("failed to open file:%s err:%s", generateParams.output, err)
 		}

@@ -18,6 +18,12 @@ type paramsT struct {
 		fileType  string
 		mockDest  bool
 	}
+	writeFiles struct {
+		fileSize       float64
+		numFiles       int
+		outDir         string
+		parallelWrites int
+	}
 }
 
 var params paramsT = paramsT{}
@@ -69,4 +75,28 @@ func addUploadMockDest(cmd *cobra.Command) string {
 	cmd.Flags().BoolVar(&params.upload.mockDest, flagName, true,
 		"whether to use GCS or a mock/stub/spy storage.Store")
 	return flagName
+}
+
+func addWriteFilesFilesize(cmd *cobra.Command) string {
+	const filesize = "filesize"
+	cmd.Flags().Float64Var(&params.writeFiles.fileSize, filesize, 16, "Per-file size (approx MiB) to write")
+	return filesize
+}
+
+func addWriteFilesNumFiles(cmd *cobra.Command) string {
+	const numFiles = "num-files"
+	cmd.Flags().IntVar(&params.writeFiles.numFiles, numFiles, 40, "Total number of files to write")
+	return numFiles
+}
+
+func addWriteFilesOutDir(cmd *cobra.Command) string {
+	const outDir = "out"
+	cmd.Flags().StringVar(&params.writeFiles.outDir, outDir, "", "Directory to write output files")
+	return outDir
+}
+
+func addWriteFilesParallelWrites(cmd *cobra.Command) string {
+	const parallelWrites = "parallel-writes"
+	cmd.Flags().IntVar(&params.writeFiles.parallelWrites, parallelWrites, 10, "Number of files to write in parallel")
+	return parallelWrites
 }

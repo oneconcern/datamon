@@ -23,7 +23,6 @@ import (
 type GCSParams struct {
 	MetadataBucket string
 	BlobBucket     string
-	Credential     string
 }
 
 var gcsParams GCSParams
@@ -82,6 +81,14 @@ var uploadCmd = &cobra.Command{
 	Short: "Upload a bundle",
 	Long:  "Upload a bundle of randomly-generated data.",
 	Run: func(cmd *cobra.Command, args []string) {
+		gcsCredential := func() string {
+			gcsCredential, foundCreds := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
+			if !foundCreds {
+				log.Fatalln("didn't find GOOGLE_APPLICATION_CREDENTIALS in env")
+			}
+			return gcsCredential
+		}()
+
 		var metaStore storage.Store
 		var blobStore storage.Store
 		if params.upload.mockDest {
@@ -93,10 +100,10 @@ var uploadCmd = &cobra.Command{
 				log.Fatalln(err)
 			}
 			defer deleteBuckets()
-			if metaStore, err = gcs.New(context.TODO(), gcsParams.MetadataBucket, gcsParams.Credential); err != nil {
+			if metaStore, err = gcs.New(context.TODO(), gcsParams.MetadataBucket, gcsCredential); err != nil {
 				log.Fatalln(err)
 			}
-			if blobStore, err = gcs.New(context.TODO(), gcsParams.BlobBucket, gcsParams.Credential); err != nil {
+			if blobStore, err = gcs.New(context.TODO(), gcsParams.BlobBucket, gcsCredential); err != nil {
 				log.Fatalln(err)
 			}
 		}
@@ -182,11 +189,6 @@ var uploadCmd = &cobra.Command{
 }
 
 func init() {
-	var foundCreds bool
-	gcsParams.Credential, foundCreds = os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
-	if !foundCreds {
-		log.Fatalln("didn't find GOOGLE_APPLICATION_CREDENTIALS in env")
-	}
 
 	addUploadFilesize(uploadCmd)
 	addUploadNumFiles(uploadCmd)

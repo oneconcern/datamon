@@ -115,6 +115,9 @@ func uploadBundleFile(
 	defer func() {
 		<-chans.concurrencyControl
 	}()
+	logger.Debug("putting file in cafs",
+		zap.String("filename", file),
+	)
 	putRes, e := cafsArchive.Put(ctx, fileReader)
 	if e != nil {
 		chans.error <- errorHit{
