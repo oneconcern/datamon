@@ -49,8 +49,6 @@ type uploadBundleChans struct {
 	// recv data from goroutines about uploaded files
 	filePacked chan<- filePacked
 	error      chan<- errorHit
-	// broadcast to all goroutines not to block by closing this channel
-	done <-chan struct{}
 	// signal file upload goroutines done by writing to this channel
 	doneOk             chan<- struct{}
 	concurrencyControl <-chan struct{}
@@ -111,25 +109,19 @@ func uploadBundleFile(
 	}()
 	putRes, e := cafsArchive.Put(ctx, fileReader)
 	if e != nil {
-		select {
-		case chans.error <- errorHit{
+		chans.error <- errorHit{
 			error: e,
 			file:  file,
-		}:
-		case <-chans.done:
 		}
 		return
 	}
 
-	select {
-	case chans.filePacked <- filePacked{
+	chans.filePacked <- filePacked{
 		hash:      putRes.Key.String(),
 		keys:      putRes.Keys,
 		name:      file,
 		size:      uint64(putRes.Written),
 		duplicate: putRes.Found,
-	}:
-	case <-chans.done:
 	}
 }
 
@@ -162,12 +154,9 @@ func uploadBundleFiles(
 				)
 				continue
 			}
-			select {
-			case chans.error <- errorHit{
+			chans.error <- errorHit{
 				error: err,
 				file:  file,
-			}:
-			case <-chans.done:
 			}
 		}
 		concurrencyControl <- struct{}{}
@@ -211,14 +200,11 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 
 	filePackedC := make(chan filePacked)
 	errorC := make(chan errorHit)
-	doneC := make(chan struct{})
 	doneOkC := make(chan struct{})
-	defer close(doneC)
 
 	go uploadBundleFiles(ctx, bundle, files, cafsArchive, uploadBundleChans{
 		filePacked: filePackedC,
 		error:      errorC,
-		done:       doneC,
 		doneOk:     doneOkC,
 	})
 
