@@ -5,6 +5,11 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const (
+	LogLevelInfo  = "info"
+	LogLevelDebug = "debug"
+)
+
 func GetLogger(logLevel string) (*zap.Logger, error) {
 	zapConfig := zap.NewProductionConfig()
 	var lvl zapcore.Level

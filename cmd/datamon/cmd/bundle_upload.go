@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -69,19 +70,19 @@ var uploadBundleCmd = &cobra.Command{
 			logFatalln(err)
 		}
 
-		if params.label.Name == "" {
-			return
+		if params.label.Name != "" {
+			labelDescriptor := core.NewLabelDescriptor(
+				core.LabelContributor(contributor),
+			)
+			label := core.NewLabel(labelDescriptor,
+				core.LabelName(params.label.Name),
+			)
+			err = label.UploadDescriptor(ctx, bundle)
+			if err != nil {
+				logFatalln(err)
+			}
 		}
-		labelDescriptor := core.NewLabelDescriptor(
-			core.LabelContributor(contributor),
-		)
-		label := core.NewLabel(labelDescriptor,
-			core.LabelName(params.label.Name),
-		)
-		err = label.UploadDescriptor(ctx, bundle)
-		if err != nil {
-			logFatalln(err)
-		}
+		log.Printf("Uploaded bundle id:%s ", bundle.BundleID)
 	},
 }
 

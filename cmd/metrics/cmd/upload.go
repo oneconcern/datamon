@@ -15,6 +15,7 @@ import (
 
 	gcsStorage "cloud.google.com/go/storage"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -81,21 +82,26 @@ var uploadCmd = &cobra.Command{
 	Short: "Upload a bundle",
 	Long:  "Upload a bundle of randomly-generated data.",
 	Run: func(cmd *cobra.Command, args []string) {
-		deleteBuckets, err := setupBuckets()
-		if err != nil {
-			log.Fatalln(err)
+		var metaStore storage.Store
+		var blobStore storage.Store
+		if params.upload.mockDest {
+			metaStore = newMockDestStore("meta", logger)
+			blobStore = newMockDestStore("blob", logger)
+		} else {
+			deleteBuckets, err := setupBuckets()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			defer deleteBuckets()
+			if metaStore, err = gcs.New(context.TODO(), gcsParams.MetadataBucket, gcsParams.Credential); err != nil {
+				log.Fatalln(err)
+			}
+			if blobStore, err = gcs.New(context.TODO(), gcsParams.BlobBucket, gcsParams.Credential); err != nil {
+				log.Fatalln(err)
+			}
 		}
-		defer deleteBuckets()
 
-		metaStore, err := gcs.New(context.TODO(), gcsParams.MetadataBucket, gcsParams.Credential)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		blobStore, err := gcs.New(context.TODO(), gcsParams.BlobBucket, gcsParams.Credential)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
+		var err error
 		sourceStore := func() storage.Store {
 			var s storage.Store
 			filenames := make([]string, 0)
@@ -106,6 +112,9 @@ var uploadCmd = &cobra.Command{
 			}
 			stripe := []byte{0xDE, 0xDB, 0xEF}
 			max := int64(1024 * 1024 * params.upload.max)
+			if max < 1 {
+				log.Fatalln("less than one byte based on filesize param")
+			}
 			numChunks := params.upload.numChunks
 			switch params.upload.fileType {
 			case "stripe":
@@ -149,6 +158,7 @@ var uploadCmd = &cobra.Command{
 			core.MetaStore(metaStore),
 			core.BlobStore(blobStore),
 			core.ConsumableStore(sourceStore),
+			core.Logger(logger),
 		)
 
 		logger.Debug("beginning upload")
@@ -159,6 +169,14 @@ var uploadCmd = &cobra.Command{
 		}
 
 		logger.Debug("upload done")
+
+		metaMockStore, ok := metaStore.(*mockDestStore)
+		if ok {
+			logger.Info("mock meta store info",
+				zap.Int("filelist put cnt", metaMockStore.fileListUploadPutCnt),
+				zap.String("store name", metaMockStore.name),
+			)
+		}
 
 	},
 }
@@ -174,6 +192,7 @@ func init() {
 	addUploadNumFiles(uploadCmd)
 	addUploadNumChunks(uploadCmd)
 	addUploadFileType(uploadCmd)
+	addUploadMockDest(uploadCmd)
 
 	rootCmd.AddCommand(uploadCmd)
 }
