@@ -242,11 +242,14 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		}
 		f.Close()
 	}
-	filePackedList := make([]filePacked, 0, len(files))
+	var numFilePackedRes int
+	var numFileListUploads int
+	fileList := make([]model.BundleEntry, 0, bundleEntriesPerFile)
 	for {
 		var gotDoneSignal bool
 		select {
 		case f := <-filePackedC:
+			numFilePackedRes++
 			bundle.l.Debug("Uploaded file",
 				zap.String("name", f.name),
 				zap.Bool("duplicate", f.duplicate),
@@ -254,7 +257,20 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 				zap.Int("num keys", len(f.keys)),
 				zap.Int("idx", f.idx),
 			)
-			filePackedList = append(filePackedList, f)
+			fileList = append(fileList, filePacked2BundleEntry(f))
+			// Write the bundle entry file if reached max or the last one
+			if len(fileList) == int(bundleEntriesPerFile) {
+				bundle.l.Debug("Uploading filelist (max entries reached)")
+				err = uploadBundleEntriesFileList(ctx, bundle, fileList)
+				if err != nil {
+					bundle.l.Error("Bundle upload failed.  Failed to upload bundle entries list.",
+						zap.Error(err),
+					)
+					return err
+				}
+				numFileListUploads++
+				fileList = fileList[:0]
+			}
 		case e := <-errorC:
 			bundle.l.Error("Bundle upload failed. Failed to upload file",
 				zap.Error(e.error),
@@ -269,36 +285,20 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 			break
 		}
 	}
-	bundle.l.Info("async results (filePackedList) constructed",
-		zap.Int("num file packed results", len(filePackedList)),
-		zap.Int("approx expected number of fileLists", len(filePackedList)/int(bundleEntriesPerFile)),
-		zap.Int("based on bundle entries per file", int(bundleEntriesPerFile)),
-	)
-	var numFileListUploads int
-	fileList := make([]model.BundleEntry, 0, bundleEntriesPerFile)
-	for packedFileIdx, packedFile := range filePackedList {
-		fileList = append(fileList, filePacked2BundleEntry(packedFile))
-		// Write the bundle entry file if reached max or the last one
-		if packedFileIdx == len(filePackedList)-1 || len(fileList) == int(bundleEntriesPerFile) {
-			numFileListUploads++
-			bundle.l.Debug("uploading file list",
-				zap.Int("curr file index", packedFileIdx),
-				zap.Int("total upload attempts so far", numFileListUploads),
-				zap.Int("BundleEntriesFileCount", int(bundle.BundleDescriptor.BundleEntriesFileCount)),
+	if len(fileList) != 0 {
+		bundle.l.Debug("Uploading filelist (final)")
+		err = uploadBundleEntriesFileList(ctx, bundle, fileList)
+		if err != nil {
+			bundle.l.Error("Bundle upload failed.  Failed to upload bundle entries list.",
+				zap.Error(err),
 			)
-			err = uploadBundleEntriesFileList(ctx, bundle, fileList)
-			if err != nil {
-				bundle.l.Error("Bundle upload failed.  Failed to upload bundle entries list.",
-					zap.Error(err),
-				)
-				return err
-			}
-			fileList = fileList[:0]
+			return err
 		}
+		numFileListUploads++
 	}
 	bundle.l.Info("uploaded filelists",
 		zap.Int("actual number uploads attempted", numFileListUploads),
-		zap.Int("approx expected number of uploads", len(filePackedList)/int(bundleEntriesPerFile)),
+		zap.Int("approx expected number of uploads", numFilePackedRes/int(bundleEntriesPerFile)),
 	)
 	err = uploadBundleDescriptor(ctx, bundle)
 	if err != nil {
