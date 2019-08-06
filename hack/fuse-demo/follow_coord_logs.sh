@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/zsh
 
 STARTUP_POLL_INTERVAL=1
 
@@ -15,4 +15,27 @@ echo "pod started, following logs of $pod_name"
 
 # kubectl logs -f -lapp=datamon-coord-demo --all-containers=true
 
-kubectl logs "$pod_name" -f --all-containers=true
+LOG_FILE=/tmp/datamon-coord-demo.log
+
+if [[ -e $LOG_FILE ]]; then
+    print "removing extant log file $LOG_FILE"
+    rm $LOG_FILE
+fi
+
+kubectl logs "$pod_name" -f --all-containers=true |tee $LOG_FILE &
+log_pid=$!
+
+LOG_POLL_INTERVAL=3
+
+WRAP_APPLICATION_DONE=
+WRAP_DATAMON_DONE=
+
+while [[ -z $WRAP_APPLICATION_DONE || -z $WRAP_DATAMON_DONE ]]; do
+    if cat $LOG_FILE | grep -q '^wrap_application sleeping indefinitely'; then
+        WRAP_APPLICATION_DONE=true
+    fi
+    if cat $LOG_FILE | grep -q '^wrap_datamon sleeping indefinitely'; then
+        WRAP_DATAMON_DONE=true
+    fi
+    sleep $LOG_POLL_INTERVAL
+done
