@@ -5,10 +5,8 @@ package core
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"hash/crc32"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -34,6 +32,7 @@ type filePacked struct {
 	keys      []byte
 	size      uint64
 	duplicate bool
+	idx       int
 }
 
 func filePacked2BundleEntry(packedFile filePacked) model.BundleEntry {
@@ -62,20 +61,26 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 		return err
 	}
 	msCRC, ok := bundle.MetaStore.(storage.StoreCRC)
+	archivePathToBundleFileList := model.GetArchivePathToBundleFileList(
+		bundle.RepoID,
+		bundle.BundleID,
+		bundle.BundleDescriptor.BundleEntriesFileCount)
 	if ok {
 		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
+		bundle.l.Debug("uploadBundleEntriesFileList calling MetaStore.PutCRC",
+			zap.String("archive path", archivePathToBundleFileList),
+			zap.Int("BundleEntriesFileCount", int(bundle.BundleDescriptor.BundleEntriesFileCount)),
+		)
 		err = msCRC.PutCRC(ctx,
-			model.GetArchivePathToBundleFileList(
-				bundle.RepoID,
-				bundle.BundleID,
-				bundle.BundleDescriptor.BundleEntriesFileCount),
+			archivePathToBundleFileList,
 			bytes.NewReader(buffer), storage.IfNotPresent, crc)
 	} else {
+		bundle.l.Debug("uploadBundleEntriesFileList calling MetaStore.Put",
+			zap.String("archive path", archivePathToBundleFileList),
+			zap.Int("BundleEntriesFileCount", int(bundle.BundleDescriptor.BundleEntriesFileCount)),
+		)
 		err = bundle.MetaStore.Put(ctx,
-			model.GetArchivePathToBundleFileList(
-				bundle.RepoID,
-				bundle.BundleID,
-				bundle.BundleDescriptor.BundleEntriesFileCount),
+			archivePathToBundleFileList,
 			bytes.NewReader(buffer), storage.IfNotPresent)
 	}
 	if err != nil {
@@ -102,7 +107,10 @@ func uploadBundleFile(
 	file string,
 	cafsArchive cafs.Fs,
 	fileReader io.Reader,
-	chans uploadBundleChans) {
+	chans uploadBundleChans,
+	fileIdx int,
+	logger *zap.Logger,
+) {
 
 	defer func() {
 		<-chans.concurrencyControl
@@ -122,7 +130,11 @@ func uploadBundleFile(
 		name:      file,
 		size:      uint64(putRes.Written),
 		duplicate: putRes.Found,
+		idx:       fileIdx,
 	}
+	logger.Debug("sent file packed result",
+		zap.Int("idx", fileIdx),
+	)
 }
 
 func uploadBundleFiles(
@@ -133,7 +145,7 @@ func uploadBundleFiles(
 	chans uploadBundleChans) {
 	concurrencyControl := make(chan struct{}, bundle.concurrentFileUploads)
 	chans.concurrencyControl = concurrencyControl
-	for _, file := range files {
+	for fileIdx, file := range files {
 		// Check to see if the file is to be skipped.
 		if bundle.skipFile(file) {
 			bundle.l.Info("skipping file",
@@ -158,16 +170,25 @@ func uploadBundleFiles(
 				error: err,
 				file:  file,
 			}
+			break
 		}
 		concurrencyControl <- struct{}{}
-		go uploadBundleFile(ctx, file, cafsArchive, fileReader, chans)
+		bundle.l.Debug("kicking off upload file",
+			zap.Int("idx", fileIdx),
+		)
+		go uploadBundleFile(ctx, file, cafsArchive, fileReader, chans,
+			fileIdx, bundle.l)
 	}
+	bundle.l.Debug("awaiting last uploads to complete",
+		zap.Int("max possible remaining uploads", cap(concurrencyControl)),
+	)
 	/* once the buffered channel semaphore is filled with sentinel entries,
 	 * all `uploadBundleFile` goroutines have exited.
 	 */
 	for i := 0; i < cap(concurrencyControl); i++ {
 		concurrencyControl <- struct{}{}
 	}
+	bundle.l.Debug("upload threads finished.  sending doneOk event.")
 	chans.doneOk <- struct{}{}
 }
 
@@ -226,23 +247,45 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		var gotDoneSignal bool
 		select {
 		case f := <-filePackedC:
-			log.Printf("Uploaded file:%s, duplicate:%t, key:%s, keys:%d", f.name, f.duplicate, f.hash, len(f.keys))
+			bundle.l.Debug("Uploaded file",
+				zap.String("name", f.name),
+				zap.Bool("duplicate", f.duplicate),
+				zap.String("key", f.hash),
+				zap.Int("num keys", len(f.keys)),
+				zap.Int("idx", f.idx),
+			)
 			filePackedList = append(filePackedList, f)
 		case e := <-errorC:
-			fmt.Printf("Bundle upload failed. Failed to upload file %s err: %s", e.file, e.error)
+			bundle.l.Error("Bundle upload failed. Failed to upload file",
+				zap.Error(e.error),
+				zap.String("file", e.file),
+			)
 			return e.error
 		case <-doneOkC:
+			bundle.l.Debug("Got upload done signal")
 			gotDoneSignal = true
 		}
 		if gotDoneSignal {
 			break
 		}
 	}
+	bundle.l.Info("async results (filePackedList) constructed",
+		zap.Int("num file packed results", len(filePackedList)),
+		zap.Int("approx expected number of fileLists", len(filePackedList)/int(bundleEntriesPerFile)),
+		zap.Int("based on bundle entries per file", int(bundleEntriesPerFile)),
+	)
+	var numFileListUploads int
 	fileList := make([]model.BundleEntry, 0, bundleEntriesPerFile)
 	for packedFileIdx, packedFile := range filePackedList {
 		fileList = append(fileList, filePacked2BundleEntry(packedFile))
 		// Write the bundle entry file if reached max or the last one
 		if packedFileIdx == len(filePackedList)-1 || len(fileList) == int(bundleEntriesPerFile) {
+			numFileListUploads++
+			bundle.l.Debug("uploading file list",
+				zap.Int("curr file index", packedFileIdx),
+				zap.Int("total upload attempts so far", numFileListUploads),
+				zap.Int("BundleEntriesFileCount", int(bundle.BundleDescriptor.BundleEntriesFileCount)),
+			)
 			err = uploadBundleEntriesFileList(ctx, bundle, fileList)
 			if err != nil {
 				bundle.l.Error("Bundle upload failed.  Failed to upload bundle entries list.",
@@ -253,11 +296,17 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 			fileList = fileList[:0]
 		}
 	}
+	bundle.l.Info("uploaded filelists",
+		zap.Int("actual number uploads attempted", numFileListUploads),
+		zap.Int("approx expected number of uploads", len(filePackedList)/int(bundleEntriesPerFile)),
+	)
 	err = uploadBundleDescriptor(ctx, bundle)
 	if err != nil {
 		return err
 	}
-	log.Printf("Uploaded bundle id:%s ", bundle.BundleID)
+	bundle.l.Info("Uploaded bundle id",
+		zap.String("BundleID", bundle.BundleID),
+	)
 	return nil
 }
 
