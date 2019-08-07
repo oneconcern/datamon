@@ -268,7 +268,7 @@ for upload_cmd in $UPLOAD_CMDS; do
     IFS="$ifs_orig"
     bundle_id=$(2>&1 run_datamon_cmd "$upload_cmd" | \
                     grep 'Uploaded bundle id' | \
-                    head -1 | \
+                    tail -1 | \
                     sed 's/Uploaded bundle id:\(.*\)/\1/')
     upload_status="$?"
     if [ "$upload_status" != 0 ]; then
