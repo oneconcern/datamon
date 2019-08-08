@@ -10,8 +10,14 @@ repo_name=
 label=
 bundle_id=
 
-while getopts r:l:b: opt; do
+pull_policy=Always
+
+while getopts or:l:b: opt; do
     case $opt in
+        (o)
+            # local deploy
+            pull_policy=IfNotPresent
+            ;;
         (r)
             repo_name="$OPTARG"
             ;;
@@ -56,8 +62,6 @@ kubectl create secret generic \
 # PROJROOT="$(git rev-parse --show-toplevel)" \
     # GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD |sed 's@/@_@g')" \
 
-echo "have repo $repo_name label $label bundle id $bundle_id"
-
 if [ -z $label ]; then
     if [ -z $bundle_id ]; then
         echo 'no bundle specified' 1>&2
@@ -68,17 +72,21 @@ else
         echo 'bundle id and label are mutually exclusive' 1>&2
         exit 1
     fi
-    bundle_id=$("$DATAMON_EXEC" label list --repo "$repo_name" 2>&1 | \
-                    grep '^'"$label" | \
-                    cut -d',' -f2 | sed 's/ //g')
+    bundle_id=$(2>&1 "$DATAMON_EXEC" label get \
+                     --repo "$repo_name" \
+                     --label $label \
+                    |tail -1 |cut -d ',' -f 2 |tr -d ' ')
     if [ "$bundle_id" = '' ]; then
         echo "couldn't find bundle if for label $label" 1>&2
         exit 1
     fi
 fi
 
+echo "have repo '$repo_name' label '$label' bundle id '$bundle_id'"
+
 RES_DEF="$proj_root_dir"/hack/k8s/gen/example-ro.yaml
 
+PULL_POLICY=$pull_policy \
 SHELL_NAME="$(basename "$SHELL")" \
           REPO_NAME="$repo_name" \
           BUNDLE_ID="$bundle_id" \

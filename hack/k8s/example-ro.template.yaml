@@ -15,7 +15,7 @@ spec:
       containers:
       - name: demo-shell
         image: gcr.io/onec-co/datamon-fuse-demo-shell:latest
-        imagePullPolicy: "Always"
+        imagePullPolicy: "$PULL_POLICY"
         command: ["/bin/tini"]
         args: ["--", "/bin/zsh"]
         stdin: true
@@ -26,14 +26,19 @@ spec:
           mountPropagation: "HostToContainer"
       - name: datamon-sidecar
         image: gcr.io/onec-co/datamon-fuse-demo-sidecar:latest
-        imagePullPolicy: "Always"
-        command: ["datamon"]
-        args: ["bundle", "mount",
-        "--repo", "$REPO_NAME",
-        "--bundle", "$BUNDLE_ID",
-        "--destination", "/tmp",
-        "--mount", "/tmp/mount",
-        "--stream"]
+        imagePullPolicy: "$PULL_POLICY"
+
+        command: ["/bin/tini"]
+        args: ["--", "/bin/zsh"]
+
+        # command: ["datamon"]
+        # args: ["bundle", "mount",
+        # "--repo", "$REPO_NAME",
+        # "--bundle", "$BUNDLE_ID",
+        # "--destination", "/tmp",
+        # "--mount", "/tmp/mount",
+        # "--stream"]
+
         securityContext:
           privileged: true
         stdin: true
@@ -47,9 +52,11 @@ spec:
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /tmp/gac/google-application-credentials.json
-        resources:
-          requests:
-            memory: "27G"
+
+        # resources:
+        #   requests:
+        #     memory: "27G"
+
       volumes:
       - name: fuse-mountpoint
         emptyDir: {}
@@ -57,12 +64,12 @@ spec:
         secret:
           secretName: google-application-credentials
 
-      tolerations:
-      - key: "oneconcern.com/flood"
-        operator: Equal
-        value: "inundation"
-      nodeSelector:
-        kubernetes.io/role: "flood-pipeline"
+      # tolerations:
+      # - key: "oneconcern.com/flood"
+      #   operator: Equal
+      #   value: "inundation"
+      # nodeSelector:
+      #   kubernetes.io/role: "flood-pipeline"
 
       # tolerations:
       #   - key: "oneconcern.com/dedicated"

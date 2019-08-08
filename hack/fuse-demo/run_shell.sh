@@ -1,5 +1,7 @@
 #! /bin/zsh
 
+STARTUP_POLL_INTERVAL=1
+
 container_name=demo-shell
 
 while getopts s opt; do
@@ -17,10 +19,12 @@ done
 
 pod_name=$(kubectl get pods -l app=datamon-ro-demo | grep Running | sed 's/ .*//')
 
-if [[ -z $pod_name ]]; then
-	echo 'fuse demo pod not found' 1>&2
-	exit 1
-fi
+echo "waiting on pod start"
+
+while [[ -z $pod_name ]]; do
+    sleep "$STARTUP_POLL_INTERVAL"
+    pod_name=$(kubectl get pods -l app=datamon-ro-demo | grep Running | sed 's/ .*//')
+done
 
 kubectl exec -it "$pod_name" \
         -c "$container_name" \

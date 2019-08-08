@@ -22,6 +22,30 @@ RUN apt-get update &&\
         /usr/share/locale/* \
         /var/cache/debconf/*-old
 
+##
+# tini
+
+# RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+
+ENV TINI_VERSION v0.18.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-amd64 /tmp/tini-static-amd64
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-amd64.asc /tmp/tini-static-amd64.asc
+
+# omitting gpg verification during development/demo
+# RUN for key in \
+#       595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
+#     ; do \
+#       gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys "$key" || \
+#       gpg --keyserver hkp://ipv4.pool.sks-keyservers.net --recv-keys "$key" || \
+#       gpg --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "$key" ; \
+#     done
+
+# RUN gpg --verify /tmp/tini-static-amd64.asc
+
+RUN install -m 0755 /tmp/tini-static-amd64 /bin/tini
+
+##
+
 # allow pprof `list` command
 ADD . /datamon
 

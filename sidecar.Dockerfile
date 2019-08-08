@@ -32,6 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends fuse &&\
   apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 RUN echo "allow_root" >> /etc/fuse.conf
 
+# RUN echo "user_allow_other" >> /etc/fuse.conf
+
 COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip
 

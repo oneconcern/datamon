@@ -236,7 +236,6 @@ fuse-demo-build-sidecar:
 fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
 	@docker image push gcr.io/onec-co/datamon-fuse-demo-shell
 	@./hack/fuse-demo/create_ro_pod.sh
-	@sleep 8 # dumb timeout on container startup
 	@./hack/fuse-demo/run_shell.sh
 
 .PHONY: fuse-demo-coord-build-app
