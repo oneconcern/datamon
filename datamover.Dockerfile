@@ -58,6 +58,7 @@ RUN apt-get update && \
     tmux \
     bc \
     vim \
+    mc \
     htop &&\
   apt-get autoremove -yqq &&\
   apt-get clean -y &&\

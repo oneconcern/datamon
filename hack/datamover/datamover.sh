@@ -1,5 +1,8 @@
 #! /bin/zsh
 
+# use the ZERR trap to finalize (e.g. set different exit code, etc.)
+setopt ERR_EXIT
+
 typeset -a dirs
 
 TIMESTAMP=$(date +%y%m%d%H%M%S)

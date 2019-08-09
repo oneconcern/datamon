@@ -51,6 +51,10 @@ if ! print $filelist_dir | grep -q '^/'; then
     filelist_dir=${pvc_mnt_path}/${filelist_dir}
 fi
 
+if [[ -z $GOOGLE_APPLICATION_CREDENTIALS ]]; then
+	echo 'GOOGLE_APPLICATION_CREDENTIALS env variable not set' 1>&2
+	exit 1
+fi
 
 RES_DEF="${PROJ_ROOT_DIR}"/hack/k8s/gen/datamover_job.yaml
 
@@ -65,6 +69,16 @@ BKUP_PATH=$bkup_path_opt \
          "${PROJ_ROOT_DIR}"/hack/k8s/datamover_job.template.yaml \
          > "$RES_DEF"
 
+##
+
+if kubectl get secret google-application-credentials &> /dev/null; then
+	kubectl delete secret google-application-credentials
+fi
+
+# https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform#step_4_import_credentials_as_a_secret
+kubectl create secret generic \
+	google-application-credentials \
+	--from-file=google-application-credentials.json=$GOOGLE_APPLICATION_CREDENTIALS
 
 kubectl delete job.batch/datamon-datamover-job
 

@@ -1,5 +1,7 @@
 #! /bin/zsh
 
+setopt ERR_EXIT
+
 LOG_PATH=/tmp/datamover_metrics.log
 
 DM_BIN=datamover

@@ -221,8 +221,8 @@ func actOnFilelist(inputFile *os.File, action filelistAction, filter filelistFil
 	wgAllInit.Add(1)
 	go func() {
 		for scanner.Scan() {
-			filelistActionChans.filename <- scanner.Text()
 			wgIndiv.Add(1)
+			filelistActionChans.filename <- scanner.Text()
 		}
 		wgAllInit.Done()
 	}()
