@@ -13,13 +13,18 @@ COORD_POINT=
 
 POLL_INTERVAL=1 # sec
 
-while getopts c: opt; do
+SLEEP_INSTEAD_OF_EXIT=
+
+while getopts sc: opt; do
     case $opt in
+        (s)
+            SLEEP_INSTEAD_OF_EXIT=true
+            ;;
         (c)
             COORD_POINT="$OPTARG"
             ;;
         (\?)
-            print Bad option, aborting.
+            echo "Bad option, aborting."
             return 1
             ;;
     esac
@@ -95,3 +100,10 @@ await_event \
 
 ## COORDINATION ENDS with this container exiting
 echo "recved upload done event, exiting"
+
+if [ -z "$SLEEP_INSTEAD_OF_EXIT" ]; then
+    exit 0
+fi
+
+echo "wrap_application sleeping indefinitely (for debug)"
+while true; do sleep 100; done

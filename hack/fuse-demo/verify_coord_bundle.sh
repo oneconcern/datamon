@@ -25,22 +25,14 @@ verify_datamon_timestamp() {
 }
 
 EXPECTED_LABEL=coordemo
-HASH_FROM_LABEL=
+print 'getting hash from label'
 
-"$DATAMON_EXEC" label list --repo "$DATAMON_REPO" 2>&1 | \
-    tail +2 | \
-    while read label_list_line; do
-        label=$(echo "$label_list_line" |cut -d"," -f 1 |tr -d ' ')
-        hash=$(echo "$label_list_line" |cut -d"," -f 2 |tr -d ' ')
-        timestamp=$(echo "$label_list_line" |cut -d"," -f 3 |sed 's/^ *//')
-        if [ "$EXPECTED_LABEL" = "$label" ]; then
-            HASH_FROM_LABEL="$hash"
-            verify_datamon_timestamp "$timestamp"
-            break
-        fi
-    done
-
-# todo: variable scoping within above `while read` loop
+label_list_line=$(2>&1 "$DATAMON_EXEC" label get \
+                       --repo "$DATAMON_REPO" \
+                       --label $EXPECTED_LABEL | \
+                      tail -1)
+HASH_FROM_LABEL=$(echo "$label_list_line" |cut -d"," -f 2 |tr -d ' ')
+verify_datamon_timestamp "$(echo "$label_list_line" |cut -d"," -f 3 |sed 's/^ *//')"
 
 if [ -z "HASH_FROM_LABEL" ]; then
     echo "didn't find expected label $EXPECTED_LABEL" 1>&2
@@ -53,28 +45,41 @@ fi
 
 mkdir "$COORD_VERIFY_PATH"
 
-# todo: set hash to download from label after bugfix
-HASH_TO_DOWNLOAD=
 
-most_recent_bundle_list_entry=$("$DATAMON_EXEC" bundle list \
-                                                --repo ransom-datamon-test-repo 2>&1 | \
-    grep 'container coordination demo$' | \
-    tail -1)
-HASH_TO_DOWNLOAD=$(echo "$most_recent_bundle_list_entry" | cut -d"," -f 1 |tr -d ' ')
-bundle_list_entry_timestamp=$(echo "$most_recent_bundle_list_entry" | cut -d"," -f 2 \
-                                  |sed 's/^ *//' |sed 's/ *$//')
+HASH_TO_DOWNLOAD=$HASH_FROM_LABEL
 
-verify_datamon_timestamp "$bundle_list_entry_timestamp"
+##
+# verify the bundle id file written according to the `-i` parameter to wrap_datamon.sh
+print 'getting hash from bundle id file'
+
+BUNDLE_ID_FILE=bundleid.txt
+if [[ -e $BUNDLE_ID_FILE ]]; then
+    print 'removing stale bundleid file'
+    rm $BUNDLE_ID_FILE
+fi
+pod_name=$(kubectl get pods -l app=datamon-coord-demo | grep Running | sed 's/ .*//')
+kubectl cp $pod_name:/tmp/bundleid.txt $BUNDLE_ID_FILE -c datamon-sidecar
+HASH_FROM_SIDECAR_OUTPUT=$(cat $BUNDLE_ID_FILE | tr -d ' ')
+rm $BUNDLE_ID_FILE
+
+##
+
+if [ -z "$HASH_TO_DOWNLOAD" ]; then
+    echo 'hash to download unset' 2>&1
+    exit 1
+fi
 
 if [ "$HASH_TO_DOWNLOAD" != "$HASH_FROM_LABEL" ]; then
     echo "message hash doesn't match label hash" 1>&2
     exit 1
 fi
 
-if [ -z "$HASH_TO_DOWNLOAD" ]; then
-    echo 'hash to download unset' 2>&1
+if [ "$HASH_TO_DOWNLOAD" != "$HASH_FROM_SIDECAR_OUTPUT" ]; then
+    echo "message hash doesn't match sidecar output hash" 1>&2
     exit 1
 fi
+
+print 'downloading bundle'
 
 "$DATAMON_EXEC" \
     bundle download \

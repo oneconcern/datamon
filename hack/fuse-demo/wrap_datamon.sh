@@ -11,9 +11,15 @@ POLL_INTERVAL=1 # sec
 
 COORD_POINT=
 DATAMON_CMDS=
+BUNDLE_ID_FILE=
 
-while getopts c:d: opt; do
+SLEEP_INSTEAD_OF_EXIT=
+
+while getopts sc:d:i: opt; do
     case $opt in
+        (s)
+            SLEEP_INSTEAD_OF_EXIT=true
+            ;;
         (c)
             COORD_POINT="$OPTARG"
             ;;
@@ -22,8 +28,11 @@ while getopts c:d: opt; do
                               sed 's/^ //' |sed 's/ $//')
             DATAMON_CMDS="${DATAMON_CMDS}:${datamon_cmd}"
             ;;
+        (i)
+            BUNDLE_ID_FILE="$OPTARG"
+            ;;
         (\?)
-            print Bad option, aborting.
+            echo "Bad option, aborting."
             return 1
             ;;
     esac
@@ -45,6 +54,7 @@ fi
 
 echo "getopts checks ok"
 
+num_upload_cmds=0
 UPLOAD_CMDS=
 MOUNT_CMDS=
 CONFIG_CMD=
@@ -67,6 +77,7 @@ for datamon_cmd in $DATAMON_CMDS; do
             bundle_cmd_name=$(echo "$datamon_cmd" |sed 's/[^ ]* \([^ ]*\).*/\1/')
             case $bundle_cmd_name in
                 (upload)
+                    num_upload_cmds="$((num_upload_cmds + 1))"
                     UPLOAD_CMDS="$UPLOAD_CMDS:$datamon_cmd"
                     ;;
                 (mount)
@@ -81,6 +92,21 @@ for datamon_cmd in $DATAMON_CMDS; do
     fi
 done
 IFS="$ifs_orig"
+
+if [ -n "$BUNDLE_ID_FILE" ]; then
+    bundle_id_file_dir="$(dirname "$BUNDLE_ID_FILE")"
+    if [ ! -d "$bundle_id_file_dir" ]; then
+        mkdir -p "$bundle_id_file_dir"
+    fi
+    if [ -f "$BUNDLE_ID_FILE" ]; then
+        echo "$BUNDLE_ID_FILE already exists" 1>&2
+        exit 1
+    fi
+    if [ ! "$num_upload_cmds" -eq 1 ]; then
+        echo "expected precisley one upload command when bundle id file specified" 1>&2
+        exit 1
+    fi
+fi
 
 UPLOAD_CMDS=$(echo "$UPLOAD_CMDS" |sed 's/^://')
 MOUNT_CMDS=$(echo "$MOUNT_CMDS" |sed 's/^://')
@@ -175,7 +201,8 @@ for mount_cmd in $MOUNT_CMDS; do
         exit
     fi
     IFS="$ifs_orig"
-    run_datamon_cmd "$mount_cmd" > "/tmp/datamon.${mount_idx}.log" 2>&1 &
+    log_file_mount="/tmp/datamon_mount.${mount_idx}.log"
+    run_datamon_cmd "$mount_cmd" > "$log_file_mount" 2>&1 &
     IFS=':'
     datamon_status="$?"
     datamon_pid="$!"
@@ -183,7 +210,7 @@ for mount_cmd in $MOUNT_CMDS; do
 
     if [ "$datamon_status" != "0" ]; then
         echo "error starting datamon $mount_cmd, try shell" 2>&1
-        cat "/tmp/datamon.${mount_idx}.log"
+        cat "$log_file_mount"
         sleep 3600
         exit 1
     fi
@@ -241,19 +268,43 @@ echo "starting datamon upload"
 
 ## notify the the application if the upload was successful, and exit this container in any case
 
+upload_idx=0
 ifs_orig="$IFS"
 IFS=':'
 for upload_cmd in $UPLOAD_CMDS; do
     IFS="$ifs_orig"
-    if ! run_datamon_cmd "$upload_cmd"; then
-        upload_status="$?"
-        echo "upload failed (${upload_status}), try shell"
+    log_file_upload="/tmp/datamon_upload.${upload_idx}.log"
+    bundle_id=$(2>&1 run_datamon_cmd "$upload_cmd" | \
+                    tee "$log_file_upload" | \
+                    grep 'Uploaded bundle id' | \
+                    tail -1 | \
+                    sed 's/Uploaded bundle id:\(.*\)/\1/')
+    datamon_status="$?"
+    if [ "$datamon_status" != 0 ]; then
+        echo "error starting datamon $upload_cmd, try shell" 2>&1
+        cat "$log_file_upload"
         sleep 3600
+        exit 1
+    fi
+    if [ -n "$BUNDLE_ID_FILE" ]; then
+        if [ -f "$BUNDLE_ID_FILE" ]; then
+            echo "$BUNDLE_ID_FILE already exists" 1>&2
+            exit 1
+        fi
+        echo "$bundle_id" > "$BUNDLE_ID_FILE"
     fi
     IFS=':'
+    upload_idx=$((upload_idx + 1))
 done
 IFS="$ifs_orig"
 
 emit_event \
     'uploaddone' \
     'dispatching upload done event'
+
+if [ -z "$SLEEP_INSTEAD_OF_EXIT" ]; then
+    exit 0
+fi
+
+echo "wrap_datamon sleeping indefinitely (for debug)"
+while true; do sleep 100; done
