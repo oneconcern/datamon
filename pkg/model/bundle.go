@@ -89,22 +89,26 @@ func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) 
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".json")
 }
 
+var labelNameRe *regexp.Regexp
+
 /* this function's design is converging on being able to return something meaningful
  * given any path in the metadata archive, not just those corresponding to bundles.
  *
- * using type polymorphism (i.e. interfaces) on  the return value might make more sense
- * as the design is built out.  with that in mind, its consumers might be better off using
- * type inference on its return value until this note is addressed.
+ * the return value might be changed to an interface type in later iterations.
  */
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	cs := strings.SplitN(archivePath, "/", 4)
 	if cs[0] == "labels" {
-		labelBasenameComponents := strings.SplitN(cs[2], ".", 2)
-		if len(labelBasenameComponents) != 2 || labelBasenameComponents[1] != "json" {
-			return ArchivePathComponents{}, fmt.Errorf("expected label basename '%v' to have serialization extension", cs[2])
+		labelBasenameMatches := labelNameRe.FindStringSubmatch(cs[2])
+		if labelBasenameMatches == nil {
+			return ArchivePathComponents{}, fmt.Errorf(
+				"expected label basename %s to match regexp %s",
+				cs[2], labelNameRe.String())
 		}
+		labelName := labelBasenameMatches[1]
+
 		return ArchivePathComponents{
-			LabelName: labelBasenameComponents[0],
+			LabelName: labelName,
 			Repo:      cs[1],
 		}, nil
 	}
@@ -128,4 +132,8 @@ func IsGeneratedFile(file string) bool {
 	//path, err := filepath.Abs(file)
 	match, _ := regexp.MatchString("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$", file)
 	return match
+}
+
+func init() {
+	labelNameRe = regexp.MustCompile(`^(.*)\.json$`)
 }
