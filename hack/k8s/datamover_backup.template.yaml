@@ -1,53 +1,52 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: datamon-datamover-nfs-access
+  name: datamon-backup-job
 spec:
-  selector:
-    matchLabels:
-      app: datamon-datamover-nfs-access
-  replicas: 1
   template:
     metadata:
       labels:
-        app: datamon-datamover-nfs-access
+        app: datamon-backup-job
     spec:
-      securityContext:
-        fsGroup: 1000
-      initContainers:
-      - name: set-pvc-vol-perms
-        image: ubuntu:latest
-        command:
-        - chown
-        - 1020:2000
-        - $PVC_MNT_PATH
-        volumeMounts:
-        - mountPath: $PVC_MNT_PATH
-          name: shared-vol
-
+      restartPolicy: Never
       containers:
       - name: datamon-bin
         image: gcr.io/onec-co/datamon-datamover:$DOCKER_IMG_TAG
         imagePullPolicy: "Always"
+        command: ["backup"]
+        args: [
+        "-d", "/filestore/output",
+        "-u", "$UNLINKABLE_LIST",
+        "-t", "$IS_TEST_DEBUG"
+        ]
+
         stdin: true
         tty: true
-
-        command: ["/bin/tini"]
-        args: ["--", "/bin/zsh"]
-
         volumeMounts:
-        - mountPath: $PVC_MNT_PATH
+        - mountPath: /filestore
           name: shared-vol
 
         # resources:
         #   requests:
         #     memory: "15G"
 
+        - mountPath: /tmp/gac
+          name: google-application-credentials
+
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /tmp/gac/google-application-credentials.json
+
       volumes:
+
+      - name: google-application-credentials
+        secret:
+          secretName: google-application-credentials
 
       - name: shared-vol
         persistentVolumeClaim:
           claimName: $PVC_NAME
+          # readOnly: false
 
       # tolerations:
       # - key: "oneconcern.com/flood"

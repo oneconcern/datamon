@@ -236,8 +236,25 @@ The docker image is called `gcr.io/onec-co/datamon-datamover` and is tagged with
 versions just as the Kubernetes sidecar, `v<release_number>`, where `v0.7` is the first
 tag that will apply to the Datamover.
 
-The shell wrapper script is to be included in Kubernetes YAML with `command: ["datamover"]`
-and used with the following parameters
+The `datamover` image contains two shell wrappers, `backup` and `datamover`.
+Both fulfill approximately the same purpose, backing up files from an NFS share
+to datamon.  The main difference is that `backup` uses standard *nix utils,
+while `datamover` uses an auxilliary util maintained alongside datamon.
+Their respective parameters are as follows:
+
+### `backup`
+
+* `-d` backup directory.  required if `-f` not present.
+  this is the recommended way to specify files to backup from a kubernetes job.
+* `-f` backup filelist.  list of files to backup.
+* `-u` unlinkable filelist.  when specified, files that can be safely deleted
+  after the backup are written to this list.  when unspecified, files are deleted
+  by `backup`.
+* `-t` set to `true` or `false` in order to run in test mode, which at present
+  does nothing more than specify the datamon repo to use.
+
+
+### `datamover`
 
 * `-d` backup directory.  required.
 * `-l` bundle label.  defaults to `datamover-<timestamp>`
