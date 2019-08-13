@@ -223,6 +223,37 @@ chmod +x datamon
 It's probably most convenient to have the wrapper script placed somewhere on your
 shell's path, of course.
 
+
+# Datamover container guide
+
+As with the [Kubernetes sidecar guide](#kubernetes-sidecar-guide), this section covers
+a particular operationalization of Datamon at One Concern wherein we use the program
+along with some auxilliary programs, all parameterized via a shell script and shipped
+in a Docker image, in order to periodically backup a shared block store and remove
+files according to their modify time.
+
+The docker image is called `gcr.io/onec-co/datamon-datamover` and is tagged with
+versions just as the Kubernetes sidecar, `v<release_number>`, where `v0.7` is the first
+tag that will apply to the Datamover.
+
+The shell wrapper script is to be included in Kubernetes YAML with `command: ["datamover"]`
+and used with the following parameters
+
+* `-d` backup directory.  required.
+* `-l` bundle label.  defaults to `datamover-<timestamp>`
+* `-t` timestamp filter before.  a timestamp string in system local time among several formats, including
+  - `<Year>-<Month>-<Day>` as in `2006-Jan-02`
+  - `<Year><Month><Day><Hour><Minute>` as in `0601021504`
+  - `<Year><Month><Day><Hour><Minute><second>` as in `060102150405`
+  defaults to `090725000000`
+* `-f` filelist directory.  defaults to `/tmp` and is the location to write
+  - `upload.list`, the files that datamon will attempt to upload as part of the backup
+  - `uploaded.list`, the files that have been successfully uploaded as part of the backup
+  - `removable.list`, the files that have been successfully uploaded and that have a modify time before the specified timestamp filter
+* `-c` concurrency factor.  defaults to 200.  tune this down in case of the NFS being hammered by too many reads during backup.
+* `-u` unlink, a boolean toggle.  whether to unlink the files in `removeable.list` as part of the `datamover` script.  defaults to off/false/not present.
+
+
 # Feature requests and bugs
 
 Please file GitHub issues for features desired in addition to any bugs encountered.

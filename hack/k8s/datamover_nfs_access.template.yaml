@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datamon-datamover-nfs-access
+spec:
+  selector:
+    matchLabels:
+      app: datamon-datamover-nfs-access
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: datamon-datamover-nfs-access
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+      - name: set-pvc-vol-perms
+        image: ubuntu:latest
+        command:
+        - chown
+        - 1020:2000
+        - $PVC_MNT_PATH
+        volumeMounts:
+        - mountPath: $PVC_MNT_PATH
+          name: shared-vol
+
+      containers:
+      - name: datamon-bin
+        image: gcr.io/onec-co/datamon-datamover:latest
+        imagePullPolicy: "Always"
+        stdin: true
+        tty: true
+
+        command: ["/bin/tini"]
+        args: ["--", "/bin/zsh"]
+
+        volumeMounts:
+        - mountPath: $PVC_MNT_PATH
+          name: shared-vol
+
+        # resources:
+        #   requests:
+        #     memory: "15G"
+
+      volumes:
+
+      - name: shared-vol
+        persistentVolumeClaim:
+          claimName: $PVC_NAME
+
+      # tolerations:
+      # - key: "oneconcern.com/flood"
+      #   operator: Equal
+      #   value: "inundation"
+      # nodeSelector:
+      #   kubernetes.io/role: "flood-pipeline"
+
+      # tolerations:
+      #   - key: "oneconcern.com/dedicated"
+      #     operator: Equal
+      #     value: "geodude"
+      # nodeSelector:
+      #     kubernetes.io/role: "geodude"

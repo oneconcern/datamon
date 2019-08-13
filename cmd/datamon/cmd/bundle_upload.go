@@ -8,6 +8,8 @@ import (
 	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/dlogger"
+
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -35,6 +37,10 @@ var uploadBundleCmd = &cobra.Command{
 		if err != nil {
 			logFatalln(err)
 		}
+		logger, err := dlogger.GetLogger(params.root.logLevel)
+		if err != nil {
+			logFatalln("Failed to set log level:" + err.Error())
+		}
 		bd := core.NewBDescriptor(
 			core.Message(params.bundle.Message),
 			core.Contributor(contributor),
@@ -46,6 +52,7 @@ var uploadBundleCmd = &cobra.Command{
 			core.MetaStore(remoteStores.meta),
 			core.SkipMissing(params.bundle.SkipOnError),
 			core.ConcurrentFileUploads(params.bundle.ConcurrencyFactor/fileUploadsByConcurrencyFactor),
+			core.Logger(logger),
 		)
 
 		if params.bundle.FileList != "" {
@@ -69,6 +76,7 @@ var uploadBundleCmd = &cobra.Command{
 		if err != nil {
 			logFatalln(err)
 		}
+		log.Printf("Uploaded bundle id:%s ", bundle.BundleID)
 
 		if params.label.Name != "" {
 			labelDescriptor := core.NewLabelDescriptor(
@@ -81,8 +89,8 @@ var uploadBundleCmd = &cobra.Command{
 			if err != nil {
 				logFatalln(err)
 			}
+			log.Printf("set label '%v'", params.label.Name)
 		}
-		log.Printf("Uploaded bundle id:%s ", bundle.BundleID)
 	},
 }
 
@@ -95,6 +103,7 @@ func init() {
 	addLabelNameFlag(uploadBundleCmd)
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd)
+	addLogLevel(uploadBundleCmd)
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {

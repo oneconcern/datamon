@@ -5,7 +5,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
 	daemonizer "github.com/jacobsa/daemonize"
@@ -116,7 +115,7 @@ var mountBundleCmd = &cobra.Command{
 		)
 		logger, err := dlogger.GetLogger(params.root.logLevel)
 		if err != nil {
-			log.Fatalln("Failed to set log level:" + err.Error())
+			logFatalln("Failed to set log level:" + err.Error())
 		}
 		fs, err := core.NewReadOnlyFS(bundle, logger)
 		if err != nil {

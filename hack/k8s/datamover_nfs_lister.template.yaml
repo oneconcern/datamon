@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: datamon-datamover-lister
+spec:
+  template:
+    metadata:
+      labels:
+        app: datamon-datamover-lister
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: lister
+        image: ubuntu:latest
+        imagePullPolicy: "Always"
+        command: ["find"]
+        args: ["$BKUP_PATH", "-type", "d", "-maxdepth", "1"]
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: $PVC_MNT_PATH
+          name: shared-vol
+      volumes:
+      - name: shared-vol
+        persistentVolumeClaim:
+          claimName: $PVC_NAME
+          readOnly: true
