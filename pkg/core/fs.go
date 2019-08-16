@@ -128,8 +128,11 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
 	// options["allow_other"] = ""
 	mountCfg := &fuse.MountConfig{
 		FSName:      dfs.fsInternal.bundle.RepoID,
+		// VolumeName used only on OS X
+		// Cf. https://github.com/osxfuse/osxfuse/wiki/Mount-options#volname
 		VolumeName:  dfs.fsInternal.bundle.BundleID,
 		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
+		ReadOnly: true,
 		// Options:     options,
 	}
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
