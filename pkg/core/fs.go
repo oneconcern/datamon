@@ -123,14 +123,15 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
 	if err != nil {
 		return err
 	}
+	bundle := dfs.fsInternal.bundle
 	// Reminder: Options are OS specific
 	// options := make(map[string]string)
 	// options["allow_other"] = ""
 	mountCfg := &fuse.MountConfig{
-		FSName:      dfs.fsInternal.bundle.RepoID,
+		FSName:      "datamon-" + bundle.RepoID + "-" + bundle.BundleID,
 		// VolumeName used only on OS X
 		// Cf. https://github.com/osxfuse/osxfuse/wiki/Mount-options#volname
-		VolumeName:  dfs.fsInternal.bundle.BundleID,
+		VolumeName:  bundle.BundleID,
 		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
 		ReadOnly: true,
 		// Options:     options,
