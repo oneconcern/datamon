@@ -82,7 +82,8 @@ func TestBundle(t *testing.T) {
 
 	// Publish the bundle and compare with original
 	require.NoError(t,
-		implPublish(context.Background(), bundle, uint(dataFilesCount)))
+		implPublish(context.Background(), bundle, uint(dataFilesCount),
+			func(s string) (bool, error) { return true, nil }))
 
 	validatePublish(t, consumableStore, bundleEntriesFileCount)
 

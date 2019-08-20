@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/spf13/cobra"
@@ -20,6 +22,8 @@ var BundleDownloadCmd = &cobra.Command{
 	Long: "Download a readonly, non-interactive view of the entire data that is part of a bundle. If --bundle is not specified" +
 		" the latest bundle will be downloaded",
 	Run: func(cmd *cobra.Command, args []string) {
+		var nameFilterRe *regexp.Regexp
+
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
@@ -46,9 +50,23 @@ var BundleDownloadCmd = &cobra.Command{
 				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
 		)
 
-		err = core.Publish(ctx, bundle)
-		if err != nil {
-			logFatalln(err)
+		if params.bundle.NameFilter != "" {
+			nameFilterRe, err = regexp.Compile(params.bundle.NameFilter)
+			if err != nil {
+				logFatalln(fmt.Errorf("name filter regexp %s didn't build: %v",
+					params.bundle.NameFilter, err))
+			}
+			err = core.PublishSelectBundleEntries(ctx, bundle, func(name string) (bool, error) {
+				return nameFilterRe.MatchString(name), nil
+			})
+			if err != nil {
+				logFatalln(err)
+			}
+		} else {
+			err = core.Publish(ctx, bundle)
+			if err != nil {
+				logFatalln(err)
+			}
 		}
 	},
 }
@@ -70,6 +88,8 @@ func init() {
 	addLabelNameFlag(BundleDownloadCmd)
 
 	addConcurrencyFactorFlag(BundleDownloadCmd)
+
+	addNameFilterFlag(BundleDownloadCmd)
 
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)

@@ -202,8 +202,17 @@ func downloadBundleEntry(ctx context.Context, bundleEntry model.BundleEntry,
 }
 
 func downloadBundleEntries(ctx context.Context, bundle *Bundle,
+	selectionPredicate func(string) (bool, error),
 	fs cafs.Fs,
 	chans downloadBundleChans) {
+	var selectionPredicateOk bool
+	var err error
+	reportError := func(err error) {
+		chans.error <- errorHit{
+			err,
+			"",
+		}
+	}
 	concurrentFileDownloads := bundle.concurrentFileDownloads
 	if concurrentFileDownloads < 1 {
 		concurrentFileDownloads = 1
@@ -213,8 +222,17 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 	bundle.l.Info("downloading bundle entries",
 		zap.Int("num", len(bundle.BundleEntries)))
 	for _, b := range bundle.BundleEntries {
-		concurrencyControl <- struct{}{}
-		go downloadBundleEntry(ctx, b, bundle, fs, chans)
+		if selectionPredicate != nil {
+			selectionPredicateOk, err = selectionPredicate(b.NameWithPath)
+			if err != nil {
+				reportError(err)
+				break
+			}
+		}
+		if selectionPredicate == nil || selectionPredicateOk {
+			concurrencyControl <- struct{}{}
+			go downloadBundleEntry(ctx, b, bundle, fs, chans)
+		}
 	}
 	for i := 0; i < cap(concurrencyControl); i++ {
 		concurrencyControl <- struct{}{}
@@ -222,7 +240,7 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 	chans.doneOk <- struct{}{}
 }
 
-func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
+func unpackDataFiles(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) error {
 	fs, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
@@ -237,6 +255,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle) error {
 	go downloadBundleEntries(
 		ctx,
 		bundle,
+		selectionPredicate,
 		fs,
 		downloadBundleChans{
 			error:  errC,
