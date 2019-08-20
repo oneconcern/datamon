@@ -121,6 +121,11 @@ build-datamon-mac:
 	go build -o out/datamon.mac --ldflags "${LDFLAGS}" ./cmd/datamon
 	(cd pkg/web && packr2 clean)
 
+.PHONY: build-datamon-local
+## Build datamon executable in-place for local os.  Goes with internal operationalization demos.
+build-datamon-local:
+	@go build -o cmd/datamon/datamon ./cmd/datamon/
+
 .PHONY: build-all
 ## Build all the containers
 build-all: clean build-datamon build-migrate
@@ -262,14 +267,6 @@ fuse-demo-coord-build-datamon:
 		-f ./hack/fuse-demo/coord-datamon.Dockerfile \
 		.
 	docker push gcr.io/onec-co/datamon-fuse-demo-coord-datamon
-
-## demonstrate a fuse read-only filesystem
-fuse-demo-coord: fuse-demo-coord-build-app fuse-demo-coord-build-datamon
-	@go build -o cmd/datamon/datamon ./cmd/datamon/
-	@date '+%s' > /tmp/datamon_fuse_demo_coord_start_timestamp
-	@./hack/fuse-demo/create_coord_pod.sh
-	@./hack/fuse-demo/follow_coord_logs.sh
-	@./hack/fuse-demo/verify_coord_bundle.sh
 
 .PHONY: profile-metrics
 ## Build the metrics collection binary and write output
