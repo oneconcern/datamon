@@ -28,7 +28,10 @@ ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 
 # Build the dist image
 FROM ubuntu:latest
-RUN apt-get update && apt-get install -y --no-install-recommends fuse &&\
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fuse \
+    sudo \
+    &&\
   apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 RUN echo "allow_root" >> /etc/fuse.conf
 
@@ -50,5 +53,10 @@ RUN useradd -u 1020 -ms /bin/bash developer
 RUN groupadd -g 2000 developers
 RUN usermod -g developers developer
 RUN chown -R developer:developers /usr/bin/datamon
+
+RUN mkdir -p /etc/sudoers.d &&\
+  echo "developer ALL = (ALL) NOPASSWD: ALL" > /etc/sudoers.d/developer &&\
+  chmod 0400 /etc/sudoers.d/developer
+
 USER developer
 ENTRYPOINT [ "datamon" ]

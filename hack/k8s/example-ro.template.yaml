@@ -12,6 +12,11 @@ spec:
       labels:
         app: datamon-ro-demo
     spec:
+
+      securityContext:
+        # runAsGroup: 2000
+        fsGroup: 2000
+
       containers:
       - name: demo-shell
         image: gcr.io/onec-co/datamon-fuse-demo-shell:latest
@@ -40,7 +45,11 @@ spec:
         # "--stream"]
 
         securityContext:
+          runAsGroup: 2000
           privileged: true
+          # https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
+          capabilities:
+            add: ["CHOWN", "SETGID"]
         stdin: true
         tty: true
         volumeMounts:

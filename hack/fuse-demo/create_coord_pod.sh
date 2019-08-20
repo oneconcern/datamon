@@ -4,6 +4,23 @@ SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 
 proj_root_dir="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+pull_policy=Always
+
+while getopts o opt; do
+    case $opt in
+        (o)
+            # local deploy
+            pull_policy=IfNotPresent
+            ;;
+        (\?)
+            print Bad option, aborting.
+            exit 1
+            ;;
+    esac
+done
+(( OPTIND > 1 )) && shift $(( OPTIND - 1 ))
+
+
 if [[ -z $GOOGLE_APPLICATION_CREDENTIALS ]]; then
 	echo 'GOOGLE_APPLICATION_CREDENTIALS env variable not set' 1>&2
 	exit 1
@@ -20,6 +37,7 @@ kubectl create secret generic \
 
 RES_DEF="$proj_root_dir"/hack/k8s/gen/example-coord.yaml
 
+PULL_POLICY=$pull_policy \
 SHELL_NAME="$(basename "$SHELL")" \
 	PROJROOT="$(git rev-parse --show-toplevel)" \
 	GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD |sed 's@/@_@g')" \

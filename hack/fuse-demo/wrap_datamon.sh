@@ -185,6 +185,10 @@ fi
 ## COORDINATION BEGINS by starting a datamon FUSE mount
 echo "starting mounts '$MOUNT_CMDS'"
 
+# in some kubernetes distros like docker-desktop, /dev/fuse has perms 660 rather than 666
+echo "setting privs on fuse device"
+sudo chgrp developers /dev/fuse
+
 mount_points=
 mount_idx=0
 datamon_pids=

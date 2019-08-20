@@ -234,7 +234,6 @@ fuse-demo-build-sidecar:
 
 ## demonstrate a fuse read-only filesystem
 fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
-	@docker image push gcr.io/onec-co/datamon-fuse-demo-shell
 	@./hack/fuse-demo/create_ro_pod.sh
 	@./hack/fuse-demo/run_shell.sh
 

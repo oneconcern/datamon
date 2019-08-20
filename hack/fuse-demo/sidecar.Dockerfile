@@ -50,5 +50,6 @@ RUN install -m 0755 /tmp/tini-static-amd64 /bin/tini
 ADD . /datamon
 
 USER developer
+# USER root
 
 RUN touch ~/.zshrc
