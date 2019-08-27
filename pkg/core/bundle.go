@@ -208,17 +208,22 @@ func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 
 // Publish an bundle to a consumable store
 func Publish(ctx context.Context, bundle *Bundle) error {
-	return implPublish(ctx, bundle, defaultBundleEntriesPerFile)
+	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
+}
+
+func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) error {
+	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
 }
 
 // implementation of Publish() with some additional parameters for test
-func implPublish(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
+func implPublish(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint,
+	selectionPredicate func(string) (bool, error)) error {
 	err := implPublishMetadata(ctx, bundle, bundleEntriesPerFile)
 	if err != nil {
 		return fmt.Errorf("failed to publish, err:%s", err)
 	}
 	if !bundle.Streamed {
-		err = unpackDataFiles(ctx, bundle)
+		err = unpackDataFiles(ctx, bundle, selectionPredicate)
 		if err != nil {
 			return fmt.Errorf("failed to unpack data files, err:%s", err)
 		}

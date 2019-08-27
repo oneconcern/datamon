@@ -29,6 +29,7 @@ type paramsT struct {
 		FileList          string
 		SkipOnError       bool
 		ConcurrencyFactor int
+		NameFilter        string
 	}
 	web struct {
 		port int
@@ -65,6 +66,13 @@ func addDataPathFlag(cmd *cobra.Command) string {
 	destination := "destination"
 	cmd.Flags().StringVar(&params.bundle.DataPath, destination, "", "The path to the download dir")
 	return destination
+}
+
+func addNameFilterFlag(cmd *cobra.Command) string {
+	nameFilter := "name-filter"
+	cmd.Flags().StringVar(&params.bundle.NameFilter, nameFilter, "",
+		"A regular expression (RE2) to match names of bundle entries.")
+	return nameFilter
 }
 
 func addMountPathFlag(cmd *cobra.Command) string {
