@@ -172,13 +172,12 @@ func (s *Server) HandleBundleListFiles() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoName := chi.URLParam(r, "repoName")
 		bundleID := chi.URLParam(r, "bundleID")
-		bundle := core.Bundle{
-			RepoID:           repoName,
-			BundleID:         bundleID,
-			MetaStore:        s.metadataStore(),
-			BundleDescriptor: model.BundleDescriptor{},
-		}
-		err := core.PopulateFiles(context.Background(), &bundle)
+		bundle := core.New(core.NewBDescriptor(),
+			core.Repo(repoName),
+			core.MetaStore(s.metadataStore()),
+			core.BundleID(bundleID),
+		)
+		err := core.PopulateFiles(context.Background(), bundle)
 		if err != nil {
 			panic(err)
 		}

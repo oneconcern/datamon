@@ -4,7 +4,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
@@ -12,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
-	"gopkg.in/yaml.v2"
 
 	"github.com/segmentio/ksuid"
 
@@ -218,7 +216,7 @@ func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPr
 // implementation of Publish() with some additional parameters for test
 func implPublish(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint,
 	selectionPredicate func(string) (bool, error)) error {
-	err := implPublishMetadata(ctx, bundle, bundleEntriesPerFile)
+	err := implPublishMetadata(ctx, bundle, true, bundleEntriesPerFile)
 	if err != nil {
 		return fmt.Errorf("failed to publish, err:%s", err)
 	}
@@ -233,18 +231,19 @@ func implPublish(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint,
 
 // PublishMetadata from the archive to the consumable store
 func PublishMetadata(ctx context.Context, bundle *Bundle) error {
-	return implPublishMetadata(ctx, bundle, defaultBundleEntriesPerFile)
+	return implPublishMetadata(ctx, bundle, true, defaultBundleEntriesPerFile)
 }
 
 // implementation of PublishMetadata() with some additional parameters for test
-func implPublishMetadata(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint) error {
-	err := unpackBundleDescriptor(ctx, bundle)
-	if err != nil {
+func implPublishMetadata(ctx context.Context, bundle *Bundle,
+	publish bool,
+	bundleEntriesPerFile uint,
+) error {
+	if err := unpackBundleDescriptor(ctx, bundle, publish); err != nil {
 		return err
 	}
-
-	err = unpackBundleFileList(ctx, bundle, bundleEntriesPerFile)
-	if err != nil {
+	// async needs bundleEntriesPerFile
+	if err := unpackBundleFileList(ctx, bundle, publish, bundleEntriesPerFile); err != nil {
 		return err
 	}
 	return nil
@@ -270,47 +269,24 @@ func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, 
 }
 
 func PopulateFiles(ctx context.Context, bundle *Bundle) error {
-	e := RepoExists(bundle.RepoID, bundle.MetaStore)
-	if e != nil {
-		return e
-	}
-	reader, err := bundle.MetaStore.Get(ctx, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID))
-	if err != nil {
-		fmt.Printf("Failed to download the bundle descriptor: %s", err)
-		return err
-	}
-	defer reader.Close()
-	object, err := ioutil.ReadAll(reader)
-	if err != nil {
-		fmt.Printf("Failed to read the bundle descriptor: %s", err)
-		return err
-	}
-	// Unmarshal the file
-	err = yaml.Unmarshal(object, &bundle.BundleDescriptor)
-	if err != nil {
-		fmt.Printf("Failed to unmarshal the bundle descriptor: %s", err)
-		return err
-	}
-
-	// Download the files json
-	var i uint64
-	for i = 0; i < bundle.BundleDescriptor.BundleEntriesFileCount; i++ {
-		r, err := bundle.MetaStore.Get(ctx, model.GetArchivePathToBundleFileList(bundle.RepoID, bundle.BundleID, i))
-		if err != nil {
-			fmt.Printf("Failed to download the bundle files: %s", err)
+	switch {
+	case bundle.ConsumableStore != nil && bundle.MetaStore != nil:
+		return fmt.Errorf("ambiguous bundle to populate files:  consumable store and meta store both exist")
+	case bundle.ConsumableStore != nil:
+		if bundle.BundleID == "" {
+			if err := setBundleIDFromConsumableStore(ctx, bundle); err != nil {
+				return err
+			}
+		}
+	case bundle.MetaStore != nil:
+		if err := RepoExists(bundle.RepoID, bundle.MetaStore); err != nil {
 			return err
 		}
-		object, err = ioutil.ReadAll(r)
-		if err != nil {
-			fmt.Printf("Failed to read the bundle files: %s", err)
-			return err
-		}
-		var bundleEntries model.BundleEntries
-		err = yaml.Unmarshal(object, &bundleEntries)
-		if err != nil {
-			return err
-		}
-		bundle.BundleEntries = append(bundle.BundleEntries, bundleEntries.BundleEntries...)
+	default:
+		return fmt.Errorf("invalid bundle to populate files:  neither consumable store nor meta store exists")
+	}
+	if err := implPublishMetadata(ctx, bundle, false, defaultBundleEntriesPerFile); err != nil {
+		return err
 	}
 	return nil
 }
@@ -330,4 +306,14 @@ func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
 
 func (b *Bundle) Exists(ctx context.Context) (bool, error) {
 	return b.MetaStore.Has(ctx, model.GetArchivePathToBundle(b.RepoID, b.BundleID))
+}
+
+func Diff(ctx context.Context, bundleExisting *Bundle, bundleAdditional *Bundle) (BundleDiff, error) {
+	if err := PopulateFiles(ctx, bundleExisting); err != nil {
+		return BundleDiff{}, err
+	}
+	if err := PopulateFiles(ctx, bundleAdditional); err != nil {
+		return BundleDiff{}, err
+	}
+	return diffBundles(bundleExisting, bundleAdditional)
 }

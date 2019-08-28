@@ -6,7 +6,6 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/core"
 
-	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/spf13/cobra"
 )
 
@@ -24,16 +23,12 @@ var bundleFileList = &cobra.Command{
 		if err != nil {
 			logFatalln(err)
 		}
-		bundle := core.Bundle{
-			RepoID:           params.repo.RepoName,
-			BundleID:         params.bundle.ID,
-			MetaStore:        remoteStores.meta,
-			ConsumableStore:  nil,
-			BlobStore:        nil,
-			BundleDescriptor: model.BundleDescriptor{},
-			BundleEntries:    nil,
-		}
-		err = core.PopulateFiles(ctx, &bundle)
+		bundle := core.New(core.NewBDescriptor(),
+			core.Repo(params.repo.RepoName),
+			core.MetaStore(remoteStores.meta),
+			core.BundleID(params.bundle.ID),
+		)
+		err = core.PopulateFiles(context.Background(), bundle)
 		if err != nil {
 			logFatalln(err)
 		}

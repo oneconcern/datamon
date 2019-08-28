@@ -100,7 +100,7 @@ func TestBundle(t *testing.T) {
 	require.True(t, validateUpload(t, bundle, archiveBundle2, bundleEntriesFileCount, dataFilesCount))
 }
 
-func TestPublishMetadata(t *testing.T) {
+func paramedTestPublishMetadata(t *testing.T, publish bool) {
 	var bundleEntriesFileCount uint64 = 3
 	var dataFilesCount uint64 = 4
 	cleanup := setupFakeDataBundleWithUnalignedFilelist(t,
@@ -130,13 +130,20 @@ func TestPublishMetadata(t *testing.T) {
 
 	// Publish the bundle and compare with original
 	require.NoError(t,
-		implPublishMetadata(context.Background(), bundle, uint(dataFilesCount)))
+		implPublishMetadata(context.Background(), bundle, publish, uint(dataFilesCount)))
 
-	validatePublishMetadata(t, bundle)
-
+	validatePublishMetadata(t, bundle, publish)
 }
 
-func validatePublishMetadata(t *testing.T, bundle *Bundle) {
+func TestPublishMetadata(t *testing.T) {
+	paramedTestPublishMetadata(t, true)
+}
+
+func TestDownloadMetadata(t *testing.T) {
+	paramedTestPublishMetadata(t, false)
+}
+
+func validatePublishMetadata(t *testing.T, bundle *Bundle, publish bool) {
 	var i uint64
 
 	consumableStore := bundle.ConsumableStore
@@ -188,17 +195,20 @@ func validatePublishMetadata(t *testing.T, bundle *Bundle) {
 			"found filelist entries in expected order")
 	}
 
-	consumableBundleEntries := readBundleEntries(consumableStore,
-		func(i uint64) string {
-			return ".datamon/" + bundleID + "-bundle-files-" + strconv.Itoa(int(i)) + ".json"
-		},
-		model.GetConsumablePathToBundle(bundleID))
 	metaBundleEntries := readBundleEntries(metaStore,
 		func(i uint64) string { return model.GetArchivePathToBundleFileList(repo, bundleID, i) },
 		model.GetArchivePathToBundle(repo, bundleID))
-
-	compareBundleEntriesLists(consumableBundleEntries, metaBundleEntries)
-	compareBundleEntriesLists(metaBundleEntries, bundle.BundleEntries)
+	if publish {
+		consumableBundleEntries := readBundleEntries(consumableStore,
+			func(i uint64) string {
+				return ".datamon/" + bundleID + "-bundle-files-" + strconv.Itoa(int(i)) + ".json"
+			},
+			model.GetConsumablePathToBundle(bundleID))
+		compareBundleEntriesLists(consumableBundleEntries, metaBundleEntries)
+		compareBundleEntriesLists(metaBundleEntries, bundle.BundleEntries)
+	} else {
+		compareBundleEntriesLists(metaBundleEntries, bundle.BundleEntries)
+	}
 
 	t.Logf("tot bundle entries in memory %v", len(bundle.BundleEntries))
 }

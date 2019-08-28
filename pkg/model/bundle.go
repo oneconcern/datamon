@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -64,12 +65,83 @@ func (c *Contributor) String() string {
 	return fmt.Sprintf("%s <%s>", c.Name, c.Email)
 }
 
+const (
+	ConsumableStorePathTypeDescriptor = iota
+	ConsumableStorePathTypeFileList
+)
+
+type ConsumableStorePathMetadata struct {
+	Type     byte
+	BundleID string
+	Index    uint64
+}
+
+/**
+ * this function is the inverse of GetConsumablePath* functions.
+ * the GetConsumablePath* functions return bundle.ConsumableStore keys (paths)
+ * given some parameters from the bundle.
+ * this function, given one of the paths returned by a GetConsumablePath* function,
+ * parses the path and returns the input values to that function.
+ */
+func GetConsumableStorePathMetadata(path string) (ConsumableStorePathMetadata, error) {
+	metaRe := regexp.MustCompile(`^\.datamon/(.*)\.json$`)
+	flRe := regexp.MustCompile(`^(.*)-bundle-files-(.*)$`)
+	info := ConsumableStorePathMetadata{}
+	metaMatch := metaRe.FindStringSubmatch(path)
+	if metaMatch == nil {
+		return ConsumableStorePathMetadata{}, fmt.Errorf("not a metadata path '%v'", path)
+	}
+	metaName := metaMatch[1]
+	flMatch := flRe.FindStringSubmatch(metaName)
+	if flMatch == nil {
+		info.Type = ConsumableStorePathTypeDescriptor
+		info.BundleID = metaName
+	} else {
+		info.Type = ConsumableStorePathTypeFileList
+		info.BundleID = flMatch[1]
+		index, err := strconv.Atoi(flMatch[2])
+		if err != nil {
+			return ConsumableStorePathMetadata{}, err
+		}
+		info.Index = uint64(index)
+	}
+	return info, nil
+}
+
 func GetConsumablePathToBundle(bundleID string) string {
-	return fmt.Sprint("./.datamon/", bundleID, ".json")
+	path := fmt.Sprint(".datamon/", bundleID, ".json")
+	info, err := GetConsumableStorePathMetadata(path)
+	if err != nil {
+		panic(fmt.Errorf("path not valid against inverse function (programming error): %v", err))
+	}
+	if info.Type != ConsumableStorePathTypeDescriptor {
+		panic(fmt.Errorf("unexpected type from inverse function (programming error)"))
+	}
+	if info.BundleID != bundleID {
+		panic(fmt.Errorf("inverse function bundle id '%v' does not match provided id '%v' (programming error)",
+			info.BundleID, bundleID))
+	}
+	return path
 }
 
 func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
-	return fmt.Sprint("./.datamon/", bundleID, "-bundle-files-", index, ".json")
+	path := fmt.Sprint(".datamon/", bundleID, "-bundle-files-", index, ".json")
+	info, err := GetConsumableStorePathMetadata(path)
+	if err != nil {
+		panic(fmt.Errorf("path not valid against inverse function (programming error): %v", err))
+	}
+	if info.Type != ConsumableStorePathTypeFileList {
+		panic(fmt.Errorf("unexpected type from inverse function (programming error)"))
+	}
+	if info.BundleID != bundleID {
+		panic(fmt.Errorf("inverse function bundle id '%v' does not match provided id '%v' (programming error)",
+			info.BundleID, bundleID))
+	}
+	if info.Index != index {
+		panic(fmt.Errorf("inverse function index '%v' does not match provided index '%v' (programming error)",
+			info.Index, index))
+	}
+	return path
 }
 
 func GetArchivePathToBundle(repo string, bundleID string) string {
