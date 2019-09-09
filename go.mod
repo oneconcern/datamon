@@ -24,6 +24,7 @@ require (
 	github.com/markbates/oncer v0.0.0-20181203154359-bf2de49a0be2 // indirect
 	github.com/markbates/safe v1.0.1 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
+	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/opentracing/opentracing-go v1.0.2
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/segmentio/ksuid v1.0.2
@@ -38,7 +39,7 @@ require (
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
 	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190624190245-7f2218787638 // indirect
+	golang.org/x/tools v0.0.0-20190624222133-a101b041ded4 // indirect
 	google.golang.org/api v0.2.0
 	google.golang.org/grpc v1.19.0
 	gopkg.in/yaml.v2 v2.2.2

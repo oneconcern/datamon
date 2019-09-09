@@ -8,6 +8,8 @@ import (
 	"io"
 	"io/ioutil"
 
+	//	"regexp"
+
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -48,6 +50,54 @@ func setBundleIDFromConsumableStore(ctx context.Context, bundle *Bundle) error {
 		}
 	}
 	return fmt.Errorf("didn't find bundle descriptor")
+}
+
+type consumableStoreMetadataKeysInfo struct {
+	bundleID   string
+	descriptor string
+	filelists  []string
+}
+
+func getConsumableStoreMetadataKeysInfo(ctx context.Context, bundle *Bundle) (consumableStoreMetadataKeysInfo, error) {
+	// todo: use KeysPrefix() after that's implemented.
+	keys, err := bundle.ConsumableStore.Keys(ctx)
+	if err != nil {
+		return consumableStoreMetadataKeysInfo{}, err
+	}
+	var bundleID string
+	var descriptor string
+	filelists := make([]string, 0)
+	for _, key := range keys {
+
+		info, err := model.GetConsumableStorePathMetadata(key)
+		if err != nil {
+			_, ok := err.(model.ConsumableStorePathMetadataErr)
+			if ok {
+				continue
+			}
+			return consumableStoreMetadataKeysInfo{}, err
+		}
+		switch info.Type {
+		case model.ConsumableStorePathTypeDescriptor:
+			if bundleID != "" {
+				return consumableStoreMetadataKeysInfo{}, fmt.Errorf("expected at most one descriptor")
+			}
+			bundleID = info.BundleID
+			descriptor = key
+		case model.ConsumableStorePathTypeFileList:
+			filelists = append(filelists, key)
+		default:
+			return consumableStoreMetadataKeysInfo{}, fmt.Errorf("unexpected consumable store metadata path type")
+		}
+	}
+	if bundleID == "" {
+		return consumableStoreMetadataKeysInfo{}, fmt.Errorf("bundle id not found")
+	}
+	return consumableStoreMetadataKeysInfo{
+		bundleID:   bundleID,
+		descriptor: descriptor,
+		filelists:  filelists,
+	}, nil
 }
 
 func unpackBundleDescriptor(ctx context.Context, bundle *Bundle, publish bool) error {
@@ -259,9 +309,10 @@ type downloadBundleChans struct {
 	concurrencyControl <-chan struct{}
 }
 
-func downloadBundleEntrySync(ctx context.Context, bundleEntry model.BundleEntry,
+func downloadBundleEntrySyncMaybeOverwrite(ctx context.Context, bundleEntry model.BundleEntry,
 	bundle *Bundle,
-	fs cafs.Fs) error {
+	fs cafs.Fs,
+	overwrite bool) error {
 	bundle.l.Info("starting bundle entry download",
 		zap.String("name", bundleEntry.NameWithPath))
 	key, err := cafs.KeyFromString(bundleEntry.Hash)
@@ -272,7 +323,20 @@ func downloadBundleEntrySync(ctx context.Context, bundleEntry model.BundleEntry,
 	if err != nil {
 		return err
 	}
-	err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.IfNotPresent)
+	var putParameterOverwrite bool
+	if overwrite {
+		err = bundle.ConsumableStore.Delete(ctx, bundleEntry.NameWithPath)
+		if err != nil {
+			bundle.l.Error("Failed to overwrite bundle entry: Delete to store",
+				zap.String("name", bundleEntry.NameWithPath),
+				zap.Error(err))
+			return err
+		}
+		putParameterOverwrite = storage.IfNotPresent
+	} else {
+		putParameterOverwrite = storage.IfNotPresent
+	}
+	err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, putParameterOverwrite)
 	if err != nil {
 		bundle.l.Error("Failed to download bundle entry: put to store",
 			zap.String("name", bundleEntry.NameWithPath),
@@ -284,6 +348,29 @@ func downloadBundleEntrySync(ctx context.Context, bundleEntry model.BundleEntry,
 	return nil
 }
 
+func downloadBundleEntrySync(ctx context.Context, bundleEntry model.BundleEntry,
+	bundle *Bundle,
+	fs cafs.Fs) error {
+	return downloadBundleEntrySyncMaybeOverwrite(ctx, bundleEntry, bundle, fs, false)
+}
+
+func deleteBundleEntrySync(ctx context.Context, bundleEntry model.BundleEntry,
+	bundle *Bundle) error {
+	bundle.l.Info("starting bundle entry delete",
+		zap.String("name", bundleEntry.NameWithPath))
+	err := bundle.ConsumableStore.Delete(ctx, bundleEntry.NameWithPath)
+	if err != nil {
+		bundle.l.Error("Failed to deleted bundle entry: store Delete",
+			zap.String("name", bundleEntry.NameWithPath),
+			zap.Error(err))
+		return err
+	}
+	bundle.l.Info("deleted bundle entry",
+		zap.String("name", bundleEntry.NameWithPath))
+	return nil
+}
+
+// dupe: deleteBundleEntry
 func downloadBundleEntry(ctx context.Context, bundleEntry model.BundleEntry,
 	bundle *Bundle,
 	fs cafs.Fs,
@@ -304,10 +391,52 @@ func downloadBundleEntry(ctx context.Context, bundleEntry model.BundleEntry,
 	}
 }
 
-func downloadBundleEntries(ctx context.Context, bundle *Bundle,
-	selectionPredicate func(string) (bool, error),
+// dupe: deleteBundleEntry
+func downloadBundleEntryOverwrite(ctx context.Context, bundleEntry model.BundleEntry,
+	bundle *Bundle,
 	fs cafs.Fs,
 	chans downloadBundleChans) {
+	defer func() {
+		<-chans.concurrencyControl
+	}()
+	reportError := func(err error) {
+		chans.error <- errorHit{
+			err,
+			bundleEntry.NameWithPath,
+		}
+	}
+	err := downloadBundleEntrySyncMaybeOverwrite(ctx, bundleEntry, bundle, fs, true)
+	if err != nil {
+		reportError(err)
+		return
+	}
+}
+
+func deleteBundleEntry(ctx context.Context, bundleEntry model.BundleEntry,
+	bundle *Bundle,
+	chans downloadBundleChans) {
+	defer func() {
+		<-chans.concurrencyControl
+	}()
+	reportError := func(err error) {
+		chans.error <- errorHit{
+			err,
+			bundleEntry.NameWithPath,
+		}
+	}
+	err := deleteBundleEntrySync(ctx, bundleEntry, bundle)
+	if err != nil {
+		reportError(err)
+		return
+	}
+}
+
+func downloadBundleEntries(ctx context.Context, bundle *Bundle,
+	selectionPredicate func(string) (bool, error),
+	bundleDest *Bundle,
+	fs cafs.Fs,
+	chans downloadBundleChans) {
+	var diff BundleDiff
 	var selectionPredicateOk bool
 	var err error
 	reportError := func(err error) {
@@ -316,25 +445,63 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 			"",
 		}
 	}
+	if bundleDest != nil {
+		diff, err = diffBundles(bundleDest, bundle)
+		if err != nil {
+			reportError(err)
+			return
+		}
+	}
 	concurrentFileDownloads := bundle.concurrentFileDownloads
 	if concurrentFileDownloads < 1 {
 		concurrentFileDownloads = 1
 	}
 	concurrencyControl := make(chan struct{}, concurrentFileDownloads)
 	chans.concurrencyControl = concurrencyControl
-	bundle.l.Info("downloading bundle entries",
-		zap.Int("num", len(bundle.BundleEntries)))
-	for _, b := range bundle.BundleEntries {
-		if selectionPredicate != nil {
-			selectionPredicateOk, err = selectionPredicate(b.NameWithPath)
-			if err != nil {
-				reportError(err)
-				break
+	if bundleDest == nil {
+		bundle.l.Info("downloading bundle entries",
+			zap.Int("num", len(bundle.BundleEntries)))
+		for _, b := range bundle.BundleEntries {
+			if selectionPredicate != nil {
+				selectionPredicateOk, err = selectionPredicate(b.NameWithPath)
+				if err != nil {
+					reportError(err)
+					break
+				}
+			}
+			if selectionPredicate == nil || selectionPredicateOk {
+				concurrencyControl <- struct{}{}
+				go downloadBundleEntry(ctx, b, bundle, fs, chans)
 			}
 		}
-		if selectionPredicate == nil || selectionPredicateOk {
+	} else {
+		bundle.l.Info("downloading diff entries",
+			zap.Int("num", len(diff.Entries)))
+		for _, de := range diff.Entries {
 			concurrencyControl <- struct{}{}
-			go downloadBundleEntry(ctx, b, bundle, fs, chans)
+			switch de.Type {
+			case DiffEntryTypeAdd:
+				bundle.l.Info("adding added entry",
+					zap.String("name Additional", de.Additional.NameWithPath),
+					zap.String("name Existing", de.Existing.NameWithPath),
+				)
+				go downloadBundleEntry(ctx, de.Additional, bundleDest, fs, chans)
+			case DiffEntryTypeDel:
+				bundle.l.Info("deleting deleted entry",
+					zap.String("name Additional", de.Additional.NameWithPath),
+					zap.String("name Existing", de.Existing.NameWithPath),
+				)
+				go deleteBundleEntry(ctx, de.Existing, bundleDest, chans)
+			case DiffEntryTypeDif:
+				bundle.l.Info("updating diff entry",
+					zap.String("name Additional", de.Additional.NameWithPath),
+					zap.String("name Existing", de.Existing.NameWithPath),
+				)
+				go downloadBundleEntryOverwrite(ctx, de.Additional, bundleDest, fs, chans)
+			default:
+				reportError(fmt.Errorf("programming error: unknown diff entry type"))
+				<-concurrencyControl
+			}
 		}
 	}
 	for i := 0; i < cap(concurrencyControl); i++ {
@@ -343,7 +510,9 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 	chans.doneOk <- struct{}{}
 }
 
-func unpackDataFiles(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) error {
+func unpackDataFiles(ctx context.Context, bundle *Bundle,
+	bundleDest *Bundle,
+	selectionPredicate func(string) (bool, error)) error {
 	fs, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
@@ -359,6 +528,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, selectionPredicate fun
 		ctx,
 		bundle,
 		selectionPredicate,
+		bundleDest,
 		fs,
 		downloadBundleChans{
 			error:  errC,
@@ -368,8 +538,38 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, selectionPredicate fun
 	case eh := <-errC:
 		return eh.error
 	case <-doneOkC:
-		return nil
 	}
+
+	// rewrite destination bundle metadata
+	if bundleDest != nil {
+		info, err := getConsumableStoreMetadataKeysInfo(ctx, bundleDest)
+		if err != nil {
+			return err
+		}
+		err = bundleDest.ConsumableStore.Delete(ctx, info.descriptor)
+		if err != nil {
+			return err
+		}
+		for _, filelist := range info.filelists {
+			err = bundleDest.ConsumableStore.Delete(ctx, filelist)
+			if err != nil {
+				return err
+			}
+		}
+		publishMetadataBundle := New(NewBDescriptor(),
+			Repo(bundle.RepoID),
+			MetaStore(bundle.MetaStore),
+			ConsumableStore(bundleDest.ConsumableStore),
+			BlobStore(bundle.BlobStore),
+			BundleID(bundle.BundleID),
+		)
+		err = PublishMetadata(ctx, publishMetadataBundle)
+		if err != nil {
+			return err
+		}
+	} // bundleDest != nil
+
+	return nil
 }
 
 func unpackDataFile(ctx context.Context, bundle *Bundle, file string) error {
