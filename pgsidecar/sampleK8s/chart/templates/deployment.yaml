@@ -1,0 +1,52 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: postgresct
+  namespace: dev
+  labels:
+    app.kubernetes.io/name: postgresct
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresct
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresct
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: postgresct
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/google/gcp-storage-admin.json
+        - name: DATA_INPUTREPO # Datamon repo for input dump
+          value: divya-test
+        - name: INPUT_DUMP_PATH # Optional path in the datamon input repo for input dump
+          value: samplePath
+        - name: DATA_OUTPUTREPO # Datamon repo for storing output dump
+          value: divya-test
+        - name: OUTPUT_DUMP_PATH # Optional path in the datamon output repo for output dump
+          value: samplePath
+        image: gcr.io/onec-co/postgresct
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 5432
+            name: psql-port
+        resources: {}
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /etc/google/
+          name: gcs-credentials
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/teardownDB.sh"]
+      nodeSelector: {}
+      restartPolicy: Always
+      volumes:
+      - name: gcs-credentials
+        secret:
+          secretName: gcs-credentials
