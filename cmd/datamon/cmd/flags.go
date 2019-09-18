@@ -263,15 +263,32 @@ func paramsToSrcStore(ctx context.Context, params paramsT, create bool) (storage
 	return sourceStore, nil
 }
 
+type DestT uint
+
+const (
+	destTEmpty = iota
+	destTMaybeNonEmpty
+	destTNonEmpty
+)
+
 func paramsToDestStore(params paramsT,
-	nonemptyErr bool,
+	destT DestT,
 	tmpdirPrefix string,
 ) (storage.Store, error) {
 	var err error
 	var consumableStorePath string
 	var destStore storage.Store
 
-	if params.bundle.DataPath == "" && tmpdirPrefix != "" {
+	if tmpdirPrefix != "" {
+		if params.bundle.DataPath != "" {
+			return nil, fmt.Errorf("bundle data path isn't compatible with temp dir usage")
+		}
+		if destT == destTNonEmpty {
+			return nil, fmt.Errorf("can't specify temp dest path and non-empty dir mutually exclusive")
+		}
+	}
+
+	if tmpdirPrefix != "" {
 		consumableStorePath, err = ioutil.TempDir("", tmpdirPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create temporary directory: %v", err)
@@ -286,7 +303,7 @@ func paramsToDestStore(params paramsT,
 
 	fs := afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath)
 
-	if nonemptyErr {
+	if destT == destTEmpty {
 		var empty bool
 		empty, err = afero.IsEmpty(fs, "/")
 		if err != nil {
@@ -295,10 +312,20 @@ func paramsToDestStore(params paramsT,
 		if !empty {
 			return nil, fmt.Errorf("%s should be empty", consumableStorePath)
 		}
+	} else if destT == destTNonEmpty {
+		/* fail-fast impl.  partial dupe of model pkg, encoded here to more fully encode intent
+		 * of this package independently.
+		 */
+		var ok bool
+		ok, err = afero.DirExists(fs, ".datamon")
+		if err != nil {
+			return nil, fmt.Errorf("failed to look for metadata dir: %v", err)
+		}
+		if !ok {
+			return nil, fmt.Errorf("failed to find metadata dir in %v", consumableStorePath)
+		}
 	}
-
 	destStore = localfs.New(fs)
-
 	return destStore, nil
 }
 

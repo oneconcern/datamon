@@ -177,6 +177,7 @@ func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool) {
 	params.repo.BlobBucket = bucketBlob
 	params.repo.ContributorEmail = contributorEmail
 	params.repo.ContributorName = contributorName
+	params.bundle.ID = ""
 	rootCmd.SetArgs(cmd)
 	require.NoError(t, rootCmd.Execute(), "error executing '"+strings.Join(cmd, " ")+"' : "+intentMsg)
 	if expectError {
@@ -885,6 +886,137 @@ func TestDiffBundle(t *testing.T) {
 	require.Equal(t, de.typeLetter, "D", "found correct type on delete file entry")
 	require.NotEqual(t, de.remote.hash, "", "remote hash on delete file entry")
 	require.Equal(t, de.local.hash, "", "no local hash on delete file entry")
+}
+
+func TestUpdateBundle(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	files := testUploadTrees[1]
+	label := internal.RandStringBytesMaskImprSrc(8)
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create second test repo", false)
+	//
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, files[0]),
+		"--message", "diff orig",
+		"--label", label,
+		"--repo", repo1,
+		"--concurrency-factor", "20",
+	}, "upload bundle at "+dirPathStr(t, files[0]), false)
+	//
+	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
+	dpc := "bundle-update"
+	dp, err := filepath.Abs(filepath.Join(consumedData, dpc))
+	require.NoError(t, err, "couldn't build file path")
+	exists, err := afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.False(t, exists, "no filesystem entry at destination path '"+dpc+"' before bundle upload")
+	runCmd(t, []string{"bundle",
+		"download",
+		"--repo", repo1,
+		"--destination", dp,
+		"--label", label,
+		"--concurrency-factor", "20",
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
+	exists, err = afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	//
+	srcFS := afero.NewBasePathFs(afero.NewOsFs(), dirPathStr(t, files[0]))
+	delFile := files[0]
+	difFile := files[1]
+	addFileName := "additional"
+	f, err := srcFS.OpenFile(addFileName, os.O_CREATE|os.O_WRONLY|os.O_SYNC|0600, 0600)
+	require.NoError(t, err, "open file to add")
+	_, err = f.WriteString("additional")
+	require.NoError(t, err, "write to additional file")
+	require.NoError(t, f.Close(), "close add file")
+	require.NoError(t, srcFS.Remove(pathInBundle(delFile)), "remove file from downloaded bundle")
+	require.NoError(t, srcFS.Remove(pathInBundle(difFile)), "remove file to change")
+	f, err = srcFS.OpenFile(pathInBundle(difFile), os.O_CREATE|os.O_WRONLY|os.O_SYNC|0600, 0600)
+	require.NoError(t, err, "open file to change")
+	_, err = f.WriteString(internal.RandStringBytesMaskImprSrc(10))
+	require.NoError(t, err, "write to changed file")
+	require.NoError(t, f.Close(), "close changed file")
+	//
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, files[0]),
+		"--message", "diff update",
+		"--label", label,
+		"--repo", repo1,
+		"--concurrency-factor", "20",
+	}, "upload bundle at "+dirPathStr(t, files[0]), false)
+	runCmd(t, []string{"bundle",
+		"update",
+		"--repo", repo1,
+		"--destination", dp,
+		"--label", label,
+		"--concurrency-factor", "20",
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
+
+	ddpc := "bundle-download"
+	ddp, err := filepath.Abs(filepath.Join(consumedData, ddpc))
+	require.NoError(t, err, "couldn't build file path")
+	params.bundle.ID = ""
+	runCmd(t, []string{"bundle",
+		"download",
+		"--repo", repo1,
+		"--destination", ddp,
+		"--label", label,
+		"--concurrency-factor", "20",
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
+
+	destUpdateFS := afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(consumedData, dpc))
+	destDownloadFS := afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(consumedData, ddpc))
+
+	udPaths := make(map[string]bool)
+	err = afero.Walk(destUpdateFS, "", func(path string, info os.FileInfo, err error) error {
+		require.NoError(t, err, "error walking upload destination path")
+		if path != "" && !info.IsDir() {
+			udPaths[path] = true
+
+			exists, err = afero.Exists(destDownloadFS, path)
+			require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+			require.True(t, exists, "found path in download dir")
+		}
+
+		return nil
+	})
+	require.NoError(t, err, "walking update destination")
+
+	err = afero.Walk(destDownloadFS, "", func(path string, info os.FileInfo, err error) error {
+		require.NoError(t, err, "error walking upload destination path")
+		if path != "" && !info.IsDir() {
+			require.True(t, udPaths[path], "download path exists in update")
+		}
+		return nil
+	})
+	require.NoError(t, err, "walking download destination")
+
+	for path := range udPaths {
+
+		df, err := destDownloadFS.Open(path)
+		require.NoError(t, err, "open downloaded file")
+		dv, err := ioutil.ReadAll(df)
+		require.NoError(t, err, "read downloaded file")
+
+		uf, err := destUpdateFS.Open(path)
+		require.NoError(t, err, "open updated file")
+		uv, err := ioutil.ReadAll(uf)
+		require.NoError(t, err, "read downloaded file")
+
+		t.Logf("comparing update and destination files at path: '%v'", path)
+
+		require.Equal(t, string(dv), string(uv), "downloaded file matches updated file '"+path+"'")
+	}
+
 }
 
 func TestDownloadBundleByLabel(t *testing.T) {
