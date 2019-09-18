@@ -7,19 +7,23 @@ POD_START_POLL_INTERVAL=1
 
 typeset -A known_nfs_pvc_tags_to_names
 known_nfs_pvc_tags_to_names[argo]=pvc1
-known_nfs_pvc_tags_to_names[depmon]=depmon-pvc
+known_nfs_pvc_tags_to_names[test]=depmon-pvc
 known_nfs_pvc_names=(${(v)known_nfs_pvc_tags_to_names})
 
 pvc_name_opt=argo
 create_pod=false
+docker_img_tag=latest
 
-while getopts cp: opt; do
+while getopts cp:t: opt; do
     case $opt in
         (c)
             create_pod=true
             ;;
         (p)
             pvc_name_opt="$OPTARG"
+            ;;
+        (t)
+            docker_img_tag="$OPTARG"
             ;;
         (\?)
             print Bad option, aborting.
@@ -46,6 +50,7 @@ deployment_name=datamon-datamover-nfs-access
 if $create_pod; then
     k8s_yaml_name=datamover_nfs_access
     res_def="${PROJ_ROOT_DIR}"/hack/k8s/gen/${k8s_yaml_name}.yaml
+    DOCKER_IMG_TAG=$docker_img_tag \
     PVC_NAME=$pvc_name \
     PVC_MNT_PATH=/filestore \
             "${PROJ_ROOT_DIR}"/hack/envexpand \

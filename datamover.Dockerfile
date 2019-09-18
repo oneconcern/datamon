@@ -104,9 +104,11 @@ ENV ZONEINFO /zoneinfo.zip
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 ADD ./hack/datamover/datamover.sh /usr/bin/datamover
 ADD ./hack/datamover/datamover_metrics.sh /usr/bin/datamover_metrics
+ADD ./hack/datamover/backup.sh /usr/bin/backup
 
 RUN chmod a+x /usr/bin/datamover
 RUN chmod a+x /usr/bin/datamover_metrics
+RUN chmod a+x /usr/bin/backup
 
 # USER root
 # USER developer
@@ -123,6 +125,8 @@ RUN cp /usr/bin/datamover /home/developer/datamover.sh && \
   chmod +x /home/developer/datamover.sh
 RUN cp /usr/bin/datamover_metrics /home/developer/datamover_metrics.sh && \
   chmod +x /home/developer/datamover_metrics.sh
+RUN cp /usr/bin/backup /home/developer/backup.sh && \
+  chmod +x /home/developer/backup.sh
 
 ENTRYPOINT [ "datamon" ]
 
