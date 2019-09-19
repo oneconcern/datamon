@@ -1,0 +1,322 @@
+package wal
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"strings"
+	"time"
+
+	iradix "github.com/hashicorp/go-immutable-radix"
+	"go.uber.org/zap"
+
+	"github.com/segmentio/ksuid"
+
+	"github.com/oneconcern/datamon/pkg/storage"
+)
+
+const (
+	maxEntriesPerList = 1000
+)
+
+type WAL struct {
+	mutableStore       storage.Store // Location for updating token generator object
+	tokenGeneratorPath string        // Path to the token generator object in the mutable store
+	walStore           storage.Store // Append only store where WAL entries are written to
+	maxConcurrency     int           // Max concurrency when reading
+	connectionControl  chan struct{} // How many max concurrent requests to send
+	l                  *zap.Logger   // Logging
+}
+
+type Options func(w *WAL)
+
+func MaxConcurrency(c int) Options {
+	return func(w *WAL) {
+		w.maxConcurrency = c
+	}
+}
+func TokenGeneratorPath(path string) Options {
+	return func(w *WAL) {
+		w.tokenGeneratorPath = path
+	}
+}
+
+func NewWAL(mutableStore storage.Store, walStore storage.Store, logger *zap.Logger, options ...Options) *WAL {
+	wal := WAL{
+		mutableStore:       mutableStore,
+		walStore:           walStore,
+		tokenGeneratorPath: tokenGeneratorPath,
+		maxConcurrency:     maxConcurrency,
+		l:                  logger,
+	}
+	for _, option := range options {
+		option(&wal)
+	}
+	wal.connectionControl = make(chan struct{}, maxConcurrency)
+	// Check if token generator object exists
+	_ = mutableStore.Put(context.Background(), wal.tokenGeneratorPath, strings.NewReader(""), storage.OverWrite)
+	return &wal
+}
+
+// Gets a token such that tokens are K-sortable.
+func (w *WAL) getToken(ctx context.Context) (string, error) {
+	err := w.updateTokenTimestamp(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to update the token generator err:%s", err.Error())
+	}
+
+	// Read the updateTime from the tokenGenerator object
+	attr, err := w.mutableStore.GetAttr(ctx, w.tokenGeneratorPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get tokenGenerator attributes: %s, err:%s", w.tokenGeneratorPath, err)
+	}
+
+	// Use the updateTime from the token generator (gain independence from local wall clock)
+	k, err := ksuid.NewRandomWithTime(attr.Updated)
+	if err != nil {
+		return "", fmt.Errorf("failed tp generate ksuid: %s", err)
+	}
+
+	w.l.Debug("generated token", zap.String("token", k.String()), zap.Time("updateTime", attr.Updated))
+
+	return k.String(), nil
+}
+
+// Adds a WAL entry to WAL
+func (w *WAL) Add(ctx context.Context, p string) (string, error) {
+	e := Entry{
+		Payload: p,
+	}
+	var err error
+	e.Token, err = w.getToken(ctx)
+	if err != nil {
+		w.l.Error("failed to generate token for entry", zap.Error(err), zap.String("payload", p))
+		return "", fmt.Errorf("failed to generate token: %v", err)
+	}
+	err = w.walStore.Put(ctx, e.Token, strings.NewReader(e.Payload), storage.NoOverWrite) // Should be a new entry
+	if err != nil {
+		w.l.Error("failed to add wal entry", zap.Error(err), zap.String("token", e.Token))
+		return "", fmt.Errorf("failed to add wal token: %s, entry: %s", e.Token, err.Error())
+	}
+	w.l.Info("Write wal entry", zap.String("token", e.Token))
+	return e.Token, err
+}
+
+func (w *WAL) GetExpirationDuration() time.Duration {
+	return 10 * time.Minute
+}
+
+func (w *WAL) updateTokenTimestamp(ctx context.Context) error {
+	return w.mutableStore.Touch(ctx, w.tokenGeneratorPath)
+}
+
+// Reads the WAL starting from the tokens passed in. If startFrom is empty it will entry from beginning.
+// Repeated reads can include duplicate tokens. No tokens are missed
+// Returns false if the list has more entries that can be listed.
+// Use the last Entry of the previous call to paginate to the next set of keys.
+func (w *WAL) ListTokens(ctx context.Context, fromToken string, max int) (tokens []string, next string, err error) {
+	if max <= 0 {
+		w.l.Warn("received 0 length max",
+			zap.String("fromToken", fromToken),
+			zap.Int("max", max))
+		return nil, "", fmt.Errorf("max count needs to be greater than 0 : %d, fromToken:%s", max, fromToken)
+	}
+	k, err := ksuid.Parse(fromToken)
+	if err != nil {
+		return nil, "", err
+	}
+	if max > maxEntriesPerList {
+		max = maxEntriesPerList
+	}
+
+	// Go back in time to include the keys that might have been written before the token was generated.
+	b := []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
+	ksuidOld, err := ksuid.FromParts(k.Time().Add(-w.GetExpirationDuration()*2), b)
+	if err != nil {
+		w.l.Error("failed to calculate first token", zap.Error(err), zap.String("fromToken", fromToken))
+	}
+	tokens, next, err = w.walStore.KeysPrefix(ctx, ksuidOld.String(), "", "", max)
+	if err != nil {
+		w.l.Error("failed to get tokens",
+			zap.Error(err),
+			zap.String("backDatedToken", ksuidOld.String()),
+			zap.String("token", fromToken))
+	}
+	return tokens, next, err
+}
+
+func (w *WAL) getConnection() {
+	w.connectionControl <- struct{}{}
+}
+
+func (w *WAL) releaseConnection() {
+	<-w.connectionControl
+}
+
+type walChannels struct {
+	tokens  chan []string
+	entry   chan *Entry
+	entries chan []Entry
+	count   chan int
+	oops    chan error
+	done    chan struct{}
+}
+
+func newWalChannels() *walChannels {
+	token := make(chan []string)
+	entry := make(chan *Entry)
+	entries := make(chan []Entry)
+	count := make(chan int)
+	done := make(chan struct{})
+	return &walChannels{
+		tokens:  token,
+		entry:   entry,
+		entries: entries,
+		count:   count,
+		done:    done,
+	}
+}
+
+func (w *WAL) ListEntries(ctx context.Context, fromToken string, max int) ([]Entry, string, error) {
+	if max <= 0 {
+		w.l.Warn("received 0 length max",
+			zap.String("fromToken", fromToken),
+			zap.Int("max", max))
+		return nil, "", fmt.Errorf("max count needs to be greater than 0 : %d, fromToken:%s", max, fromToken)
+	}
+	walChannels := newWalChannels()
+	count := 0
+
+	// ListEntries spawns a go routine for a batch of entries that spawns parallel read. The responses for the parallel reads
+	// are read by one routine that collects all responses and returns them to the main thread.
+
+	// Start routine which collects all parallel responses.
+	go w.collectParallelResponses(ctx, walChannels)
+	// Start routine that will issue parallel reads.
+	go w.issueParallelReads(ctx, walChannels)
+
+	// Read tokens and send to routine to entry in parallel while fetching new tokens.
+	tokens, next, err := w.ListTokens(ctx, fromToken, max-count)
+
+	if err != nil {
+		return nil, "", fmt.Errorf("wal failed to ListEntries: " + err.Error())
+	}
+	count = len(tokens)
+
+	if count > 0 {
+		// account for case list is not complete but the response does not include any token.
+		walChannels.tokens <- tokens
+	} else {
+		return nil, next, err
+	}
+
+	close(walChannels.tokens) // No more tokens to report.
+
+	walChannels.count <- count // Send total count for reading responses.
+
+	for {
+		select {
+		case entries := <-walChannels.entries:
+			if len(entries) != count {
+				panic(fmt.Sprintf("received count different than the list of tokens entries: %d count: %d", len(entries), count))
+			}
+			return entries, next, nil
+		case err := <-walChannels.oops:
+			return nil, "", err
+		}
+	}
+}
+
+func (w *WAL) issueParallelReads(ctx context.Context, channels *walChannels) {
+	count := 0
+	for tokens := range channels.tokens {
+		for _, t := range tokens {
+			w.getConnection() // concurrency control
+			count++
+			go w.read(ctx, t, channels)
+		}
+	}
+}
+
+func (w *WAL) read(ctx context.Context, token string, channels *walChannels) {
+	defer w.releaseConnection() // concurrency control
+	r, err := w.walStore.Get(ctx, token)
+	w.l.Debug("Read token", zap.String("token", token))
+	defer r.Close()
+	if err != nil {
+		channels.oops <- err
+		return
+	}
+	b := make([]byte, 1024)
+	for {
+		l, e := r.Read(b)
+		if e == io.EOF {
+			b = b[:l]
+			break
+		}
+	}
+	entry, err := Unmarshal(b)
+	if err != nil {
+		channels.oops <- fmt.Errorf("token: %s, err: %s", token, err)
+		return
+	}
+	channels.entry <- entry
+}
+
+func (w *WAL) collectParallelResponses(ctx context.Context, channels *walChannels) {
+	entriesMap := iradix.New().Txn()
+	count := 0
+	total := 0
+	var err error
+
+	finalize := func() {
+		if err != nil {
+			// Report an error occurred.
+			channels.oops <- err
+			return
+		}
+		var entries []Entry
+		iterator := entriesMap.Root().Iterator()
+		for {
+			_, e, ok := iterator.Next()
+			if !ok {
+				// send the final entries
+				channels.entries <- entries
+				return
+			}
+			entry := e.(*Entry)
+			entries = append(entries, *entry)
+		}
+	}
+
+	for {
+		// Wait for all reads to return.
+		select {
+		case e := <-channels.entry:
+			w.l.Debug("Received entry", zap.String("token", e.Token))
+			_, updated := entriesMap.Insert([]byte(e.Token), e)
+			if updated {
+				panic(fmt.Sprintf("Received more than one response for token: %s string: %s", e.Token, e.Payload))
+			}
+			count++
+			if count == total {
+				finalize()
+				return
+			}
+		case total = <-channels.count:
+			w.l.Info("waiting to read", zap.Int("total", total))
+			if count == total {
+				finalize()
+				return
+			}
+		case err = <-channels.oops:
+			// Log all errors
+			w.l.Error("failed to read token", zap.Error(err))
+			count++
+			if count == total {
+				finalize()
+				return
+			}
+		}
+	}
+}

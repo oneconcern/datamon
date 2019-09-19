@@ -121,6 +121,14 @@ func (gs genStore) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return &readerAtReadCloser{rAt: rAt}, nil
 }
 
+func (gs genStore) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
+	panic("implement me")
+}
+
+func (gs genStore) Touch(ctx context.Context, objectName string) error {
+	panic("implement me")
+}
+
 func (gs genStore) GetAt(ctx context.Context, key string) (io.ReaderAt, error) {
 	var fn byteFunc
 	switch gs.genType {

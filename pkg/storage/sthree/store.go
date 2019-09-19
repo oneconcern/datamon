@@ -177,3 +177,11 @@ func (s *s3FS) String() string {
 func (s *s3FS) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
 	return nil, errors.New("unimplemented")
 }
+
+func (s *s3FS) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
+	panic("implement me")
+}
+
+func (s *s3FS) Touch(ctx context.Context, objectName string) error {
+	panic("implement me")
+}

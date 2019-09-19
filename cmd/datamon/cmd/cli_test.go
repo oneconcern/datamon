@@ -1370,7 +1370,7 @@ func createTestUploadTreeHelper(t *testing.T, sourceFS storage.Store, tree []upl
 			err = sourceFS.Put(context.Background(),
 				file.path,
 				bytes.NewReader(internal.RandBytesMaskImprSrc(file.size)),
-				storage.IfNotPresent)
+				storage.NoOverWrite)
 			if err == nil {
 				break
 			}

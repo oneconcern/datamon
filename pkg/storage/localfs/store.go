@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/status"
@@ -84,7 +86,7 @@ func (rc readCloser) Close() error {
 	return nil
 }
 
-func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
+func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive storage.NewKey) error {
 	// TODO: Change this implementation to use rename to put file into place.
 	dir := filepath.Dir(key)
 	if dir != "" {
@@ -178,4 +180,26 @@ func (l *localFS) String() string {
 
 func (l *localFS) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
 	return l.fs.Open(objectName)
+}
+
+func (l *localFS) Touch(ctx context.Context, objectName string) error {
+	err := l.fs.Chtimes(objectName, time.Now(), time.Now())
+	return err
+}
+
+func (l *localFS) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
+	stat, err := l.fs.Stat(objectName)
+	if err != nil {
+		return storage.Attributes{}, err
+	}
+	sys, ok := stat.Sys().(syscall.Stat_t)
+	if !ok {
+		return storage.Attributes{}, fmt.Errorf("failed to convert sys to Stat_t for object:%s", objectName)
+	}
+	return storage.Attributes{
+		Created: stat.ModTime(), // Fix me: need a platform independent way to extracting timestamps
+		Updated: stat.ModTime(),
+		Owner:   fmt.Sprint(sys.Uid),
+	}, nil
+
 }
