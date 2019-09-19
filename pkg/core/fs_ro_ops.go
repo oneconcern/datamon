@@ -438,31 +438,213 @@ func generateBundleDirEntry(nameWithPath string) *model.BundleEntry {
 	}
 }
 
-func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
-	dirStoreTxn := fs.fsDirStore.Txn()
-	lookupTreeTxn := fs.lookupTree.Txn()
-	fsEntryStoreTxn := fs.fsEntryStore.Txn()
+/* all the radix trees used during initialization */
+type populateFSTxns struct {
+	dirStore     *iradix.Txn
+	lookupTree   *iradix.Txn
+	fsEntryStore *iradix.Txn
+}
 
-	// Add root.
-	dirFsEntry := newDatamonFSEntry(generateBundleDirEntry(rootPath), bundle.BundleDescriptor.Timestamp, fuseops.RootInodeID, dirLinkCount)
-	err := fs.insertDatamonFSDirEntry(
-		dirStoreTxn,
-		lookupTreeTxn,
-		fsEntryStoreTxn,
-		fuseops.RootInodeID, // Root points to itself
-		*dirFsEntry)
-	if err != nil {
-		return nil, err
+func (txns *populateFSTxns) commitToFS(fs *readOnlyFsInternal) {
+	fs.fsEntryStore = txns.fsEntryStore.Commit()
+	fs.lookupTree = txns.lookupTree.Commit()
+	fs.fsDirStore = txns.dirStore.Commit()
+}
+
+/* unwound recursion to build a list of ents terminating at the first extant parent */
+// consider winding up recursion for clarity.(?).
+func populateFSBundleEntryToNodes(
+	fs *readOnlyFsInternal,
+	bundle *Bundle,
+	txns *populateFSTxns,
+	nodesToAdd []fsNodeToAdd,
+	iNode *fuseops.InodeID,
+	bundleEntry model.BundleEntry,
+) []fsNodeToAdd {
+
+	generateNextINode := func(iNode *fuseops.InodeID) fuseops.InodeID {
+		*iNode++
+		return *iNode
 	}
+
+	be := bundleEntry
+	// Generate the fsEntry
+	newFsEntry := newDatamonFSEntry(
+		&be,
+		bundle.BundleDescriptor.Timestamp,
+		generateNextINode(iNode),
+		fileLinkCount,
+	)
+
+	// Add parents if first visit
+	// If a parent has been visited, all the parent's parents in the path have been visited
+	nameWithPath := be.NameWithPath
+	for {
+		parentPath := path.Dir(nameWithPath)
+		fs.l.Debug("Processing parent",
+			zap.String("parentPath", parentPath),
+			zap.String("fullPath", be.NameWithPath))
+		// entry under root
+		if parentPath == "" || parentPath == "." || parentPath == "/" {
+			nodesToAdd = append(nodesToAdd, fsNodeToAdd{
+				parentINode: fuseops.RootInodeID,
+				fsEntry:     *newFsEntry,
+			})
+			if len(nodesToAdd) > 1 {
+				// If more than one node is to be added populate the parent iNode.
+				nodesToAdd[len(nodesToAdd)-2].parentINode = nodesToAdd[len(nodesToAdd)-1].fsEntry.iNode
+			}
+			break
+		}
+
+		// Copy into queue
+		nodesToAdd = append(nodesToAdd, fsNodeToAdd{
+			parentINode: 0, // undefined
+			fsEntry:     *newFsEntry,
+		})
+
+		if len(nodesToAdd) > 1 {
+			// If more than one node is to be added populate the parent iNode.
+			nodesToAdd[len(nodesToAdd)-2].parentINode = nodesToAdd[len(nodesToAdd)-1].fsEntry.iNode
+		}
+
+		p, found := txns.dirStore.Get([]byte(parentPath))
+		if !found {
+			fs.l.Debug("parentPath not found",
+				zap.String("parent", parentPath))
+			newFsEntry = newDatamonFSEntry(
+				generateBundleDirEntry(parentPath),
+				bundle.BundleDescriptor.Timestamp,
+				generateNextINode(iNode),
+				dirLinkCount,
+			)
+			// Continue till we hit root or found
+			nameWithPath = parentPath
+			continue
+		} else {
+			fs.l.Debug("parentPath found",
+				zap.String("parent", parentPath))
+			parentDirEntry := typeAssertToFsEntry(p)
+			if len(nodesToAdd) >= 1 {
+				nodesToAdd[len(nodesToAdd)-1].parentINode = parentDirEntry.iNode
+			}
+		}
+		fs.l.Debug("last node", zap.String("path", nodesToAdd[len(nodesToAdd)-1].fsEntry.fullPath),
+			zap.Uint64("childInode", uint64(nodesToAdd[len(nodesToAdd)-1].fsEntry.iNode)),
+			zap.Uint64("parentInode", uint64(nodesToAdd[len(nodesToAdd)-1].parentINode)))
+		break
+	}
+	return nodesToAdd
+}
+
+func populateFSAddNodes(
+	fs *readOnlyFsInternal,
+	txns *populateFSTxns,
+	nodesToAdd []fsNodeToAdd,
+) error {
+	var err error
+	for _, nodeToAdd := range nodesToAdd {
+		if nodeToAdd.fsEntry.attributes.Nlink == dirLinkCount {
+			err = fs.insertDatamonFSDirEntry(
+				txns,
+				nodeToAdd.parentINode,
+				nodeToAdd.fsEntry,
+			)
+
+		} else {
+			err = fs.insertDatamonFSEntry(
+				txns,
+				nodeToAdd.parentINode,
+				nodeToAdd.fsEntry,
+			)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func populateFSAddBundleEntry(
+	fs *readOnlyFsInternal,
+	bundle *Bundle,
+	txns *populateFSTxns,
+	nodesToAdd []fsNodeToAdd,
+	iNode *fuseops.InodeID,
+	bundleEntry model.BundleEntry,
+) error {
+
+	nodesToAdd = populateFSBundleEntryToNodes(
+		fs,
+		bundle,
+		txns,
+		nodesToAdd,
+		iNode,
+		bundleEntry,
+	)
+
+	fs.l.Debug("Nodes added",
+		zap.String("repo", fs.bundle.RepoID),
+		zap.String("bundle ID", fs.bundle.BundleID),
+		zap.Int("count", len(nodesToAdd)),
+	)
+	if err := populateFSAddNodes(
+		fs,
+		txns,
+		nodesToAdd,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func populateFSAddBundleEntries(
+	fs *readOnlyFsInternal,
+	bundle *Bundle,
+	txns *populateFSTxns,
+) error {
 
 	// For a Bundle Entry there might be intermediate directories that need adding.
 	var nodesToAdd []fsNodeToAdd
 	// iNode for fs entries
 	var iNode = firstINode
 
-	generateNextINode := func(iNode *fuseops.InodeID) fuseops.InodeID {
-		*iNode++
-		return *iNode
+	for _, bundleEntry := range fs.bundle.GetBundleEntries() {
+		if err := populateFSAddBundleEntry(
+			fs,
+			bundle,
+			txns,
+			nodesToAdd,
+			&iNode,
+			bundleEntry,
+		); err != nil {
+			return err
+		}
+		nodesToAdd = nodesToAdd[:0]
+	} // End walking bundle entries q2
+	return nil
+
+}
+
+func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
+	txns := new(populateFSTxns)
+	txns.dirStore = fs.fsDirStore.Txn()
+	txns.lookupTree = fs.lookupTree.Txn()
+	txns.fsEntryStore = fs.fsEntryStore.Txn()
+
+	// Add root.
+	dirFsEntry := newDatamonFSEntry(
+		generateBundleDirEntry(rootPath),
+		bundle.BundleDescriptor.Timestamp,
+		fuseops.RootInodeID,
+		dirLinkCount,
+	)
+	if err := fs.insertDatamonFSDirEntry(
+		txns,
+		fuseops.RootInodeID, // Root points to itself
+		*dirFsEntry,
+	); err != nil {
+		return nil, err
 	}
 
 	fs.l.Info("Populating fs",
@@ -470,106 +652,21 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 		zap.String("bundle ID", fs.bundle.BundleID),
 		zap.Int("entryCount", len(fs.bundle.BundleEntries)),
 	)
-	var count int
-	for _, bundleEntry := range fs.bundle.GetBundleEntries() {
-		be := bundleEntry
-		// Generate the fsEntry
-		newFsEntry := newDatamonFSEntry(&be, bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), fileLinkCount)
 
-		// Add parents if first visit
-		// If a parent has been visited, all the parent's parents in the path have been visited
-		nameWithPath := be.NameWithPath
-		for {
-			parentPath := path.Dir(nameWithPath)
-			fs.l.Debug("Processing parent",
-				zap.String("parentPath", parentPath),
-				zap.String("fullPath", be.NameWithPath))
-			// entry under root
-			if parentPath == "" || parentPath == "." || parentPath == "/" {
-				nodesToAdd = append(nodesToAdd, fsNodeToAdd{
-					parentINode: fuseops.RootInodeID,
-					fsEntry:     *newFsEntry,
-				})
-				if len(nodesToAdd) > 1 {
-					// If more than one node is to be added populate the parent iNode.
-					nodesToAdd[len(nodesToAdd)-2].parentINode = nodesToAdd[len(nodesToAdd)-1].fsEntry.iNode
-				}
-				break
-			}
+	if err := populateFSAddBundleEntries(
+		fs,
+		bundle,
+		txns,
+	); err != nil {
+		return nil, err
+	}
 
-			// Copy into queue
-			nodesToAdd = append(nodesToAdd, fsNodeToAdd{
-				parentINode: 0, // undefined
-				fsEntry:     *newFsEntry,
-			})
+	txns.commitToFS(fs)
 
-			if len(nodesToAdd) > 1 {
-				// If more than one node is to be added populate the parent iNode.
-				nodesToAdd[len(nodesToAdd)-2].parentINode = nodesToAdd[len(nodesToAdd)-1].fsEntry.iNode
-			}
-
-			p, found := dirStoreTxn.Get([]byte(parentPath))
-			if !found {
-				fs.l.Debug("parentPath not found",
-					zap.String("parent", parentPath))
-				newFsEntry = newDatamonFSEntry(generateBundleDirEntry(parentPath), bundle.BundleDescriptor.Timestamp, generateNextINode(&iNode), dirLinkCount)
-
-				// Continue till we hit root or found
-				nameWithPath = parentPath
-				continue
-			} else {
-				fs.l.Debug("parentPath found",
-					zap.String("parent", parentPath))
-				parentDirEntry := typeAssertToFsEntry(p)
-				if len(nodesToAdd) >= 1 {
-					nodesToAdd[len(nodesToAdd)-1].parentINode = parentDirEntry.iNode
-				}
-			}
-			fs.l.Debug("last node", zap.String("path", nodesToAdd[len(nodesToAdd)-1].fsEntry.fullPath),
-				zap.Uint64("childInode", uint64(nodesToAdd[len(nodesToAdd)-1].fsEntry.iNode)),
-				zap.Uint64("parentInode", uint64(nodesToAdd[len(nodesToAdd)-1].parentINode)))
-			break
-		}
-
-		fs.l.Debug("Nodes added",
-			zap.String("repo", fs.bundle.RepoID),
-			zap.String("bundle ID", fs.bundle.BundleID),
-			zap.Int("count", len(nodesToAdd)),
-		)
-		for _, nodeToAdd := range nodesToAdd {
-			if nodeToAdd.fsEntry.attributes.Nlink == dirLinkCount {
-				err = fs.insertDatamonFSDirEntry(
-					dirStoreTxn,
-					lookupTreeTxn,
-					fsEntryStoreTxn,
-					nodeToAdd.parentINode,
-					nodeToAdd.fsEntry,
-				)
-
-			} else {
-				count++
-				err = fs.insertDatamonFSEntry(
-					lookupTreeTxn,
-					fsEntryStoreTxn,
-					nodeToAdd.parentINode,
-					nodeToAdd.fsEntry,
-				)
-			}
-			if err != nil {
-				return nil, err
-			}
-			nodesToAdd = nodesToAdd[:0]
-		}
-	} // End walking bundle entries q2
-
-	fs.fsEntryStore = fsEntryStoreTxn.Commit()
-	fs.lookupTree = lookupTreeTxn.Commit()
-	fs.fsDirStore = dirStoreTxn.Commit()
 	fs.isReadOnly = true
 	fs.l.Info("Populating fs done",
 		zap.String("repo", fs.bundle.RepoID),
 		zap.String("bundle ID", fs.bundle.BundleID),
-		zap.Int("entryCount", count),
 	)
 	return &ReadOnlyFS{
 		fsInternal: fs,
@@ -578,15 +675,14 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 }
 
 func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
-	dirStoreTxn *iradix.Txn,
-	lookupTreeTxn *iradix.Txn,
-	fsEntryStoreTxn *iradix.Txn,
+	txns *populateFSTxns,
 	parentInode fuseops.InodeID,
 	dirFsEntry fsEntry) error {
+
 	fs.l.Debug("Inserting FSDirEntry",
 		zap.String("fullPath", dirFsEntry.fullPath),
 		zap.Uint64("parentInode", uint64(parentInode)))
-	_, update := dirStoreTxn.Insert([]byte(dirFsEntry.fullPath), dirFsEntry)
+	_, update := txns.dirStore.Insert([]byte(dirFsEntry.fullPath), dirFsEntry)
 
 	if update {
 		return errors.New("dirStore updates are not expected: /" + dirFsEntry.fullPath)
@@ -594,7 +690,7 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 
 	key := formKey(dirFsEntry.iNode)
 
-	_, update = fsEntryStoreTxn.Insert(key, dirFsEntry)
+	_, update = txns.fsEntryStore.Insert(key, dirFsEntry)
 	if update {
 		return errors.New("fsEntryStore updates are not expected: /")
 	}
@@ -602,7 +698,7 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 	if dirFsEntry.iNode != fuseops.RootInodeID {
 		key = formLookupKey(parentInode, path.Base(dirFsEntry.fullPath))
 
-		_, update = lookupTreeTxn.Insert(key, dirFsEntry)
+		_, update = txns.lookupTree.Insert(key, dirFsEntry)
 		if update {
 			fs.l.Error("lookupTree updates are not expected",
 				zap.String("fullPath", dirFsEntry.fullPath),
@@ -624,10 +720,10 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 }
 
 func (fs *readOnlyFsInternal) insertDatamonFSEntry(
-	lookupTreeTxn *iradix.Txn,
-	fsEntryStoreTxn *iradix.Txn,
+	txns *populateFSTxns,
 	parentInode fuseops.InodeID,
 	fsEntry fsEntry) error {
+
 	fs.l.Debug("adding",
 		zap.Uint64("parent", uint64(parentInode)),
 		zap.String("fullPath", fsEntry.fullPath),
@@ -635,14 +731,14 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 		zap.String("base", path.Base(fsEntry.fullPath)))
 	key := formKey(fsEntry.iNode)
 
-	_, update := fsEntryStoreTxn.Insert(key, fsEntry)
+	_, update := txns.fsEntryStore.Insert(key, fsEntry)
 	if update {
 		return errors.New("fsEntryStore updates are not expected: " + fsEntry.fullPath)
 	}
 
 	key = formLookupKey(parentInode, path.Base(fsEntry.fullPath))
 
-	_, update = lookupTreeTxn.Insert(key, fsEntry)
+	_, update = txns.lookupTree.Insert(key, fsEntry)
 	if update {
 		fs.l.Error("lookupTree updates are not expected",
 			zap.String("fullPath", fsEntry.fullPath),
