@@ -7,6 +7,8 @@ import (
 	"io"
 )
 
+//go:generate moq -out ./mockstorage/store.go -pkg mockstorage . Store
+
 type errString string
 
 const MaxObjectSizeInMemory = 2 * 1024 * 1024 * 1024 // 2 gigs

@@ -12,6 +12,9 @@ linters-settings:
   goconst:
     min-len: 2
     min-occurrences: 2
+  funlen:
+    lines: 150
+    statements: 300
 
 linters:
   enable-all: true

@@ -186,8 +186,13 @@ clean:
 ## Setup, run all tests and clean
 test: clean setup runtests clean
 
+.PHONY: mocks
+mocks:
+	@go get -u github.com/matryer/moq
+	@go generate ./...
+
 .PHONY: runtests
-runtests:
+runtests: mocks
 	@go test ./...
 
 .PHONY: gofmt

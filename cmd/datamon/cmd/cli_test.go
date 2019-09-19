@@ -502,7 +502,15 @@ func testListBundle(t *testing.T, file uploadTree, bcnt int) {
 	ll, err = listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, bcnt, len(ll), "bundle count in test repo")
-	require.Equal(t, msg, ll[len(ll)-1].message, "bundle log message")
+	// ordering of bundles not strictly required
+	found := false
+	for _, b := range ll {
+		if msg == b.message {
+			found = true
+			break
+		}
+	}
+	require.Truef(t, found, "bundle log message %q not found in returned bundles")
 	require.True(t, testNow.Sub(ll[len(ll)-1].time).Seconds() < 3, "timestamp bounds after bundle create")
 }
 

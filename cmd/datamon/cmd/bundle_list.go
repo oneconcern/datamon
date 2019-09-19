@@ -23,7 +23,7 @@ var BundleListCommand = &cobra.Command{
 		if err != nil {
 			logFatalln(err)
 		}
-		bundleDescriptors, err := core.ListBundles(params.repo.RepoName, remoteStores.meta)
+		bundleDescriptors, err := core.ListBundles(params.repo.RepoName, remoteStores.meta, core.ConcurrentBundleList(params.core.ConcurrencyFactor))
 		if err != nil {
 			logFatalln(err)
 		}
@@ -44,6 +44,7 @@ func init() {
 
 	addBucketNameFlag(BundleListCommand)
 	addBlobBucket(BundleListCommand)
+	addCoreConcurrencyFactorFlag(BundleListCommand)
 
 	for _, flag := range requiredFlags {
 		err := BundleListCommand.MarkFlagRequired(flag)

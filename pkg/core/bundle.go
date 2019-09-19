@@ -4,6 +4,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
@@ -67,6 +68,7 @@ func (b *Bundle) GetBundleEntries() []model.BundleEntry {
 }
 
 type BundleOption func(*Bundle)
+
 type BundleDescriptorOption func(descriptor *model.BundleDescriptor)
 
 func Message(m string) BundleDescriptorOption {
@@ -172,20 +174,47 @@ func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
 	}
 }
 
-func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
-	b := Bundle{
+// BundleListOption sets options for ListBundles
+type BundleListOption func(*CoreSettings)
+
+// CoreSettings defines various settings for core features
+type CoreSettings struct {
+	concurrentBundleList int
+}
+
+var (
+	defaultBundleListConcurrency = 2 * runtime.NumCPU()
+)
+
+// ConcurrentBundleList sets the max level of concurrency to retrieve bundles. It defaults to 4 x #cpus.
+func ConcurrentBundleList(concurrentBundleList int) BundleListOption {
+	return func(s *CoreSettings) {
+		if concurrentBundleList == 0 {
+			s.concurrentBundleList = defaultBundleListConcurrency
+			return
+		}
+		s.concurrentBundleList = concurrentBundleList
+	}
+}
+
+func defaultBundle() Bundle {
+	return Bundle{
 		RepoID:                      "",
 		BundleID:                    "",
 		MetaStore:                   nil,
 		ConsumableStore:             nil,
 		BlobStore:                   nil,
-		BundleDescriptor:            *bd,
 		BundleEntries:               make([]model.BundleEntry, 0, 1024),
 		Streamed:                    false,
 		concurrentFileUploads:       20,
 		concurrentFileDownloads:     10,
 		concurrentFilelistDownloads: 10,
 	}
+}
+
+func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
+	b := defaultBundle()
+	b.BundleDescriptor = *bd
 
 	b.l, _ = dlogger.GetLogger("info")
 

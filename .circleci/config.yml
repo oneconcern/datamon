@@ -31,17 +31,19 @@ jobs:
           name: Install go tools
           command: |
             go get -u gotest.tools/gotestsum
+            go get -u github.com/matryer/moq
             go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
             mkdir -p /tmp/test-results
       - checkout
       # Restore bundle cache
       - restore_cache:
           keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
+           - pkg-cache-{{ checksum "go.sum" }}
+           - pkg-cache-
       - run:
           name: Run golang linter
           command: |
+            hack/go-generate.sh
             golangci-lint run --disable golint,funlen,godox,whitespace,stylecheck --build-tags fuse_cli --max-same-issues 0 --verbose
       - run:
           name: Lint shell scripts
@@ -82,6 +84,7 @@ jobs:
           name: Install go tools
           command: |
             go get -u gotest.tools/gotestsum
+            go get -u github.com/matryer/moq
             mkdir -p /tmp/test-results
       - checkout
       # Restore bundle cache
@@ -96,6 +99,7 @@ jobs:
             echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
             echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
+            hack/go-generate.sh
             gotestsum --junitfile /tmp/test-results/go-test-report.xml ./... -- -race ./...
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
