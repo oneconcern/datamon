@@ -279,16 +279,14 @@ func paramsToDestStore(params paramsT,
 	var consumableStorePath string
 	var destStore storage.Store
 
-	if tmpdirPrefix != "" {
-		if params.bundle.DataPath != "" {
-			return nil, fmt.Errorf("bundle data path isn't compatible with temp dir usage")
-		}
-		if destT == destTNonEmpty {
-			return nil, fmt.Errorf("can't specify temp dest path and non-empty dir mutually exclusive")
-		}
+	if tmpdirPrefix != "" && params.bundle.DataPath != "" {
+		tmpdirPrefix = ""
 	}
 
 	if tmpdirPrefix != "" {
+		if destT == destTNonEmpty {
+			return nil, fmt.Errorf("can't specify temp dest path and non-empty dir mutually exclusive")
+		}
 		consumableStorePath, err = ioutil.TempDir("", tmpdirPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create temporary directory: %v", err)

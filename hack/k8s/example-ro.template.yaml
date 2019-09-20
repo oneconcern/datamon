@@ -31,7 +31,6 @@ spec:
         args: ["bundle", "mount",
         "--repo", "$REPO_NAME",
         "--bundle", "$BUNDLE_ID",
-        "--destination", "/tmp",
         "--mount", "/tmp/mount",
         "--stream"]
         securityContext:

@@ -11,4 +11,4 @@ USER developer
 # ADD hack/fuse-demo/datamon.yaml /home/developer/.datamon/datamon.yaml
 
 ENTRYPOINT ["./wrap_datamon.sh"]
-CMD ["-c", "/tmp/coord", "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo", "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --destination /tmp --mount /tmp/mount --stream"]
+CMD ["-c", "/tmp/coord", "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo", "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
