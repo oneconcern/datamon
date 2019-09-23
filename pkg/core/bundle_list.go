@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -22,7 +23,7 @@ func ListBundles(repo string, store storage.Store) ([]model.BundleDescriptor, er
 	if e != nil {
 		return nil, e
 	}
-	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", maxBundlesToList)
+	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "/", maxBundlesToList)
 	if err != nil {
 		return nil, err
 	}
@@ -32,11 +33,11 @@ func ListBundles(repo string, store storage.Store) ([]model.BundleDescriptor, er
 		if err != nil {
 			return nil, err
 		}
-		if apc.ArchiveFileName != "bundle.json" {
-			continue
-		}
 		r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, apc.BundleID))
 		if err != nil {
+			if strings.Contains(err.Error(), "object doesn't exist") {
+				continue
+			}
 			return nil, err
 		}
 		o, err := ioutil.ReadAll(r)

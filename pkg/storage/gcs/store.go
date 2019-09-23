@@ -181,7 +181,6 @@ func (g *gcs) Keys(ctx context.Context) ([]string, error) {
 // todo: consider KeysPrefix returning all keys, not pages,
 //   and expanding api surface to include paged results for both keys and keys according to prefix
 func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error) {
-
 	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})
 
 	var objects []*gcsStorage.ObjectAttrs
@@ -193,7 +192,11 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 	}
 
 	for _, objAttrs := range objects {
-		keys = append(keys, objAttrs.Name)
+		if objAttrs.Prefix != "" {
+			keys = append(keys, objAttrs.Prefix)
+		} else {
+			keys = append(keys, objAttrs.Name)
+		}
 	}
 
 	return keys, pageToken, nil

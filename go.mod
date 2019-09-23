@@ -15,8 +15,10 @@ require (
 	github.com/docker/go-units v0.3.3
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/go-chi/chi v4.0.2+incompatible
+	github.com/gobuffalo/envy v1.7.1 // indirect
+	github.com/gobuffalo/logger v1.0.1 // indirect
 	github.com/gobuffalo/packd v0.3.0
-	github.com/gobuffalo/packr/v2 v2.5.1
+	github.com/gobuffalo/packr/v2 v2.6.0
 	github.com/gogo/protobuf v1.3.0 // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
@@ -49,14 +51,15 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/objx v0.2.0 // indirect
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8 // indirect
 	github.com/ultraware/funlen v0.0.2 // indirect
 	go.uber.org/zap v1.10.0
+	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	golang.org/x/sys v0.0.0-20190916202348-b4ddaad3f8a3
+	golang.org/x/sys v0.0.0-20190922100055-0a153f010e69
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190918192907-c886270503e0 // indirect
+	golang.org/x/tools v0.0.0-20190923195354-c85f9fa9581e
 	google.golang.org/api v0.2.0
 	google.golang.org/grpc v1.21.0
 	gopkg.in/yaml.v2 v2.2.2
