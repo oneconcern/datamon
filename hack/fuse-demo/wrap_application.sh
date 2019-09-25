@@ -15,7 +15,10 @@ POLL_INTERVAL=1 # sec
 
 SLEEP_INSTEAD_OF_EXIT=
 
-while getopts sc: opt; do
+SC_FUSE=
+SC_PG=
+
+while getopts sc:b: opt; do
     case $opt in
         (s)
             SLEEP_INSTEAD_OF_EXIT=true
@@ -23,9 +26,20 @@ while getopts sc: opt; do
         (c)
             COORD_POINT="$OPTARG"
             ;;
+        (b)
+            battery_type="$OPTARG"
+            if [ "$battery_type" = "fuse" ]; then
+                SC_FUSE=true
+            elif [ "$battery_type" = "postgres" ]; then
+                SC_PG=true
+            else
+                echo "unkown battery type $battery_type" 1>&2
+                exit 1
+            fi
+            ;;
         (\?)
             echo "Bad option, aborting."
-            return 1
+            exit 1
             ;;
     esac
 done
@@ -71,9 +85,16 @@ emit_event() {
 ### application wrapper
 
 ## the following waits on datamon to make a FUSE mount available
-await_event \
-    'mountdone' \
-    'waiting on datamon mount (app wrap)'
+if [ -n "$SC_FUSE" ]; then
+    await_event \
+        'mountdone' \
+        'waiting on datamon mount (app wrap)'
+fi
+if [ -n "$SC_PG" ]; then
+    await_event \
+        'dbstarted' \
+        'waiting on db start (app wrap)'
+fi
 
 ## once data is available, the data-science application is started
 echo "mount done, executing mock application, '" "$@" "'"
@@ -88,15 +109,28 @@ fi
 echo "mock application done"
 
 ## after the application writes its output, notify the sidecar to start uploading it
-
-emit_event \
-    'initupload' \
-    'dispatching init upload event'
+if [ -n "$SC_FUSE" ]; then
+    emit_event \
+        'initupload' \
+        'dispatching init upload event'
+fi
+if [ -n "$SC_PG" ]; then
+    emit_event \
+        'initdbupload' \
+        'dispatching init db upload event'
+fi
 
 ## block until the sidecar finishes uploading
-await_event \
-    'uploaddone' \
-    'waiting on upload'
+if [ -n "$SC_FUSE" ]; then
+    await_event \
+        'uploaddone' \
+        'waiting on upload'
+fi
+if [ -n "$SC_PG" ]; then
+    await_event \
+        'dbuploaddone' \
+        'waiting on db upload'
+fi
 
 ## COORDINATION ENDS with this container exiting
 echo "recved upload done event, exiting"

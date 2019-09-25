@@ -44,7 +44,7 @@ jobs:
           name: Run golang linter
           command: |
             hack/go-generate.sh
-            golangci-lint run --disable golint,funlen,godox,whitespace,stylecheck --build-tags fuse_cli --max-same-issues 0 --verbose
+            golangci-lint run --verbose
       - run:
           name: Lint shell scripts
           command: |

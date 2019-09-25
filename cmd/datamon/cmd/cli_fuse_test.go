@@ -133,8 +133,7 @@ func TestBundleMutableMount(t *testing.T) {
 	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, 0, bundles.Len(), "bundle count in test repo")
-
-	cmd := exec.Command(
+	cmd := exec.Command( // nolint:gosec
 		"../datamon",
 		"bundle", "mount", "new",
 		"--repo", repo1,
