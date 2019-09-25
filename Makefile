@@ -48,7 +48,7 @@ help:
 
 .PHONY: build-and-push-fuse-sidecar
 ## build sidecar container used in Argo workflows
-build-and-push-fuse-sidecar:
+build-and-push-fuse-sidecar: build-datamon-binaries
 	@echo 'building fuse sidecar container'
 	docker build \
 		--progress plain \
@@ -63,7 +63,7 @@ build-and-push-fuse-sidecar:
 
 .PHONY: build-and-push-datamover
 ## build sidecar container used in Argo workflows
-build-and-push-datamover:
+build-and-push-datamover: build-datamon-binaries
 	@echo 'building fuse sidecar container'
 	docker build \
 		--progress plain \
@@ -211,12 +211,12 @@ check: gofmt goimports
 .PHONY: lint-init-scripts
 ## build shell container used in fuse demo
 fuse-demo-lint-init-scripts:
-	shellcheck hack/fuse-demo/wrap_*.sh
+	shellcheck hack/fuse-demo/wrap_application.sh
 
 .PHONY: fuse-demo-build-shell
 ## build shell container used in fuse demo
 fuse-demo-build-shell:
-	@echo 'building fuse demo container'
+	@echo 'building fuse demo application container'
 	docker build \
 		--progress plain \
 		-t gcr.io/onec-co/datamon-fuse-demo-shell \
@@ -227,8 +227,8 @@ fuse-demo-build-shell:
 
 .PHONY: fuse-demo-build-sidecar
 ## build sidecar container used in fuse demo
-fuse-demo-build-sidecar:
-	@echo 'building fuse demo container'
+fuse-demo-build-sidecar: build-and-push-fuse-sidecar
+	@echo 'building fuse demo sidecar container'
 	docker build \
 		--progress plain \
 		-t gcr.io/onec-co/datamon-fuse-demo-sidecar \
@@ -239,9 +239,7 @@ fuse-demo-build-sidecar:
 
 ## demonstrate a fuse read-only filesystem
 fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
-	@docker image push gcr.io/onec-co/datamon-fuse-demo-shell
 	@./hack/fuse-demo/create_ro_pod.sh
-	@sleep 8 # dumb timeout on container startup
 	@./hack/fuse-demo/run_shell.sh
 
 .PHONY: fuse-demo-coord-build-app

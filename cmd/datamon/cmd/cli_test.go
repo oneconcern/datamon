@@ -278,7 +278,7 @@ func listRepos(t *testing.T) ([]repoListEntry, error) {
 	require.NoError(t, err, "i/o error reading patched log from pipe")
 	//
 	rles := make([]repoListEntry, 0)
-	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
+	for _, line := range getDataLogLines(t, string(lb), []string{}) {
 		sl := strings.Split(line, ",")
 		t, err := time.Parse(timeForm, strings.TrimSpace(sl[4]))
 		if err != nil {
@@ -469,7 +469,7 @@ func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
 	lb, err := ioutil.ReadAll(r)
 	require.NoError(t, err, "i/o error reading patched log from pipe")
 	bles := make([]bundleListEntry, 0)
-	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
+	for _, line := range getDataLogLines(t, string(lb), []string{}) {
 		sl := strings.Split(line, ",")
 		t, err := time.Parse(timeForm, strings.TrimSpace(sl[1]))
 		if err != nil {
@@ -592,7 +592,7 @@ func listLabels(t *testing.T, repoName string) []labelListEntry {
 	lb, err := ioutil.ReadAll(r)
 	require.NoError(t, err, "i/o error reading patched log from pipe")
 	lles := make([]labelListEntry, 0)
-	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
+	for _, line := range getDataLogLines(t, string(lb), []string{}) {
 		sl := strings.Split(line, ",")
 		time, err := time.Parse(timeForm, strings.TrimSpace(sl[2]))
 		require.NoError(t, err, "couldn't parse label list time")
@@ -848,7 +848,7 @@ func TestDiffBundle(t *testing.T) {
 	lb, err := ioutil.ReadAll(r)
 	require.NoError(t, err, "i/o error reading patched log from pipe")
 	des := make([]diffEntry, 0)
-	for _, line := range getDataLogLines(t, string(lb), []string{`Using config file`}) {
+	for _, line := range getDataLogLines(t, string(lb), []string{}) {
 		sl := strings.Split(line, ",")
 		de := diffEntry{
 			rawLine:    line,

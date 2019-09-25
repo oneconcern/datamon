@@ -68,9 +68,8 @@ else
         echo 'bundle id and label are mutually exclusive' 1>&2
         exit 1
     fi
-    bundle_id=$("$DATAMON_EXEC" label list --repo "$repo_name" 2>&1 | \
-                    grep '^'"$label" | \
-                    cut -d',' -f2 | sed 's/ //g')
+    bundle_id=$(2>&1 "$DATAMON_EXEC" label get --repo "$repo_name" --label "$label" | \
+                    cut -d ',' -f 2 | tr -d ' ')
     if [ "$bundle_id" = '' ]; then
         echo "couldn't find bundle if for label $label" 1>&2
         exit 1

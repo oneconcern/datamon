@@ -49,7 +49,7 @@ spec:
         "-i", "/tmp/bundleid.txt",
         "-d", "config create --name \"Coord\" --email coord-bot@oneconcern.com",
         "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo",
-        "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --destination /tmp --mount /tmp/mount --stream"]
+        "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
         securityContext:
           privileged: true
         stdin: true
