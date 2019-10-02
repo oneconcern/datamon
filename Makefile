@@ -188,8 +188,7 @@ test: clean setup runtests clean
 
 .PHONY: mocks
 mocks:
-	@go get -u github.com/matryer/moq
-	@go generate ./...
+	@hack/go-generate.sh
 
 .PHONY: runtests
 runtests: mocks
