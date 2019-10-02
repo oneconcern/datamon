@@ -25,6 +25,7 @@ require (
 	github.com/karrick/godirwalk v1.10.12
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
+	github.com/matryer/moq v0.0.0-20190312154309-6cfb0558e1bd // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/opentracing/opentracing-go v1.0.2
@@ -40,10 +41,10 @@ require (
 	github.com/stretchr/testify v1.4.0
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392 // indirect
-	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	golang.org/x/sys v0.0.0-20190922100055-0a153f010e69
 	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/tools v0.0.0-20191001184121-329c8d646ebe // indirect
 	google.golang.org/api v0.2.0
 	google.golang.org/grpc v1.21.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect

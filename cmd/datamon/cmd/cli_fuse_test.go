@@ -30,9 +30,10 @@ func testBundleMount(t *testing.T, testType string) {
 		"--message", "read-only mount test bundle",
 		"--repo", repo1,
 	}, "upload bundle in order to test downloading individual files", false)
-	rll, err := listBundles(t, repo1)
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, 1, len(rll), "bundle count in test repo")
+	require.Equal(t, 1, bundles.Len(), "bundle count in test repo")
+
 	const (
 		pathBackingFs = "/tmp/mmfs"
 		pathToMount   = "/tmp/mmp"
@@ -129,9 +130,10 @@ func TestBundleMutableMount(t *testing.T) {
 	)
 	defer os.RemoveAll(pathBackingFs)
 	defer os.RemoveAll(pathToMount)
-	rll, err := listBundles(t, repo1)
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, 0, len(rll), "bundle count in test repo")
+	require.Equal(t, 0, bundles.Len(), "bundle count in test repo")
+
 	cmd := exec.Command(
 		"../datamon",
 		"bundle", "mount", "new",
@@ -158,9 +160,10 @@ func TestBundleMutableMount(t *testing.T) {
 	mutableMountOutput := string(bytes)
 	t.Logf("mutableMountOutput: %v", mutableMountOutput)
 	bundleID := mutableMountOutputToBundleID(t, mutableMountOutput)
-	rll, err = listBundles(t, repo1)
+	bundles, err = listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, 1, len(rll), "bundle count in test repo")
-	t.Logf("bundles list output %v", rll[0])
-	require.Equal(t, bundleID, rll[0].hash)
+	require.Equal(t, 1, bundles.Len(), "bundle count in test repo")
+	bundle := bundles.Last()
+	t.Logf("bundles list output %v", bundle)
+	require.Equal(t, bundleID, bundle.hash)
 }
