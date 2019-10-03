@@ -186,8 +186,12 @@ clean:
 ## Setup, run all tests and clean
 test: clean setup runtests clean
 
+.PHONY: mocks
+mocks:
+	@hack/go-generate.sh
+
 .PHONY: runtests
-runtests:
+runtests: mocks
 	@go test ./...
 
 .PHONY: gofmt

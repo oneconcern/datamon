@@ -97,3 +97,6 @@ scratch.txt
 
 # MAC
 .DS_Store
+
+# Generated code
+pkg/storage/mockstorage/

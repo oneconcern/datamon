@@ -50,6 +50,9 @@ type paramsT struct {
 		logLevel string
 		cpuProf  bool
 	}
+	core struct {
+		ConcurrencyFactor int
+	}
 }
 
 var params = paramsT{}
@@ -126,10 +129,21 @@ func addSkipMissingFlag(cmd *cobra.Command) string {
 	return skipOnError
 }
 
+const concurrencyFactorFlag = "concurrency-factor"
+
 func addConcurrencyFactorFlag(cmd *cobra.Command) string {
-	concurrencyFactor := "concurrency-factor"
+	concurrencyFactor := concurrencyFactorFlag
 	cmd.Flags().IntVar(&params.bundle.ConcurrencyFactor, concurrencyFactor, 100,
 		"Heuristic on the amount of concurrency used by various operations.  "+
+			"Turn this value down to use less memory, increase for faster operations.")
+	return concurrencyFactor
+}
+
+func addCoreConcurrencyFactorFlag(cmd *cobra.Command) string {
+	// this takes the usual "concurrency-factor" flag, but sets non-object specific settings
+	concurrencyFactor := concurrencyFactorFlag
+	cmd.Flags().IntVar(&params.core.ConcurrencyFactor, concurrencyFactor, 100,
+		"Heuristic on the amount of concurrency used by core operations (e.g. bundle list).  "+
 			"Turn this value down to use less memory, increase for faster operations.")
 	return concurrencyFactor
 }

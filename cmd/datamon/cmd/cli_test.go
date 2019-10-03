@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -453,7 +454,22 @@ type bundleListEntry struct {
 	time    time.Time
 }
 
-func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
+type bundleListEntries []bundleListEntry
+
+func (b bundleListEntries) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+func (b bundleListEntries) Len() int {
+	return len(b)
+}
+func (b bundleListEntries) Less(i, j int) bool {
+	return b[i].time.Before(b[j].time)
+}
+func (b bundleListEntries) Last() bundleListEntry {
+	return b[len(b)-1]
+}
+
+func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		panic(err)
@@ -468,7 +484,7 @@ func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
 	//
 	lb, err := ioutil.ReadAll(r)
 	require.NoError(t, err, "i/o error reading patched log from pipe")
-	bles := make([]bundleListEntry, 0)
+	bles := make(bundleListEntries, 0)
 	for _, line := range getDataLogLines(t, string(lb), []string{}) {
 		sl := strings.Split(line, ",")
 		t, err := time.Parse(timeForm, strings.TrimSpace(sl[1]))
@@ -483,6 +499,7 @@ func listBundles(t *testing.T, repoName string) ([]bundleListEntry, error) {
 		}
 		bles = append(bles, rle)
 	}
+	sort.Sort(bles) // sort test result by timestamp
 	return bles, nil
 }
 
@@ -496,14 +513,24 @@ func testListBundle(t *testing.T, file uploadTree, bcnt int) {
 		"--repo", repo1,
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
-	ll, err := listBundles(t, repo2)
+	bundles, err := listBundles(t, repo2)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, 0, len(ll), "no bundles in secondary repo")
-	ll, err = listBundles(t, repo1)
+	require.Equal(t, 0, bundles.Len(), "no bundles in secondary repo")
+
+	bundles, err = listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, bcnt, len(ll), "bundle count in test repo")
-	require.Equal(t, msg, ll[len(ll)-1].message, "bundle log message")
-	require.True(t, testNow.Sub(ll[len(ll)-1].time).Seconds() < 3, "timestamp bounds after bundle create")
+	require.Equal(t, bcnt, bundles.Len(), "bundle count in test repo")
+
+	// ordering of bundles is not strictly required
+	found := false
+	for _, b := range bundles {
+		if msg == b.message {
+			found = true
+			break
+		}
+	}
+	require.Truef(t, found, "bundle log message %q not found in returned bundles")
+	require.True(t, testNow.Sub(bundles.Last().time).Seconds() < 3, "timestamp bounds after bundle create")
 }
 
 func TestListBundles(t *testing.T) {
@@ -523,12 +550,15 @@ func TestListBundles(t *testing.T) {
 		"--name", "tests",
 		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
-	ll, err := listBundles(t, repo1)
+
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, len(ll), 0, "no bundles created yet")
-	ll, err = listBundles(t, repo2)
+	require.Equal(t, bundles.Len(), 0, "no bundles created yet")
+
+	bundles, err = listBundles(t, repo2)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, 0, len(ll), "no bundles created yet")
+	require.Equal(t, 0, bundles.Len(), "no bundles created yet")
+
 	for i, tree := range testUploadTrees {
 		testListBundle(t, tree[0], i+1)
 	}
@@ -639,18 +669,22 @@ func TestListLabels(t *testing.T) {
 		"--label", label,
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
+
 	ll = listLabels(t, repo2)
 	require.Equal(t, 0, len(ll), "no labels in secondary repo")
+
 	ll = listLabels(t, repo1)
 	require.Equal(t, 1, len(ll), "label count in test repo")
+
 	labelEnt := ll[0]
 	require.Equal(t, label, labelEnt.name, "found expected name in label entry")
 	require.True(t, testNow.Sub(labelEnt.time).Seconds() < 3, "timestamp bounds after bundle create")
-	bll, err := listBundles(t, repo1)
+
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, 1, len(bll), "bundle count in test repo")
-	bundleEnt := bll[0]
-	require.Equal(t, labelEnt.hash, bundleEnt.hash, "found expected hash in label entry")
+	require.Equal(t, 1, bundles.Len(), "bundle count in test repo")
+	bundleEnt := bundles.Last()
+	require.Equal(t, labelEnt.hash, bundleEnt.hash, "found unexpected hash in label entry")
 }
 
 func TestSetLabel(t *testing.T) {
@@ -674,12 +708,15 @@ func TestSetLabel(t *testing.T) {
 		"--repo", repo1,
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
+
 	ll = listLabels(t, repo1)
 	require.Equal(t, len(ll), 0, "no labels created yet")
-	bll, err := listBundles(t, repo1)
+
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, 1, len(bll), "bundle count in test repo")
-	bundleEnt := bll[0]
+	require.Equal(t, 1, bundles.Len(), "bundle count in test repo")
+
+	bundleEnt := bundles.Last()
 	label := internal.RandStringBytesMaskImprSrc(8)
 	testNow := time.Now()
 	runCmd(t, []string{"label",
@@ -707,12 +744,15 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		"--repo", repo1,
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, files[0]), false)
-	ll, err := listBundles(t, repo1)
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, bcnt, len(ll), "bundle count in test repo")
+	require.Equal(t, bcnt, bundles.Len(), "bundle count in test repo")
+	t.Logf("bundles listed: %v", bundles)
 	//
 	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
-	dpc := "bundle-dl-" + ll[len(ll)-1].hash
+	bundle := bundles.Last()
+	//for _, bundle := range bundles {
+	dpc := "bundle-dl-" + bundle.hash
 	dp, err := filepath.Abs(filepath.Join(consumedData, dpc))
 	require.NoError(t, err, "couldn't build file path")
 	exists, err := afero.Exists(destFS, dpc)
@@ -722,7 +762,7 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		"download",
 		"--repo", repo1,
 		"--destination", dp,
-		"--bundle", ll[len(ll)-1].hash,
+		"--bundle", bundle.hash,
 		"--concurrency-factor", concurrencyFactor,
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
@@ -735,6 +775,7 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(file)+"' size")
 		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(file)+"' contents")
 	}
+	//}
 }
 
 func TestDownloadBundles(t *testing.T) {
@@ -1139,12 +1180,14 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 		"--concurrency-factor", concurrencyFactor,
 	}, "create second test repo", false)
 
-	rll, err := listBundles(t, repo1)
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, bcnt, len(rll), "bundle count in test repo")
+	require.Equal(t, bcnt, bundles.Len(), "bundle count in test repo")
 	//
-	bfles := listBundleFiles(t, repo1, rll[len(rll)-1].hash)
-	require.Equal(t, len(files), len(bfles), "file count in bundle files list log")
+	//for _, bundle := range bundles {
+	bundle := bundles.Last()
+	bfles := listBundleFiles(t, repo1, bundle.hash)
+	require.Equalf(t, len(files), len(bfles), "file count in bundle files list log [bundle: %v]", bundle)
 	/* test set equality of names while setting up maps to test data by name */
 	bnsAc := make(map[string]bool)
 	bflesM := make(map[string]bundleFileListEntry)
@@ -1163,6 +1206,7 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 		require.Equal(t, filesM[name].size, bfle.size, "bundle files list log compared to fixture data: "+
 			"entry's size '"+name+"'")
 	}
+	//}
 }
 
 func TestListBundlesFiles(t *testing.T) {
@@ -1218,12 +1262,13 @@ func testBundleDownloadFiles(t *testing.T, files []uploadTree, bcnt int) {
 		"--repo", repo1,
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle in order to test downloading individual files", false)
-	rll, err := listBundles(t, repo1)
+	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
-	require.Equal(t, bcnt, len(rll), "bundle count in test repo")
+	require.Equal(t, bcnt, bundles.Len(), "bundle count in test repo")
 	//
+	bundle := bundles.Last()
 	for _, file := range files {
-		testBundleDownloadFile(t, file, rll[len(rll)-1].hash)
+		testBundleDownloadFile(t, file, bundle.hash)
 	}
 }
 
