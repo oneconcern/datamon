@@ -263,6 +263,11 @@ func PublishMetadata(ctx context.Context, bundle *Bundle) error {
 	return implPublishMetadata(ctx, bundle, true, defaultBundleEntriesPerFile)
 }
 
+// DownloadMetadata from the archive to main memory
+func DownloadMetadata(ctx context.Context, bundle *Bundle) error {
+	return implPublishMetadata(ctx, bundle, false, defaultBundleEntriesPerFile)
+}
+
 // implementation of PublishMetadata() with some additional parameters for test
 func implPublishMetadata(ctx context.Context, bundle *Bundle,
 	publish bool,

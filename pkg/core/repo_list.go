@@ -14,7 +14,35 @@ const (
 	maxReposToList = 1000000
 )
 
-// todo: dedupe ListReposPaginated()
+func GetRepoDescriptorByRepoName(store storage.Store, repoName string) (model.RepoDescriptor, error) {
+	var rd model.RepoDescriptor
+	archivePathToRepoDescriptor := model.GetArchivePathToRepoDescriptor(repoName)
+	has, err := store.Has(context.Background(), archivePathToRepoDescriptor)
+	if err != nil {
+		return rd, err
+	}
+	if !has {
+		return rd, ErrNotFound
+	}
+	r, err := store.Get(context.Background(), archivePathToRepoDescriptor)
+	if err != nil {
+		return rd, err
+	}
+	o, err := ioutil.ReadAll(r)
+	if err != nil {
+		return rd, err
+	}
+	err = yaml.Unmarshal(o, &rd)
+	if err != nil {
+		return rd, err
+	}
+	if rd.Name != repoName {
+		return rd, fmt.Errorf("repo names in descriptor '%v' and archive path '%v' don't match",
+			rd.Name, repoName)
+	}
+	return rd, nil
+}
+
 func ListRepos(store storage.Store) ([]model.RepoDescriptor, error) {
 	// Get a list
 	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
@@ -24,28 +52,15 @@ func ListRepos(store storage.Store) ([]model.RepoDescriptor, error) {
 		if err != nil {
 			return nil, err
 		}
-		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(apc.Repo))
-		if err != nil {
-			return nil, err
-		}
-		o, err := ioutil.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
+
 		var rd model.RepoDescriptor
-		err = yaml.Unmarshal(o, &rd)
-		if err != nil {
-			return nil, err
-		}
-		if rd.Name != apc.Repo {
-			return nil, fmt.Errorf("repo names in descriptor '%v' and archive path '%v' don't match",
-				rd.Name, apc.Repo)
-		}
+		rd, err = GetRepoDescriptorByRepoName(store, apc.Repo)
 		repos = append(repos, rd)
 	}
 	return repos, nil
 }
 
+// todo: use storage.Store pagination
 func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescriptor, error) {
 	// Get a list
 	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
@@ -62,23 +77,9 @@ func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescript
 		if !tokenHit {
 			continue
 		}
-		r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(apc.Repo))
-		if err != nil {
-			return nil, err
-		}
-		o, err := ioutil.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
+
 		var rd model.RepoDescriptor
-		err = yaml.Unmarshal(o, &rd)
-		if err != nil {
-			return nil, err
-		}
-		if rd.Name != apc.Repo {
-			return nil, fmt.Errorf("repo names in descriptor '%v' and archive path '%v' don't match",
-				rd.Name, apc.Repo)
-		}
+		rd, err = GetRepoDescriptorByRepoName(store, apc.Repo)
 		repos = append(repos, rd)
 	}
 	return repos, nil

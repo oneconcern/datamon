@@ -342,6 +342,29 @@ func TestRepoList(t *testing.T) {
 	require.True(t, testNow.Sub(ll[1].time).Seconds() < 3, "second timestamp bounds after second create")
 }
 
+func TestGetRepo(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	repoName := internal.RandStringBytesMaskImprSrc(8)
+	runCmd(t, []string{"repo",
+		"get",
+		"--repo", repoName,
+	}, "attempt get non-exist repo", true)
+	require.Equal(t, int(unix.ENOENT), exitMocks.exitStatuses[len(exitMocks.exitStatuses)-1],
+		"ENOENT on nonexistant label")
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repoName,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create second test repo", false)
+	runCmd(t, []string{"repo",
+		"get",
+		"--repo", repoName,
+	}, "get repo", false)
+}
+
 func testUploadBundle(t *testing.T, file uploadTree) {
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -564,6 +587,41 @@ func TestListBundles(t *testing.T) {
 	}
 }
 
+func TestGetBundle(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+		"--name", "tests",
+		"--email", "datamon@oneconcern.com",
+	}, "create second test repo", false)
+	label := internal.RandStringBytesMaskImprSrc(8)
+	runCmd(t, []string{"bundle",
+		"get",
+		"--repo", repo1,
+		"--label", label,
+	}, "attempt get non-exist bundle", true)
+	require.Equal(t, int(unix.ENOENT), exitMocks.exitStatuses[len(exitMocks.exitStatuses)-1],
+		"ENOENT on nonexistant bundle")
+	files := testUploadTrees[0]
+	file := files[0]
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, file),
+		"--message", "label test bundle",
+		"--repo", repo1,
+		"--label", label,
+		"--concurrency-factor", concurrencyFactor,
+	}, "upload bundle at "+dirPathStr(t, file), false)
+	runCmd(t, []string{"bundle",
+		"get",
+		"--repo", repo1,
+		"--label", label,
+	}, "get bundle", false)
+}
+
 func TestGetLabel(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
@@ -579,7 +637,7 @@ func TestGetLabel(t *testing.T) {
 		"get",
 		"--repo", repo1,
 		"--label", label,
-	}, "list labels", true)
+	}, "attempt get non-exist label", true)
 	require.Equal(t, int(unix.ENOENT), exitMocks.exitStatuses[len(exitMocks.exitStatuses)-1],
 		"ENOENT on nonexistant label")
 	files := testUploadTrees[0]
@@ -596,7 +654,7 @@ func TestGetLabel(t *testing.T) {
 		"get",
 		"--repo", repo1,
 		"--label", label,
-	}, "list labels", false)
+	}, "get label", false)
 }
 
 type labelListEntry struct {
