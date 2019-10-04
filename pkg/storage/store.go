@@ -25,6 +25,7 @@ const (
 	ErrNotSupported errString = "not supported"
 	ErrExists       errString = "exists already"
 	ErrObjectTooBig errString = "object too big to be read into memory"
+	ErrNotExists    errString = "object doesn't exist"
 )
 
 // Store implementations know how to write entries to a K/V model.Store.

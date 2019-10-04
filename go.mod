@@ -6,6 +6,8 @@ replace github.com/spf13/cobra => github.com/babysnakes/cobra v0.0.2-0.201806031
 
 replace github.com/spf13/pflag => github.com/spf13/pflag v1.0.3
 
+replace go.uber.org/goleak => go.uber.org/goleak v0.10.1-0.20190823232112-227bd74c3482
+
 require (
 	cloud.google.com/go v0.37.1
 	github.com/aws/aws-sdk-go v1.18.6
@@ -39,6 +41,7 @@ require (
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
+	go.uber.org/goleak v0.0.0-00010101000000-000000000000
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect

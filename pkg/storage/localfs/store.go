@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/status"
 	"github.com/spf13/afero"
 )
 
@@ -57,11 +58,19 @@ func (r localReader) Read(p []byte) (n int, err error) {
 	return r.objectReader.Read(p)
 }
 
+func toSentinelErrors(err error) error {
+	// return sentinel errors defined by the status package
+	if os.IsNotExist(err) {
+		return status.ErrNotExists
+	}
+	return err
+}
+
 func (l *localFS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	t, err := l.fs.Open(key)
 	return localReader{
 		objectReader: t,
-	}, err
+	}, toSentinelErrors(err)
 }
 
 type readCloser struct {
