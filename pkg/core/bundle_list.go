@@ -29,21 +29,36 @@ func minInt(a, b int) int {
 }
 
 // BundleEvent catches a single bundle with possible retrieval error
-type BundleEvent struct {
-	bundle model.BundleDescriptor
-	err    error
+type BundleEvent = func() (model.BundleDescriptor, error)
+
+func bundleEvent(b model.BundleDescriptor, e error) BundleEvent {
+	return func() (model.BundleDescriptor, error) {
+		return b, e
+	}
+}
+
+func bundleEventError(e error) BundleEvent {
+	return func() (model.BundleDescriptor, error) {
+		return model.BundleDescriptor{}, e
+	}
 }
 
 // BundlesEvent catches a collection of bundles with possible retrieval error
-type BundlesEvent struct {
-	bundles model.BundleDescriptors
-	err     error
+type BundlesEvent = func() (model.BundleDescriptors, error)
+
+func bundlesEvent(bs model.BundleDescriptors, e error) BundlesEvent {
+	return func() (model.BundleDescriptors, error) {
+		return bs, e
+	}
 }
 
 // BundleKeyBatchEvent catches a collection of bundle keys with possible retrieval error
-type BundleKeyBatchEvent struct {
-	keys []string
-	err  error
+type BundleKeyBatchEvent = func() ([]string, error)
+
+func bundleKeyBatchEvent(keys []string, e error) BundleKeyBatchEvent {
+	return func() ([]string, error) {
+		return keys, e
+	}
 }
 
 // ErrInterrupted signals that the current background processing has been interrupted
@@ -61,10 +76,11 @@ var ErrInterrupted = errors.New("background processing interrupted")
 func DoSelectBundles(bundlesChan <-chan BundlesEvent, do func(model.BundleDescriptors)) error {
 	// consume batches of ordered bundle metadata
 	for bundleBatch := range bundlesChan {
-		if bundleBatch.err != nil {
-			return bundleBatch.err
+		bundles, err := bundleBatch()
+		if err != nil {
+			return err
 		}
-		do(bundleBatch.bundles)
+		do(bundles)
 	}
 	return nil
 }
@@ -183,7 +199,7 @@ func ListBundlesChan(repo string, store storage.Store, opts ...BundleListOption)
 	batchChan := make(chan BundlesEvent, 1) // buffered to 1 to avoid blocking on early errors
 
 	if err := RepoExists(repo, store); err != nil {
-		batchChan <- BundlesEvent{err: err}
+		batchChan <- bundlesEvent(nil, err)
 		close(batchChan)
 		return batchChan, &wg
 	}
@@ -247,24 +263,25 @@ func fetchBundles(repo string, store storage.Store, settings CoreSettings,
 	for {
 		select {
 		case <-doneChan:
-			batchChan <- BundlesEvent{err: ErrInterrupted}
+			batchChan <- bundlesEvent(nil, ErrInterrupted)
 			return
 		case keyBatch, isOpen := <-keysChan:
 			if !isOpen {
 				return
 			}
-			if keyBatch.err != nil {
-				batchChan <- BundlesEvent{err: keyBatch.err}
+			keys, err := keyBatch()
+			if err != nil {
+				batchChan <- bundlesEvent(nil, err)
 				return
 			}
-			batch, err := fetchBundleBatch(repo, store, settings, keyBatch.keys)
+			batch, err := fetchBundleBatch(repo, store, settings, keys)
 			if err != nil {
 				doneWithKeysChan <- struct{}{} // stop co-worker
-				batchChan <- BundlesEvent{err: err}
+				batchChan <- bundlesEvent(nil, err)
 				return
 			}
 			// send out a single batch of (ordered) bundle descriptors
-			batchChan <- BundlesEvent{bundles: batch}
+			batchChan <- bundlesEvent(batch, nil)
 		}
 	}
 }
@@ -289,10 +306,10 @@ func fetchKeys(repo string, store storage.Store, settings CoreSettings,
 		ks, next, err = store.KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToBundles(repo), "/", settings.bundleBatchSize)
 		if err != nil {
 			select {
-			case keyBatchChan <- BundleKeyBatchEvent{err: err}:
+			case keyBatchChan <- bundleKeyBatchEvent(nil, err):
 			case <-doneChan:
 				select {
-				case keyBatchChan <- BundleKeyBatchEvent{err: ErrInterrupted}:
+				case keyBatchChan <- bundleKeyBatchEvent(nil, ErrInterrupted):
 				default:
 				}
 			}
@@ -304,10 +321,10 @@ func fetchKeys(repo string, store storage.Store, settings CoreSettings,
 		}
 
 		select {
-		case keyBatchChan <- BundleKeyBatchEvent{keys: ks}:
+		case keyBatchChan <- bundleKeyBatchEvent(ks, nil):
 		case <-doneChan:
 			select {
-			case keyBatchChan <- BundleKeyBatchEvent{err: ErrInterrupted}:
+			case keyBatchChan <- bundleKeyBatchEvent(nil, ErrInterrupted):
 			default:
 			}
 			return
@@ -365,14 +382,15 @@ func fetchBundleBatch(repo string, store storage.Store, settings CoreSettings, k
 
 	// watch for results and coalesce
 	for bd := range bundleChan {
-		if bd.err != nil && werr == nil {
-			werr = bd.err
+		bundle, err := bd()
+		if err != nil && werr == nil {
+			werr = err
 			doneChan <- struct{}{} // interrupts key distribution (non-blocking)
 			for range bundleChan {
 			} // wait for close
 			break
 		}
-		bds = append(bds, bd.bundle)
+		bds = append(bds, bundle)
 	}
 
 	wg.Wait()
@@ -396,7 +414,7 @@ func getBundleAsync(repo string, store storage.Store,
 	for k := range input {
 		apc, err := model.GetArchivePathComponents(k)
 		if err != nil {
-			output <- BundleEvent{err: err}
+			output <- bundleEventError(err)
 			continue
 		}
 		r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, apc.BundleID))
@@ -404,27 +422,27 @@ func getBundleAsync(repo string, store storage.Store,
 			if errors.Is(err, status.ErrNotExists) {
 				continue
 			}
-			output <- BundleEvent{err: err}
+			output <- bundleEventError(err)
 			continue
 		}
 		o, err := ioutil.ReadAll(r)
 		if err != nil {
-			output <- BundleEvent{err: err}
+			output <- bundleEventError(err)
 			continue
 		}
 		var bd model.BundleDescriptor
 		err = yaml.Unmarshal(o, &bd)
 		if err != nil {
-			output <- BundleEvent{err: err}
+			output <- bundleEventError(err)
 			continue
 		}
 		if bd.ID != apc.BundleID {
 			err = fmt.Errorf("bundle IDs in descriptor '%v' and archive path '%v' don't match", bd.ID, apc.BundleID)
-			output <- BundleEvent{err: err}
+			output <- bundleEventError(err)
 			continue
 		}
 
-		output <- BundleEvent{bundle: bd}
+		output <- bundleEvent(bd, nil)
 	}
 }
 
