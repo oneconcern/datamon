@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"log"
-	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -16,9 +15,7 @@ var BundleListCommand = &cobra.Command{
 	Short: "List bundles",
 	Long:  "List the bundles in a repo",
 	Run: func(cmd *cobra.Command, args []string) {
-		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
 		ctx := context.Background()
-		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
@@ -29,7 +26,7 @@ var BundleListCommand = &cobra.Command{
 		}
 		for _, bd := range bundleDescriptors {
 			var buf bytes.Buffer
-			err := listLineTemplate.Execute(&buf, bd)
+			err := bundleDescriptorTemplate.Execute(&buf, bd)
 			if err != nil {
 				log.Println("executing template:", err)
 			}

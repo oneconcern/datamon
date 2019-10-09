@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -22,10 +23,17 @@ Every bundle is an entry in the history of a repository at a point in time.
 `,
 }
 
+var bundleDescriptorTemplate *template.Template
+
 func init() {
 	rootCmd.AddCommand(bundleCmd)
 	addBucketNameFlag(bundleCmd)
 	addBlobBucket(bundleCmd)
+
+	bundleDescriptorTemplate = func() *template.Template {
+		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
+		return template.Must(template.New("list line").Parse(listLineTemplateString))
+	}()
 }
 
 func setLatestOrLabelledBundle(ctx context.Context, store storage.Store) error {

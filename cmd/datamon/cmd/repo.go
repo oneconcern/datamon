@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"text/template"
+
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +18,13 @@ Repos are datasets that are versioned and managed via bundles.
 `,
 }
 
+var repoDescriptorTemplate *template.Template
+
 func init() {
 	rootCmd.AddCommand(repoCmd)
+
+	repoDescriptorTemplate = func() *template.Template {
+		const listLineTemplateString = `{{.Name}} , {{.Description}} , {{with .Contributor}}{{.Name}} , {{.Email}}{{end}} , {{.Timestamp}}`
+		return template.Must(template.New("list line").Parse(listLineTemplateString))
+	}()
 }

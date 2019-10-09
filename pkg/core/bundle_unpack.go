@@ -118,7 +118,16 @@ func unpackBundleDescriptor(ctx context.Context, bundle *Bundle, publish bool) e
 		}
 
 	case bundle.MetaStore != nil:
-		rdr, err = bundle.MetaStore.Get(ctx, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID))
+		var has bool
+		archivePathToBundle := model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID)
+		has, err = bundle.MetaStore.Has(ctx, archivePathToBundle)
+		if err != nil {
+			return err
+		}
+		if !has {
+			return ErrNotFound
+		}
+		rdr, err = bundle.MetaStore.Get(ctx, archivePathToBundle)
 		if err != nil {
 			return err
 		}
