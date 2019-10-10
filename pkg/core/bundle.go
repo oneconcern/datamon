@@ -175,10 +175,10 @@ func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
 }
 
 // BundleListOption sets options for ListBundles
-type BundleListOption func(*CoreSettings)
+type BundleListOption func(*Settings)
 
-// CoreSettings defines various settings for core features
-type CoreSettings struct {
+// Settings defines various settings for core features
+type Settings struct {
 	concurrentBundleList int
 	bundleBatchSize      int
 	doneChannel          chan struct{}
@@ -194,7 +194,7 @@ var (
 
 // ConcurrentBundleList sets the max level of concurrency to retrieve bundles. It defaults to 2 x #cpus.
 func ConcurrentBundleList(concurrentBundleList int) BundleListOption {
-	return func(s *CoreSettings) {
+	return func(s *Settings) {
 		if concurrentBundleList == 0 {
 			s.concurrentBundleList = defaultBundleListConcurrency
 			return
@@ -203,9 +203,9 @@ func ConcurrentBundleList(concurrentBundleList int) BundleListOption {
 	}
 }
 
-// BundleBatchSize sets the batch window to fetch bundle keys. It defaults to 100.
+// BundleBatchSize sets the batch window to fetch bundle IDs. It defaults to defaultBundleBatchSize
 func BundleBatchSize(batchSize int) BundleListOption {
-	return func(s *CoreSettings) {
+	return func(s *Settings) {
 		if batchSize == 0 {
 			s.bundleBatchSize = defaultBundleBatchSize
 			return
@@ -216,13 +216,13 @@ func BundleBatchSize(batchSize int) BundleListOption {
 
 // WithBundleDoneChan sets a signaling channel controlled by the caller to interrupt ongoing goroutines
 func WithBundleDoneChan(done chan struct{}) BundleListOption {
-	return func(s *CoreSettings) {
+	return func(s *Settings) {
 		s.doneChannel = done
 	}
 }
 
-func defaultCoreSettings() CoreSettings {
-	return CoreSettings{
+func defaultSettings() Settings {
+	return Settings{
 		concurrentBundleList: defaultBundleListConcurrency,
 		bundleBatchSize:      defaultBundleBatchSize,
 	}

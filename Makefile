@@ -192,7 +192,7 @@ mocks:
 
 .PHONY: runtests
 runtests: mocks
-	@go test -v ./cmd/datamon//cmd
+	@go test ./...
 
 .PHONY: gofmt
 ## Run gofmt on the cmd and pkg packages

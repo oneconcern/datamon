@@ -516,13 +516,13 @@ func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
 		}
 		rle := bundleListEntry{
 			rawLine: line,
-			hash:    strings.TrimSpace(sl[0]), // bundle key ID
+			hash:    strings.TrimSpace(sl[0]), // bundle ID
 			message: strings.TrimSpace(sl[2]),
 			time:    t,
 		}
 		bles = append(bles, rle)
 	}
-	// bundles are ordered by lexicographic order of keys (ksuids).
+	// bundles are ordered by lexicographic order of bundle IDs
 	require.True(t, sort.IsSorted(bles))
 
 	sort.Sort(bles) // sort test result by timestamp

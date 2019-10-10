@@ -153,7 +153,7 @@ func addCoreConcurrencyFactorFlag(cmd *cobra.Command) string {
 func addBatchSizeFlag(cmd *cobra.Command) string {
 	batchSize := "batch-size"
 	cmd.Flags().IntVar(&params.core.BatchSize, batchSize, 1024,
-		"Number of bundle keys fetched per rountrip to storage -- keys are 20B long, defaults corresponds to 20kB pages")
+		"Number of bundles streamed together as a batch. This can be tuned for performance based on network connectivity")
 	return batchSize
 }
 

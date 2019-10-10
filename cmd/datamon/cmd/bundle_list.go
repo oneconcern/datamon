@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -11,26 +12,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func applyBundleTemplate(bundle model.BundleDescriptor) error {
+	var buf bytes.Buffer
+	err := bundleDescriptorTemplate.Execute(&buf, bundle)
+	if err != nil {
+		return fmt.Errorf("executing template: %w", err)
+	}
+	log.Println(buf.String())
+	return nil
+}
+
 // BundleListCommand describes the CLI command for listing bundles
 var BundleListCommand = &cobra.Command{
 	Use:   "list",
 	Short: "List bundles",
-	Long:  "List the bundles in a repo, ordered by their key",
+	Long:  "List the bundles in a repo, ordered by their bundle ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
 		}
-		err = core.ListBundlesApply(params.repo.RepoName, remoteStores.meta, func(bundle model.BundleDescriptor) error {
-			var buf bytes.Buffer
-			err := bundleDescriptorTemplate.Execute(&buf, bundle)
-			if err != nil {
-				log.Println("executing template:", err)
-			}
-			log.Println(buf.String())
-			return nil
-		}, core.ConcurrentBundleList(params.core.ConcurrencyFactor), core.BundleBatchSize(params.core.BatchSize))
+		err = core.ListBundlesApply(params.repo.RepoName, remoteStores.meta, applyBundleTemplate,
+			core.ConcurrentBundleList(params.core.ConcurrencyFactor),
+			core.BundleBatchSize(params.core.BatchSize))
 		if err != nil {
 			logFatalln(err)
 		}
