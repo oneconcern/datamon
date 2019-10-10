@@ -4,18 +4,21 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"strings"
+	"sort"
 	"sync"
+
+	"errors"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/status"
 )
 
 const (
 	maxMetaFilesToProcess = 1000000
-	typicalBundlesNum     = 1000
+	typicalBundlesNum     = 1000 // default number of allocated slots for bundles in a repo
 )
 
 func minInt(a, b int) int {
@@ -25,74 +28,341 @@ func minInt(a, b int) int {
 	return b
 }
 
-// ListBundles returns the list of bundle descriptors from a repo.
+// bundleEvent catches a single bundle with possible retrieval error
+type bundleEvent struct {
+	bundle model.BundleDescriptor
+	err    error
+}
+
+// bundlesEvent catches a collection of bundles with possible retrieval error
+type bundlesEvent struct {
+	bundles model.BundleDescriptors
+	err     error
+}
+
+// bundleKeyBatchEvent catches a collection of bundle keys with possible retrieval error
+type bundleKeyBatchEvent struct {
+	keys []string
+	err  error
+}
+
+// ErrInterrupted signals that the current background processing has been interrupted
+var ErrInterrupted = errors.New("background processing interrupted")
+
+// doSelectBundles is a helper function to listen on a channel of batches of bundle descriptors.
 //
-// NOTE: resulting bundles are returned in no particular order.
+// It applies some function on the received batches and returns upon completion or error.
 //
-// TODO: return a paginated list of id<->bd (separate function in repo_list.go)
-func ListBundles(repo string, store storage.Store, opts ...BundleListOption) ([]model.BundleDescriptor, error) {
-	settings := CoreSettings{concurrentBundleList: defaultBundleListConcurrency}
+// Example usage:
+//
+//		err := doSelectBundles(bundlesChan, func(bundleBatch model.BundleDescriptors) {
+//			bundles = append(bundles, bundleBatch...)
+//		})
+func doSelectBundles(bundlesChan <-chan bundlesEvent, do func(model.BundleDescriptors)) error {
+	// consume batches of ordered bundle metadata
+	for bundleBatch := range bundlesChan {
+		if bundleBatch.err != nil {
+			return bundleBatch.err
+		}
+		do(bundleBatch.bundles)
+	}
+	return nil
+}
+
+// ApplyBundleFunc is a function to be applied on a bundle
+type ApplyBundleFunc func(model.BundleDescriptor) error
+
+// ListBundlesApply applies some function to the retrieved bundles, in lexicographic order of keys.
+//
+// The execution of the applied function does not block background retrieval of more keys and bundle descriptors.
+//
+// Example usage: printing bundle descriptors as they come
+//
+//   err := core.ListBundlesApply(repo, store, func(bundle model.BundleDescriptorOption) error {
+//				fmt.Fprintf(os.Stderr, "%v\n", bundle)
+//				return nil
+//			})
+func ListBundlesApply(repo string, store storage.Store, apply ApplyBundleFunc, opts ...BundleListOption) error {
+	var (
+		err, applyErr error
+		once          sync.Once
+	)
+
+	bundleChan := make(chan model.BundleDescriptor)
+	doneChan := make(chan struct{}, 1)
+
+	clean := func() {
+		close(doneChan)
+	}
+	interruptAndClean := func() {
+		doneChan <- struct{}{}
+		close(doneChan)
+	}
+
+	// collect bundle metadata asynchronously
+	go func(bundleChan chan<- model.BundleDescriptor, doneChan chan struct{}) {
+		defer close(bundleChan)
+
+		bundlesChan, workers := listBundlesChan(repo, store, append(opts, WithBundleDoneChan(doneChan))...)
+
+		err = doSelectBundles(bundlesChan, func(bundleBatch model.BundleDescriptors) {
+			for _, bundle := range bundleBatch {
+				bundleChan <- bundle // transfer a batch of metadata to the applied func
+			}
+		})
+		once.Do(clean)
+
+		workers.Wait()
+	}(bundleChan, doneChan)
+
+	// apply function on collected metadata
+	for bundle := range bundleChan {
+		if applyErr = apply(bundle); applyErr != nil {
+			// wind down goroutines, but when nothing is left to be interrupted
+			once.Do(interruptAndClean)
+			for range bundleChan {
+			} // wait for close
+			break
+		}
+	}
+	// collect errors
+	switch {
+	case err == ErrInterrupted && applyErr != nil:
+		return applyErr
+	case err != nil:
+		return err
+	case applyErr != nil:
+		return applyErr
+	default:
+		return nil
+	}
+}
+
+// ListBundles returns a list of bundle descriptors from a repo. It collects all bundles until completion.
+//
+// NOTE: this func could become deprecated. At this moment, however, it is used by pkg/web.
+func ListBundles(repo string, store storage.Store, opts ...BundleListOption) (model.BundleDescriptors, error) {
+	bundles := make(model.BundleDescriptors, 0, typicalBundlesNum)
+
+	bundlesChan, workers := listBundlesChan(repo, store, opts...)
+
+	// consume batches of ordered bundles
+	err := doSelectBundles(bundlesChan, func(bundleBatch model.BundleDescriptors) {
+		bundles = append(bundles, bundleBatch...)
+	})
+
+	workers.Wait()
+
+	return bundles, err // we may have some batches resolved before the error occurred
+}
+
+// listBundlesChan returns a list of bundle descriptors from a repo. Each batch of returned descriptors
+// is sent on the output channel, following key lexicographic order.
+//
+// Simple use cases of this helper are wrapped in ListBundles (block until completion) and ListBundlesApply
+// (apply function while retrieving metadata).
+//
+// A signaling channel may be given as option to interrupt background processing (e.g. on error).
+//
+// The sync.WaitGroup for internal goroutines is returned if caller wants to wait and avoid any leaked goroutines.
+func listBundlesChan(repo string, store storage.Store, opts ...BundleListOption) (chan bundlesEvent, *sync.WaitGroup) {
+	var wg sync.WaitGroup
+
+	settings := defaultSettings()
 	for _, bApply := range opts {
 		bApply(&settings)
 	}
 
-	// Get a list
-	e := RepoExists(repo, store)
-	if e != nil {
-		return nil, e
+	batchChan := make(chan bundlesEvent, 1) // buffered to 1 to avoid blocking on early errors
+
+	if err := RepoExists(repo, store); err != nil {
+		batchChan <- bundlesEvent{err: err}
+		close(batchChan)
+		return batchChan, &wg
 	}
 
-	// this call is not made async yet
-	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "/", maxMetaFilesToProcess)
-	if err != nil {
-		return nil, err
+	// internal signaling channels
+	doneWithKeysChan := make(chan struct{}, 1)
+	doneWithBundlesChan := make(chan struct{}, 1)
+
+	if settings.doneChannel != nil {
+		// watch for an interruption signal requested by caller
+		wg.Add(1)
+		go watchForInterrupts(settings.doneChannel, &wg, doneWithKeysChan, doneWithBundlesChan)
 	}
 
+	keysChan := make(chan bundleKeyBatchEvent, 1)
+
+	// starting keys retrieval
+	wg.Add(1)
+	go fetchKeys(repo, store, settings, keysChan, doneWithKeysChan, &wg) // scan for key batches
+
+	// start bundle metadata retrieval
+	wg.Add(1)
+	go fetchBundles(repo, store, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+
+	// let the gc clean up internal signaling channels left open after wg goroutines are done.
+
+	// return at once. Caller may chose to wait on returned WaitGroup
+	return batchChan, &wg
+}
+
+// watchForInterrupts broadcasts a done signal to several output channels
+func watchForInterrupts(doneChan <-chan struct{}, wg *sync.WaitGroup, outputChans ...chan<- struct{}) {
+	defer wg.Done()
+
+	if _, interrupt := <-doneChan; interrupt {
+		for _, outputChan := range outputChans {
+			outputChan <- struct{}{}
+		}
+	}
+}
+
+// fetchBundles waits on a channel of key batches and outputs batches of descriptors corresponding to these keys
+func fetchBundles(repo string, store storage.Store, settings Settings,
+	keysChan <-chan bundleKeyBatchEvent, batchChan chan<- bundlesEvent,
+	doneWithKeysChan chan<- struct{}, doneChan <-chan struct{}, wg *sync.WaitGroup) {
+	defer func() {
+		close(batchChan)
+		wg.Done()
+	}()
+
+	for {
+		select {
+		case <-doneChan:
+			batchChan <- bundlesEvent{err: ErrInterrupted}
+			return
+		case keyBatch, isOpen := <-keysChan:
+			if !isOpen {
+				return
+			}
+			if keyBatch.err != nil {
+				batchChan <- bundlesEvent{err: keyBatch.err}
+				return
+			}
+			batch, err := fetchBundleBatch(repo, store, settings, keyBatch.keys)
+			if err != nil {
+				doneWithKeysChan <- struct{}{} // stop co-worker
+				batchChan <- bundlesEvent{err: err}
+				return
+			}
+			// send out a single batch of (ordered) bundle descriptors
+			batchChan <- bundlesEvent{bundles: batch}
+		}
+	}
+}
+
+// fetchKeys fetches keys for bundles in batches, then close the keyBatchChan channel upon completion or error.
+func fetchKeys(repo string, store storage.Store, settings Settings,
+	keyBatchChan chan<- bundleKeyBatchEvent,
+	doneChan <-chan struct{}, wg *sync.WaitGroup) {
+	defer func() {
+		close(keyBatchChan)
+		wg.Done()
+	}()
+
+	var (
+		ks   []string
+		next string
+		err  error
+	)
+
+	for {
+		// get a batch of keys
+		ks, next, err = store.KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToBundles(repo), "/", settings.bundleBatchSize)
+		if err != nil {
+			select {
+			case keyBatchChan <- bundleKeyBatchEvent{err: err}:
+			case <-doneChan:
+				select {
+				case keyBatchChan <- bundleKeyBatchEvent{err: ErrInterrupted}:
+				default:
+				}
+			}
+			return
+		}
+
+		if len(ks) == 0 {
+			break
+		}
+
+		select {
+		case keyBatchChan <- bundleKeyBatchEvent{keys: ks}:
+		case <-doneChan:
+			select {
+			case keyBatchChan <- bundleKeyBatchEvent{err: ErrInterrupted}:
+			default:
+			}
+			return
+		}
+
+		if next == "" {
+			break
+		}
+	}
+}
+
+// fetchBundleBatch performs a parallel fetch for a batch of bundles identified by their keys,
+// then reorders the result by key.
+//
+// TODO: this performs a parallel fetch for a batch of keys. However, we wait until completion of this batch to start
+// a new one. In addition, for every new batch of key, we spin up a new pool of workers.
+// We could improve this further by streaming batches of keys then stashing looked-ahead results and directly obtain
+// a sorted output.
+func fetchBundleBatch(repo string, store storage.Store, settings Settings, keys []string) (model.BundleDescriptors, error) {
 	var (
 		workers, wg sync.WaitGroup
 		werr        error
 	)
 
-	bundleChan := make(chan model.BundleDescriptor)
+	bundleChan := make(chan bundleEvent)
 	keyChan := make(chan string)
-	errorChan := make(chan error)
+	doneChan := make(chan struct{}, 1)
+	defer close(doneChan)
 
-	for i := 0; i < minInt(settings.concurrentBundleList, len(ks)); i++ {
+	// spin up workers pool
+	for i := 0; i < minInt(settings.concurrentBundleList, len(keys)); i++ {
 		workers.Add(1)
-		go getBundleAsync(repo, store, keyChan, bundleChan, errorChan, &workers)
+		go getBundleAsync(repo, store, keyChan, bundleChan, &workers)
 	}
 
-	bds := make([]model.BundleDescriptor, 0, typicalBundlesNum) // preallocate some typical number of bundles, e.g. 1000
+	bds := make(model.BundleDescriptors, 0, len(keys))
 
+	// distribute work. Stop immediately on first error reported by a worker
 	wg.Add(1)
-	go func(bundleChan <-chan model.BundleDescriptor, wg *sync.WaitGroup) {
-		defer wg.Done()
-		for bd := range bundleChan { // watch for results and coalesce
-			bds = append(bds, bd)
+	go func(keyChan chan<- string, doneChan <-chan struct{}, wg *sync.WaitGroup) {
+		defer func() {
+			close(keyChan)
+			wg.Done()
+		}()
+		for _, k := range keys {
+			select {
+			case keyChan <- k:
+			case <-doneChan:
+				return
+			}
 		}
-	}(bundleChan, &wg)
+	}(keyChan, doneChan, &wg)
 
+	// wait for workers to complete
 	wg.Add(1)
-	go func(errorChan <-chan error, wg *sync.WaitGroup) { // watch for errors
-		defer wg.Done()
-		for err := range errorChan {
-			werr = err
-		}
-	}(errorChan, &wg)
-
-	for _, k := range ks { // distribute work
-		keyChan <- k
-	}
-
-	close(keyChan)
-
-	wg.Add(1)
-	go func(wg *sync.WaitGroup) { // wait for workers to complete
+	go func(wg *sync.WaitGroup) {
 		defer wg.Done()
 		workers.Wait()
 		close(bundleChan)
-		close(errorChan)
 	}(&wg)
+
+	// watch for results and coalesce
+	for bd := range bundleChan {
+		if bd.err != nil && werr == nil {
+			werr = bd.err
+			doneChan <- struct{}{} // interrupts key distribution (non-blocking)
+			for range bundleChan {
+			} // wait for close
+			break
+		}
+		bds = append(bds, bd.bundle)
+	}
 
 	wg.Wait()
 
@@ -100,50 +370,49 @@ func ListBundles(repo string, store storage.Store, opts ...BundleListOption) ([]
 		return nil, werr
 	}
 
+	// sort result batch
+	sort.Sort(bds)
 	return bds, nil
 }
 
+// getBundleAsync fetches and unmarshalls the bundle descriptor for each single key submitted as input
 func getBundleAsync(repo string, store storage.Store,
-	input <-chan string,
-	output chan<- model.BundleDescriptor,
-	errorChan chan<- error,
+	input <-chan string, output chan<- bundleEvent,
 	wg *sync.WaitGroup) {
-
 	// fetch descriptors
 	defer wg.Done()
 	for k := range input {
 		apc, err := model.GetArchivePathComponents(k)
 		if err != nil {
-			errorChan <- err
+			output <- bundleEvent{err: err}
 			continue
 		}
 		r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, apc.BundleID))
 		if err != nil {
-			// TODO: should be an error type (this creates a dependency on the actual implementation of the interface)
-			if strings.Contains(err.Error(), "object doesn't exist") {
+			if errors.Is(err, status.ErrNotExists) {
 				continue
 			}
-			errorChan <- err
+			output <- bundleEvent{err: err}
 			continue
 		}
 		o, err := ioutil.ReadAll(r)
 		if err != nil {
-			errorChan <- err
+			output <- bundleEvent{err: err}
 			continue
 		}
 		var bd model.BundleDescriptor
 		err = yaml.Unmarshal(o, &bd)
 		if err != nil {
-			errorChan <- err
+			output <- bundleEvent{err: err}
 			continue
 		}
 		if bd.ID != apc.BundleID {
 			err = fmt.Errorf("bundle IDs in descriptor '%v' and archive path '%v' don't match", bd.ID, apc.BundleID)
-			errorChan <- err
+			output <- bundleEvent{err: err}
 			continue
 		}
 
-		output <- bd
+		output <- bundleEvent{bundle: bd}
 	}
 }
 
@@ -153,7 +422,7 @@ func GetLatestBundle(repo string, store storage.Store) (string, error) {
 	if e != nil {
 		return "", e
 	}
-	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", 1000000)
+	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", maxMetaFilesToProcess)
 	if err != nil {
 		return "", err
 	}

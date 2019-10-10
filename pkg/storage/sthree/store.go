@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/status"
 )
 
 const PageSize = 1000
@@ -67,6 +68,17 @@ func (s *s3FS) Has(ctx context.Context, key string) (bool, error) {
 	return true, nil
 }
 
+func toSentinelErrors(err error) error {
+	// return sentinel errors defined by the status package
+	// see: https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
+	if awse, ok := err.(awserr.Error); ok {
+		if awse.Code() == "NoSuchKey" || awse.Code() == "NoSuchBucket" {
+			return status.ErrNotExists
+		}
+	}
+	return err
+}
+
 func (s *s3FS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	obj, err := s.s3.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -74,7 +86,7 @@ func (s *s3FS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, toSentinelErrors(err)
 	}
 	return obj.Body, nil
 }

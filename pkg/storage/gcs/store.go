@@ -6,12 +6,14 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 
 	"google.golang.org/api/iterator"
 
 	gcsStorage "cloud.google.com/go/storage"
 
 	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/status"
 	"google.golang.org/api/option"
 )
 
@@ -92,10 +94,18 @@ func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 	return objectReader.Read(p)
 }
 
+func toSentinelErrors(err error) error {
+	// return sentinel errors defined by the status package
+	if strings.Contains(err.Error(), "object doesn't exist") {
+		return status.ErrNotExists
+	}
+	return err
+}
+
 func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	objectReader, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).NewReader(ctx)
 	if err != nil {
-		return nil, err
+		return nil, toSentinelErrors(err)
 	}
 	return &gcsReader{
 		g:            g,

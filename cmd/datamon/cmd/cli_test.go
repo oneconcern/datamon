@@ -486,7 +486,7 @@ func (b bundleListEntries) Len() int {
 	return len(b)
 }
 func (b bundleListEntries) Less(i, j int) bool {
-	return b[i].time.Before(b[j].time)
+	return b[i].hash < b[j].hash
 }
 func (b bundleListEntries) Last() bundleListEntry {
 	return b[len(b)-1]
@@ -516,12 +516,15 @@ func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
 		}
 		rle := bundleListEntry{
 			rawLine: line,
-			hash:    strings.TrimSpace(sl[0]),
+			hash:    strings.TrimSpace(sl[0]), // bundle ID
 			message: strings.TrimSpace(sl[2]),
 			time:    t,
 		}
 		bles = append(bles, rle)
 	}
+	// bundles are ordered by lexicographic order of bundle IDs
+	require.True(t, sort.IsSorted(bles))
+
 	sort.Sort(bles) // sort test result by timestamp
 	return bles, nil
 }
@@ -544,7 +547,6 @@ func testListBundle(t *testing.T, file uploadTree, bcnt int) {
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, bcnt, bundles.Len(), "bundle count in test repo")
 
-	// ordering of bundles is not strictly required
 	found := false
 	for _, b := range bundles {
 		if msg == b.message {

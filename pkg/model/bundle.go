@@ -26,6 +26,22 @@ type BundleDescriptor struct {
 	_                      struct{}
 }
 
+// BundleDescriptors is a sortable slice of BundleDescriptor
+type BundleDescriptors []BundleDescriptor
+
+func (b BundleDescriptors) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+func (b BundleDescriptors) Len() int {
+	return len(b)
+}
+func (b BundleDescriptors) Less(i, j int) bool {
+	return b[i].ID < b[j].ID
+}
+func (b BundleDescriptors) Last() BundleDescriptor {
+	return b[len(b)-1]
+}
+
 // List of files part of a bundle.
 type BundleEntries struct {
 	BundleEntries []BundleEntry `json:"BundleEntries" yaml:"BundleEntries"`

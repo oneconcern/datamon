@@ -52,6 +52,7 @@ type paramsT struct {
 	}
 	core struct {
 		ConcurrencyFactor int
+		BatchSize         int
 	}
 }
 
@@ -143,9 +144,17 @@ func addCoreConcurrencyFactorFlag(cmd *cobra.Command) string {
 	// this takes the usual "concurrency-factor" flag, but sets non-object specific settings
 	concurrencyFactor := concurrencyFactorFlag
 	cmd.Flags().IntVar(&params.core.ConcurrencyFactor, concurrencyFactor, 100,
-		"Heuristic on the amount of concurrency used by core operations (e.g. bundle list).  "+
+		"Heuristic on the amount of concurrency used by core operations (e.g. bundle list). "+
+			"Concurrent retrieval of bundle metadata is capped by the 'batch-size' parameter. "+
 			"Turn this value down to use less memory, increase for faster operations.")
 	return concurrencyFactor
+}
+
+func addBatchSizeFlag(cmd *cobra.Command) string {
+	batchSize := "batch-size"
+	cmd.Flags().IntVar(&params.core.BatchSize, batchSize, 1024,
+		"Number of bundles streamed together as a batch. This can be tuned for performance based on network connectivity")
+	return batchSize
 }
 
 func addWebPortFlag(cmd *cobra.Command) string {
