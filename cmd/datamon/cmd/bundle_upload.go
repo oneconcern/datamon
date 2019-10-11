@@ -39,7 +39,7 @@ var uploadBundleCmd = &cobra.Command{
 		}
 		logger, err := dlogger.GetLogger(params.root.logLevel)
 		if err != nil {
-			logFatalln("Failed to set log level:" + err.Error())
+			wrapFatalln("failed to set log level", err)
 		}
 		bd := core.NewBDescriptor(
 			core.Message(params.bundle.Message),
@@ -60,7 +60,7 @@ var uploadBundleCmd = &cobra.Command{
 				var file afero.File
 				file, err = os.Open(params.bundle.FileList)
 				if err != nil {
-					return nil, fmt.Errorf("failed to open file: %s err:%s", params.bundle.FileList, err.Error())
+					return nil, fmt.Errorf("failed to open file: %s: %w", params.bundle.FileList, err)
 				}
 				lineScanner := bufio.NewScanner(file)
 				files := make([]string, 0)

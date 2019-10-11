@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -59,6 +60,6 @@ func setLatestOrLabelledBundle(ctx context.Context, store storage.Store) error {
 		}
 		params.bundle.ID = label.Descriptor.BundleID
 	}
-	fmt.Printf("Using bundle: %s\n", params.bundle.ID)
+	log.Printf("Using bundle: %s", params.bundle.ID)
 	return nil
 }

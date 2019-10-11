@@ -19,7 +19,9 @@ func DieIfNotAccessible(path string) {
 func createPath(path string) {
 	// todo: determine proper permission bits.  previously 0700.
 	err := os.MkdirAll(path, 0777)
-	fmt.Println(err)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func sanitizePath(path string) (string, error) {
@@ -32,6 +34,6 @@ func DieIfNotDirectory(path string) {
 		logFatalln(err)
 	}
 	if !fileInfo.IsDir() {
-		logFatalln("'" + path + "' is not a directory")
+		logFatalln(fmt.Errorf("%q is not a directory", path))
 	}
 }

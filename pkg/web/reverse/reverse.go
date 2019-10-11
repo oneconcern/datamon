@@ -89,8 +89,7 @@ func (us *urlStore) AddGr(urlName, group, urlAddr string, params ...string) (str
 		return "", errors.New("url already exists. Try to use .Get() method")
 	}
 
-	tmpUrl := url{group + urlAddr, params}
-	us.store[urlName] = tmpUrl
+	us.store[urlName] = url{group + urlAddr, params}
 	return urlAddr, nil
 }
 

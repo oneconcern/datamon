@@ -22,10 +22,12 @@ var bundleUpdateCmd = &cobra.Command{
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		destinationStore, err := paramsToDestStore(params, destTNonEmpty, "")
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		/* lockfile to prevent multiple updates to same bundle */
 		var cmdLockfile lockfile.Lockfile
@@ -34,31 +36,37 @@ var bundleUpdateCmd = &cobra.Command{
 			var cmdLockfilePath string
 			path, err = sanitizePath(params.bundle.DataPath)
 			if err != nil {
-				logFatalln("Failed path validation: " + err.Error())
+				wrapFatalln("failed path validation", err)
+				return
 			}
 			cmdLockfilePath, err = sanitizePath(filepath.Join(path, ".datamon-lock"))
 			if err != nil {
 				logFatalln(err)
+				return
 			}
 			cmdLockfile, err = lockfile.New(cmdLockfilePath)
 			if err != nil {
-				logFatalln("Failed to create ui-level lockfile object: " + err.Error())
+				wrapFatalln("failed to create ui-level lockfile object", err)
+				return
 			}
 		}()
 		err = cmdLockfile.TryLock()
 		if err != nil {
-			logFatalln("Failed to acquire ui-level lock: " + err.Error())
+			wrapFatalln("failed to acquire ui-level lock", err)
+			return
 		}
 		defer func() {
 			err = cmdLockfile.Unlock()
 			if err != nil {
-				logFatalln("Failed to release ui-level lock: " + err.Error())
+				wrapFatalln("failed to release ui-level lock", err)
+				return
 			}
 		}()
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		localBundle := core.New(core.NewBDescriptor(),
 			core.ConsumableStore(destinationStore),
@@ -73,6 +81,7 @@ var bundleUpdateCmd = &cobra.Command{
 		err = core.Update(ctx, remoteBundle, localBundle)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 
 	},
@@ -100,6 +109,7 @@ func init() {
 		err := bundleUpdateCmd.MarkFlagRequired(flag)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 	}
 

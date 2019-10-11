@@ -255,14 +255,14 @@ func paramsToSrcStore(ctx context.Context, params paramsT, create bool) (storage
 	case params.bundle.DataPath == "":
 		consumableStorePath, err = ioutil.TempDir("", "datamon-mount-destination")
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create temporary directory: %v", err)
+			return nil, fmt.Errorf("couldn't create temporary directory: %w", err)
 		}
 	case strings.HasPrefix(params.bundle.DataPath, "gs://"):
 		consumableStorePath = params.bundle.DataPath
 	default:
 		consumableStorePath, err = sanitizePath(params.bundle.DataPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to sanitize destination: %v: %v",
+			return nil, fmt.Errorf("failed to sanitize destination: %v: %w",
 				params.bundle.DataPath, err)
 		}
 	}
@@ -312,12 +312,12 @@ func paramsToDestStore(params paramsT,
 		}
 		consumableStorePath, err = ioutil.TempDir("", tmpdirPrefix)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create temporary directory: %v", err)
+			return nil, fmt.Errorf("couldn't create temporary directory: %w", err)
 		}
 	} else {
 		consumableStorePath, err = sanitizePath(params.bundle.DataPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to sanitize destination: %s", params.bundle.DataPath)
+			return nil, fmt.Errorf("failed to sanitize destination: %s: %w", params.bundle.DataPath, err)
 		}
 		createPath(consumableStorePath)
 	}
@@ -328,7 +328,7 @@ func paramsToDestStore(params paramsT,
 		var empty bool
 		empty, err = afero.IsEmpty(fs, "/")
 		if err != nil {
-			return nil, fmt.Errorf("failed path validation: %v", err)
+			return nil, fmt.Errorf("failed path validation: %w", err)
 		}
 		if !empty {
 			return nil, fmt.Errorf("%s should be empty", consumableStorePath)
@@ -340,7 +340,7 @@ func paramsToDestStore(params paramsT,
 		var ok bool
 		ok, err = afero.DirExists(fs, ".datamon")
 		if err != nil {
-			return nil, fmt.Errorf("failed to look for metadata dir: %v", err)
+			return nil, fmt.Errorf("failed to look for metadata dir: %w", err)
 		}
 		if !ok {
 			return nil, fmt.Errorf("failed to find metadata dir in %v", consumableStorePath)

@@ -811,7 +811,6 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 	//
 	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
 	bundle := bundles.Last()
-	//for _, bundle := range bundles {
 	dpc := "bundle-dl-" + bundle.hash
 	dp, err := filepath.Abs(filepath.Join(consumedData, dpc))
 	require.NoError(t, err, "couldn't build file path")
@@ -835,7 +834,6 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 		require.Equal(t, len(expected), len(actual), "downloaded file '"+pathInBundle(file)+"' size")
 		require.Equal(t, expected, actual, "downloaded file '"+pathInBundle(file)+"' contents")
 	}
-	//}
 }
 
 func TestDownloadBundles(t *testing.T) {
@@ -1182,8 +1180,9 @@ func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileList
 	if err != nil {
 		panic(err)
 	}
-	stdout := os.Stdout
-	os.Stdout = w
+	//stdout := os.Stdout
+	//os.Stdout = w
+	log.SetOutput(w)
 	//
 	runCmd(t, []string{"bundle",
 		"list",
@@ -1192,11 +1191,13 @@ func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileList
 		"--bundle", bid,
 	}, "get bundle files list", false)
 	//
-	os.Stdout = stdout
+	//os.Stdout = stdout
+	log.SetOutput(os.Stdout)
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
 	require.NoError(t, err, "i/o error reading patched stdout from pipe")
+	t.Logf("output collected: %s", string(lb))
 	lms := make([]map[string]string, 0)
 	for _, line := range getDataLogLines(t, string(lb), []string{`Using bundle`}) {
 		lm := make(map[string]string)
@@ -1243,8 +1244,6 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 	bundles, err := listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, bcnt, bundles.Len(), "bundle count in test repo")
-	//
-	//for _, bundle := range bundles {
 	bundle := bundles.Last()
 	bfles := listBundleFiles(t, repo1, bundle.hash)
 	require.Equalf(t, len(files), len(bfles), "file count in bundle files list log [bundle: %v]", bundle)
@@ -1266,7 +1265,6 @@ func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
 		require.Equal(t, filesM[name].size, bfle.size, "bundle files list log compared to fixture data: "+
 			"entry's size '"+name+"'")
 	}
-	//}
 }
 
 func TestListBundlesFiles(t *testing.T) {

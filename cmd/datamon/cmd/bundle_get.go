@@ -3,9 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -29,8 +27,7 @@ exits with ENOENT status otherwise.`,
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err == core.ErrNotFound {
-			fmt.Fprintf(os.Stderr, "didn't find label %q\n", params.label.Name)
-			osExit(int(unix.ENOENT))
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", params.label.Name)
 			return
 		}
 		if err != nil {
@@ -45,13 +42,12 @@ exits with ENOENT status otherwise.`,
 
 		err = core.DownloadMetadata(ctx, bundle)
 		if err == core.ErrNotFound {
-			fmt.Fprintf(os.Stderr, "didn't find bundle '%v'\n", params.bundle.ID)
-			osExit(int(unix.ENOENT))
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find bundle %q", params.bundle.ID)
 			return
 		}
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			logFatalf("error downloading bundle information\n")
+			wrapFatalln("error downloading bundle information", err)
+			return
 		}
 
 		var buf bytes.Buffer
@@ -73,6 +69,7 @@ func init() {
 		err := GetBundleCommand.MarkFlagRequired(flag)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 	}
 

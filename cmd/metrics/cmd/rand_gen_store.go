@@ -75,9 +75,8 @@ func zeroOneChunkByteFunc(chunkBytes int64, max int64) byteFunc {
 		intraChunkOff := off % (2 * chunkBytes)
 		if intraChunkOff < chunkBytes {
 			return 0, nil
-		} else {
-			return 0xFF, nil
 		}
+		return 0xFF, nil
 	}
 }
 

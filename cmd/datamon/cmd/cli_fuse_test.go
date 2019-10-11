@@ -46,7 +46,7 @@ func testBundleMount(t *testing.T, testType string) {
 		cmdParams = []string{
 			"bundle", "mount",
 			"--repo", repo1,
-			"--bundle", rll[0].hash,
+			"--bundle", bundles[0].hash,
 			"--destination", pathBackingFs,
 			"--mount", pathToMount,
 			"--meta", params.repo.MetadataBucket,
@@ -57,7 +57,7 @@ func testBundleMount(t *testing.T, testType string) {
 		cmdParams = []string{
 			"bundle", "mount",
 			"--repo", repo1,
-			"--bundle", rll[0].hash,
+			"--bundle", bundles[0].hash,
 			"--destination", pathBackingFs,
 			"--mount", pathToMount,
 			"--meta", params.repo.MetadataBucket,
@@ -67,7 +67,7 @@ func testBundleMount(t *testing.T, testType string) {
 		cmdParams = []string{
 			"bundle", "mount",
 			"--repo", repo1,
-			"--bundle", rll[0].hash,
+			"--bundle", bundles[0].hash,
 			"--mount", pathToMount,
 			"--meta", params.repo.MetadataBucket,
 			"--blob", params.repo.BlobBucket,

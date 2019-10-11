@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -32,23 +31,26 @@ var completionCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
-			// #nosec
-			_, _ = fmt.Fprintln(os.Stderr, "specify a shell to generate completions for bash or zsh")
-			os.Exit(1)
+			logFatalln("specify a shell to generate completions for bash or zsh")
+			return
 		}
 		shell := args[0]
 		if shell != bash && shell != zsh {
-			// #nosec
-			_, _ = fmt.Fprintln(os.Stderr, "the only supported shells are bash and zsh")
+			logFatalln("the only supported shells are bash and zsh")
+			return
 		}
 		if shell == bash {
-			err := rootCmd.GenBashCompletion(os.Stdout)
-			_, _ = fmt.Fprintln(os.Stderr, "failed to generate bash completion:", err)
+			if err := rootCmd.GenBashCompletion(os.Stdout); err != nil {
+				wrapFatalln("failed to generate bash completion", err)
+				return
+			}
 		}
 
 		if shell == zsh {
-			err := rootCmd.GenZshCompletion(os.Stdout)
-			_, _ = fmt.Fprintln(os.Stderr, "failed to generate zsh completion:", err)
+			if err := rootCmd.GenZshCompletion(os.Stdout); err != nil {
+				wrapFatalln("failed to generate zsh completion", err)
+				return
+			}
 		}
 	},
 }

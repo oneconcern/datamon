@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"strings"
 	"testing"
 
@@ -30,7 +29,7 @@ func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
 	ctx := context.Background()
 
 	bucket := "datamontest-" + internal.RandStringBytesMaskImprSrc(15)
-	log.Printf("Created bucket %s ", bucket)
+	t.Logf("Created bucket %s ", bucket)
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err)
@@ -50,7 +49,7 @@ func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
 			err = gcs.Delete(ctx, gen(i))
 			require.NoError(t, err)
 		}
-		log.Printf("Delete bucket %s ", bucket)
+		t.Logf("Delete bucket %s ", bucket)
 		err = client.Bucket(bucket).Delete(ctx)
 		require.NoError(t, err)
 	}

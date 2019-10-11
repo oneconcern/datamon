@@ -26,9 +26,9 @@ type paramsT struct {
 	}
 }
 
-var params paramsT = paramsT{}
+var params = paramsT{}
 
-func addCpuProfPath(cmd *cobra.Command) string {
+func addCPUProfPath(cmd *cobra.Command) string {
 	const flagName = "cpuprof"
 	cmd.Flags().StringVar(&params.root.cpuProfPath, flagName, "cpu.prof",
 		"The path to output the pprof cpu information.")

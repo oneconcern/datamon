@@ -16,6 +16,8 @@ func applyBundleTemplate(bundle model.BundleDescriptor) error {
 	var buf bytes.Buffer
 	err := bundleDescriptorTemplate.Execute(&buf, bundle)
 	if err != nil {
+		// NOTE(frederic): to be discussed - PR#267 introduced a change here
+		// by stopping upon errors while it was previously non-blocking
 		return fmt.Errorf("executing template: %w", err)
 	}
 	log.Println(buf.String())
