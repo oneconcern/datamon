@@ -5,6 +5,7 @@ RUN apt-get update &&\
     apt-get install -y \
         curl \
         ca-certificates \
+        zsh \
         gnupg &&\
     apt-get autoremove -yqq &&\
     apt-get clean -y &&\
@@ -45,6 +46,8 @@ ADD hack/fuse-demo/mock_application.sh .
 RUN chmod a+x mock_application.sh
 
 USER developer
+
+RUN touch ~/.zshrc
 
 ENTRYPOINT [ "/tmp/coord/.scripts/wrap_application.sh"]
 CMD [ "./mock_application.sh"]

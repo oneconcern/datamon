@@ -16,7 +16,10 @@ spec:
       - name: init-application-wrap
         image: gcr.io/onec-co/datamon-fuse-demo-coord-datamon:latest
         imagePullPolicy: "$PULL_POLICY"
-        command: ["sh", "-c", "mkdir /tmp/coord/.scripts; cp wrap_application.sh /tmp/coord/.scripts/wrap_application.sh; chmod a+x /tmp/coord/.scripts/wrap_application.sh; echo 'placed application wrapper'"]
+
+        command: ["sh", "-c",
+        "mkdir /tmp/coord/.scripts; cp wrap_application.sh /tmp/coord/.scripts/wrap_application.sh; chmod a+x /tmp/coord/.scripts/wrap_application.sh; echo 'placed application wrapper'"]
+
         stdin: true
         tty: true
         volumeMounts:
@@ -26,11 +29,18 @@ spec:
       - name: demo-app
         image: gcr.io/onec-co/datamon-fuse-demo-coord-app:latest
         imagePullPolicy: "$PULL_POLICY"
+
+        # command: ["/bin/tini"]
+        # args: ["--", "/bin/zsh"]
+
         command: ["/tmp/coord/.scripts/wrap_application.sh"]
-        # use the wrong number of params in order to simulate error out of mock app
-        # args: ["-c", "/tmp/coord", "--", "./mock_application.sh", "/tmp/mount"]
         args: ["-s", "-c", "/tmp/coord", "-b", "fuse", "--",
         "./mock_application.sh", "/tmp/mount", "/tmp/upload"]
+
+        # use the wrong number of params in order to simulate error out of mock app
+        # args: ["-c", "/tmp/coord",  "-b", "fuse",
+        # "--", "./mock_application.sh", "/tmp/mount"]
+
         stdin: true
         tty: true
         volumeMounts:
@@ -44,12 +54,20 @@ spec:
       - name: datamon-sidecar
         image: gcr.io/onec-co/datamon-fuse-demo-coord-datamon:latest
         imagePullPolicy: "$PULL_POLICY"
+
+        # command: ["/bin/tini"]
+        # args: ["--", "/bin/zsh"]
+
         command: ["./wrap_datamon.sh"]
-        args: ["-s", "-c", "/tmp/coord",
-        "-i", "/tmp/bundleid.txt",
-        "-d", "config create --name \"Coord\" --email coord-bot@oneconcern.com",
-        "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo",
-        "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
+        args: []
+
+        # args: ["-s", "-c", "/tmp/coord",
+        # "-i", "/tmp/bundleid.txt",
+        # "-d", "config create --name \"Coord\" --email coord-bot@oneconcern.com",
+        # "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo",
+        # "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
+
+
         securityContext:
           privileged: true
         stdin: true
@@ -65,8 +83,21 @@ spec:
         - mountPath: /tmp/gac
           name: google-application-credentials
         env:
+
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /tmp/gac/google-application-credentials.json
+
+        - name: dm_fuse_opts
+          value: ";:S;c:/tmp/coord;i:/tmp/bundleid.txt;n:Coord;e:coord-bot@oneconcern.com"
+        # "sources" are data that exists in datamon and accessed by sidecar
+        - name: dm_fuse_bd_src
+          value: ";:sp:/tmp/mount;sr:ransom-datamon-test-repo;sl:testlabel"
+        # "destinations" are data that are created by the sidecar
+        # and placed in datamon
+        - name: dm_fuse_bd_dest
+          value: ";:dp:/tmp/upload;dr:ransom-datamon-test-repo;dm:result of container coordination demo;dl:coordemo"
+
+
       volumes:
       - name: fuse-mountpoint
         emptyDir: {}

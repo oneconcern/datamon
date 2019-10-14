@@ -13,19 +13,23 @@ known_k8s_tags_to_ctxs[remote]=gke_onec-co_us-west2-c_onec-dev
 known_k8s_ctxs=(${(v)known_k8s_tags_to_ctxs})
 
 k8s_ctx_opt=remote
-build_sidecar_base=true
+build_datamon_base=false
+build_sidecar=true
 build_demo_sidecar=true
 build_demo_app=true
 build_local=true
 
 while getopts os opt; do
     case $opt in
+        (b)
+            build_datamon_base=true
+            ;;
         (o)
             # local deploy
             k8s_ctx_opt=local
             ;;
         (s)
-            build_sidecar_base=false
+            build_sidecar=false
             build_demo_sidecar=false
             build_demo_app=false
             build_local=false
@@ -52,8 +56,11 @@ kubectx $k8s_ctx
 
 ##
 
-if $build_sidecar_base; then
-    make build-and-push-fuse-sidecar
+if $build_datamon_base; then
+    make build-datamon-binaries
+fi
+if $build_sidecar; then
+    make build-and-push-fuse-sidecar-img
 fi
 if $build_demo_app; then
     make fuse-demo-coord-build-app

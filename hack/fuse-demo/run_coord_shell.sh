@@ -15,14 +15,16 @@ while getopts s opt; do
 done
 (( OPTIND > 1 )) && shift $(( OPTIND - 1 ))
 
+typeset pod_name
 
-pod_name=$(kubectl get pods -l app=datamon-coord-demo | grep Running | sed 's/ .*//')
+print -- "waiting on pod start"
 
-if [[ -z $pod_name ]]; then
-	echo 'coord demo pod not found' 1>&2
-	exit 1
-fi
+while [[ -z $pod_name ]]; do
+    sleep 1
+    pod_name=$(kubectl get pods -l app=datamon-coord-demo | \
+                   grep Running | sed 's/ .*//')
+done
 
-kubectl exec -it "$pod_name" \
-        -c "$container_name" \
-        -- "/bin/bash"
+kubectl exec -it $pod_name \
+        -c $container_name \
+        -- "/bin/zsh"

@@ -218,59 +218,21 @@ where
   [conventional UNIX syntax](http://zsh.sourceforge.net/Guide/zshguide02.html#l11)
   for stating that options to a command are done being declared.
 
-Meanwhile, each sidecar's datamon-specific batteries have their corresponding usages.
-
-##### `gcr.io/onec-co/datamon-fuse-sidecar` -- `wrap_datamon.sh`
-
-Provides filesystem representations (i.e. a folder) of [datamon bundles](#data-modeling).
-Since bundles' filelists are serialized filesystem representations,
-the `wrap_datamon.sh` interface is tightly coupled to that of the self-documenting
-`datamon` binary itself.
-
-```shell
-./wrap_datamon.sh -c <coord_dir> -d <bin_cmd_I> -d <bin_cmd_J> ...
-```
-
-* `-c` the same coordination directory passed to `wrap_application.sh`
-* `-d` all parameters, exactly as passed to the datamon binary, except as a
-  single scalar (quoted) parameter, for one of the following commands
-  - `config` sets user information associated with any bundles created by the node
-  - `bundle mount` provides sources for data-science applications
-  - `bundle upload` provides sinks for data-science applications
-
-Multiple (or none) `bundle mount` and `bundle upload` commands may be specified,
-and at most one `config` command is allowed so that an example `wrap_datamon.sh`
-YAML might be
-
-```yaml
-command: ["./wrap_datamon.sh"]
-args: ["-c", "/tmp/coord", "-d", "config create --name \"Coord\" --email coord-bot@oneconcern.com", "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo", "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
-```
-
-or from the shell
-
-```shell
-./wrap_datamon.sh -c /tmp/coord -d 'config create --name "Coord" --email coord-bot@oneconcern.com' -d 'bundle upload --path /tmp/upload --message "result of container coordination demo" --repo ransom-datamon-test-repo --label coordemo' -d 'bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream'
-```
-
-##### `gcr.io/onec-co/datamon-pg-sidecar` -- `wrap_datamon_pg.sh`
-
-Provides Postgres databases as bundles and vice versa.
-Since the datamon binary does not include any Postgres-specific notions,
-the UI here is more decoupled than that of `wrap_datamon.sh`.
-The UI is specified via environment variables
-such that `wrap_datamon.sh` is invoked without parameters.
-
-The script looks for precisely one `dm_pg_opts` environment variable
-specifying global options for the entire script and any number of
-`dm_pg_db_<db_id>` variables, one per database.
+Meanwhile, each sidecar's datamon-specific batteries have their corresponding
+usages.
+Despite their differences, both are parameterized via environment variables.
+[12 factor](https://www.12factor.net/config) principles are loosely part
+of the overall ideology with the strong opinion being that of the virtue of
+declarative specification.
+The environment variables for sidecars both use the same serialization
+format to represent dictionaries (aka associative arrays) with strings.
 
 ----
 
 _Aside on serialization format_
 
-Each of these environment variables each contain a serialized dictionary
-according the the following format
+Each of environment variable parsed by the sidecars contains a serialized
+dictionary according the the following format
 
 ```
 <entry_sperator><key_value_seperator><entry_1><entry_seperator><entry_2>...
@@ -286,7 +248,7 @@ So for example
 ;:a;b:c
 ```
 
-expresses something like a Python map
+expresses something like a Python `dict`
 
 ```python
 {'a': True, 'b' : 'c'}
@@ -300,6 +262,47 @@ or shell option args
 
 ----
 
+
+##### `gcr.io/onec-co/datamon-fuse-sidecar` -- `wrap_datamon.sh`
+
+Provides filesystem representations (i.e. a folder) of
+[datamon bundles](#data-modeling).
+The environment variables consist of
+* `dm_fuse_opts` global options
+* `dm_fuse_bd_<id>` bundle options
+
+The available global options are
+
+* `c` the same coordination directory passed to `wrap_application.sh`
+* `n`, `e` name and email for datamon contributor record
+* `S` without an `<arg>` is causes the wrapper script to sleep instead
+  of exiting, which can be useful for debug.
+
+The per-bundle options (one per `<id>`,
+a unique string among all bundle options) determine whether the bundle
+is a _source_, data that exist in datamon and accessed by sidecar,
+or a _destination_, data that are created by the sidecar.
+
+The options for sources are
+* `sp` path (required)
+* `sr` repo (required)
+* `sl` label (required if bundle id not present)
+* `sb` bundle id (required if label not present)
+
+while those for destinations are
+* `dp` path (required)
+* `dr` repo (required)
+* `dm` bundle message (required)
+* `dl` bundle label (optional)
+
+##### `gcr.io/onec-co/datamon-pg-sidecar` -- `wrap_datamon_pg.sh`
+
+Provides Postgres databases as bundles and vice versa.
+
+The script looks for precisely one `dm_pg_opts` environment variable
+specifying global options for the entire script and any number of
+`dm_pg_db_<db_id>` variables, one per database.
+
 Every database created in the sidecar corresponding to a `dm_pg_db_<db_id>`
 env var is uploaded to datamon and optionally initialized by a previously
 uploaded database.
@@ -312,7 +315,6 @@ The opts in the above serialization format availble to specify are
 * `sr` repo containing the source bundle
 * `sl` label of the source bundle
 * `sb` source bundle id
-
 
 that affect the availability of the database from the application container
 or the upload of the database to datamon are

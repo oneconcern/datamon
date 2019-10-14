@@ -11,12 +11,16 @@ start_timestamp=$(cat /tmp/datamon_fuse_demo_coord_start_timestamp)
 
 verify_datamon_timestamp() {
     timestamp="$1"
-    timestamp_to_parse=$(echo "$timestamp" | sed 's/\.[^ ]*//g' | sed 's/ *[^ ]*$//')
+    timestamp_to_parse=$(echo "$timestamp" | \
+                             sed 's/\.[^ ]*//g' | sed 's/ *[^ ]*$//')
     epoch_timestamp=$(date -jf '%Y-%m-%d %H:%M:%S %z' "$timestamp_to_parse" '+%s')
-    sec_from_start=$(echo "$epoch_timestamp - $start_timestamp" |bc)
+    start_timestamp_local=$(date -jf  '%s' "$start_timestamp" \
+                                 '+%Y-%m-%d %H:%M:%S %z')
+    sec_from_start=$(($epoch_timestamp - $start_timestamp))
 
     #
-    echo "timestamp_to_parse $timestamp_to_parse"
+    print -- "local at $start_timestamp_local (${start_timestamp})"
+    print -- "label at $timestamp_to_parse (${epoch_timestamp})"
 
     if [ ! "$sec_from_start" -gt 0 ]; then
         echo 'label timestamp not after demo start' 1>&2
@@ -31,8 +35,9 @@ label_list_line=$(2>&1 "$DATAMON_EXEC" label get \
                        --repo "$DATAMON_REPO" \
                        --label $EXPECTED_LABEL | \
                       tail -1)
-HASH_FROM_LABEL=$(echo "$label_list_line" |cut -d"," -f 2 |tr -d ' ')
-verify_datamon_timestamp "$(echo "$label_list_line" |cut -d"," -f 3 |sed 's/^ *//')"
+HASH_FROM_LABEL=$(print -- "$label_list_line" |cut -d"," -f 2 |tr -d ' ')
+TIMESTAMP_FROM_LABEL=$(print -- "$label_list_line" |cut -d"," -f 3 |sed 's/^ *//')
+verify_datamon_timestamp $TIMESTAMP_FROM_LABEL
 
 if [ -z "HASH_FROM_LABEL" ]; then
     echo "didn't find expected label $EXPECTED_LABEL" 1>&2
