@@ -48,9 +48,9 @@ help:
 	} \
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
-.PHONY: build-and-push-fuse-sidecar
-## build sidecar container used in Argo workflows
-build-and-push-fuse-sidecar: build-datamon-binaries
+.PHONY: build-and-push-fuse-sidecar-img
+## build FUSE sidecar container used in Argo workflows
+build-and-push-fuse-sidecar-img:
 	@echo 'building fuse sidecar container'
 	docker build \
 		--progress plain \
@@ -64,6 +64,27 @@ build-and-push-fuse-sidecar: build-datamon-binaries
 		.
 	docker push gcr.io/onec-co/datamon-fuse-sidecar
 
+.PHONY: build-and-push-fuse-sidecar
+## build FUSE sidecar container used in Argo workflows
+build-and-push-fuse-sidecar: build-datamon-binaries build-and-push-fuse-sidecar-img
+
+.PHONY: build-and-push-pg-sidecar-img
+## build postgres sidecar container used in Argo workflows
+build-and-push-pg-sidecar-img:
+	@echo 'building pg sidecar container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-pg-sidecar \
+		-t gcr.io/onec-co/datamon-pg-sidecar:${GITHUB_USER}-$$(date '+%Y%m%d') \
+		-t gcr.io/onec-co/datamon-pg-sidecar:$(subst /,_,$(GIT_BRANCH)) \
+		--ssh default \
+		-f sidecar-pg.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-pg-sidecar
+
+.PHONY: build-and-push-pg-sidecar
+## build postgres sidecar container used in Argo workflows
+build-and-push-pg-sidecar: build-datamon-binaries build-and-push-pg-sidecar-img
 
 .PHONY: build-and-push-datamover
 ## build sidecar container used in Argo workflows
@@ -259,7 +280,7 @@ fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
 .PHONY: fuse-demo-coord-build-app
 ## build shell container used in fuse demo
 fuse-demo-coord-build-app:
-	@echo 'building fuse demo container'
+	@echo 'building fuse demo application container'
 	docker build \
 		--progress plain \
 		-t gcr.io/onec-co/datamon-fuse-demo-coord-app \
@@ -271,7 +292,7 @@ fuse-demo-coord-build-app:
 .PHONY: fuse-demo-coord-build-datamon
 ## build shell container used in fuse demo
 fuse-demo-coord-build-datamon:
-	@echo 'building fuse demo container'
+	@echo 'building fuse demo sidecar container'
 	docker build \
 		--progress plain \
 		-t gcr.io/onec-co/datamon-fuse-demo-coord-datamon \
@@ -279,6 +300,18 @@ fuse-demo-coord-build-datamon:
 		-f ./hack/fuse-demo/coord-datamon.Dockerfile \
 		.
 	docker push gcr.io/onec-co/datamon-fuse-demo-coord-datamon
+
+.PHONY: pg-demo-coord-build-app
+## build shell container used in fuse demo
+pg-demo-coord-build-app:
+	@echo 'building pg demo application container'
+	docker build \
+		--progress plain \
+		-t gcr.io/onec-co/datamon-pg-demo-coord-app \
+		--ssh default \
+		-f ./hack/fuse-demo/coord-app-pg.Dockerfile \
+		.
+	docker push gcr.io/onec-co/datamon-pg-demo-coord-app
 
 .PHONY: profile-metrics
 ## Build the metrics collection binary and write output

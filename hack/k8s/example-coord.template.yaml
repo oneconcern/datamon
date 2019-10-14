@@ -29,7 +29,7 @@ spec:
         command: ["/tmp/coord/.scripts/wrap_application.sh"]
         # use the wrong number of params in order to simulate error out of mock app
         # args: ["-c", "/tmp/coord", "--", "./mock_application.sh", "/tmp/mount"]
-        args: ["-s", "-c", "/tmp/coord", "--",
+        args: ["-s", "-c", "/tmp/coord", "-b", "fuse", "--",
         "./mock_application.sh", "/tmp/mount", "/tmp/upload"]
         stdin: true
         tty: true

@@ -1,3 +1,6 @@
+run:
+  build-tags: fuse_cli
+
 linters-settings:
   govet:
     check-shadowing: true
@@ -23,3 +26,11 @@ linters:
     - lll
     - gochecknoinits
     - gochecknoglobals
+    - golint
+    - godox
+    - whitespace
+    - funlen
+    - stylecheck
+    - unparam
+
+max-same-issues: 0
