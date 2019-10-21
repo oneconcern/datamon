@@ -30,6 +30,26 @@ SLEEP_INSTEAD_OF_EXIT=
 
 ####
 
+# bridge parameters to shell script specific format
+# (currently environment variables
+
+if [[ -n $dm_fuse_params ]]; then
+    typeset dm_fuse_params_val
+    env_vars_file=/tmp/env_vars_from_params.sh
+    if [[ -f $dm_fuse_params ]]; then
+        dm_fuse_params_val=$(cat $dm_fuse_params)
+    else
+        dm_fuse_params_val=$dm_fuse_params
+    fi
+    print -- $dm_fuse_params_val | \
+        datamon_sidecar_param parse > $env_vars_file
+    . $env_vars_file
+fi
+
+####
+
+# parse the shell script specific format
+
 # deserialize an associate array from a scalar
 # example usage
 # typeset -A opts_global_dict

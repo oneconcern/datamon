@@ -19,11 +19,8 @@ build_demo_sidecar=true
 build_demo_app=true
 build_local=true
 
-while getopts os opt; do
+while getopts osb opt; do
     case $opt in
-        (b)
-            build_datamon_base=true
-            ;;
         (o)
             # local deploy
             k8s_ctx_opt=local
@@ -33,6 +30,9 @@ while getopts os opt; do
             build_demo_sidecar=false
             build_demo_app=false
             build_local=false
+            ;;
+        (b)
+            build_datamon_base=true
             ;;
         (\?)
             print Bad option, aborting.

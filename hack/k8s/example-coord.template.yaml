@@ -87,15 +87,18 @@ spec:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /tmp/gac/google-application-credentials.json
 
-        - name: dm_fuse_opts
-          value: ";:S;c:/tmp/coord;i:/tmp/bundleid.txt;n:Coord;e:coord-bot@oneconcern.com"
-        # "sources" are data that exists in datamon and accessed by sidecar
-        - name: dm_fuse_bd_src
-          value: ";:sp:/tmp/mount;sr:ransom-datamon-test-repo;sl:testlabel"
-        # "destinations" are data that are created by the sidecar
-        # and placed in datamon
-        - name: dm_fuse_bd_dest
-          value: ";:dp:/tmp/upload;dr:ransom-datamon-test-repo;dm:result of container coordination demo;dl:coordemo"
+        - name: dm_fuse_params
+          value: /fuse-params.yaml
+
+        # - name: dm_fuse_opts
+        #   value: ";:S;c:/tmp/coord;i:/tmp/bundleid.txt;n:Coord;e:coord-bot@oneconcern.com"
+        # # "sources" are data that exists in datamon and accessed by sidecar
+        # - name: dm_fuse_bd_src
+        #   value: ";:sp:/tmp/mount;sr:ransom-datamon-test-repo;sl:testlabel"
+        # # "destinations" are data that are created by the sidecar
+        # # and placed in datamon
+        # - name: dm_fuse_bd_dest
+        #   value: ";:dp:/tmp/upload;dr:ransom-datamon-test-repo;dm:result of container coordination demo;dl:coordemo"
 
 
       volumes:

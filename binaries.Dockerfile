@@ -49,10 +49,20 @@ RUN cp /stage/usr/bin/datamon.linux /stage/usr/bin/datamon && \
   upx /stage/usr/bin/datamon
 RUN md5sum /stage/usr/bin/datamon
 
-RUN go build -o /stage/usr/bin/migrate --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/backup2blobs
+RUN go build -o /stage/usr/bin/migrate \
+  --ldflags '-s -w -linkmode external -extldflags "-static"' \
+  ./cmd/backup2blobs
 RUN upx /stage/usr/bin/migrate
 RUN md5sum /stage/usr/bin/migrate
 
-RUN go build -o /stage/usr/bin/datamon_metrics --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/metrics
+RUN go build -o /stage/usr/bin/datamon_metrics \
+  --ldflags '-s -w -linkmode external -extldflags "-static"' \
+  ./cmd/metrics
 RUN upx /stage/usr/bin/datamon_metrics
 RUN md5sum /stage/usr/bin/datamon_metrics
+
+RUN go build -o /stage/usr/bin/datamon_sidecar_param \
+  --ldflags '-s -w -linkmode external -extldflags "-static"' \
+  ./cmd/sidecar_param
+RUN upx /stage/usr/bin/datamon_sidecar_param
+RUN md5sum /stage/usr/bin/datamon_sidecar_param

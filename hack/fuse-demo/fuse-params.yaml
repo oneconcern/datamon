@@ -1,0 +1,17 @@
+globalOpts:
+  sleepInsteadOfExit: true
+  coordPoint: "/tmp/coord"
+  contributor:
+    name: "Coord"
+    email: "coord-bot@oneconcern.com"
+  bundleID: "/tmp/bundleid.txt"
+bundles:
+  - name: "src"
+    srcPath: "/tmp/mount"
+    srcRepo: "ransom-datamon-test-repo"
+    srcLabel: "testlabel"
+  - name: "dest"
+    destPath: "/tmp/upload"
+    destRepo: "ransom-datamon-test-repo"
+    destMessage: "result of container coordination demo"
+    destLabel: "coordemo"

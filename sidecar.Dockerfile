@@ -52,6 +52,7 @@ RUN useradd -u 1020 -ms /bin/bash developer
 RUN groupadd -g 2000 developers
 RUN usermod -g developers developer
 RUN chown -R developer:developers /usr/bin/datamon
+RUN chown -R developer:developers /usr/bin/datamon_sidecar_param
 
 RUN mkdir -p /etc/sudoers.d &&\
   echo "developer ALL = (ALL) NOPASSWD: ALL" > /etc/sudoers.d/developer &&\
