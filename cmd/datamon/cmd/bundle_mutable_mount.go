@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
 	daemonizer "github.com/jacobsa/daemonize"
 
@@ -65,7 +64,7 @@ var mutableMountBundleCmd = &cobra.Command{
 		if err = fs.Commit(); err != nil {
 			logFatalln(err)
 		}
-		fmt.Printf("bundle: %v\n", bundle.BundleID)
+		infoLogger.Printf("bundle: %v", bundle.BundleID)
 	},
 }
 

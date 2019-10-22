@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 
@@ -19,14 +18,13 @@ func registerSIGINTHandlerMount(mountPoint string) {
 	go func() {
 		for {
 			<-signalChan
-			fmt.Println("Received SIGINT, attempting to unmount...")
+			infoLogger.Println("received SIGINT, attempting to unmount...")
 
 			err := fuse.Unmount(mountPoint)
 			if err != nil {
-				fmt.Printf("Failed to unmount in response to SIGINT: %v", err)
+				infoLogger.Printf("failed to unmount in response to SIGINT: %v", err)
 			} else {
-				fmt.Printf("Successfully unmounted in response to SIGINT.")
-				return
+				infoLogger.Printf("successfully unmounted in response to SIGINT.")
 			}
 		}
 	}()

@@ -67,6 +67,6 @@ func init() {
 		log.Fatalln("Failed to set log level:" + err.Error())
 	}
 
-	addCpuProfPath(rootCmd)
+	addCPUProfPath(rootCmd)
 	addMemProfPath(rootCmd)
 }

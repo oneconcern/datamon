@@ -42,9 +42,8 @@ func filterModify(time time.Time, after bool) filelistFilter {
 		modTime := fileInfo.ModTime()
 		if after {
 			return modTime.After(time), nil
-		} else {
-			return modTime.Before(time), nil
 		}
+		return modTime.Before(time), nil
 	}
 }
 

@@ -208,6 +208,7 @@ func (n *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
+//nolint: golint,stylecheck
 func (n *nodeServer) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
 	return &csi.NodeGetIdResponse{
 		NodeId: n.driver.config.NodeID,

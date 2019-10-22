@@ -29,14 +29,17 @@ var bundleDiffCmd = &cobra.Command{
 		sourceStore, err := gcs.New(ctx, params.repo.MetadataBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		blobStore, err := gcs.New(ctx, params.repo.BlobBucket, config.Credential)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		path, err := sanitizePath(params.bundle.DataPath)
 		if err != nil {
-			logFatalln("Failed path validation: " + err.Error())
+			wrapFatalln("failed path validation", err)
+			return
 		}
 		fs := afero.NewBasePathFs(afero.NewOsFs(), path+"/")
 		destinationStore := localfs.New(fs)
@@ -44,6 +47,7 @@ var bundleDiffCmd = &cobra.Command{
 		err = setLatestOrLabelledBundle(ctx, sourceStore)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 
 		localBundle := core.New(core.NewBDescriptor(),
@@ -61,6 +65,7 @@ var bundleDiffCmd = &cobra.Command{
 		diff, err := core.Diff(ctx, localBundle, remoteBundle)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 
 		if len(diff.Entries) == 0 {
@@ -100,6 +105,7 @@ func init() {
 		err := bundleDiffCmd.MarkFlagRequired(flag)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 	}
 

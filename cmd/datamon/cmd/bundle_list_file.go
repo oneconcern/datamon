@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -33,7 +33,7 @@ var bundleFileList = &cobra.Command{
 			logFatalln(err)
 		}
 		for _, e := range bundle.BundleEntries {
-			fmt.Printf("name:%s, size:%d, hash:%s\n", e.NameWithPath, e.Size, e.Hash)
+			log.Printf("name:%s, size:%d, hash:%s", e.NameWithPath, e.Size, e.Hash)
 		}
 	},
 }

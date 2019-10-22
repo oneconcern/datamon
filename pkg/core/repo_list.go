@@ -55,6 +55,9 @@ func ListRepos(store storage.Store) ([]model.RepoDescriptor, error) {
 
 		var rd model.RepoDescriptor
 		rd, err = GetRepoDescriptorByRepoName(store, apc.Repo)
+		if err != nil {
+			return nil, err
+		}
 		repos = append(repos, rd)
 	}
 	return repos, nil
@@ -80,6 +83,9 @@ func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescript
 
 		var rd model.RepoDescriptor
 		rd, err = GetRepoDescriptorByRepoName(store, apc.Repo)
+		if err != nil {
+			return nil, err
+		}
 		repos = append(repos, rd)
 	}
 	return repos, nil

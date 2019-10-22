@@ -28,15 +28,18 @@ var BundleDownloadCmd = &cobra.Command{
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		destinationStore, err := paramsToDestStore(params, destTEmpty, "")
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
@@ -54,19 +57,21 @@ var BundleDownloadCmd = &cobra.Command{
 		if params.bundle.NameFilter != "" {
 			nameFilterRe, err = regexp.Compile(params.bundle.NameFilter)
 			if err != nil {
-				logFatalln(fmt.Errorf("name filter regexp %s didn't build: %v",
-					params.bundle.NameFilter, err))
+				wrapFatalln(fmt.Sprintf("name filter regexp %s didn't build", params.bundle.NameFilter), err)
+				return
 			}
 			err = core.PublishSelectBundleEntries(ctx, bundle, func(name string) (bool, error) {
 				return nameFilterRe.MatchString(name), nil
 			})
 			if err != nil {
 				logFatalln(err)
+				return
 			}
 		} else {
 			err = core.Publish(ctx, bundle)
 			if err != nil {
 				logFatalln(err)
+				return
 			}
 		}
 	},
@@ -96,6 +101,7 @@ func init() {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 	}
 

@@ -7,7 +7,7 @@ linters-settings:
   golint:
     min-confidence: 0
   gocyclo:
-    min-complexity: 35
+    min-complexity: 75
   maligned:
     suggest-new: true
   dupl:
@@ -15,22 +15,23 @@ linters-settings:
   goconst:
     min-len: 2
     min-occurrences: 2
-  funlen:
-    lines: 150
-    statements: 300
 
 linters:
   enable-all: true
+  build-tags:
+    - fuse_cli
   disable:
     - maligned
     - lll
     - gochecknoinits
     - gochecknoglobals
-    - golint
+    #- golint
     - godox
     - whitespace
     - funlen
-    - stylecheck
+    #- stylecheck
     - unparam
+    - wsl
+    - gocognit
 
 max-same-issues: 0

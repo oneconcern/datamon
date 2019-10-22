@@ -18,20 +18,22 @@ var webSrv = &cobra.Command{
 	Short: "Webserver",
 	Long:  "A webserver process to browse Datamon data",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("begin webserver")
+		infoLogger.Println("begin webserver")
 		// todo: pass storage.Store
 		s, err := web.NewServer(web.ServerParams{
 			MetadataBucket: params.repo.MetadataBucket,
 			Credential:     config.Credential,
 		})
 		if err != nil {
-			logFatalf("server init error %v", err)
+			wrapFatalln("server init error", err)
+			return
 		}
 		r := web.InitRouter(s)
-		fmt.Printf("serving on %d...\n", params.web.port)
+		infoLogger.Printf("serving on %d...", params.web.port)
 		err = http.ListenAndServe(fmt.Sprintf(":%d", params.web.port), r)
 		if err != nil {
-			logFatalf("server listen error %v", err)
+			wrapFatalln("server listen error", err)
+			return
 		}
 	},
 }

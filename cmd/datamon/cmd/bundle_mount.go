@@ -41,8 +41,8 @@ func runDaemonized() {
 	var path string
 	path, err := os.Executable()
 	if err != nil {
-		err = fmt.Errorf("os.Executable: %v", err)
-		logFatalln(err)
+		wrapFatalln("os.Executable", err)
+		return
 	}
 
 	foregroundArgs := undaemonizeArgs(os.Args[1:])
@@ -61,8 +61,8 @@ func runDaemonized() {
 	// Run.
 	err = daemonizer.Run(path, foregroundArgs, env, os.Stdout)
 	if err != nil {
-		err = fmt.Errorf("daemonize.Run: %v", err)
-		logFatalln(err)
+		wrapFatalln("daemonize.Run", err)
+		return
 	}
 }
 
@@ -72,7 +72,8 @@ func runDaemonized() {
  */
 func onDaemonError(err error) {
 	if errSig := daemonizer.SignalOutcome(err); errSig != nil {
-		logFatalln(fmt.Errorf("error SignalOutcome: %v, cause: %v", errSig, err))
+		wrapFatalln(fmt.Sprintf("error SignalOutcome: %v", errSig), err)
+		return
 	}
 	logFatalln(err)
 }
@@ -92,15 +93,18 @@ var mountBundleCmd = &cobra.Command{
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
 			onDaemonError(err)
+			return
 		}
 		consumableStore, err := paramsToDestStore(params, destTEmpty, "datamon-mount-destination")
 		if err != nil {
 			onDaemonError(err)
+			return
 		}
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
@@ -115,22 +119,27 @@ var mountBundleCmd = &cobra.Command{
 		)
 		logger, err := dlogger.GetLogger(params.root.logLevel)
 		if err != nil {
-			logFatalln("Failed to set log level:" + err.Error())
+			wrapFatalln("failed to set log level", err)
+			return
 		}
 		fs, err := core.NewReadOnlyFS(bundle, logger)
 		if err != nil {
 			onDaemonError(err)
+			return
 		}
 		if err = fs.MountReadOnly(params.bundle.MountPath); err != nil {
 			onDaemonError(err)
+			return
 		}
 
 		registerSIGINTHandlerMount(params.bundle.MountPath)
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			logFatalln(err)
+			return
 		}
 		if err = fs.JoinMount(ctx); err != nil {
 			logFatalln(err)
+			return
 		}
 	},
 }
@@ -155,6 +164,7 @@ func init() {
 		err := mountBundleCmd.MarkFlagRequired(flag)
 		if err != nil {
 			logFatalln(err)
+			return
 		}
 	}
 
