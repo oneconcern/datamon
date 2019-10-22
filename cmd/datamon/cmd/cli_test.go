@@ -948,7 +948,11 @@ func TestDiffBundle(t *testing.T) {
 	require.NoError(t, err, "i/o error reading patched log from pipe")
 	des := make([]diffEntry, 0)
 	for _, line := range getDataLogLines(t, string(lb), []string{}) {
+		if strings.HasPrefix(line, "Using bundle") {
+			continue
+		}
 		sl := strings.Split(line, ",")
+		require.Truef(t, len(sl) > 4, "expected at least 5 comma separated items in output, got: %s", line)
 		de := diffEntry{
 			rawLine:    line,
 			typeLetter: strings.TrimSpace(sl[0]),
@@ -1180,8 +1184,6 @@ func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileList
 	if err != nil {
 		panic(err)
 	}
-	//stdout := os.Stdout
-	//os.Stdout = w
 	log.SetOutput(w)
 	//
 	runCmd(t, []string{"bundle",
@@ -1191,7 +1193,6 @@ func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileList
 		"--bundle", bid,
 	}, "get bundle files list", false)
 	//
-	//os.Stdout = stdout
 	log.SetOutput(os.Stdout)
 	w.Close()
 	//
