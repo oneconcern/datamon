@@ -33,13 +33,15 @@ var BundleListCommand = &cobra.Command{
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		err = core.ListBundlesApply(params.repo.RepoName, remoteStores.meta, applyBundleTemplate,
 			core.ConcurrentBundleList(params.core.ConcurrencyFactor),
 			core.BundleBatchSize(params.core.BatchSize))
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("concurrent list bundles", err)
+			return
 		}
 	},
 }
@@ -56,7 +58,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := BundleListCommand.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

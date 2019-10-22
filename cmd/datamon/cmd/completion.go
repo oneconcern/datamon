@@ -31,12 +31,12 @@ var completionCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
-			logFatalln("specify a shell to generate completions for bash or zsh")
+			wrapFatalln("specify a shell to generate completions for bash or zsh", nil)
 			return
 		}
 		shell := args[0]
 		if shell != bash && shell != zsh {
-			logFatalln("the only supported shells are bash and zsh")
+			wrapFatalln("the only supported shells are bash and zsh", nil)
 			return
 		}
 		if shell == bash {

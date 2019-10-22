@@ -12,7 +12,8 @@ import (
 func DieIfNotAccessible(path string) {
 	_, err := os.Stat(path)
 	if err != nil {
-		logFatalln(err)
+		wrapFatalln(fmt.Sprintf("couldn't stat %q", path), err)
+		return
 	}
 }
 
@@ -31,9 +32,10 @@ func sanitizePath(path string) (string, error) {
 func DieIfNotDirectory(path string) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		logFatalln(err)
+		wrapFatalln(fmt.Sprintf("couldn't stat %q", path), err)
+		return
 	}
 	if !fileInfo.IsDir() {
-		logFatalln(fmt.Errorf("%q is not a directory", path))
+		wrapFatalln("incorrect file info", fmt.Errorf("%q is not a directory", path))
 	}
 }

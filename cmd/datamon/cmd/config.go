@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
-
 	"github.com/spf13/viper"
 )
 
@@ -41,13 +38,13 @@ func (c *Config) setRepoParams(params *paramsT) {
 	if params.repo.MetadataBucket == "" {
 		params.repo.MetadataBucket = config.Metadata
 		if params.repo.MetadataBucket == "" {
-			logFatalln(fmt.Errorf("metadata bucket not set in config or as a cli param"))
+			wrapFatalln("metadata bucket not set in config or as a cli param", nil)
 		}
 	}
 	if params.repo.BlobBucket == "" {
 		params.repo.BlobBucket = config.Blob
 		if params.repo.BlobBucket == "" {
-			logFatalln(fmt.Errorf("blob bucket not set in config or as a cli param"))
+			wrapFatalln("blob bucket not set in config or as a cli param", nil)
 		}
 	}
 }

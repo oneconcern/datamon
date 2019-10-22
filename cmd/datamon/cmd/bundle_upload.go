@@ -27,19 +27,23 @@ var uploadBundleCmd = &cobra.Command{
 		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("populate contributor struct", err)
+			return
 		}
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		sourceStore, err := paramsToSrcStore(ctx, params, false)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create source store", err)
+			return
 		}
 		logger, err := dlogger.GetLogger(params.root.logLevel)
 		if err != nil {
 			wrapFatalln("failed to set log level", err)
+			return
 		}
 		bd := core.NewBDescriptor(
 			core.Message(params.bundle.Message),
@@ -70,11 +74,16 @@ var uploadBundleCmd = &cobra.Command{
 				return files, nil
 			}
 			err = core.UploadSpecificKeys(ctx, bundle, getKeys)
+			if err != nil {
+				wrapFatalln("upload bundle by filelist", err)
+				return
+			}
 		} else {
 			err = core.Upload(ctx, bundle)
-		}
-		if err != nil {
-			logFatalln(err)
+			if err != nil {
+				wrapFatalln("upload bundle", err)
+				return
+			}
 		}
 		log.Printf("Uploaded bundle id:%s ", bundle.BundleID)
 
@@ -87,7 +96,8 @@ var uploadBundleCmd = &cobra.Command{
 			)
 			err = label.UploadDescriptor(ctx, bundle)
 			if err != nil {
-				logFatalln(err)
+				wrapFatalln("upload label", err)
+				return
 			}
 			log.Printf("set label '%v'", params.label.Name)
 		}
@@ -107,7 +117,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

@@ -21,12 +21,12 @@ var bundleUpdateCmd = &cobra.Command{
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
 			return
 		}
 		destinationStore, err := paramsToDestStore(params, destTNonEmpty, "")
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create destination store", err)
 			return
 		}
 		/* lockfile to prevent multiple updates to same bundle */
@@ -41,7 +41,7 @@ var bundleUpdateCmd = &cobra.Command{
 			}
 			cmdLockfilePath, err = sanitizePath(filepath.Join(path, ".datamon-lock"))
 			if err != nil {
-				logFatalln(err)
+				wrapFatalln("prepare lock file path", err)
 				return
 			}
 			cmdLockfile, err = lockfile.New(cmdLockfilePath)
@@ -65,7 +65,7 @@ var bundleUpdateCmd = &cobra.Command{
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("determine bundle id", err)
 			return
 		}
 		localBundle := core.New(core.NewBDescriptor(),
@@ -80,7 +80,7 @@ var bundleUpdateCmd = &cobra.Command{
 
 		err = core.Update(ctx, remoteBundle, localBundle)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("update bundle", err)
 			return
 		}
 
@@ -108,7 +108,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := bundleUpdateCmd.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
 			return
 		}
 	}

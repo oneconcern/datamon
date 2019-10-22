@@ -20,11 +20,13 @@ var repoCreate = &cobra.Command{
 		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("populate contributor struct", err)
+			return
 		}
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		repo := model.RepoDescriptor{
 			Name:        params.repo.RepoName,
@@ -34,7 +36,8 @@ var repoCreate = &cobra.Command{
 		}
 		err = core.CreateRepo(repo, remoteStores.meta)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create repo", err)
+			return
 		}
 	},
 }
@@ -53,7 +56,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := repoCreate.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

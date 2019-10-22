@@ -21,7 +21,7 @@ exits with ENOENT status otherwise.`,
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
 			return
 		}
 
@@ -31,7 +31,7 @@ exits with ENOENT status otherwise.`,
 			return
 		}
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("determine bundle id", err)
 			return
 		}
 		bundle := core.New(core.NewBDescriptor(),
@@ -68,7 +68,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := GetBundleCommand.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
 			return
 		}
 	}

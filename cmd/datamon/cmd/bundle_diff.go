@@ -28,12 +28,12 @@ var bundleDiffCmd = &cobra.Command{
 		ctx := context.Background()
 		sourceStore, err := gcs.New(ctx, params.repo.MetadataBucket, config.Credential)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create source store", err)
 			return
 		}
 		blobStore, err := gcs.New(ctx, params.repo.BlobBucket, config.Credential)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create blob store", err)
 			return
 		}
 		path, err := sanitizePath(params.bundle.DataPath)
@@ -46,7 +46,7 @@ var bundleDiffCmd = &cobra.Command{
 
 		err = setLatestOrLabelledBundle(ctx, sourceStore)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("determine bundle id", err)
 			return
 		}
 
@@ -64,7 +64,7 @@ var bundleDiffCmd = &cobra.Command{
 
 		diff, err := core.Diff(ctx, localBundle, remoteBundle)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("bundle diff", err)
 			return
 		}
 
@@ -104,7 +104,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := bundleDiffCmd.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
 			return
 		}
 	}

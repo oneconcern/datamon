@@ -27,18 +27,18 @@ var BundleDownloadCmd = &cobra.Command{
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
 			return
 		}
 		destinationStore, err := paramsToDestStore(params, destTEmpty, "")
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create destination store", err)
 			return
 		}
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("determine bundle id", err)
 			return
 		}
 		bd := core.NewBDescriptor()
@@ -64,13 +64,13 @@ var BundleDownloadCmd = &cobra.Command{
 				return nameFilterRe.MatchString(name), nil
 			})
 			if err != nil {
-				logFatalln(err)
+				wrapFatalln("publish bundle entries selected by name filter", err)
 				return
 			}
 		} else {
 			err = core.Publish(ctx, bundle)
 			if err != nil {
-				logFatalln(err)
+				wrapFatalln("publish bundle", err)
 				return
 			}
 		}
@@ -100,7 +100,7 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
 			return
 		}
 	}

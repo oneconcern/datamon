@@ -18,17 +18,20 @@ var LabelListCommand = &cobra.Command{
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		labelDescriptors, err := core.ListLabels(params.repo.RepoName, remoteStores.meta)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("download label list", err)
+			return
 		}
 		for _, ld := range labelDescriptors {
 			var buf bytes.Buffer
 			err := labelDescriptorTemplate.Execute(&buf, ld)
 			if err != nil {
-				log.Println("executing template:", err)
+				wrapFatalln("executing template", err)
+				return
 			}
 			log.Println(buf.String())
 		}
@@ -42,7 +45,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := LabelListCommand.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

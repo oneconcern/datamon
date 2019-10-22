@@ -17,17 +17,20 @@ var repoList = &cobra.Command{
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		repos, err := core.ListRepos(remoteStores.meta)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("download repo list", err)
+			return
 		}
 		for _, rd := range repos {
 			var buf bytes.Buffer
 			err := repoDescriptorTemplate.Execute(&buf, rd)
 			if err != nil {
-				log.Println("executing template:", err)
+				wrapFatalln("executing template", err)
+				return
 			}
 			log.Println(buf.String())
 		}
