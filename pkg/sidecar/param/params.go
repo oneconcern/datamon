@@ -4,13 +4,20 @@ package param
 import (
 	"errors"
 	"fmt"
+	"io"
+	"reflect"
 	"strings"
 )
 
+/*
 const (
 	itemSep = ";"
 	kvSep = ":"
 )
+*/
+
+var itemSep string // = ";"
+var kvSep string // = ":"
 
 const (
 	fuseGlobalsEnvVar = "dm_fuse_opts"
@@ -146,8 +153,187 @@ func fuseParamsBundleStrings(fuseParams FUSEParams) (map[string]string, error) {
 	return rv, nil
 }
 
+// abstract serialization utility belt fn
+func fieldsAsStringValues(iVal interface{}) ([]string, error) {
+	v := reflect.ValueOf(iVal)
+	kind := v.Kind()
+	switch kind {
+	case reflect.Bool:
+		if iVal.(bool) {
+			return []string{"true"}, nil
+		} else {
+			return []string{"false"}, nil
+		}
+	case reflect.String:
+		return []string{iVal.(string)}, nil
+	case reflect.Struct:
+		rv := make([]string, 0)
+		for i := 0; i < v.NumField(); i++ {
+			nestedV := v.Field(i)
+			vType := v.Type()
+			nestedVStructField := vType.Field(i)
+			if nestedVStructField.PkgPath != "" {
+				continue
+			}
+			nestedIVal := nestedV.Interface()
+			nestedStrings, err := fieldsAsStringValues(nestedIVal)
+			if err != nil {
+				return []string{}, err
+			}
+			rv = append(rv, nestedStrings...)
+		}
+		return rv, nil
+	case reflect.Slice:
+		rv := make([]string, 0)
+		for i := 0; i < v.Len(); i++ {
+			nestedV := v.Index(i)
+
+			nestedIVal := nestedV.Interface()
+
+			nestedStrings, err := fieldsAsStringValues(nestedIVal)
+			if err != nil {
+				return []string{}, err
+			}
+			rv = append(rv, nestedStrings...)
+		}
+		return rv, nil
+	default:
+		return []string{}, errors.New("unsupported kind")
+	}
+}
+
+func stringToUniqRunes(str string) ([]rune, error) {
+	rdr := strings.NewReader(str)
+	rv := make([]rune, 0)
+	for {
+		ch, _, err := rdr.ReadRune()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		runeSeen := false
+		for _, ech := range rv {
+			if ech == ch {
+				runeSeen = true
+				break
+			}
+		}
+		if !runeSeen {
+			rv = append(rv, ch)
+		}
+	}
+	return rv, nil
+}
+
+// set-ification with union operation
+func mergeAndUniqifyRunes(runesArrs ...string) (string, error) {
+	var rv strings.Builder
+	for _, runesStr := range runesArrs {
+		runes := make([]rune, 0)
+		rdr := strings.NewReader(runesStr)
+		for {
+			ch, _, err := rdr.ReadRune()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return "", err
+			}
+			runes = append(runes, ch)
+		}
+		for _, runeNew := range runes {
+			runeSeen := false
+			rvrdr := strings.NewReader(rv.String())
+ 			for {
+				runeExist, _, err := rvrdr.ReadRune()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return "", err
+				}
+				if runeNew == runeExist {
+					runeSeen = true
+					break
+				}
+			}
+			if !runeSeen {
+				_, err := rv.WriteRune(runeNew)
+				if err != nil {
+					return "", err
+				}
+			}
+		}
+	}
+	return rv.String(), nil
+}
+
+// actually deterministic, despite name
+func randCharNotInString(str string) (string, error) {
+	runes, err := stringToUniqRunes(str)
+	if err != nil {
+		return "", err
+	}
+	addRune := '0'
+	for {
+		runeSeen := false
+		for _, cr := range runes {
+			if cr == addRune {
+				runeSeen = true
+				break
+			}
+		}
+		if !runeSeen {
+			break
+		}
+		addRune += 1
+	}
+	var rb strings.Builder
+	_, err = rb.WriteRune(addRune)
+	if err != nil {
+		return "", err
+	}
+	return rb.String(), nil
+}
+
+func charsInFuseParams(fuseParams FUSEParams) (string, error) {
+	stringVals, err := fieldsAsStringValues(fuseParams)
+	if err != nil {
+		return "", err
+	}
+	return mergeAndUniqifyRunes(stringVals...)
+}
+
+func setSeparators(fuseParams FUSEParams) error {
+	var err error
+	stringVals, err := fieldsAsStringValues(fuseParams)
+	if err != nil {
+		return err
+	}
+	invalidSeps, err := mergeAndUniqifyRunes(stringVals...)
+	if err != nil {
+		return err
+	}
+	itemSep, err = randCharNotInString(invalidSeps)
+	if err != nil {
+		return err
+	}
+	invalidSeps += itemSep
+	kvSep, err = randCharNotInString(invalidSeps)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func FUSEParamsToEnvVars(fuseParams FUSEParams) (map[string]string, error) {
 	rv := make(map[string]string)
+	err := setSeparators(fuseParams)
+	if err != nil {
+		return rv, fmt.Errorf("bundles' parameters: %v", err)
+	}
 	bundleStrings, err := fuseParamsBundleStrings(fuseParams)
 	if err != nil {
 		return rv, fmt.Errorf("bundles' parameters: %v", err)
@@ -166,4 +352,9 @@ func FUSEParamsToEnvVars(fuseParams FUSEParams) (map[string]string, error) {
 // todo: PG sidecar after FUSE sidecar
 type PGParams struct {
 	_                      struct{}
+}
+
+func init() {
+	itemSep = ";"
+	kvSep = ":"
 }
