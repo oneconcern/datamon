@@ -30,6 +30,7 @@ type fuseParamsBundleParams struct{
 	DestRepo string `json:"destRepo" yaml:"destRepo"`
 	DestMessage string `json:"destMessage" yaml:"destMessage"`
 	DestLabel string `json:"destLabel" yaml:"destLabel"`
+	DestBundleID string `json:"destBundleID" yaml:"destBundleID"`
 	_ struct{}
 }
 
@@ -42,8 +43,6 @@ type FUSEParams struct {
 			Email string `json:"email" yaml:"email"`
 			_ struct{}
 		} `json:"contributor" yaml:"contributor"`
-		// todo: this was *never* a good idea [as a global parameter]...
-		BundleID string `json:"bundleID" yaml:"bundleID"`
 		_ struct{}
 	} `json:"globalOpts" yaml:"globalOpts"`
 	Bundles []fuseParamsBundleParams `json:"bundles" yaml:"bundles"`
@@ -75,10 +74,6 @@ func fuseParamsGlobalString(fuseParams FUSEParams) (string, error) {
 		return rv, errors.New("coordination point not set")
 	}
 	rv, err = appendToParamString(rv, "c", fuseParams.Globals.CoordPoint)
-	if err != nil {
-		return rv, err
-	}
-	rv, err = appendToParamString(rv, "i", fuseParams.Globals.BundleID)
 	if err != nil {
 		return rv, err
 	}
@@ -130,6 +125,10 @@ func fuseParamsBundleString(bundleParams fuseParamsBundleParams) (string, error)
 		return rv, err
 	}
 	rv, err = appendToParamString(rv, "dl", bundleParams.DestLabel)
+	if err != nil {
+		return rv, err
+	}
+	rv, err = appendToParamString(rv, "dif", bundleParams.DestBundleID)
 	if err != nil {
 		return rv, err
 	}

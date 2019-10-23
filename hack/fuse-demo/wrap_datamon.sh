@@ -24,7 +24,6 @@ POLL_INTERVAL=1 # sec
 #####
 
 typeset COORD_POINT
-typeset BUNDLE_ID_FILE
 
 SLEEP_INSTEAD_OF_EXIT=
 
@@ -135,9 +134,9 @@ if [[ -n $opts_global_dict[n] || -n $opts_global_dict[e] ]]; then
                     --email $opts_global_dict[e] \
                )
 fi
-if [[ -n $opts_global_dict[i] ]]; then
-    BUNDLE_ID_FILE=$opts_global_dict[i]
-fi
+# if [[ -n $opts_global_dict[i] ]]; then
+#     BUNDLE_ID_FILE=$opts_global_dict[i]
+# fi
 if [[ -n $opts_global_dict[c] ]]; then
     COORD_POINT=$opts_global_dict[c]
 fi
@@ -152,6 +151,7 @@ typeset -A DATAMON_DEST_PATHS
 typeset -A DATAMON_DEST_REPOS
 typeset -A DATAMON_DEST_MSGS
 typeset -A DATAMON_DEST_LABELS
+typeset -A DATAMON_DEST_BUNDLE_ID_FILES
 # src
 typeset -A DATAMON_SRC_PATHS
 typeset -A DATAMON_SRC_REPOS
@@ -166,6 +166,7 @@ for dm_v_id in ${(k)dm_fuse_opts_bds}; do
     DATAMON_DEST_REPOS[$dm_v_id]=$bd_opts_dict[dr]
     DATAMON_DEST_MSGS[$dm_v_id]=$bd_opts_dict[dm]
     DATAMON_DEST_LABELS[$dm_v_id]=$bd_opts_dict[dl]
+    DATAMON_DEST_BUNDLE_ID_FILES[$dm_v_id]=$bd_opts_dict[dif]
     DATAMON_SRC_PATHS[$dm_v_id]=$bd_opts_dict[sp]
     DATAMON_SRC_REPOS[$dm_v_id]=$bd_opts_dict[sr]
     DATAMON_SRC_BUNDLES[$dm_v_id]=$bd_opts_dict[sb]
@@ -238,24 +239,29 @@ fi
 
 print -- 'internal data structures verified'
 
-if [[ -n "$BUNDLE_ID_FILE" ]]; then
-    bundle_id_file_dir=$(dirname "$BUNDLE_ID_FILE")
-    if [[ ! -d "$bundle_id_file_dir" ]]; then
-        mkdir -p "$bundle_id_file_dir"
-    fi
-    if [[ -f "$BUNDLE_ID_FILE" ]]; then
-        terminate "$BUNDLE_ID_FILE already exists"
-    fi
-    typeset -i num_upload_cmds
-    for dm_v_id in $SIDECAR_VERTEX_IDS; do
-        if [[ -n ${DATAMON_DEST_PATHS[$dm_v_id]} ]]; then
-            ((num_upload_cmds++)) || true
+for dm_v_id in $SIDECAR_VERTEX_IDS; do
+    BUNDLE_ID_FILE=$DATAMON_DEST_BUNDLE_ID_FILES[$dm_v_id]
+    if [[ -n "$BUNDLE_ID_FILE" ]]; then
+        bundle_id_file_dir=$(dirname "$BUNDLE_ID_FILE")
+        if [[ ! -d "$bundle_id_file_dir" ]]; then
+            mkdir -p "$bundle_id_file_dir"
         fi
-    done
-    if [[ ! $num_upload_cmds -eq 1 ]]; then
-        terminate "expected precisley one upload command when bundle id file specified"
+        if [[ -f "$BUNDLE_ID_FILE" ]]; then
+            terminate "$BUNDLE_ID_FILE already exists"
+        fi
+
+        # typeset -i num_upload_cmds
+        # for dm_v_id in $SIDECAR_VERTEX_IDS; do
+        #     if [[ -n ${DATAMON_DEST_PATHS[$dm_v_id]} ]]; then
+        #         ((num_upload_cmds++)) || true
+        #     fi
+        # done
+        # if [[ ! $num_upload_cmds -eq 1 ]]; then
+        #     terminate "expected precisley one upload command when bundle id file specified"
+        # fi
+
     fi
-fi
+done
 
 #####
 
@@ -438,10 +444,13 @@ for dm_v_id in $SIDECAR_VERTEX_IDS; do
         exit 1
     fi
     dbg_print "upload command had nominal status"
+
+    BUNDLE_ID_FILE=$DATAMON_DEST_BUNDLE_ID_FILES[$dm_v_id]
     if [[ -n $BUNDLE_ID_FILE ]]; then
         if [[ -f "$BUNDLE_ID_FILE" ]]; then
             terminate "$BUNDLE_ID_FILE already exists"
         fi
+        # extracting bundle id from log (could be cleaner :/ error handling
         dbg_print "getting bundle id lines"
         unsetopt ERR_EXIT
         bundle_id_lines=$(cat "$log_file_upload" | grep 'Uploaded bundle id')

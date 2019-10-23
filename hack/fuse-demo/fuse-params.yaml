@@ -4,7 +4,6 @@ globalOpts:
   contributor:
     name: "Coord"
     email: "coord-bot@oneconcern.com"
-  bundleID: "/tmp/bundleid.txt"
 bundles:
   - name: "src"
     srcPath: "/tmp/mount"
@@ -15,3 +14,4 @@ bundles:
     destRepo: "ransom-datamon-test-repo"
     destMessage: "result of container coordination demo"
     destLabel: "coordemo"
+    destBundleID: "/tmp/bundleid.txt"
