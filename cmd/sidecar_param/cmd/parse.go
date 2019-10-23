@@ -18,41 +18,30 @@ var repoCreate = &cobra.Command{
 The UI likely needs to bifurcate along various directions,
 and the option and verb combinations remains to resolve.
 `,
-// todo: fmt.Errorf() to concat errors throughout
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 		var inputBuffer []byte
 		var fuseParams param.FUSEParams
-
 		inputBuffer, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			terminate(err)
+			terminate(fmt.Errorf("read input from stdin: %v", err))
 		}
-
 		err = yaml.Unmarshal(inputBuffer, &fuseParams)
 		if err != nil {
-			terminate(err)
+			terminate(fmt.Errorf("deserialize parameters for sidecar: %v", err))
 		}
-
-//		fmt.Printf("parsed:\n %v\n", fuseParams)
-
 		envVars, err := param.FUSEParamsToEnvVars(fuseParams)
 		if err != nil {
-			terminate(err)
+			terminate(fmt.Errorf("serialize parameters as environment variables: %v", err))
 		}
-
 		for varName, varVal := range envVars {
 			fmt.Printf("export %s='%s'\n", varName, varVal)
 		}
-
 	},
 }
 
 func init() {
 	requiredFlags := []string{}
-
-//	requiredFlags = append(requiredFlags, addRepoDescription(repoCreate))
-
 
 	for _, flag := range requiredFlags {
 		err := repoCreate.MarkFlagRequired(flag)

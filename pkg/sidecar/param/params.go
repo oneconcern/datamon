@@ -3,6 +3,7 @@ package param
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -49,9 +50,7 @@ type FUSEParams struct {
 	_ struct{}
 }
 
-// todo: serialize to .conf file(s)
-
-// todo: chain errors with fmt.Errorf() throughout
+// todo: ingestion of parameters as multiple environment variables
 
 // todo: dynamic separators to allow arbitrary values not covering entire unicode plane
 func appendToParamString(paramString string, paramName string, paramVal string) (string, error) {
@@ -75,7 +74,7 @@ func fuseParamsGlobalString(fuseParams FUSEParams) (string, error) {
 	}
 	rv, err = appendToParamString(rv, "c", fuseParams.Globals.CoordPoint)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	if fuseParams.Globals.Contributor.Name != "" || fuseParams.Globals.Contributor.Email != "" {
 		if fuseParams.Globals.Contributor.Name == "" || fuseParams.Globals.Contributor.Email == "" {
@@ -83,11 +82,11 @@ func fuseParamsGlobalString(fuseParams FUSEParams) (string, error) {
 		}
 		rv, err = appendToParamString(rv, "e", fuseParams.Globals.Contributor.Email)
 		if err != nil {
-			return rv, err
+			return rv, fmt.Errorf("build parameter string: %v", err)
 		}
 		rv, err = appendToParamString(rv, "n", fuseParams.Globals.Contributor.Name)
 		if err != nil {
-			return rv, err
+			return rv, fmt.Errorf("build parameter string: %v", err)
 		}
 	}
 	return strings.TrimSuffix(rv, itemSep), nil
@@ -98,39 +97,39 @@ func fuseParamsBundleString(bundleParams fuseParamsBundleParams) (string, error)
 	rv := itemSep + kvSep
 	rv, err = appendToParamString(rv, "sp", bundleParams.SrcPath)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "sr", bundleParams.SrcRepo)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "sl", bundleParams.SrcLabel)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "sb", bundleParams.SrcBundle)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "dp", bundleParams.DestPath)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "dr", bundleParams.DestRepo)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "dm", bundleParams.DestMessage)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "dl", bundleParams.DestLabel)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	rv, err = appendToParamString(rv, "dif", bundleParams.DestBundleID)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("build parameter string: %v", err)
 	}
 	return strings.TrimSuffix(rv, itemSep), nil
 }
@@ -140,7 +139,7 @@ func fuseParamsBundleStrings(fuseParams FUSEParams) (map[string]string, error) {
 	for _, bundleParams := range fuseParams.Bundles {
 		bundleString, err := fuseParamsBundleString(bundleParams)
 		if err != nil {
-			return rv, err
+			return rv, fmt.Errorf("parameterize individual bundle: %v", err)
 		}
 		rv[bundleParams.Name] = bundleString
 	}
@@ -151,27 +150,20 @@ func FUSEParamsToEnvVars(fuseParams FUSEParams) (map[string]string, error) {
 	rv := make(map[string]string)
 	bundleStrings, err := fuseParamsBundleStrings(fuseParams)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("bundles' parameters: %v", err)
 	}
 	for bundleName, bundleString := range bundleStrings {
 		rv[bundleEnvVarPrefix + bundleName] = bundleString
 	}
 	globalString, err := fuseParamsGlobalString(fuseParams)
 	if err != nil {
-		return rv, err
+		return rv, fmt.Errorf("global parameters: %v", err)
 	}
 	rv[fuseGlobalsEnvVar] = globalString
 	return rv, nil
 }
 
-/*
-example of marshal/unmarshal using json/yaml
-	var bundleDescriptorBuffer []byte
-	err = yaml.Unmarshal(bundleDescriptorBuffer, &bundle.BundleDescriptor)
-	buffer, err := yaml.Marshal(bundle.BundleDescriptor)
-*/
-
-
+// todo: PG sidecar after FUSE sidecar
 type PGParams struct {
 	_                      struct{}
 }
