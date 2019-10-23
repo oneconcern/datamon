@@ -54,7 +54,11 @@ var osExit = os.Exit
 var infoLogger = log.New(os.Stdout, "", 0)
 
 func wrapFatalln(msg string, err error) {
-	logFatalf("%v", fmt.Errorf(msg+": %w", err))
+	if err == nil {
+		logFatalln(msg)
+	} else {
+		logFatalf("%v", fmt.Errorf(msg+": %w", err))
+	}
 }
 
 func wrapFatalWithCode(code int, format string, args ...interface{}) {
@@ -99,7 +103,8 @@ func initConfig() {
 	var err error
 	config, err = newConfig()
 	if err != nil {
-		logFatalln(err)
+		wrapFatalln("populate config struct", err)
+		return
 	}
 	config.setRepoParams(&params)
 	if config.Credential != "" {

@@ -15,16 +15,19 @@ var bundleDownloadFileCmd = &cobra.Command{
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		destinationStore, err := paramsToDestStore(params, destTMaybeNonEmpty, "")
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create destination store", err)
+			return
 		}
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("determine bundle id", err)
+			return
 		}
 		bd := core.NewBDescriptor()
 		bundle := core.New(bd,
@@ -37,7 +40,8 @@ var bundleDownloadFileCmd = &cobra.Command{
 
 		err = core.PublishFile(ctx, bundle, params.bundle.File)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("publish bundle", err)
+			return
 		}
 	},
 }
@@ -56,7 +60,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := bundleDownloadFileCmd.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

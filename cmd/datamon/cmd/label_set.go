@@ -16,11 +16,13 @@ var SetLabelCommand = &cobra.Command{
 		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("populate contributor struct", err)
+			return
 		}
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		bundle := core.New(core.NewBDescriptor(),
 			core.Repo(params.repo.RepoName),
@@ -29,10 +31,12 @@ var SetLabelCommand = &cobra.Command{
 		)
 		bundleExists, err := bundle.Exists(ctx)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("poll for bundle existence", err)
+			return
 		}
 		if !bundleExists {
-			logFatalln(fmt.Errorf("bundle %v not found", bundle))
+			wrapFatalln(fmt.Sprintf("bundle %v not found", bundle), nil)
+			return
 		}
 		labelDescriptor := core.NewLabelDescriptor(
 			core.LabelContributor(contributor),
@@ -42,7 +46,8 @@ var SetLabelCommand = &cobra.Command{
 		)
 		err = label.UploadDescriptor(ctx, bundle)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("upload label", err)
+			return
 		}
 	},
 }
@@ -56,7 +61,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := SetLabelCommand.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

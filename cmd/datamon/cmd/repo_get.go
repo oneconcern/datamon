@@ -3,9 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -23,23 +21,25 @@ exits with ENOENT status otherwise.`,
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		repoDescriptor, err := core.GetRepoDescriptorByRepoName(
 			remoteStores.meta, params.repo.RepoName)
 		if err == core.ErrNotFound {
-			fmt.Fprintf(os.Stderr, "didn't find repo '%v'\n", params.repo.RepoName)
-			osExit(int(unix.ENOENT))
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find repo '%v'", params.repo.RepoName)
 			return
 		}
 		if err != nil {
-			logFatalf("error downloading repo information: %v\n", err)
+			wrapFatalln("error downloading repo information", err)
+			return
 		}
 
 		var buf bytes.Buffer
 		err = repoDescriptorTemplate.Execute(&buf, repoDescriptor)
 		if err != nil {
-			log.Println("executing template:", err)
+			wrapFatalln("executing template", err)
+			return
 		}
 		log.Println(buf.String())
 	},
@@ -51,7 +51,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := GetRepoCommand.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

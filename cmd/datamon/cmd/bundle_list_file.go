@@ -17,11 +17,13 @@ var bundleFileList = &cobra.Command{
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("determine bundle id", err)
+			return
 		}
 		bundle := core.New(core.NewBDescriptor(),
 			core.Repo(params.repo.RepoName),
@@ -30,7 +32,8 @@ var bundleFileList = &cobra.Command{
 		)
 		err = core.PopulateFiles(context.Background(), bundle)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("download filelist", err)
+			return
 		}
 		for _, e := range bundle.BundleEntries {
 			log.Printf("name:%s, size:%d, hash:%s", e.NameWithPath, e.Size, e.Hash)
@@ -53,7 +56,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 	BundleListCommand.AddCommand(bundleFileList)

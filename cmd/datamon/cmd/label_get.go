@@ -3,9 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -23,7 +21,8 @@ exits with ENOENT status otherwise.`,
 		ctx := context.Background()
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("create remote stores", err)
+			return
 		}
 		bundle := core.New(core.NewBDescriptor(),
 			core.Repo(params.repo.RepoName),
@@ -34,12 +33,12 @@ exits with ENOENT status otherwise.`,
 		)
 		err = label.DownloadDescriptor(ctx, bundle, true)
 		if err == core.ErrNotFound {
-			fmt.Fprintf(os.Stderr, "didn't find label '%v'\n", params.label.Name)
-			osExit(int(unix.ENOENT))
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", params.label.Name)
 			return
 		}
 		if err != nil {
-			logFatalf("error downloading label information: %v\n", err)
+			wrapFatalln("error downloading label information", err)
+			return
 		}
 
 		var buf bytes.Buffer
@@ -60,7 +59,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := GetLabelCommand.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 

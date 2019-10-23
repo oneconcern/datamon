@@ -20,7 +20,8 @@ var mutableMountBundleCmd = &cobra.Command{
 		ctx := context.Background()
 		contributor, err := paramsToContributor(params)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("populate contributor struct", err)
+			return
 		}
 		// cf. comments on runDaemonized in bundle_mount.go
 		if params.bundle.Daemonize {
@@ -29,11 +30,13 @@ var mutableMountBundleCmd = &cobra.Command{
 		}
 		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
 		if err != nil {
-			onDaemonError(err)
+			onDaemonError("create remote stores", err)
+			return
 		}
 		consumableStore, err := paramsToSrcStore(ctx, params, true)
 		if err != nil {
-			onDaemonError(err)
+			onDaemonError("create source store", err)
+			return
 		}
 
 		bd := core.NewBDescriptor(
@@ -48,21 +51,26 @@ var mutableMountBundleCmd = &cobra.Command{
 		)
 		fs, err := core.NewMutableFS(bundle, params.bundle.DataPath)
 		if err != nil {
-			onDaemonError(err)
+			onDaemonError("create mutable filesystem", err)
+			return
 		}
 		err = fs.MountMutable(params.bundle.MountPath)
 		if err != nil {
-			onDaemonError(err)
+			onDaemonError("mount mutable filesystem", err)
+			return
 		}
 		registerSIGINTHandlerMount(params.bundle.MountPath)
 		if err = daemonizer.SignalOutcome(nil); err != nil {
-			logFatalln(err)
+			wrapFatalln("send event from possibly daemonized process", err)
+			return
 		}
 		if err = fs.JoinMount(ctx); err != nil {
-			logFatalln(err)
+			wrapFatalln("block on os mount", err)
+			return
 		}
 		if err = fs.Commit(); err != nil {
-			logFatalln(err)
+			wrapFatalln("upload bundle from mutable fs", err)
+			return
 		}
 		infoLogger.Printf("bundle: %v", bundle.BundleID)
 	},
@@ -81,7 +89,8 @@ func init() {
 	for _, flag := range requiredFlags {
 		err := mutableMountBundleCmd.MarkFlagRequired(flag)
 		if err != nil {
-			logFatalln(err)
+			wrapFatalln("mark required flag", err)
+			return
 		}
 	}
 
