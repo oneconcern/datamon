@@ -1,5 +1,8 @@
 #! /bin/zsh
 
+setopt ERR_EXIT
+setopt PIPE_FAIL
+
 #####
 
 ### util
@@ -9,10 +12,14 @@ terminate() {
     exit 1
 }
 
-#####
+dbg_print() {
+    typeset dbg=true
+    if $dbg; then
+        print -- $*
+    fi
+}
 
-setopt ERR_EXIT
-setopt PIPE_FAIL
+#####
 
 POLL_INTERVAL=1 # sec
 
@@ -62,6 +69,43 @@ SLEEP_INSTEAD_OF_EXIT=
 
 ##
 
+deserialize_dict() {
+    local item_sep
+    local kv_sep
+    local input_val
+    typeset -A output_dict
+    #
+    local input_str
+    local dict_name
+    input_str=$1
+    dict_name=$2
+    #
+    item_sep=$(print -- $input_str |sed 's/^\(.\).*$/\1/')
+    kv_sep=$(print -- $input_str |sed 's/^.\(.\).*$/\1/')
+    if [[ $item_sep = '.' ]]; then
+        terminate "'.' is not a valid parameter seperator"
+    fi
+    if [[ $kv_sep = '.' ]]; then
+        terminate "'.' is not a valid parameter seperator"
+    fi
+    input_val=$(print -- $input_str |sed 's/^..\(.*\)$/\1/')
+    items=(${(ps.$item_sep.)input_val})
+    for item in $items; do
+        opt=$(print -- $item |cut -d $kv_sep -f 1)
+        if print -- $item |grep -q $kv_sep; then
+            arg=$(print -- $item |cut -d $kv_sep -f 2)
+        else
+            arg=true
+        fi
+        output_dict[$opt]=$arg
+    done
+    if [[ -z $dict_name ]]; then
+        print -r -- ${(qkv)output_dict}
+    else
+        eval "${dict_name}=($(print -r -- ${(qkv)output_dict}))"
+    fi
+}
+
 # parse labels into internal data structures,
 # encapsulating kubernetes upward api details
 typeset dm_pg_opts_global
@@ -90,40 +134,22 @@ for env_var_name in ${(k)env_vars}; do
     fi
 done
 
-# dbg
-print "have global option string $dm_pg_opts_global"
-print 'and local options'
-for k in ${(k)dm_pg_opts_dbs}; do
-    print -- "$k : $dm_pg_opts_dbs[$k]"
-done
-#
-
 # parse global opts data structure
-if [[ -z $dm_pg_opts_global ]]; then
-    terminate "didn't see global opts label"
-fi
-item_sep=$(print -- $dm_pg_opts_global |sed 's/^\(.\).*$/\1/')
-kv_sep=$(print -- $dm_pg_opts_global |sed 's/^.\(.\).*$/\1/')
-if [[ $item_sep = '.' ]]; then
-    terminate "'.' is not a valid parameter seperator"
-fi
-if [[ $kv_sep = '.' ]]; then
-    terminate "'.' is not a valid parameter seperator"
-fi
-dm_pg_opts_global_val=$(print -- $dm_pg_opts_global |sed 's/^..\(.*\)$/\1/')
-dm_pg_opts_global_items=(${(ps.$item_sep.)dm_pg_opts_global_val})
-for item in $dm_pg_opts_global_items; do
-    opt=$(print -- $item |cut -d $kv_sep -f 1)
-    arg=$(print -- $item |cut -d $kv_sep -f 2)
+
+typeset -A opts_global_dict
+deserialize_dict $dm_pg_opts_global opts_global_dict
+
+for opt in ${(k)opts_global_dict}; do
+    arg=$opts_global_dict[$opt]
     case $opt in
         (S)
             SLEEP_INSTEAD_OF_EXIT=true
             ;;
         (V)
-            IGNORE_VERSION_MISMATCH="$arg"
+            IGNORE_VERSION_MISMATCH=$arg
             ;;
         (c)
-            COORD_POINT="$arg"
+            COORD_POINT=$arg
             ;;
         (\?)
             terminate "unknown global option '$opt'"
@@ -133,116 +159,21 @@ done
 
 for pg_db_id in ${(k)dm_pg_opts_dbs}; do
     PG_DB_IDS=($PG_DB_IDS $pg_db_id)
-    dm_pg_opts_db=$dm_pg_opts_dbs[$pg_db_id]
-    item_sep=$(print -- $dm_pg_opts_db |sed 's/^\(.\).*$/\1/')
-    kv_sep=$(print -- $dm_pg_opts_db |sed 's/^.\(.\).*$/\1/')
-    if [[ $item_sep = '.' ]]; then
-        terminate "'.' is not a valid parameter seperator"
+    typeset -A db_opts_dict
+    deserialize_dict ${dm_pg_opts_dbs[$pg_db_id]} db_opts_dict
+    PG_DB_PORTS[$pg_db_id]=$db_opts_dict[p]
+    PG_DB_MSGS[$pg_db_id]=$db_opts_dict[m]
+    PG_DB_LABELS[$pg_db_id]=$db_opts_dict[l]
+    PG_DB_REPOS[$pg_db_id]=$db_opts_dict[r]
+    PG_DB_SRC_LABELS[$pg_db_id]=$db_opts_dict[sl]
+    PG_DB_SRC_REPOS[$pg_db_id]=$db_opts_dict[sr]
+    PG_DB_SRC_BUNDLES[$pg_db_id]=$db_opts_dict[sb]
+    if [[ -n $PG_DB_SRC_LABELS[$pg_db_id] || \
+              -n $PG_DB_SRC_REPOS[$pg_db_id] || \
+              -n $PG_DB_SRC_BUNDLES[$pg_db_id] ]]; then
+        PG_DB_HAS_SRC[$pg_db_id]=true
     fi
-    if [[ $kv_sep = '.' ]]; then
-        terminate "'.' is not a valid parameter seperator"
-    fi
-    dm_pg_opts_db_val=$(print -- $dm_pg_opts_db |sed 's/^..\(.*\)$/\1/')
-    dm_pg_opts_db_items=(${(ps.$item_sep.)dm_pg_opts_db_val})
-    for item in $dm_pg_opts_db_items; do
-        opt=$(print -- $item |cut -d $kv_sep -f 1)
-        arg=$(print -- $item |cut -d $kv_sep -f 2)
-        case $opt in
-            (p)
-                PG_DB_PORTS[$pg_db_id]="$arg"
-                ;;
-            (m)
-                PG_DB_MSGS[$pg_db_id]="$arg"
-                ;;
-            (l)
-                PG_DB_LABELS[$pg_db_id]="$arg"
-                ;;
-            (r)
-                PG_DB_REPOS[$pg_db_id]="$arg"
-                ;;
-            (sl)
-                PG_DB_HAS_SRC[$pg_db_id]=true
-                PG_DB_SRC_LABELS[$pg_db_id]="$arg"
-                ;;
-            (sr)
-                PG_DB_HAS_SRC[$pg_db_id]=true
-                PG_DB_SRC_REPOS[$pg_db_id]="$arg"
-                ;;
-            (sb)
-                PG_DB_HAS_SRC[$pg_db_id]=true
-                PG_DB_SRC_BUNDLES[$pg_db_id]="$arg"
-                ;;
-            (\?)
-                terminate "unknown db option '$opt'"
-                ;;
-        esac
-    done
 done
-
-##
-
-cliopts() {
-    while getopts SV:c:xsm:l:r:b:p: opt; do
-        case $opt in
-            (S)
-                SLEEP_INSTEAD_OF_EXIT=true
-                ;;
-            (V)
-                IGNORE_VERSION_MISMATCH="$OPTARG"
-                ;;
-            (c)
-                COORD_POINT="$OPTARG"
-                ;;
-            (x)
-                ((pg_db_idx++)) || true
-                pg_db_id="db_${pg_db_idx}"
-                PG_DB_IDS=($PG_DB_IDS $pg_db_id)
-                ;;
-            (s)
-                PG_DB_HAS_SRC[$pg_db_id]=true
-                ;;
-            (p)
-                PG_DB_PORTS[$pg_db_id]="$OPTARG"
-                ;;
-            (m)
-                if [[ -n ${PG_DB_HAS_SRC[$pg_db_id]} ]]; then
-                    terminate "messages aren't written to source"
-                fi
-                PG_DB_MSGS[$pg_db_id]="$OPTARG"
-                ;;
-            (l)
-                if [[ -z ${PG_DB_HAS_SRC[$pg_db_id]} ]]; then
-                    PG_DB_LABELS[$pg_db_id]="$OPTARG"
-                else
-                    PG_DB_SRC_LABELS[$pg_db_id]="$OPTARG"
-                fi
-                ;;
-            (r)
-                if [[ -z ${PG_DB_HAS_SRC[$pg_db_id]} ]]; then
-                    PG_DB_REPOS[$pg_db_id]="$OPTARG"
-                else
-                    PG_DB_SRC_REPOS[$pg_db_id]="$OPTARG"
-                fi
-                ;;
-            (b)
-                if [[ -z ${PG_DB_HAS_SRC[$pg_db_id]} ]]; then
-                    terminate \
-                        "bundle flag is only meaningful when specifying source"
-                fi
-                PG_DB_SRC_BUNDLES[$pg_db_id]="$OPTARG"
-                ;;
-            (\?)
-                print -- "Bad option, aborting."
-                exit 1
-                ;;
-        esac
-    done
-    if [[ "$OPTIND" -gt 1 ]]; then
-        shift $(( OPTIND - 1 ))
-    fi
-}
-
-# cliopts
 
 ##
 
@@ -302,13 +233,6 @@ emit_event() {
     DBG_MSG="$2"
     echo "$DBG_MSG"
     touch "${COORD_POINT}/${EVENT_NAME}"
-}
-
-dbg_print() {
-    typeset dbg=true
-    if $dbg; then
-        print -- $*
-    fi
 }
 
 slay() {
