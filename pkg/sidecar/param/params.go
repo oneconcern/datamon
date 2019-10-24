@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"strconv"
 )
 
 var itemSep string
@@ -15,6 +16,8 @@ var kvSep string
 const (
 	fuseGlobalsEnvVar = "dm_fuse_opts"
 	bundleEnvVarPrefix = "dm_fuse_bd_"
+	pgGlobalsEnvVar = "dm_pg_opts"
+	dbEnvVarPrefix = "dm_pg_db_"
 )
 
 func containsSep(val string) bool {
@@ -298,9 +301,9 @@ func charsInFuseParams(fuseParams FUSEParams) (string, error) {
 	return mergeAndUniqifyRunes(stringVals...)
 }
 
-func setSeparators(fuseParams FUSEParams) error {
+func setSeparators(paramsStruct interface{}) error {
 	var err error
-	stringVals, err := fieldsAsStringValues(fuseParams)
+	stringVals, err := fieldsAsStringValues(paramsStruct)
 	if err != nil {
 		return err
 	}
@@ -341,9 +344,147 @@ func FUSEParamsToEnvVars(fuseParams FUSEParams) (map[string]string, error) {
 	return rv, nil
 }
 
+type pgParamsDBParams struct{
+	Name string `json:"name" yaml:"name"`
+	Port int `json:"pgPort" yaml:"pgPort"`
+	DestRepo string `json:"destRepo" yaml:"destRepo"`
+	DestMessage string `json:"destMessage" yaml:"destMessage"`
+	DestLabel string `json:"destLabel" yaml:"destLabel"`
+	SrcRepo string `json:"srcRepo" yaml:"srcRepo"`
+	SrcLabel string `json:"srcLabel" yaml:"srcLabel"`
+	SrcBundle string `json:"srcBundle" yaml:"srcBundle"`
+	_ struct{}
+}
+
 // todo: PG sidecar after FUSE sidecar
 type PGParams struct {
-	_                      struct{}
+	Globals struct{
+		SleepInsteadOfExit bool `json:"sleepInsteadOfExit" yaml:"sleepInsteadOfExit"`
+		IgnorePGVersionMismatch bool `json:"ignorePGVersionMismatch" yaml:"ignorePGVersionMismatch"`
+		CoordPoint string `json:"coordPoint" yaml:"coordPoint"`
+		// todo: pass contributor information into script
+/*
+		Contributor struct{
+			Name string `json:"name" yaml:"name"`
+			Email string `json:"email" yaml:"email"`
+			_ struct{}
+		} `json:"contributor" yaml:"contributor"`
+*/
+		_ struct{}
+	} `json:"globalOpts" yaml:"globalOpts"`
+	Databases []pgParamsDBParams `json:"databases" yaml:"databases"`
+	_ struct{}
+}
+
+
+func pgParamsGlobalString(pgParams PGParams) (string, error) {
+	var err error
+	rv := itemSep + kvSep
+	if pgParams.Globals.SleepInsteadOfExit {
+		rv += "S" + itemSep
+	}
+	if pgParams.Globals.CoordPoint == "" {
+		return rv, errors.New("coordination point not set")
+	}
+	rv, err = appendToParamString(rv, "c", pgParams.Globals.CoordPoint)
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	if pgParams.Globals.IgnorePGVersionMismatch {
+		rv, err = appendToParamString(rv, "V", "true")
+		if err != nil {
+			return rv, fmt.Errorf("build parameter string: %v", err)
+		}
+	} else {
+		rv, err = appendToParamString(rv, "V", "false")
+		if err != nil {
+			return rv, fmt.Errorf("build parameter string: %v", err)
+		}
+	}
+/*
+	if pgParams.Globals.Contributor.Name != "" || pgParams.Globals.Contributor.Email != "" {
+		if pgParams.Globals.Contributor.Name == "" || pgParams.Globals.Contributor.Email == "" {
+			return rv, errors.New("contributor name and email must be set together or not at all")
+		}
+		rv, err = appendToParamString(rv, "e", pgParams.Globals.Contributor.Email)
+		if err != nil {
+			return rv, fmt.Errorf("build parameter string: %v", err)
+		}
+		rv, err = appendToParamString(rv, "n", pgParams.Globals.Contributor.Name)
+		if err != nil {
+			return rv, fmt.Errorf("build parameter string: %v", err)
+		}
+	}
+*/
+	return strings.TrimSuffix(rv, itemSep), nil
+}
+
+func pgParamsDatabaseString(dbParams pgParamsDBParams) (string, error) {
+	var err error
+	rv := itemSep + kvSep
+	rv, err = appendToParamString(rv, "p", strconv.Itoa(dbParams.Port))
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	rv, err = appendToParamString(rv, "m", dbParams.DestMessage)
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	rv, err = appendToParamString(rv, "l", dbParams.DestLabel)
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	rv, err = appendToParamString(rv, "r", dbParams.DestRepo)
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	rv, err = appendToParamString(rv, "sl", dbParams.SrcLabel)
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	rv, err = appendToParamString(rv, "sr", dbParams.SrcRepo)
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	rv, err = appendToParamString(rv, "sb", dbParams.SrcBundle)
+	if err != nil {
+		return rv, fmt.Errorf("build parameter string: %v", err)
+	}
+	return strings.TrimSuffix(rv, itemSep), nil
+}
+
+func pgParamsDatabaseStrings(pgParams PGParams) (map[string]string, error) {
+	rv := make(map[string]string)
+	for _, dbParams := range pgParams.Databases {
+		dbString, err := pgParamsDatabaseString(dbParams)
+		if err != nil {
+			return rv, fmt.Errorf("parameterize individual database: %v", err)
+		}
+		rv[dbParams.Name] = dbString
+	}
+	return rv, nil
+}
+
+
+func PGParamsToEnvVars(pgParams PGParams) (map[string]string, error) {
+	rv := make(map[string]string)
+	err := setSeparators(pgParams)
+	if err != nil {
+		return rv, fmt.Errorf("dbs' parameters: %v", err)
+	}
+	dbStrings, err := pgParamsDatabaseStrings(pgParams)
+	if err != nil {
+		return rv, fmt.Errorf("dbs' parameters: %v", err)
+	}
+	for dbName, dbString := range dbStrings {
+		rv[dbEnvVarPrefix + dbName] = dbString
+	}
+	globalString, err := pgParamsGlobalString(pgParams)
+	if err != nil {
+		return rv, fmt.Errorf("global parameters: %v", err)
+	}
+	rv[pgGlobalsEnvVar] = globalString
+	return rv, nil
 }
 
 func init() {
