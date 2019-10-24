@@ -96,7 +96,11 @@ deserialize_dict() {
         fi
         output_dict[$opt]=$arg
     done
-    print -- ${(kv)output_dict}
+    if [[ -z $dict_name ]]; then
+        print -r -- ${(qkv)output_dict}
+    else
+        eval "${dict_name}=($(print -r -- ${(qkv)output_dict}))"
+    fi
 }
 
 typeset dm_fuse_opts_global
@@ -132,7 +136,7 @@ done
 typeset -a CFG_PARAMS
 
 typeset -A opts_global_dict
-opts_global_dict=($(deserialize_dict $dm_fuse_opts_global))
+deserialize_dict $dm_fuse_opts_global opts_global_dict
 
 if [[ -n $opts_global_dict[n] || -n $opts_global_dict[e] ]]; then
     if [[ -z $opts_global_dict[n] || -z $opts_global_dict[e] ]]; then
@@ -167,7 +171,7 @@ typeset -A DATAMON_SRC_LABELS
 typeset -A bd_opts_dict
 for dm_v_id in ${(k)dm_fuse_opts_bds}; do
     SIDECAR_VERTEX_IDS=($SIDECAR_VERTEX_IDS $dm_v_id)
-    bd_opts_dict=($(deserialize_dict ${dm_fuse_opts_bds[$dm_v_id]}))
+    deserialize_dict ${dm_fuse_opts_bds[$dm_v_id]} bd_opts_dict
     DATAMON_DEST_PATHS[$dm_v_id]=$bd_opts_dict[dp]
     DATAMON_DEST_REPOS[$dm_v_id]=$bd_opts_dict[dr]
     DATAMON_DEST_MSGS[$dm_v_id]=$bd_opts_dict[dm]
