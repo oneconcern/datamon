@@ -50,7 +50,7 @@ if [[ -n $dm_fuse_params ]]; then
         dm_fuse_params_val=$dm_fuse_params
     fi
     print -- $dm_fuse_params_val | \
-        datamon_sidecar_param parse > $env_vars_file
+        datamon_sidecar_param parse fuse > $env_vars_file
     . $env_vars_file
 fi
 
