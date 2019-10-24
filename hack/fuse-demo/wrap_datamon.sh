@@ -17,6 +17,13 @@ terminate() {
     exit 1
 }
 
+dbg_print() {
+    typeset dbg=true
+    if $dbg; then
+        print -- $*
+    fi
+}
+
 #####
 
 POLL_INTERVAL=1 # sec
@@ -36,8 +43,10 @@ if [[ -n $dm_fuse_params ]]; then
     typeset dm_fuse_params_val
     env_vars_file=/tmp/env_vars_from_params.sh
     if [[ -f $dm_fuse_params ]]; then
+        dbg_print "parsing parameters YAML file $dm_fuse_params"
         dm_fuse_params_val=$(cat $dm_fuse_params)
     else
+        dbg_print "parsing parameters YAML from env var"
         dm_fuse_params_val=$dm_fuse_params
     fi
     print -- $dm_fuse_params_val | \
@@ -249,17 +258,6 @@ for dm_v_id in $SIDECAR_VERTEX_IDS; do
         if [[ -f "$BUNDLE_ID_FILE" ]]; then
             terminate "$BUNDLE_ID_FILE already exists"
         fi
-
-        # typeset -i num_upload_cmds
-        # for dm_v_id in $SIDECAR_VERTEX_IDS; do
-        #     if [[ -n ${DATAMON_DEST_PATHS[$dm_v_id]} ]]; then
-        #         ((num_upload_cmds++)) || true
-        #     fi
-        # done
-        # if [[ ! $num_upload_cmds -eq 1 ]]; then
-        #     terminate "expected precisley one upload command when bundle id file specified"
-        # fi
-
     fi
 done
 
@@ -293,13 +291,6 @@ emit_event() {
     DBG_MSG="$2"
     echo "$DBG_MSG"
     touch "${COORD_POINT}/${EVENT_NAME}"
-}
-
-dbg_print() {
-    typeset dbg=true
-    if $dbg; then
-        print -- $*
-    fi
 }
 
 dbg_print "have zsh version $ZSH_VERSION"

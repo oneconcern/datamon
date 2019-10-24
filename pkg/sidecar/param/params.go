@@ -9,15 +9,8 @@ import (
 	"strings"
 )
 
-/*
-const (
-	itemSep = ";"
-	kvSep = ":"
-)
-*/
-
-var itemSep string // = ";"
-var kvSep string // = ":"
+var itemSep string
+var kvSep string
 
 const (
 	fuseGlobalsEnvVar = "dm_fuse_opts"
@@ -59,7 +52,6 @@ type FUSEParams struct {
 
 // todo: ingestion of parameters as multiple environment variables
 
-// todo: dynamic separators to allow arbitrary values not covering entire unicode plane
 func appendToParamString(paramString string, paramName string, paramVal string) (string, error) {
 	if paramVal == "" {
 		return paramString, nil
