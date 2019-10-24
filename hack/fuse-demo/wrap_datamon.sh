@@ -143,9 +143,6 @@ if [[ -n $opts_global_dict[n] || -n $opts_global_dict[e] ]]; then
                     --email $opts_global_dict[e] \
                )
 fi
-# if [[ -n $opts_global_dict[i] ]]; then
-#     BUNDLE_ID_FILE=$opts_global_dict[i]
-# fi
 if [[ -n $opts_global_dict[c] ]]; then
     COORD_POINT=$opts_global_dict[c]
 fi

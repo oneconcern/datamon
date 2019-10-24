@@ -284,6 +284,10 @@ func randCharNotInString(str string) (string, error) {
 			break
 		}
 		addRune += 1
+		// todo: generalize disallowed characters to include things other than '.'
+		if addRune == '.' {
+			addRune += 1
+		}
 	}
 	var rb strings.Builder
 	_, err = rb.WriteRune(addRune)
