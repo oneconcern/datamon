@@ -8,7 +8,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "sidecar_param",
+	Use:   "param",
 	Short: "Parameter munging for datamon sidecars",
 	Long: `Conversion and extraction of various serialization formats.
 
