@@ -24,35 +24,6 @@ func containsSep(val string) bool {
 	return strings.Contains(val, itemSep) || strings.Contains(val, kvSep)
 }
 
-type fuseParamsBundleParams struct{
-	Name string `json:"name" yaml:"name"`
-	SrcPath string `json:"srcPath" yaml:"srcPath"`
-	SrcRepo string `json:"srcRepo" yaml:"srcRepo"`
-	SrcLabel string `json:"srcLabel" yaml:"srcLabel"`
-	SrcBundle string `json:"srcBundle" yaml:"srcBundle"`
-	DestPath string `json:"destPath" yaml:"destPath"`
-	DestRepo string `json:"destRepo" yaml:"destRepo"`
-	DestMessage string `json:"destMessage" yaml:"destMessage"`
-	DestLabel string `json:"destLabel" yaml:"destLabel"`
-	DestBundleID string `json:"destBundleID" yaml:"destBundleID"`
-	_ struct{}
-}
-
-type FUSEParams struct {
-	Globals struct{
-		SleepInsteadOfExit bool `json:"sleepInsteadOfExit" yaml:"sleepInsteadOfExit"`
-		CoordPoint string `json:"coordPoint" yaml:"coordPoint"`
-		Contributor struct{
-			Name string `json:"name" yaml:"name"`
-			Email string `json:"email" yaml:"email"`
-			_ struct{}
-		} `json:"contributor" yaml:"contributor"`
-		_ struct{}
-	} `json:"globalOpts" yaml:"globalOpts"`
-	Bundles []fuseParamsBundleParams `json:"bundles" yaml:"bundles"`
-	_ struct{}
-}
-
 // todo: ingestion of parameters as multiple environment variables
 
 func appendToParamString(paramString string, paramName string, paramVal string) (string, error) {
@@ -347,39 +318,6 @@ func FUSEParamsToEnvVars(fuseParams FUSEParams) (map[string]string, error) {
 	rv[fuseGlobalsEnvVar] = globalString
 	return rv, nil
 }
-
-type pgParamsDBParams struct{
-	Name string `json:"name" yaml:"name"`
-	Port int `json:"pgPort" yaml:"pgPort"`
-	DestRepo string `json:"destRepo" yaml:"destRepo"`
-	DestMessage string `json:"destMessage" yaml:"destMessage"`
-	DestLabel string `json:"destLabel" yaml:"destLabel"`
-	SrcRepo string `json:"srcRepo" yaml:"srcRepo"`
-	SrcLabel string `json:"srcLabel" yaml:"srcLabel"`
-	SrcBundle string `json:"srcBundle" yaml:"srcBundle"`
-	_ struct{}
-}
-
-// todo: PG sidecar after FUSE sidecar
-type PGParams struct {
-	Globals struct{
-		SleepInsteadOfExit bool `json:"sleepInsteadOfExit" yaml:"sleepInsteadOfExit"`
-		IgnorePGVersionMismatch bool `json:"ignorePGVersionMismatch" yaml:"ignorePGVersionMismatch"`
-		CoordPoint string `json:"coordPoint" yaml:"coordPoint"`
-		// todo: pass contributor information into script
-/*
-		Contributor struct{
-			Name string `json:"name" yaml:"name"`
-			Email string `json:"email" yaml:"email"`
-			_ struct{}
-		} `json:"contributor" yaml:"contributor"`
-*/
-		_ struct{}
-	} `json:"globalOpts" yaml:"globalOpts"`
-	Databases []pgParamsDBParams `json:"databases" yaml:"databases"`
-	_ struct{}
-}
-
 
 func pgParamsGlobalString(pgParams PGParams) (string, error) {
 	var err error
