@@ -69,6 +69,23 @@ SLEEP_INSTEAD_OF_EXIT=
 
 ##
 
+if [[ -n $dm_pg_params ]]; then
+    typeset dm_pg_params_val
+    env_vars_file=/tmp/env_vars_from_params.sh
+    if [[ -f $dm_pg_params ]]; then
+        dbg_print "parsing parameters YAML file $dm_pg_params"
+        dm_pg_params_val=$(cat $dm_pg_params)
+    else
+        dbg_print "parsing parameters YAML from env var"
+        dm_pg_params_val=$dm_pg_params
+    fi
+    print -- $dm_pg_params_val | \
+        datamon_sidecar_param parse postgres > $env_vars_file
+    . $env_vars_file
+fi
+
+##
+
 deserialize_dict() {
     local item_sep
     local kv_sep

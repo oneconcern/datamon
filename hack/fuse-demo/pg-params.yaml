@@ -1,0 +1,18 @@
+globalOpts:
+  sleepInsteadOfExit: true
+  # todo: could be templated out
+  ignorePGVersionMismatch: false
+  coordPoint: "/tmp/coord"
+databases:
+  - name: "db1"
+    pgPort: 5430
+    destRepo: "ransom-datamon-test-repo"
+    destMessage: "postgres coordination example"
+    # todo: could be templated out
+    destLabel: "pg-coord-example"
+  - name: "db2"
+    pgPort: 5429
+    destRepo: "ransom-datamon-test-repo"
+    destMessage: "postgres coordination example input"
+    srcRepo: "ransom-datamon-test-repo"
+    srcLabel: "pg-coord-example-input"

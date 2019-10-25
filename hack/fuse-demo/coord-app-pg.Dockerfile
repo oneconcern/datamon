@@ -52,6 +52,8 @@ RUN chown -R developer:developers /bin/tini
 ADD hack/fuse-demo/mock_application_pg.sh .
 RUN chmod a+x mock_application_pg.sh
 
+ADD hack/fuse-demo/pg-params.yaml /pg-params.yaml
+
 USER developer
 
 RUN touch ~/.zshrc

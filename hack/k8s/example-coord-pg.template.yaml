@@ -24,6 +24,18 @@ spec:
         volumeMounts:
         - mountPath: /tmp/coord
           name: container-coord
+
+      - name: init-sidecar-params
+        image: gcr.io/onec-co/datamon-pg-demo-coord-app:latest
+        imagePullPolicy: "$PULL_POLICY"
+        command: ["sh", "-c",
+        "cp /pg-params.yaml /tmp/params/pg-params.yaml; echo 'placed sidecar parameters'"]
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /tmp/params
+          name: sidecar-params
+
       containers:
       - name: demo-app
         image: gcr.io/onec-co/datamon-pg-demo-coord-app:latest
@@ -53,23 +65,6 @@ spec:
         command: ["./wrap_datamon_pg.sh"]
         args: []
 
-        # args: ["-S",
-        # "-V", "$IGNORE_VERSION_MISMATCH",
-        # "-c", "/tmp/coord",
-        # "-x",
-        # "-r", "ransom-datamon-test-repo",
-        # "-l", "$OUTPUT_LABEL",
-        # "-m", "postgres coordination example",
-        # "-p", "5430",
-        # "-x",
-        # "-r", "ransom-datamon-test-repo",
-        # "-m", "postgres coordination example input",
-        # "-p", "5429",
-        # "-s",
-        # "-r", "ransom-datamon-test-repo",
-        # "-l", "pg-coord-example-input",
-        # ]
-
         securityContext:
           privileged: true
         stdin: true
@@ -81,19 +76,26 @@ spec:
           name: container-coord
         - mountPath: /tmp/gac
           name: google-application-credentials
+        - mountPath: /tmp/params
+          name: sidecar-params
 
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /tmp/gac/google-application-credentials.json
 
-        - name: dm_pg_opts
-          value: ";:S;V:$IGNORE_VERSION_MISMATCH;c:/tmp/coord"
-        - name: dm_pg_db_db1
-          value: ";:r:ransom-datamon-test-repo;l:$OUTPUT_LABEL;m:postgres coordination example;p:5430"
-        - name: dm_pg_db_db2
-          value: ";:r:ransom-datamon-test-repo;m:postgres coordination example input;p:5429;sr:ransom-datamon-test-repo;sl:pg-coord-example-input"
+        - name: dm_pg_params
+          value: /tmp/params/pg-params.yaml
+
+        # - name: dm_pg_opts
+        #   value: ";:S;V:$IGNORE_VERSION_MISMATCH;c:/tmp/coord"
+        # - name: dm_pg_db_db1
+        #   value: ";:r:ransom-datamon-test-repo;l:$OUTPUT_LABEL;m:postgres coordination example;p:5430"
+        # - name: dm_pg_db_db2
+        #   value: ";:r:ransom-datamon-test-repo;m:postgres coordination example input;p:5429;sr:ransom-datamon-test-repo;sl:pg-coord-example-input"
 
       volumes:
+      - name: sidecar-params
+        emptyDir: {}
       - name: container-coord
         emptyDir: {}
       - name: staging-area

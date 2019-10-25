@@ -124,6 +124,8 @@ func fieldsAsStringValues(iVal interface{}) ([]string, error) {
 	v := reflect.ValueOf(iVal)
 	kind := v.Kind()
 	switch kind {
+	case reflect.Int:
+		return []string{strconv.Itoa(iVal.(int))}, nil
 	case reflect.Bool:
 		if iVal.(bool) {
 			return []string{"true"}, nil
