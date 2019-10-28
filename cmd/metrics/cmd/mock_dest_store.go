@@ -39,6 +39,14 @@ func (mds *mockDestStore) GetAt(ctx context.Context, key string) (io.ReaderAt, e
 	return nil, errors.New("mock destination store GetAt() unimpl")
 }
 
+func (mds *mockDestStore) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
+	panic("implement me")
+}
+
+func (mds *mockDestStore) Touch(ctx context.Context, objectName string) error {
+	panic("implement me")
+}
+
 var fileListRe *regexp.Regexp
 
 func init() {

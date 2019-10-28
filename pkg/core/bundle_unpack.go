@@ -332,7 +332,6 @@ func downloadBundleEntrySyncMaybeOverwrite(ctx context.Context, bundleEntry mode
 	if err != nil {
 		return err
 	}
-	var putParameterOverwrite bool
 	if overwrite {
 		err = bundle.ConsumableStore.Delete(ctx, bundleEntry.NameWithPath)
 		if err != nil {
@@ -341,11 +340,8 @@ func downloadBundleEntrySyncMaybeOverwrite(ctx context.Context, bundleEntry mode
 				zap.Error(err))
 			return err
 		}
-		putParameterOverwrite = storage.IfNotPresent
-	} else {
-		putParameterOverwrite = storage.IfNotPresent
 	}
-	err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, putParameterOverwrite)
+	err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.NoOverWrite)
 	if err != nil {
 		bundle.l.Error("Failed to download bundle entry: put to store",
 			zap.String("name", bundleEntry.NameWithPath),

@@ -21,7 +21,7 @@ func CreateRepo(repo model.RepoDescriptor, store storage.Store) error {
 		return err
 	}
 	path := model.GetArchivePathToRepoDescriptor(repo.Name)
-	err = store.Put(context.Background(), path, bytes.NewReader(r), storage.IfNotPresent)
+	err = store.Put(context.Background(), path, bytes.NewReader(r), storage.NoOverWrite)
 	if err != nil {
 		if strings.Contains(err.Error(), "googleapi: Error 412: Precondition Failed, conditionNotMet") {
 			return fmt.Errorf("repo already exists: %s", repo.Name)

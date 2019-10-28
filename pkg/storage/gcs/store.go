@@ -113,11 +113,28 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 	}, nil
 }
 
+func (g *gcs) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
+	attr, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).Attrs(ctx)
+	if err != nil {
+		return storage.Attributes{}, err
+	}
+	return storage.Attributes{
+		Created: attr.Created,
+		Updated: attr.Updated,
+		Owner:   attr.Owner,
+	}, nil
+}
+
 func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
 	return &gcsReader{
 		g:          g,
 		objectName: objectName,
 	}, nil
+}
+
+func (g *gcs) Touch(ctx context.Context, objectName string) error {
+	_, err := g.client.Bucket(g.bucket).Object(objectName).Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
+	return err
 }
 
 type readCloser struct {
@@ -131,12 +148,16 @@ func (rc readCloser) Close() error {
 	return nil
 }
 
-func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool) error {
+func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newObject storage.NewKey) error {
 	// Put if not present
 	var writer *gcsStorage.Writer
-	if doesNotExist {
+	b := false
+	if newObject {
+		b = true
+	}
+	if newObject {
 		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
-			DoesNotExist: doesNotExist,
+			DoesNotExist: b,
 		}).NewWriter(ctx)
 	} else {
 		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
@@ -170,6 +191,7 @@ func (g *gcs) Delete(ctx context.Context, objectName string) error {
 	return g.client.Bucket(g.bucket).Object(objectName).Delete(ctx)
 }
 
+// TODO: Sent error if more than a million keys. Use KeysPrefix API.
 func (g *gcs) Keys(ctx context.Context) ([]string, error) {
 	const keysPerQuery = 1000000
 	var pageToken string
@@ -188,8 +210,6 @@ func (g *gcs) Keys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-// todo: consider KeysPrefix returning all keys, not pages,
-//   and expanding api surface to include paged results for both keys and keys according to prefix
 func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error) {
 	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})
 

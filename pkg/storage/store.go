@@ -5,6 +5,7 @@ package storage
 import (
 	"context"
 	"io"
+	"time"
 )
 
 //go:generate moq -out ./mockstorage/store.go -pkg mockstorage . Store
@@ -15,9 +16,12 @@ const MaxObjectSizeInMemory = 2 * 1024 * 1024 * 1024 // 2 gigs
 func (e errString) Error() string                    { return string(e) }
 
 const (
-	IfNotPresent = true
-	OverWrite    = false
+	// Adding these to make code more readable when looking at Put Call
+	NoOverWrite = true
+	OverWrite   = false
 )
+
+type NewKey = bool
 
 const (
 	ErrNotFound     errString = "not found"
@@ -27,6 +31,12 @@ const (
 	ErrObjectTooBig errString = "object too big to be read into memory"
 )
 
+type Attributes struct {
+	Created time.Time
+	Updated time.Time
+	Owner   string
+}
+
 // Store implementations know how to write entries to a K/V model.Store.
 //
 // Typically this is something file system-like. Examples are S3, local FS, NFS, ...
@@ -35,8 +45,10 @@ type Store interface {
 	String() string
 	Has(context.Context, string) (bool, error)
 	Get(context.Context, string) (io.ReadCloser, error)
+	GetAttr(context.Context, string) (Attributes, error)
 	GetAt(context.Context, string) (io.ReaderAt, error)
-	Put(context.Context, string, io.Reader, bool) error
+	Touch(context.Context, string) error
+	Put(context.Context, string, io.Reader, NewKey) error
 	Delete(context.Context, string) error
 	Keys(context.Context) ([]string, error)
 	Clear(context.Context) error

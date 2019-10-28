@@ -367,7 +367,7 @@ func setupFakeDataBundleWithUnalignedFilelist(t *testing.T,
 		require.NoError(t, metaStore.Put(context.Background(),
 			destinationPath,
 			bytes.NewReader(buffer),
-			storage.IfNotPresent,
+			storage.NoOverWrite,
 		))
 	}
 	bundleDescriptor := generateBundleDescriptor(bundleEntriesFileCount)
@@ -377,7 +377,7 @@ func setupFakeDataBundleWithUnalignedFilelist(t *testing.T,
 	require.NoError(t, metaStore.Put(context.Background(),
 		model.GetArchivePathToBundle(repo, bundleID),
 		bytes.NewReader(buffer),
-		storage.IfNotPresent,
+		storage.NoOverWrite,
 	))
 	return cleanup
 }
