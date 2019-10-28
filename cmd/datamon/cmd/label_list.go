@@ -21,7 +21,7 @@ var LabelListCommand = &cobra.Command{
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		labelDescriptors, err := core.ListLabels(params.repo.RepoName, remoteStores.meta)
+		labelDescriptors, err := core.ListLabels(params.repo.RepoName, remoteStores.meta, params.label.Prefix)
 		if err != nil {
 			wrapFatalln("download label list", err)
 			return
@@ -41,7 +41,7 @@ var LabelListCommand = &cobra.Command{
 func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(LabelListCommand)}
-
+	addLabelPrefixFlag(LabelListCommand)
 	for _, flag := range requiredFlags {
 		err := LabelListCommand.MarkFlagRequired(flag)
 		if err != nil {
@@ -49,6 +49,5 @@ func init() {
 			return
 		}
 	}
-
 	labelCmd.AddCommand(LabelListCommand)
 }

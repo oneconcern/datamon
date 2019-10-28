@@ -21,6 +21,10 @@ func GetArchivePathPrefixToLabels(repo string) string {
 	return fmt.Sprint(getArchivePathToLabels(), repo+"/")
 }
 
+func GetArchivePathPrefixToLabelPrefix(repo string, prefix string) string {
+	return fmt.Sprint(getArchivePathToLabels(), repo+"/"+prefix)
+}
+
 func GetArchivePathToLabel(repo string, labelName string) string {
 	return fmt.Sprint(GetArchivePathPrefixToLabels(repo), labelName, ".json")
 }

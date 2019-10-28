@@ -35,7 +35,8 @@ type paramsT struct {
 		port int
 	}
 	label struct {
-		Name string
+		Prefix string
+		Name   string
 	}
 	repo struct {
 		MetadataBucket   string
@@ -166,6 +167,12 @@ func addLabelNameFlag(cmd *cobra.Command) string {
 	labelName := "label"
 	cmd.Flags().StringVar(&params.label.Name, labelName, "", "The human-readable name of a label")
 	return labelName
+}
+
+func addLabelPrefixFlag(cmd *cobra.Command) string {
+	prefixString := "prefix"
+	cmd.Flags().StringVar(&params.label.Prefix, prefixString, "", "List labels starting with a prefix.")
+	return prefixString
 }
 
 func addRepoNameOptionFlag(cmd *cobra.Command) string {
