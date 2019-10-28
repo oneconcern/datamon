@@ -5,12 +5,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config describes the CLI configuration.
 type Config struct {
 	// bug in viper? Need to keep names of fields the same as the serialized names..
 	Metadata   string `json:"metadata" yaml:"metadata"`
 	Blob       string `json:"blob" yaml:"blob"`
-	Email      string `json:"email" yaml:"email"`
-	Name       string `json:"name" yaml:"name"`
 	Credential string `json:"credential" yaml:"credential"`
 }
 
@@ -23,18 +22,7 @@ func newConfig() (*Config, error) {
 	return &config, nil
 }
 
-func (c *Config) setContributor(params *paramsT) {
-	if params.repo.ContributorEmail == "" {
-		params.repo.ContributorEmail = config.Email
-	}
-
-	if params.repo.ContributorName == "" {
-		params.repo.ContributorName = config.Name
-	}
-}
-
 func (c *Config) setRepoParams(params *paramsT) {
-	c.setContributor(params)
 	if params.repo.MetadataBucket == "" {
 		params.repo.MetadataBucket = config.Metadata
 		if params.repo.MetadataBucket == "" {

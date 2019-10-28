@@ -27,8 +27,6 @@ var configGen = &cobra.Command{
 			return
 		}
 		config := Config{
-			Email:      params.repo.ContributorEmail,
-			Name:       params.repo.ContributorName,
 			Metadata:   params.repo.MetadataBucket,
 			Blob:       params.repo.BlobBucket,
 			Credential: params.root.credFile,
@@ -48,20 +46,11 @@ var configGen = &cobra.Command{
 }
 
 func init() {
-
-	requiredFlags := []string{addContributorEmail(configGen)}
-	requiredFlags = append(requiredFlags, addContributorName(configGen))
+	addContributorEmail(configGen)
+	addContributorName(configGen)
 	addBucketNameFlag(configGen)
 	addBlobBucket(configGen)
 	addCredentialFile(configGen)
-
-	for _, flag := range requiredFlags {
-		err := configGen.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	configCmd.AddCommand(configGen)
 }
