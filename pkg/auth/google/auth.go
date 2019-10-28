@@ -2,9 +2,9 @@ package google
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/oneconcern/datamon/pkg/auth/status"
 	"github.com/oneconcern/datamon/pkg/model"
 	goauth "google.golang.org/api/oauth2/v2"
 	goption "google.golang.org/api/option"
@@ -34,16 +34,16 @@ func (g Auth) Principal(credFile string) (model.Contributor, error) {
 		goption.WithScopes(goauth.UserinfoEmailScope, goauth.UserinfoProfileScope),
 	)
 	if err != nil {
-		return model.Contributor{}, fmt.Errorf("cannot create oauth service: %w", err)
+		return model.Contributor{}, status.ErrAuthService.Wrap(err)
 	}
 
 	u, err := svc.Userinfo.Get().Do()
 	if err != nil {
-		return model.Contributor{}, fmt.Errorf("cannot retrieve userinfo: %w", err)
+		return model.Contributor{}, status.ErrUserinfo.Wrap(err)
 	}
 
 	if u.Email == "" {
-		return model.Contributor{}, fmt.Errorf("email scope is mandatory to run datamon")
+		return model.Contributor{}, status.ErrEmailScope
 	}
 	// NOTE(frederic): at this moment, the profile scope is not required and we fall back
 	// on email for the name if the full name is not available.
