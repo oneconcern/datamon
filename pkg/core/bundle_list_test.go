@@ -529,7 +529,7 @@ func assertBundles(t *testing.T, testcase bundleFixture, bundles model.BundleDes
 
 func TestListBundles(t *testing.T) {
 	for i := 0; i < 10; i++ { // check results remain stable over 10 independent iterations
-		for _, concurrency := range []int{0, 1, 50, 100, 400} { // test several concurrency parameterss
+		for _, concurrency := range []int{0, 1, 50, 100, 400} { // test several concurrency parameters
 			t.Logf("simulating ListBundles with concurrency-factor=%d, iteration=%d", concurrency, i)
 			testListBundles(t, concurrency, i)
 		}

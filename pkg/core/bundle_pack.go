@@ -73,7 +73,7 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 		)
 		err = msCRC.PutCRC(ctx,
 			archivePathToBundleFileList,
-			bytes.NewReader(buffer), storage.IfNotPresent, crc)
+			bytes.NewReader(buffer), storage.NoOverWrite, crc)
 	} else {
 		bundle.l.Debug("uploadBundleEntriesFileList calling MetaStore.Put",
 			zap.String("archive path", archivePathToBundleFileList),
@@ -81,7 +81,7 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 		)
 		err = bundle.MetaStore.Put(ctx,
 			archivePathToBundleFileList,
-			bytes.NewReader(buffer), storage.IfNotPresent)
+			bytes.NewReader(buffer), storage.NoOverWrite)
 	}
 	if err != nil {
 		return err
@@ -324,12 +324,12 @@ func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
 		err = msCRC.PutCRC(ctx,
 			model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
-			bytes.NewReader(buffer), storage.IfNotPresent, crc)
+			bytes.NewReader(buffer), storage.NoOverWrite, crc)
 
 	} else {
 		err = bundle.MetaStore.Put(ctx,
 			model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
-			bytes.NewReader(buffer), storage.IfNotPresent)
+			bytes.NewReader(buffer), storage.NoOverWrite)
 	}
 	if err != nil {
 		return err

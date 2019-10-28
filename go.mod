@@ -15,10 +15,8 @@ require (
 	github.com/coreos/go-etcd v2.0.0+incompatible // indirect
 	github.com/docker/go-units v0.3.3
 	github.com/go-chi/chi v4.0.2+incompatible
-	github.com/gobuffalo/envy v1.7.1 // indirect
-	github.com/gobuffalo/logger v1.0.1 // indirect
 	github.com/gobuffalo/packd v0.3.0
-	github.com/gobuffalo/packr/v2 v2.6.0
+	github.com/gobuffalo/packr/v2 v2.7.1
 	github.com/gogo/protobuf v1.3.0 // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golangci/go-tools v0.0.0-20190318055746-e32c54105b7c // indirect
@@ -34,7 +32,7 @@ require (
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20180417054321-cd3959611bcb
 	github.com/json-iterator/go v1.1.6
-	github.com/karrick/godirwalk v1.10.12
+	github.com/karrick/godirwalk v1.12.0
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/markbates/oncer v0.0.0-20181203154359-bf2de49a0be2 // indirect
@@ -46,6 +44,7 @@ require (
 	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/opentracing/opentracing-go v1.0.2
 	github.com/pelletier/go-toml v1.4.0 // indirect
+	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/securego/gosec v0.0.0-20191002120514-e680875ea14d // indirect
 	github.com/segmentio/ksuid v1.0.2
 	github.com/spf13/afero v1.2.2
@@ -58,9 +57,9 @@ require (
 	github.com/ultraware/whitespace v0.0.4 // indirect
 	go.uber.org/goleak v0.0.0-00010101000000-000000000000
 	go.uber.org/zap v1.10.0
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	golang.org/x/sys v0.0.0-20191003212358-c178f38b412c
-	golang.org/x/tools v0.0.0-20191004211743-43d3a2ca2ae9
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
+	golang.org/x/sys v0.0.0-20191023151326-f89234f9a2c2
+	golang.org/x/tools v0.0.0-20191023163450-98e333b8b3a3
 	google.golang.org/api v0.2.0
 	google.golang.org/grpc v1.21.0
 	gopkg.in/yaml.v2 v2.2.4

@@ -64,7 +64,7 @@ func (i *instrumentedStore) Get(ctx context.Context, key string) (io.ReadCloser,
 	return i.store.Get(ctx, key)
 }
 
-func (i *instrumentedStore) Put(ctx context.Context, key string, rdr io.Reader, c bool) error {
+func (i *instrumentedStore) Put(ctx context.Context, key string, rdr io.Reader, c NewKey) error {
 	span := i.spanFromContext(ctx, i.opName("Put"))
 	defer span.Finish()
 
@@ -105,4 +105,18 @@ func (i *instrumentedStore) GetAt(ctx context.Context, objectName string) (io.Re
 	defer span.Finish()
 	i.logs.Info("get a offset reader")
 	return i.store.GetAt(ctx, objectName)
+}
+
+func (i *instrumentedStore) GetAttr(ctx context.Context, object string) (Attributes, error) {
+	span := i.spanFromContext(ctx, i.opName("GetAttr"))
+	defer span.Finish()
+	i.logs.Info("get attributes for an object")
+	return i.store.GetAttr(ctx, object)
+}
+
+func (i *instrumentedStore) Touch(ctx context.Context, object string) error {
+	span := i.spanFromContext(ctx, i.opName("Touch"))
+	defer span.Finish()
+	i.logs.Info("touch an object")
+	return i.store.Touch(ctx, object)
 }

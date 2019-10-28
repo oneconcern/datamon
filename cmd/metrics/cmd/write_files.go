@@ -106,7 +106,7 @@ yet is generally part of the datamon metrics collection and benchmarking picture
 			cc <- struct{}{}
 			go func(key string, rdr io.Reader, idx int) {
 				defer func() { <-cc }()
-				err := destStore.Put(ctx, key, rdr, storage.IfNotPresent)
+				err := destStore.Put(ctx, key, rdr, storage.NoOverWrite)
 				if err != nil {
 					log.Fatalln(err)
 				}

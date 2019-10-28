@@ -18,7 +18,7 @@ func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, des
 	if err != nil {
 		return nil, err
 	}
-	err = dStore.Put(ctx, destination, bytes.NewReader(object), IfNotPresent)
+	err = dStore.Put(ctx, destination, bytes.NewReader(object), NoOverWrite)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ type MultiStoreUnit struct {
 	TolerateFailure bool
 }
 
-func MultiPut(ctx context.Context, stores []MultiStoreUnit, name string, buffer []byte, doesNotExist bool) error {
+func MultiPut(ctx context.Context, stores []MultiStoreUnit, name string, buffer []byte, doesNotExist NewKey) error {
 	errC := make(chan error, len(stores))
 	var wg sync.WaitGroup
 
