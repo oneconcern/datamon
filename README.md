@@ -2,10 +2,18 @@
 
 # CLI Guide
 
-Make sure your gcloud credentials have been setup.
+Make sure your gcloud credentials have been setup, with proper scopes.
 ```$bash
-gcloud auth application-default login
+gcloud auth application-default login --scopes https://www.googleapis.com/auth/cloud-platform,email,profile
 ```
+
+datamon will use your email and name from your Google ID account.
+
+> **NOTE**: by default `gcloud auth application-default login` will not allow applications to see your full profile
+> In that case, datamon will use your email as your user name.
+>
+> You may control your personal information stored by Google here: https://aboutme.google.com
+
 Download the datamon binary for mac or for linux on the
 [Releases Page](https://github.com/oneconcern/datamon/releases/)
 or use the
@@ -22,13 +30,10 @@ For non kubernetes use, it's necessary to supply gcloud credentials.
 
 ```bash
 # Replace path to gcloud credential file. Use absolute path
-% datamon config create --email ritesh@oneconcern.com --name "Ritesh H Shukla" --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
+% datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
 ```
 
 Inside a kubernetes pod, Datamon will use kubernetes service credentials.
-```bash
-% datamon config create --name "Ritesh Shukla" --email ritesh@oneconcern.com
-```
 
 Check the config file, credential file will not be set in kubernetes deployment.
 ```bash
@@ -244,13 +249,13 @@ YAML might be
 
 ```yaml
 command: ["./wrap_datamon.sh"]
-args: ["-c", "/tmp/coord", "-d", "config create --name \"Coord\" --email coord-bot@oneconcern.com", "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo", "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
+args: ["-c", "/tmp/coord", "-d", "config create", "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo", "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
 ```
 
 or from the shell
 
 ```shell
-./wrap_datamon.sh -c /tmp/coord -d 'config create --name "Coord" --email coord-bot@oneconcern.com' -d 'bundle upload --path /tmp/upload --message "result of container coordination demo" --repo ransom-datamon-test-repo --label coordemo' -d 'bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream'
+./wrap_datamon.sh -c /tmp/coord -d 'config create' -d 'bundle upload --path /tmp/upload --message "result of container coordination demo" --repo ransom-datamon-test-repo --label coordemo' -d 'bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream'
 ```
 
 ##### `gcr.io/onec-co/datamon-pg-sidecar` -- `wrap_datamon_pg.sh`
