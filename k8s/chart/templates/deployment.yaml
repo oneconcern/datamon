@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "datamon.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "datamon.name" . }}
+    helm.sh/chart: {{ include "datamon.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "datamon.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "datamon.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      volumes:
+        - name: creds-secret
+          secret:
+            secretName: {{ .Values.secretName }}
+        - name: config
+          configMap:
+            name: {{ include "datamon.fullname" . }}
+      {{- if .Values.extraVolumes }}
+{{ toYaml .Values.extraVolumes | indent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: {{ .Values.home }}/.config/gcloud/application_default_credentials.json
+          command:
+            - '/bin/sh'
+          # The main container just does nothing, waiting for interactive users
+          # to connect via kubectl exec ...
+          args:
+            - '-c'
+            - 'while :; do sleep 2073600; done'
+            {{- if .Values.extraArgs }}
+{{ toYaml .Values.extraArgs | indent 12 }}
+            {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - '/bin/true'
+              initialDelaySeconds: 1
+              periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - '/bin/true'
+              initialDelaySeconds: 1
+              periodSeconds: 30
+          volumeMounts:
+            - mountPath: {{ .Values.home }}/.datamon
+              name: config
+            - mountPath: {{ .Values.home }}/.config/gcloud
+              name: creds-secret
+          {{- if .Values.extraVolumeMounts }}
+{{ toYaml .Values.extraVolumeMounts | indent 12 }}
+          {{- end }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

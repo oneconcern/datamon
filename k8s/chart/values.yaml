@@ -1,0 +1,34 @@
+# how many pods do you want to create?
+replicaCount: 1
+
+image:
+  # TODO(frederic): use gcr.io/onec-co/datamon-pod
+  # when ready
+  repository: datamon-pod
+  tag: 2.0.0
+  pullPolicy: IfNotPresent
+
+#namespace: frederic-oneconcern-com
+
+# some config to map as ${HOME}/.datamon/datamon.yaml
+config: {}
+
+# your gce credentials secret: must be prepared beforehand
+# kubectl create secret generic my-creds --from-file=~/.config/gcloud/application_default_credentials.json
+secretName: my-creds
+
+home: '/home/project'
+
+nameOverride: ""
+fullnameOverride: ""
+application: datamon
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# you may declare and mount extra volumes on the pod
+extraVolumes: []
+extraVolumeMounts: []
+extraArgs: []
