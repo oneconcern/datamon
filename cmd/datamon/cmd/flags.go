@@ -21,7 +21,6 @@ type paramsT struct {
 		ID                string
 		DataPath          string
 		Message           string
-		ContributorEmail  string
 		MountPath         string
 		File              string
 		Daemonize         bool
@@ -39,12 +38,10 @@ type paramsT struct {
 		Name   string
 	}
 	repo struct {
-		MetadataBucket   string
-		RepoName         string
-		BlobBucket       string
-		Description      string
-		ContributorEmail string
-		ContributorName  string
+		MetadataBucket string
+		RepoName       string
+		BlobBucket     string
+		Description    string
 	}
 	root struct {
 		credFile string
@@ -201,17 +198,6 @@ func addBlobBucket(cmd *cobra.Command) string {
 	return blob
 }
 
-func addContributorEmail(cmd *cobra.Command) string {
-	contributorEmail := "email"
-	cmd.Flags().StringVar(&params.repo.ContributorEmail, contributorEmail, "", "The email of the contributor")
-	return contributorEmail
-}
-func addContributorName(cmd *cobra.Command) string {
-	contributorName := "name"
-	cmd.Flags().StringVar(&params.repo.ContributorName, contributorName, "", "The name of the contributor")
-	return contributorName
-}
-
 func addCredentialFile(cmd *cobra.Command) string {
 	credential := "credential"
 	cmd.Flags().StringVar(&params.root.credFile, credential, "", "The path to the credential file")
@@ -293,6 +279,7 @@ func paramsToSrcStore(ctx context.Context, params paramsT, create bool) (storage
 	return sourceStore, nil
 }
 
+// DestT defines the nomenclature for allowed destination types (e.g. Empty/NonEmpty)
 type DestT uint
 
 const (
@@ -357,18 +344,6 @@ func paramsToDestStore(params paramsT,
 	return destStore, nil
 }
 
-func paramsToContributor(params paramsT) (model.Contributor, error) {
-	if params.repo.ContributorEmail == "" {
-		return model.Contributor{}, fmt.Errorf(
-			"contributor email must be set in config or as a cli param")
-	}
-	if params.repo.ContributorName == "" {
-		return model.Contributor{}, fmt.Errorf(
-			"contributor name must be set in config or as a cli param")
-	}
-
-	return model.Contributor{
-		Email: params.repo.ContributorEmail,
-		Name:  params.repo.ContributorName,
-	}, nil
+func paramsToContributor(_ paramsT) (model.Contributor, error) {
+	return authorizer.Principal(config.Credential)
 }

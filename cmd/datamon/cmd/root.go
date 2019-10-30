@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/oneconcern/datamon/pkg/auth"
+	gauth "github.com/oneconcern/datamon/pkg/auth/google"
 	"github.com/spf13/cobra"
 )
 
@@ -49,6 +51,9 @@ var logFatalln = log.Fatalln
 var logFatalf = log.Fatalf
 var osExit = os.Exit
 
+// used to patch over calls to Authable.Principal() during test
+var authorizer auth.Authable = gauth.New()
+
 // infoLogger wraps informative messages to os.Stdout without cluttering expected output in tests.
 // To be used instead on fmt.Printf(os.Stdout, ...)
 var infoLogger = log.New(os.Stdout, "", 0)
@@ -62,7 +67,7 @@ func wrapFatalln(msg string, err error) {
 }
 
 func wrapFatalWithCode(code int, format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, format, args...)
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	osExit(code)
 }
 

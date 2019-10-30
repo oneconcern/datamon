@@ -27,7 +27,7 @@ exits with ENOENT status otherwise.`,
 		repoDescriptor, err := core.GetRepoDescriptorByRepoName(
 			remoteStores.meta, params.repo.RepoName)
 		if err == core.ErrNotFound {
-			wrapFatalWithCode(int(unix.ENOENT), "didn't find repo '%v'", params.repo.RepoName)
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", params.repo.RepoName)
 			return
 		}
 		if err != nil {

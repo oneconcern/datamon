@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -24,11 +23,9 @@ import (
 
 	gcsStorage "cloud.google.com/go/storage"
 	"github.com/oneconcern/datamon/internal"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 const (
@@ -88,108 +85,6 @@ var testUploadTrees = [][]uploadTree{{
 },
 }
 
-type ExitMocks struct {
-	mock.Mock
-	exitStatuses []int
-}
-
-func (m *ExitMocks) Fatalf(format string, v ...interface{}) {
-	fmt.Println(format)
-	m.exitStatuses = append(m.exitStatuses, 1)
-}
-
-func (m *ExitMocks) Fatalln(v ...interface{}) {
-	fmt.Println(v...)
-	m.exitStatuses = append(m.exitStatuses, 1)
-}
-
-func (m *ExitMocks) Exit(code int) {
-	m.exitStatuses = append(m.exitStatuses, code)
-}
-
-func (m *ExitMocks) fatalCalls() int {
-	return len(m.exitStatuses)
-}
-
-func NewExitMocks() *ExitMocks {
-	exitMocks := ExitMocks{
-		exitStatuses: make([]int, 0),
-	}
-	return &exitMocks
-}
-
-// https://github.com/stretchr/testify/issues/610
-func MakeFatalfMock(m *ExitMocks) func(string, ...interface{}) {
-	return func(format string, v ...interface{}) {
-		m.Fatalf(format, v...)
-	}
-}
-
-func MakeFatallnMock(m *ExitMocks) func(...interface{}) {
-	return func(v ...interface{}) {
-		m.Fatalln(v...)
-	}
-}
-
-func MakeExitMock(m *ExitMocks) func(int) {
-	return func(code int) {
-		m.Exit(code)
-	}
-}
-
-var exitMocks *ExitMocks
-
-func setupTests(t *testing.T) func() {
-	os.RemoveAll(destinationDir)
-	ctx := context.Background()
-	exitMocks = NewExitMocks()
-	logFatalf = MakeFatalfMock(exitMocks)
-	logFatalln = MakeFatallnMock(exitMocks)
-	osExit = MakeExitMock(exitMocks)
-	btag := internal.RandStringBytesMaskImprSrc(15)
-	bucketMeta := "datamontestmeta-" + btag
-	bucketBlob := "datamontestblob-" + btag
-
-	client, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl))
-	require.NoError(t, err, "couldn't create bucket client")
-	err = client.Bucket(bucketMeta).Create(ctx, "onec-co", nil)
-	require.NoError(t, err, "couldn't create metadata bucket")
-	err = client.Bucket(bucketBlob).Create(ctx, "onec-co", nil)
-	require.NoError(t, err, "couldn't create blob bucket")
-	params.repo.MetadataBucket = bucketMeta
-	params.repo.BlobBucket = bucketBlob
-	createAllTestUploadTrees(t)
-	cleanup := func() {
-		os.RemoveAll(destinationDir)
-		deleteBucket(ctx, t, client, bucketMeta)
-		deleteBucket(ctx, t, client, bucketBlob)
-	}
-	return cleanup
-}
-
-func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool) {
-	fatalCallsBefore := exitMocks.fatalCalls()
-	bucketMeta := params.repo.MetadataBucket
-	bucketBlob := params.repo.BlobBucket
-	contributorEmail := params.repo.ContributorEmail
-	contributorName := params.repo.ContributorName
-	params = paramsT{}
-	params.repo.MetadataBucket = bucketMeta
-	params.repo.BlobBucket = bucketBlob
-	params.repo.ContributorEmail = contributorEmail
-	params.repo.ContributorName = contributorName
-	params.bundle.ID = ""
-	rootCmd.SetArgs(cmd)
-	require.NoError(t, rootCmd.Execute(), "error executing '"+strings.Join(cmd, " ")+"' : "+intentMsg)
-	if expectError {
-		require.Equal(t, fatalCallsBefore+1, exitMocks.fatalCalls(),
-			"ran '"+strings.Join(cmd, " ")+"' expecting error and didn't see one in mocks : "+intentMsg)
-	} else {
-		require.Equal(t, fatalCallsBefore, exitMocks.fatalCalls(),
-			"unexpected error in mocks on '"+strings.Join(cmd, " ")+"' : "+intentMsg)
-	}
-}
-
 func TestCreateRepo(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
@@ -197,22 +92,16 @@ func TestCreateRepo(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create first test repo", false)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo2,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "observe error on create repo with duplicate name", true)
 }
 
@@ -309,8 +198,6 @@ func TestRepoList(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create first test repo", false)
 	ll, err = listRepos(t)
 	require.NoError(t, err, "error out of listRepos() test helper")
@@ -325,9 +212,7 @@ func TestRepoList(t *testing.T) {
 		"create",
 		"--description", "testing too",
 		"--repo", repo2,
-		"--name", "tests2",
-		"--email", "datamon2@oneconcern.com",
-	}, "create second test repo", false)
+	}, "create second test repo", false, AuthMock{name: "tests2", email: "datamon2@oneconcern.com"})
 	ll, err = listRepos(t)
 	require.NoError(t, err, "error out of listRepos() test helper")
 	require.Equal(t, 2, len(ll), "two repos in list after second create")
@@ -356,8 +241,6 @@ func TestGetRepo(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repoName,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	runCmd(t, []string{"repo",
 		"get",
@@ -399,8 +282,6 @@ func TestUploadBundle(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create test repo", false)
 	for _, tree := range testUploadTrees {
 		testUploadBundle(t, tree[0])
@@ -414,8 +295,6 @@ func TestUploadBundle_filePath(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create test repo", false)
 	file := testUploadTrees[0][0]
 	runCmd(t, []string{"bundle",
@@ -462,8 +341,6 @@ func TestUploadBundleLabel(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create test repo", false)
 	file := testUploadTrees[0][0]
 	label := "testlabel"
@@ -565,15 +442,11 @@ func TestListBundles(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo2,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 
 	bundles, err := listBundles(t, repo1)
@@ -596,8 +469,6 @@ func TestGetBundle(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	label := internal.RandStringBytesMaskImprSrc(8)
 	runCmd(t, []string{"bundle",
@@ -632,8 +503,6 @@ func TestGetLabel(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create first test repo", false)
 	runCmd(t, []string{"label",
 		"get",
@@ -705,15 +574,11 @@ func TestListLabels(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create first test repo", false)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
 		"--repo", repo2,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	ll := listLabels(t, repo1, "")
 	require.Equal(t, len(ll), 0, "no labels created yet")
@@ -762,8 +627,6 @@ func TestSetLabel(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create first test repo", false)
 	ll := listLabels(t, repo1, "")
 	require.Equal(t, len(ll), 0, "no labels created yet")
@@ -851,8 +714,6 @@ func TestDownloadBundles(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	for i, tree := range testUploadTrees {
 		testDownloadBundle(t, tree, i+1)
@@ -881,8 +742,6 @@ func TestDiffBundle(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	//
 	runCmd(t, []string{"bundle",
@@ -1008,8 +867,6 @@ func TestUpdateBundle(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	//
 	runCmd(t, []string{"bundle",
@@ -1137,8 +994,6 @@ func TestDownloadBundleByLabel(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create test repo", false)
 	files := testUploadTrees[0]
 	file := files[0]
@@ -1283,8 +1138,6 @@ func TestListBundlesFiles(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create second test repo", false)
 	for i, tree := range testUploadTrees {
 		testListBundleFiles(t, tree, i+1)
@@ -1346,8 +1199,6 @@ func TestBundlesDownloadFiles(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-		"--name", "tests",
-		"--email", "datamon@oneconcern.com",
 	}, "create repo", false)
 
 	testBundleDownloadFiles(t, testUploadTrees[0], 1)
