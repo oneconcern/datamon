@@ -19,6 +19,12 @@ output/new data that is generated from the existing data.
 
 [More on design and architecture](docs/design.md).
 
+### Migrating from v1 to v2
+
+v2 comes with breaking changes. The migration process replaces older repos by new ones.
+
+See the [migration guide](k8s/migatev2/README.md).
+
 ### Environment
 
 Although flexible in its concepts and architecture, the current version of datamon is primarily developed and tested 

@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{.Release.Name}}-scripts"
+  labels:
+    app.kubernetes.io/name: {{ include "datamon.name" . }}
+    helm.sh/chart: {{ include "datamon.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+{{- if .Values.scripts }}
+  {{- if .Values.scripts.migrate }}
+  'migrate.sh': |
+{{ tpl .Values.scripts.migrate . | indent 4 }}
+  {{- end }}
+  {{- if .Values.scripts.history }}
+  'migrate-history.sh': |
+{{ tpl .Values.scripts.history . | indent 4 }}
+  {{- end }}
+  {{- if .Values.scripts.funcs }}
+  'funcs.sh': |
+{{ tpl .Values.scripts.funcs . | indent 4 }}
+  {{- end }}
+{{- end }}
