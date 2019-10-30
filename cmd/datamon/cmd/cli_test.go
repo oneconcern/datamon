@@ -535,7 +535,7 @@ type labelListEntry struct {
 	time    time.Time
 }
 
-func listLabels(t *testing.T, repoName string) []labelListEntry {
+func listLabels(t *testing.T, repoName string, prefix string) []labelListEntry {
 	r, w, err := os.Pipe()
 	if err != nil {
 		panic(err)
@@ -544,6 +544,7 @@ func listLabels(t *testing.T, repoName string) []labelListEntry {
 	runCmd(t, []string{"label",
 		"list",
 		"--repo", repoName,
+		"--prefix", prefix,
 	}, "list labels", false)
 	log.SetOutput(os.Stdout)
 	w.Close()
@@ -579,9 +580,9 @@ func TestListLabels(t *testing.T) {
 		"--description", "testing",
 		"--repo", repo2,
 	}, "create second test repo", false)
-	ll := listLabels(t, repo1)
+	ll := listLabels(t, repo1, "")
 	require.Equal(t, len(ll), 0, "no labels created yet")
-	ll = listLabels(t, repo2)
+	ll = listLabels(t, repo2, "")
 	require.Equal(t, 0, len(ll), "no labels created yet")
 	file := testUploadTrees[0][0]
 	label := internal.RandStringBytesMaskImprSrc(8)
@@ -595,13 +596,20 @@ func TestListLabels(t *testing.T) {
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 
-	ll = listLabels(t, repo2)
+	ll = listLabels(t, repo2, "")
 	require.Equal(t, 0, len(ll), "no labels in secondary repo")
 
-	ll = listLabels(t, repo1)
+	ll = listLabels(t, repo1, "")
 	require.Equal(t, 1, len(ll), "label count in test repo")
 
 	labelEnt := ll[0]
+	require.Equal(t, label, labelEnt.name, "found expected name in label entry")
+	require.True(t, testNow.Sub(labelEnt.time).Seconds() < 3, "timestamp bounds after bundle create")
+
+	ll = listLabels(t, repo1, label[:2])
+	require.Equal(t, 1, len(ll), "label count in test repo")
+
+	labelEnt = ll[0]
 	require.Equal(t, label, labelEnt.name, "found expected name in label entry")
 	require.True(t, testNow.Sub(labelEnt.time).Seconds() < 3, "timestamp bounds after bundle create")
 
@@ -620,7 +628,7 @@ func TestSetLabel(t *testing.T) {
 		"--description", "testing",
 		"--repo", repo1,
 	}, "create first test repo", false)
-	ll := listLabels(t, repo1)
+	ll := listLabels(t, repo1, "")
 	require.Equal(t, len(ll), 0, "no labels created yet")
 	file := testUploadTrees[0][0]
 	msg := internal.RandStringBytesMaskImprSrc(15)
@@ -632,7 +640,7 @@ func TestSetLabel(t *testing.T) {
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
 
-	ll = listLabels(t, repo1)
+	ll = listLabels(t, repo1, "")
 	require.Equal(t, len(ll), 0, "no labels created yet")
 
 	bundles, err := listBundles(t, repo1)
@@ -648,7 +656,7 @@ func TestSetLabel(t *testing.T) {
 		"--bundle", bundleEnt.hash,
 		"--repo", repo1,
 	}, "set bundle label", false)
-	ll = listLabels(t, repo1)
+	ll = listLabels(t, repo1, "")
 	require.NoError(t, err, "error out of listLabels() test helper")
 	require.Equal(t, 1, len(ll), "label count in test repo")
 	labelEnt := ll[0]
