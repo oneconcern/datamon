@@ -8,8 +8,9 @@ import (
 	"log"
 	"text/template"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -22,14 +23,15 @@ var bundleCmd = &cobra.Command{
 A bundle is a group of files that are tracked and changed together.
 Every bundle is an entry in the history of a repository at a point in time.
 `,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	},
 }
 
 var bundleDescriptorTemplate *template.Template
 
 func init() {
 	rootCmd.AddCommand(bundleCmd)
-	addBucketNameFlag(bundleCmd)
-	addBlobBucket(bundleCmd)
 
 	bundleDescriptorTemplate = func() *template.Template {
 		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
@@ -37,29 +39,31 @@ func init() {
 	}()
 }
 
-func setLatestOrLabelledBundle(ctx context.Context, store storage.Store) error {
+func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) error {
 	switch {
-	case params.bundle.ID != "" && params.label.Name != "":
-		return fmt.Errorf("--" + addBundleFlag(nil) + " and --" + addLabelNameFlag(nil) + " flags are mutually exclusive")
-	case params.bundle.ID == "" && params.label.Name == "":
-		key, err := core.GetLatestBundle(params.repo.RepoName, store)
+	case datamonFlags.bundle.ID != "" && datamonFlags.label.Name != "":
+		return fmt.Errorf("--%s and --%s datamonFlags are mutually exclusive",
+			addBundleFlag(nil),
+			addLabelNameFlag(nil))
+	case datamonFlags.bundle.ID == "" && datamonFlags.label.Name == "":
+		key, err := core.GetLatestBundle(datamonFlags.repo.RepoName, remote)
 		if err != nil {
 			return err
 		}
-		params.bundle.ID = key
-	case params.bundle.ID == "" && params.label.Name != "":
+		datamonFlags.bundle.ID = key
+	case datamonFlags.bundle.ID == "" && datamonFlags.label.Name != "":
 		label := core.NewLabel(nil,
-			core.LabelName(params.label.Name),
+			core.LabelName(datamonFlags.label.Name),
 		)
-		bundle := core.New(core.NewBDescriptor(),
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(store),
+		bundle := core.NewBundle(core.NewBDescriptor(),
+			core.Repo(datamonFlags.repo.RepoName),
+			core.ContextStores(remote),
 		)
 		if err := label.DownloadDescriptor(ctx, bundle, true); err != nil {
 			return err
 		}
-		params.bundle.ID = label.Descriptor.BundleID
+		datamonFlags.bundle.ID = label.Descriptor.BundleID
 	}
-	log.Printf("Using bundle: %s", params.bundle.ID)
+	log.Printf("Using bundle: %s", datamonFlags.bundle.ID)
 	return nil
 }

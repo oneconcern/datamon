@@ -4,28 +4,30 @@ import (
 	"context"
 	"fmt"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/model"
-	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 const (
 	maxLabelsToList = 1000000
 )
 
-func ListLabels(repo string, metaStore storage.Store, prefix string) ([]model.LabelDescriptor, error) {
-	e := RepoExists(repo, metaStore)
+func ListLabels(repo string, stores context2.Stores, prefix string) ([]model.LabelDescriptor, error) {
+	e := RepoExists(repo, stores)
 	if e != nil {
 		return nil, e
 	}
+	metaStore := getLabelStore(stores)
 	ks, _, err := metaStore.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToLabelPrefix(repo, prefix), "", maxLabelsToList)
 
 	if err != nil {
 		return nil, err
 	}
 	labelDescriptors := make([]model.LabelDescriptor, 0)
-	bundle := New(NewBDescriptor(),
+	bundle := NewBundle(NewBDescriptor(),
 		Repo(repo),
-		MetaStore(metaStore),
+		ContextStores(stores),
 	)
 	for _, k := range ks {
 		apc, err := model.GetArchivePathComponents(k)

@@ -15,12 +15,12 @@ var repoList = &cobra.Command{
 	Long:  "List repos that have been created",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		repos, err := core.ListRepos(remoteStores.meta)
+		repos, err := core.ListRepos(remoteStores)
 		if err != nil {
 			wrapFatalln("download repo list", err)
 			return
@@ -35,9 +35,12 @@ var repoList = &cobra.Command{
 			log.Println(buf.String())
 		}
 	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	}, // https://github.com/spf13/cobra/issues/458
 }
 
 func init() {
-	addBucketNameFlag(repoList)
+	addMetadataBucket(repoList)
 	repoCmd.AddCommand(repoList)
 }

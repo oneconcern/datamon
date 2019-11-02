@@ -1,4 +1,9 @@
-package wal
+/*
+ * Copyright © 2019 One Concern
+ *
+ */
+
+package model
 
 import (
 	"fmt"
@@ -13,8 +18,7 @@ type Entry struct {
 	Payload string `json:"payload" yaml:"payload"`
 }
 
-const tokenGeneratorPath = "WALTokenGeneratorPath"
-const maxConcurrency = 1024
+const TokenGeneratorPath = "WALTokenGeneratorPath"
 
 func NewEntry(token string, payload string) *Entry {
 	return &Entry{
@@ -23,7 +27,7 @@ func NewEntry(token string, payload string) *Entry {
 	}
 }
 
-func Unmarshal(b []byte) (*Entry, error) {
+func UnmarshalWAL(b []byte) (*Entry, error) {
 	if b == nil {
 		return nil, fmt.Errorf("received nil entry to unmarshall")
 	}
@@ -32,7 +36,7 @@ func Unmarshal(b []byte) (*Entry, error) {
 	return &e, err
 }
 
-func Marshal(entry *Entry) ([]byte, error) {
+func MarshalWAL(entry *Entry) ([]byte, error) {
 	b, err := yaml.Marshal(entry)
 	return b, err
 }

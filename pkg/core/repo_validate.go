@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/oneconcern/datamon/pkg/model"
-	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-func RepoExists(repo string, store storage.Store) error {
+func RepoExists(repo string, stores context2.Stores) error {
+	store := getRepoStore(stores)
 	exists, err := store.Has(context.Background(), model.GetArchivePathToRepoDescriptor(repo))
 	if err != nil {
 		return fmt.Errorf("repo validation failed: Hit err:%s", err)
@@ -22,7 +24,8 @@ func RepoExists(repo string, store storage.Store) error {
 	return nil
 }
 
-func GetRepo(repo string, store storage.Store) (*model.RepoDescriptor, error) {
+func GetRepo(repo string, stores context2.Stores) (*model.RepoDescriptor, error) {
+	store := stores.Metadata()
 	r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(repo))
 	if err != nil {
 		return nil, err

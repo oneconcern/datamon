@@ -106,28 +106,28 @@ func unpackBundleDescriptor(ctx context.Context, bundle *Bundle, publish bool) e
 	var rdr io.Reader
 	switch {
 	case publish:
-		if bundle.MetaStore == nil || bundle.ConsumableStore == nil {
+		if bundle.MetaStore() == nil || bundle.ConsumableStore == nil {
 			return fmt.Errorf("can't publish without both meta and consumable stores")
 		}
 
 		bundleDescriptorBuffer, err = storage.ReadTee(ctx,
-			bundle.MetaStore, model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
+			bundle.MetaStore(), model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
 			bundle.ConsumableStore, model.GetConsumablePathToBundle(bundle.BundleID))
 		if err != nil {
 			return err
 		}
 
-	case bundle.MetaStore != nil:
+	case bundle.MetaStore() != nil:
 		var has bool
 		archivePathToBundle := model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID)
-		has, err = bundle.MetaStore.Has(ctx, archivePathToBundle)
+		has, err = bundle.MetaStore().Has(ctx, archivePathToBundle)
 		if err != nil {
 			return err
 		}
 		if !has {
 			return ErrNotFound
 		}
-		rdr, err = bundle.MetaStore.Get(ctx, archivePathToBundle)
+		rdr, err = bundle.MetaStore().Get(ctx, archivePathToBundle)
 		if err != nil {
 			return err
 		}
@@ -192,19 +192,19 @@ func downloadBundleFileListFile(ctx context.Context, bundle *Bundle,
 
 	switch {
 	case publish:
-		if bundle.MetaStore == nil || bundle.ConsumableStore == nil {
+		if bundle.MetaStore() == nil || bundle.ConsumableStore == nil {
 			sendErr(fmt.Errorf("can't publish without both meta and consumable stores"))
 			return
 		}
 		bundleEntriesBuffer, err = storage.ReadTee(ctx,
-			bundle.MetaStore, archivePathToBundleFileList,
+			bundle.MetaStore(), archivePathToBundleFileList,
 			bundle.ConsumableStore, consumablePathToBundleFileList)
 		if err != nil {
 			sendErr(err)
 			return
 		}
-	case bundle.MetaStore != nil:
-		rdr, err = bundle.MetaStore.Get(ctx, archivePathToBundleFileList)
+	case bundle.MetaStore() != nil:
+		rdr, err = bundle.MetaStore().Get(ctx, archivePathToBundleFileList)
 		if err != nil {
 			sendErr(err)
 			return
@@ -521,7 +521,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle,
 	fs, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
-		cafs.Backend(bundle.BlobStore),
+		cafs.Backend(bundle.BlobStore()),
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
 	)
 	if err != nil {
@@ -561,11 +561,10 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle,
 				return err
 			}
 		}
-		publishMetadataBundle := New(NewBDescriptor(),
+		publishMetadataBundle := NewBundle(NewBDescriptor(),
 			Repo(bundle.RepoID),
-			MetaStore(bundle.MetaStore),
+			ContextStores(bundle.contextStores),
 			ConsumableStore(bundleDest.ConsumableStore),
-			BlobStore(bundle.BlobStore),
 			BundleID(bundle.BundleID),
 		)
 		err = PublishMetadata(ctx, publishMetadataBundle)
@@ -581,7 +580,7 @@ func unpackDataFile(ctx context.Context, bundle *Bundle, file string) error {
 	fs, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
-		cafs.Backend(bundle.BlobStore),
+		cafs.Backend(bundle.BlobStore()),
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
 	)
 	if err != nil {

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oneconcern/datamon/pkg/model"
+
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"go.uber.org/zap"
 
@@ -17,6 +19,7 @@ import (
 
 const (
 	maxEntriesPerList = 1000
+	maxConcurrency    = 1024
 )
 
 type WAL struct {
@@ -45,7 +48,7 @@ func NewWAL(mutableStore storage.Store, walStore storage.Store, logger *zap.Logg
 	wal := WAL{
 		mutableStore:       mutableStore,
 		walStore:           walStore,
-		tokenGeneratorPath: tokenGeneratorPath,
+		tokenGeneratorPath: model.TokenGeneratorPath,
 		maxConcurrency:     maxConcurrency,
 		l:                  logger,
 	}
@@ -84,7 +87,7 @@ func (w *WAL) getToken(ctx context.Context) (string, error) {
 
 // Adds a WAL entry to WAL
 func (w *WAL) Add(ctx context.Context, p string) (string, error) {
-	e := Entry{
+	e := model.Entry{
 		Payload: p,
 	}
 	var err error
@@ -155,8 +158,8 @@ func (w *WAL) releaseConnection() {
 
 type walChannels struct {
 	tokens  chan []string
-	entry   chan *Entry
-	entries chan []Entry
+	entry   chan *model.Entry
+	entries chan []model.Entry
 	count   chan int
 	oops    chan error
 	done    chan struct{}
@@ -164,8 +167,8 @@ type walChannels struct {
 
 func newWalChannels() *walChannels {
 	token := make(chan []string)
-	entry := make(chan *Entry)
-	entries := make(chan []Entry)
+	entry := make(chan *model.Entry)
+	entries := make(chan []model.Entry)
 	count := make(chan int)
 	done := make(chan struct{})
 	return &walChannels{
@@ -177,7 +180,7 @@ func newWalChannels() *walChannels {
 	}
 }
 
-func (w *WAL) ListEntries(ctx context.Context, fromToken string, max int) ([]Entry, string, error) {
+func (w *WAL) ListEntries(ctx context.Context, fromToken string, max int) ([]model.Entry, string, error) {
 	if max <= 0 {
 		w.l.Warn("received 0 length max",
 			zap.String("fromToken", fromToken),
@@ -255,7 +258,7 @@ func (w *WAL) read(ctx context.Context, token string, channels *walChannels) {
 			break
 		}
 	}
-	entry, err := Unmarshal(b)
+	entry, err := model.UnmarshalWAL(b)
 	if err != nil {
 		channels.oops <- fmt.Errorf("token: %s, err: %s", token, err)
 		return
@@ -275,7 +278,7 @@ func (w *WAL) collectParallelResponses(ctx context.Context, channels *walChannel
 			channels.oops <- err
 			return
 		}
-		var entries []Entry
+		var entries []model.Entry
 		iterator := entriesMap.Root().Iterator()
 		for {
 			_, e, ok := iterator.Next()
@@ -284,7 +287,7 @@ func (w *WAL) collectParallelResponses(ctx context.Context, channels *walChannel
 				channels.entries <- entries
 				return
 			}
-			entry := e.(*Entry)
+			entry := e.(*model.Entry)
 			entries = append(entries, *entry)
 		}
 	}

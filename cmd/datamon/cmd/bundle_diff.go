@@ -9,7 +9,6 @@ import (
 	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 
 	"github.com/spf13/afero"
@@ -22,21 +21,17 @@ var bundleDiffCmd = &cobra.Command{
 	Long: "Diff a downloaded bundle with a remote bundle.  " +
 		"--destination is a location previously passed to the `bundle download` command.",
 	Run: func(cmd *cobra.Command, args []string) {
+
 		const listLineTemplateString = `{{.Type}} , {{.Name}} , {{with .Additional}}{{.Size}} , {{.Hash}}{{end}} , {{with .Existing}}{{.Size}} , {{.Hash}}{{end}}`
 		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
 
 		ctx := context.Background()
-		sourceStore, err := gcs.New(ctx, params.repo.MetadataBucket, config.Credential)
+
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
-			wrapFatalln("create source store", err)
-			return
+			wrapFatalln("failed to initialize remote stores", err)
 		}
-		blobStore, err := gcs.New(ctx, params.repo.BlobBucket, config.Credential)
-		if err != nil {
-			wrapFatalln("create blob store", err)
-			return
-		}
-		path, err := sanitizePath(params.bundle.DataPath)
+		path, err := sanitizePath(datamonFlags.bundle.DataPath)
 		if err != nil {
 			wrapFatalln("failed path validation", err)
 			return
@@ -44,22 +39,24 @@ var bundleDiffCmd = &cobra.Command{
 		fs := afero.NewBasePathFs(afero.NewOsFs(), path+"/")
 		destinationStore := localfs.New(fs)
 
-		err = setLatestOrLabelledBundle(ctx, sourceStore)
+		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err != nil {
 			wrapFatalln("determine bundle id", err)
 			return
 		}
 
-		localBundle := core.New(core.NewBDescriptor(),
+		localBundle := core.NewBundle(core.NewBDescriptor(),
 			core.ConsumableStore(destinationStore),
 		)
-		remoteBundle := core.New(core.NewBDescriptor(),
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(sourceStore),
-			core.BlobStore(blobStore),
-			core.BundleID(params.bundle.ID),
-			core.ConcurrentFilelistDownloads(
-				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
+
+		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundleOpts = append(bundleOpts,
+			core.ConcurrentFilelistDownloads(datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
+
+		remoteBundle := core.NewBundle(core.NewBDescriptor(),
+			bundleOpts...,
 		)
 
 		diff, err := core.Diff(ctx, localBundle, remoteBundle)
@@ -81,6 +78,9 @@ var bundleDiffCmd = &cobra.Command{
 			}
 		}
 	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	},
 }
 
 func init() {
@@ -94,8 +94,6 @@ func init() {
 	// Bundle to download
 	addBundleFlag(bundleDiffCmd)
 	// Blob bucket
-	addBlobBucket(bundleDiffCmd)
-	addBucketNameFlag(bundleDiffCmd)
 
 	addLabelNameFlag(bundleDiffCmd)
 

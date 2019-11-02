@@ -839,7 +839,7 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 func (fs *fsMutable) Commit() error {
 	caFs, err := cafs.New(
 		cafs.LeafSize(fs.bundle.BundleDescriptor.LeafSize),
-		cafs.Backend(fs.bundle.BlobStore),
+		cafs.Backend(fs.bundle.BlobStore()),
 	)
 	if err != nil {
 		return err

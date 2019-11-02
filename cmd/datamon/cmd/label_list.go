@@ -16,12 +16,14 @@ var LabelListCommand = &cobra.Command{
 	Long:  "List the labels in a repo",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		labelDescriptors, err := core.ListLabels(params.repo.RepoName, remoteStores.meta, params.label.Prefix)
+
+		labelDescriptors, err := core.ListLabels(datamonFlags.repo.RepoName, remoteStores, datamonFlags.label.Prefix)
 		if err != nil {
 			wrapFatalln("download label list", err)
 			return
@@ -35,6 +37,9 @@ var LabelListCommand = &cobra.Command{
 			}
 			log.Println(buf.String())
 		}
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 

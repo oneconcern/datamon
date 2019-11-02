@@ -1,20 +1,26 @@
 package cmd
 
 import (
+	"context"
+	"io/ioutil"
+
+	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
-// Config describes the CLI configuration.
-type Config struct {
+// CLIConfig describes the CLI configuration.
+type CLIConfig struct {
 	// bug in viper? Need to keep names of fields the same as the serialized names..
-	Metadata   string `json:"metadata" yaml:"metadata"`
-	Blob       string `json:"blob" yaml:"blob"`
-	Credential string `json:"credential" yaml:"credential"`
+	Credential string `json:"credential" yaml:"credential"` // Credentials to use for GCS
+	Config     string `json:"config" yaml:"config"`         // Config for datamon
+	Context    string `json:"context" yaml:"context"`       // Context for datamon
 }
 
-func newConfig() (*Config, error) {
-	var config Config
+func newConfig() (*CLIConfig, error) {
+	var config CLIConfig
 	err := viper.Unmarshal(&config)
 	if err != nil {
 		return nil, err
@@ -22,19 +28,38 @@ func newConfig() (*Config, error) {
 	return &config, nil
 }
 
-func (c *Config) setRepoParams(params *paramsT) {
-	if params.repo.MetadataBucket == "" {
-		params.repo.MetadataBucket = config.Metadata
-		if params.repo.MetadataBucket == "" {
-			wrapFatalln("metadata bucket not set in config or as a cli param", nil)
-		}
+func (c *CLIConfig) setDatamonParams(flags *flagsT) {
+	if flags.context.Descriptor.Name == "" {
+		flags.context.Descriptor.Name = c.Context
 	}
-	if params.repo.BlobBucket == "" {
-		params.repo.BlobBucket = config.Blob
-		if params.repo.BlobBucket == "" {
-			wrapFatalln("blob bucket not set in config or as a cli param", nil)
-		}
+	if flags.core.Config == "" {
+		flags.core.Config = c.Config
 	}
+}
+
+func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
+	configStore, err := gcs.New(context.Background(), flags.core.Config, config.Credential)
+	if err != nil {
+		wrapFatalln("failed to get context details", err)
+		return
+	}
+	rdr, err := configStore.Get(context.Background(), model.GetPathToContext(flags.context.Descriptor.Name))
+	if err != nil {
+		wrapFatalln("failed to get context details from config store for "+flags.context.Descriptor.Name, err)
+		return
+	}
+	b, err := ioutil.ReadAll(rdr)
+	if err != nil {
+		wrapFatalln("failed to read context details", err)
+		return
+	}
+	contextDescriptor := model.Context{}
+	err = yaml.Unmarshal(b, &contextDescriptor)
+	if err != nil {
+		wrapFatalln("failed to unmarshal", err)
+		return
+	}
+	flags.context.Descriptor = contextDescriptor
 }
 
 // configCmd represents the bundle related commands
@@ -43,7 +68,7 @@ var configCmd = &cobra.Command{
 	Short: "Commands to manage a config",
 	Long: `Commands to manage datamon cli config.
 
-Configuration for datamon is the common set of params that are needed for most commands and do not change.
+Configuration for datamon is the common set of datamonFlags that are needed for most commands and do not change.
 `,
 }
 

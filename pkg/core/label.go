@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"time"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/oneconcern/datamon/pkg/model"
@@ -24,6 +26,10 @@ func LabelContributors(c []model.Contributor) LabelDescriptorOption {
 	return func(ld *model.LabelDescriptor) {
 		ld.Contributors = c
 	}
+}
+
+func getLabelStore(stores context2.Stores) storage.Store {
+	return stores.VMetadata()
 }
 
 func LabelContributor(c model.Contributor) LabelDescriptorOption {
@@ -60,7 +66,7 @@ func NewLabel(ld *model.LabelDescriptor, labelOps ...LabelOption) *Label {
 }
 
 func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error {
-	e := RepoExists(bundle.RepoID, bundle.MetaStore)
+	e := RepoExists(bundle.RepoID, bundle.contextStores)
 	if e != nil {
 		return e
 	}
@@ -69,7 +75,7 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 	if err != nil {
 		return err
 	}
-	lsCRC, ok := bundle.MetaStore.(storage.StoreCRC)
+	lsCRC, ok := bundle.contextStores.VMetadata().(storage.StoreCRC)
 	if ok {
 		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
 		err = lsCRC.PutCRC(ctx,
@@ -77,7 +83,7 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 			bytes.NewReader(buffer), storage.OverWrite, crc)
 
 	} else {
-		err = bundle.MetaStore.Put(ctx,
+		err = bundle.contextStores.VMetadata().Put(ctx,
 			model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name),
 			bytes.NewReader(buffer), storage.OverWrite)
 	}
@@ -89,20 +95,20 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 
 func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, checkRepoExists bool) error {
 	if checkRepoExists {
-		e := RepoExists(bundle.RepoID, bundle.MetaStore)
+		e := RepoExists(bundle.RepoID, bundle.contextStores)
 		if e != nil {
 			return e
 		}
 	}
 	archivePath := model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name)
-	has, err := bundle.MetaStore.Has(context.Background(), archivePath)
+	has, err := getLabelStore(bundle.contextStores).Has(context.Background(), archivePath)
 	if err != nil {
 		return err
 	}
 	if !has {
 		return ErrNotFound
 	}
-	rdr, err := bundle.MetaStore.Get(context.Background(), archivePath)
+	rdr, err := getLabelStore(bundle.contextStores).Get(context.Background(), archivePath)
 	if err != nil {
 		return err
 	}

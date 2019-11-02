@@ -60,7 +60,7 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 	if err != nil {
 		return err
 	}
-	msCRC, ok := bundle.MetaStore.(storage.StoreCRC)
+	msCRC, ok := bundle.MetaStore().(storage.StoreCRC)
 	archivePathToBundleFileList := model.GetArchivePathToBundleFileList(
 		bundle.RepoID,
 		bundle.BundleID,
@@ -79,7 +79,7 @@ func uploadBundleEntriesFileList(ctx context.Context, bundle *Bundle, fileList [
 			zap.String("archive path", archivePathToBundleFileList),
 			zap.Int("BundleEntriesFileCount", int(bundle.BundleDescriptor.BundleEntriesFileCount)),
 		)
-		err = bundle.MetaStore.Put(ctx,
+		err = bundle.MetaStore().Put(ctx,
 			archivePathToBundleFileList,
 			bytes.NewReader(buffer), storage.NoOverWrite)
 	}
@@ -209,7 +209,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	}
 	cafsArchive, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
-		cafs.Backend(bundle.BlobStore),
+		cafs.Backend(bundle.BlobStore()),
 		cafs.ConcurrentFlushes(bundle.concurrentFileUploads/fileUploadsPerFlush),
 	)
 	if err != nil {
@@ -319,7 +319,7 @@ func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 	if err != nil {
 		return err
 	}
-	msCRC, ok := bundle.MetaStore.(storage.StoreCRC)
+	msCRC, ok := bundle.MetaStore().(storage.StoreCRC)
 	if ok {
 		crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
 		err = msCRC.PutCRC(ctx,
@@ -327,7 +327,7 @@ func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
 			bytes.NewReader(buffer), storage.NoOverWrite, crc)
 
 	} else {
-		err = bundle.MetaStore.Put(ctx,
+		err = bundle.MetaStore().Put(ctx,
 			model.GetArchivePathToBundle(bundle.RepoID, bundle.BundleID),
 			bytes.NewReader(buffer), storage.NoOverWrite)
 	}

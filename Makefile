@@ -172,15 +172,6 @@ build-migrate:
 		-t reg.onec.co/migrate:$(subst /,_,$(GIT_BRANCH)) \
 		-f migrate.Dockerfile .
 
-.PHONY: build-csi
-build-csi:
-	@echo 'building ${yello}csi${RESET} container'
-	@docker build --pull --build-arg github_user=$(GITHUB_USER) \
-		--build-arg github_token=$(GITHUB_TOKEN) \
-		-t ${REPOSITORY}/datamon-csi:${GITHUB_USER}-$$(date '+%Y%m%d') \
-		-t ${REPOSITORY}/datamon-csi:$(subst /,_,$(GIT_BRANCH)) \
-		-f csi.Dockerfile .
-
 .PHONY: push-all
 ## Push all the containers
 push-all: push-datamon

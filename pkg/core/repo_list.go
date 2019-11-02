@@ -5,17 +5,19 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/model"
-	"github.com/oneconcern/datamon/pkg/storage"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 const (
 	maxReposToList = 1000000
 )
 
-func GetRepoDescriptorByRepoName(store storage.Store, repoName string) (model.RepoDescriptor, error) {
+func GetRepoDescriptorByRepoName(stores context2.Stores, repoName string) (model.RepoDescriptor, error) {
 	var rd model.RepoDescriptor
+	store := getRepoStore(stores) // TODO: ReadLog integration
 	archivePathToRepoDescriptor := model.GetArchivePathToRepoDescriptor(repoName)
 	has, err := store.Has(context.Background(), archivePathToRepoDescriptor)
 	if err != nil {
@@ -43,8 +45,9 @@ func GetRepoDescriptorByRepoName(store storage.Store, repoName string) (model.Re
 	return rd, nil
 }
 
-func ListRepos(store storage.Store) ([]model.RepoDescriptor, error) {
+func ListRepos(stores context2.Stores) ([]model.RepoDescriptor, error) {
 	// Get a list
+	store := getRepoStore(stores)
 	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
 	var repos = make([]model.RepoDescriptor, 0)
 	for _, k := range ks {
@@ -54,7 +57,7 @@ func ListRepos(store storage.Store) ([]model.RepoDescriptor, error) {
 		}
 
 		var rd model.RepoDescriptor
-		rd, err = GetRepoDescriptorByRepoName(store, apc.Repo)
+		rd, err = GetRepoDescriptorByRepoName(stores, apc.Repo)
 		if err != nil {
 			return nil, err
 		}
@@ -64,9 +67,9 @@ func ListRepos(store storage.Store) ([]model.RepoDescriptor, error) {
 }
 
 // todo: use storage.Store pagination
-func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescriptor, error) {
+func ListReposPaginated(stores context2.Stores, token string) ([]model.RepoDescriptor, error) {
 	// Get a list
-	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
+	ks, _, _ := getRepoStore(stores).KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
 	var repos = make([]model.RepoDescriptor, 0)
 	tokenHit := false
 	for _, k := range ks {
@@ -82,7 +85,7 @@ func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescript
 		}
 
 		var rd model.RepoDescriptor
-		rd, err = GetRepoDescriptorByRepoName(store, apc.Repo)
+		rd, err = GetRepoDescriptorByRepoName(stores, apc.Repo)
 		if err != nil {
 			return nil, err
 		}

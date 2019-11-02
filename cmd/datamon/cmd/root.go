@@ -24,11 +24,9 @@ var rootCmd = &cobra.Command{
 This is not a replacement for existing tools, but rather a way to manage their inputs and outputs.
 
 Datamon works by providing a git like interface to manage data efficiently.
-It executes pipelines by scheduling the processors as serverless functions on either AWS lambda or on kubeless.
-
 `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if params.root.cpuProf {
+		if datamonFlags.root.cpuProf {
 			f, err := os.Create("cpu.prof")
 			if err != nil {
 				log.Fatal(err)
@@ -38,13 +36,13 @@ It executes pipelines by scheduling the processors as serverless functions on ei
 	},
 	// upstream api note:  *PostRun functions aren't called in case of a panic() in Run
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		if params.root.cpuProf {
+		if datamonFlags.root.cpuProf {
 			pprof.StopCPUProfile()
 		}
 	},
 }
 
-var config *Config
+var config *CLIConfig
 
 // used to patch over calls to os.Exit() during test
 var logFatalln = log.Fatalln
@@ -71,7 +69,7 @@ func wrapFatalWithCode(code int, format string, args ...interface{}) {
 	osExit(code)
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
+// Execute adds all child commands to the root command and sets datamonFlags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	var err error
@@ -85,37 +83,58 @@ func Execute() {
 func init() {
 	log.SetFlags(0)
 	cobra.OnInitialize(initConfig)
+	addConfigFlag(rootCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	viper.SetDefault("metadata", "datamon-meta-data")
-	viper.SetDefault("blob", "datamon-blob-data")
-	viper.SetDefault("label", "datamon-label-data")
+	// 1. Set defaults
+	// 2. Read in config file
+	// 3. Override via environment variable
+	// 4. Override via flags.
+
+	// 2. Config file
 	if os.Getenv("DATAMON_CONFIG") != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(os.Getenv("DATAMON_CONFIG"))
 	} else {
 		viper.AddConfigPath(".")
-		viper.AddConfigPath("$HOME/.datamon")
-		viper.AddConfigPath("/etc/datamon")
-		viper.SetConfigName("datamon")
+		viper.AddConfigPath("$HOME/" + datamonDir)
+		viper.AddConfigPath("/etc/datamon2")
+		viper.SetConfigName("datamon2")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
 	// If a config file is found, read it in.
-	viper.ReadInConfig() // nolint:errcheck
+	_ = viper.ReadInConfig() // nolint:errcheck
 	// `viper.ConfigFileUsed()` returns path to config file if error is nil
 	var err error
+	// 2. Initialize config
 	config, err = newConfig()
 	if err != nil {
 		wrapFatalln("populate config struct", err)
 		return
 	}
-	config.setRepoParams(&params)
+
 	if config.Credential != "" {
-		// Always pick the config file. There can be a duplicate bucket name in a different project, avoid wrong environment
-		// variable from dev testing from screwing things up..
 		_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.Credential)
+	}
+
+	viper.AutomaticEnv() // read in environment variables that match
+	if datamonFlags.context.Descriptor.Name == "" {
+		datamonFlags.context.Descriptor.Name = viper.GetString("DATAMON_CONTEXT")
+	}
+	if datamonFlags.core.Config == "" {
+		datamonFlags.core.Config = viper.GetString("DATAMON_GLOBAL_CONFIG")
+	}
+
+	config.setDatamonParams(&datamonFlags)
+
+	if datamonFlags.context.Descriptor.Name == "" {
+		datamonFlags.context.Descriptor.Name = "datamon-dev"
+	}
+
+	if datamonFlags.core.Config == "" {
+		wrapFatalln("set environment variable $DATAMON_GLOBAL_CONFIG or create config file", nil)
+		return
 	}
 }

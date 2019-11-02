@@ -6,6 +6,8 @@ import (
 	"math"
 	"strconv"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -30,6 +32,9 @@ const (
 	sourceDir              = "../../testdata/core/bundle/source/"
 	blobDir                = sourceDir + "/blob"
 	metaDir                = sourceDir + "/meta"
+	vmetaDir               = sourceDir + "/vmeta"
+	wal                    = sourceDir + "/wal"
+	readLog                = sourceDir + "/readLog"
 	destinationDir         = "../../testdata/core/bundle/destination/"
 	reArchiveMetaDir       = "../../testdata/core/bundle/destination2/meta"
 	reArchiveBlobDir       = "../../testdata/core/bundle/destination2/blob"
@@ -52,6 +57,8 @@ func TestBundle(t *testing.T) {
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	reArchiveBlob := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveBlobDir))
 	reArchive := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveMetaDir))
+	dmc := context2.Stores{}
+	dmc.SetMetadata(metaStore)
 	require.NoError(t, CreateRepo(model.RepoDescriptor{
 		Name:        repo,
 		Description: "test",
@@ -60,7 +67,8 @@ func TestBundle(t *testing.T) {
 			Name:  "test",
 			Email: "t@test.com",
 		},
-	}, metaStore))
+	}, dmc))
+	dmc.SetMetadata(reArchive)
 	require.NoError(t, CreateRepo(model.RepoDescriptor{
 		Name:        repo,
 		Description: "test",
@@ -69,15 +77,16 @@ func TestBundle(t *testing.T) {
 			Name:  "test",
 			Email: "t@test.com",
 		},
-	}, reArchive))
+	}, dmc))
 
 	bd := NewBDescriptor()
-	bundle := New(bd,
+	dmc.SetMetadata(metaStore)
+	dmc.SetBlob(blobStore)
+	bundle := NewBundle(bd,
 		Repo(repo),
 		BundleID(bundleID),
-		MetaStore(metaStore),
 		ConsumableStore(consumableStore),
-		BlobStore(blobStore),
+		ContextStores(dmc),
 	)
 
 	// Publish the bundle and compare with original
@@ -88,11 +97,12 @@ func TestBundle(t *testing.T) {
 	validatePublish(t, consumableStore, bundleEntriesFileCount)
 
 	/* bundle id is set on upload */
-	archiveBundle2 := New(bd,
+	dmc.SetBlob(reArchiveBlob)
+	dmc.SetMetadata(reArchive)
+	archiveBundle2 := NewBundle(bd,
 		Repo(repo),
-		MetaStore(reArchive),
 		ConsumableStore(consumableStore),
-		BlobStore(reArchiveBlob),
+		ContextStores(dmc),
 	)
 	require.NoError(t,
 		implUpload(context.Background(), archiveBundle2, reBundleEntriesPerFile, nil))
@@ -109,6 +119,8 @@ func paramedTestPublishMetadata(t *testing.T, publish bool) {
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
+	dmc := context2.Stores{}
+	dmc.SetMetadata(metaStore)
 	require.NoError(t, CreateRepo(model.RepoDescriptor{
 		Name:        repo,
 		Description: "test",
@@ -117,15 +129,16 @@ func paramedTestPublishMetadata(t *testing.T, publish bool) {
 			Name:  "test",
 			Email: "t@test.com",
 		},
-	}, metaStore))
+	}, dmc))
 
 	bd := NewBDescriptor()
-	bundle := New(bd,
+	dmc.SetMetadata(metaStore)
+	dmc.SetBlob(blobStore)
+	bundle := NewBundle(bd,
 		Repo(repo),
 		BundleID(bundleID),
-		MetaStore(metaStore),
 		ConsumableStore(consumableStore),
-		BlobStore(blobStore),
+		ContextStores(dmc),
 	)
 
 	// Publish the bundle and compare with original
@@ -147,7 +160,7 @@ func validatePublishMetadata(t *testing.T, bundle *Bundle, publish bool) {
 	var i uint64
 
 	consumableStore := bundle.ConsumableStore
-	metaStore := bundle.MetaStore
+	metaStore := bundle.MetaStore()
 
 	readBundleEntries := func(store storage.Store,
 		idx2Filelist func(uint64) string,
@@ -248,7 +261,7 @@ func validateUpload(t *testing.T,
 	}
 	// Check Bundle File
 	pathToBundleDescriptor := model.GetArchivePathToBundle(uploadedBundle.RepoID, uploadedBundle.BundleID)
-	bundleDescriptor := readBundleDescriptor(t, uploadedBundle.MetaStore, pathToBundleDescriptor)
+	bundleDescriptor := readBundleDescriptor(t, uploadedBundle.MetaStore(), pathToBundleDescriptor)
 	expectedBundleDescriptor := generateBundleDescriptor(bundleEntriesFileCount)
 	require.Equal(t, bundleDescriptor.Parents, expectedBundleDescriptor.Parents)
 	require.Equal(t, bundleDescriptor.LeafSize, expectedBundleDescriptor.LeafSize)
@@ -262,7 +275,7 @@ func readBundleFilelist(t *testing.T,
 ) []model.BundleEntry {
 	var fileList []model.BundleEntry
 	for i := 0; i < int(bundleEntriesFileCount); i++ {
-		bundleEntriesReader, err := bundle.MetaStore.Get(context.Background(),
+		bundleEntriesReader, err := bundle.MetaStore().Get(context.Background(),
 			model.GetArchivePathToBundleFileList(repo, bundle.BundleID, uint64(i)))
 		require.NoError(t, err)
 		var bundleEntries model.BundleEntries
@@ -272,7 +285,7 @@ func readBundleFilelist(t *testing.T,
 		fileList = append(fileList, bundleEntries.BundleEntries...)
 	}
 	// verify that the file count is correct
-	_, err := bundle.MetaStore.Get(context.Background(),
+	_, err := bundle.MetaStore().Get(context.Background(),
 		model.GetArchivePathToBundleFileList(repo, bundle.BundleID, bundleEntriesFileCount))
 	require.NotNil(t, err)
 	return fileList
@@ -414,4 +427,21 @@ func validateDataFiles(t *testing.T, expectedDir string, actualDir string) bool 
 		require.True(t, found)
 	}
 	return true
+}
+
+func TestBundle_StoreGet(t *testing.T) {
+	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
+	vmetaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), vmetaDir))
+	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
+	walStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), wal))
+	readLog := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), readLog))
+	dmc := context2.NewStores(walStore, readLog, blobStore, metaStore, vmetaStore)
+	b := Bundle{
+		contextStores: dmc,
+	}
+	require.Equal(t, metaStore, b.MetaStore())
+	require.Equal(t, vmetaStore, b.VMetaStore())
+	require.Equal(t, blobStore, b.BlobStore())
+	require.Equal(t, walStore, b.WALStore())
+	require.Equal(t, readLog, b.ReadLogStore())
 }

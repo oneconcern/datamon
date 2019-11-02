@@ -49,8 +49,8 @@ func testBundleMount(t *testing.T, testType string) {
 			"--bundle", bundles[0].hash,
 			"--destination", pathBackingFs,
 			"--mount", pathToMount,
-			"--meta", params.repo.MetadataBucket,
-			"--blob", params.repo.BlobBucket,
+			"--meta", datamonFlags.context.Descriptor.Metadata,
+			"--blob", datamonFlags.context.Descriptor.Blob,
 			"--stream=false",
 		}
 	case "stream-dest":
@@ -60,8 +60,8 @@ func testBundleMount(t *testing.T, testType string) {
 			"--bundle", bundles[0].hash,
 			"--destination", pathBackingFs,
 			"--mount", pathToMount,
-			"--meta", params.repo.MetadataBucket,
-			"--blob", params.repo.BlobBucket,
+			"--meta", datamonFlags.context.Descriptor.Metadata,
+			"--blob", datamonFlags.context.Descriptor.Blob,
 		}
 	case "nostream-nodest":
 		cmdParams = []string{
@@ -69,8 +69,8 @@ func testBundleMount(t *testing.T, testType string) {
 			"--repo", repo1,
 			"--bundle", bundles[0].hash,
 			"--mount", pathToMount,
-			"--meta", params.repo.MetadataBucket,
-			"--blob", params.repo.BlobBucket,
+			"--meta", datamonFlags.context.Descriptor.Metadata,
+			"--blob", datamonFlags.context.Descriptor.Blob,
 		}
 	default:
 		require.True(t, false, "unexpected test type '"+testType+"'")
@@ -140,8 +140,8 @@ func TestBundleMutableMount(t *testing.T) {
 		"--message", "mutabletest",
 		"--destination", pathBackingFs,
 		"--mount", pathToMount,
-		"--meta", params.repo.MetadataBucket,
-		"--blob", params.repo.BlobBucket,
+		"--meta", datamonFlags.context.Descriptor.Metadata,
+		"--blob", datamonFlags.context.Descriptor.Blob,
 	)
 	rdr, err := cmd.StdoutPipe()
 	require.NoError(t, err)

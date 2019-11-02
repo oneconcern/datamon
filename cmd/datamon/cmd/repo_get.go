@@ -19,15 +19,15 @@ Prints corresponding repo information if the name exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
 		repoDescriptor, err := core.GetRepoDescriptorByRepoName(
-			remoteStores.meta, params.repo.RepoName)
+			remoteStores, datamonFlags.repo.RepoName)
 		if err == core.ErrNotFound {
-			wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", params.repo.RepoName)
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
 			return
 		}
 		if err != nil {
@@ -42,6 +42,9 @@ exits with ENOENT status otherwise.`,
 			return
 		}
 		log.Println(buf.String())
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 

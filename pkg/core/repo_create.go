@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"strings"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"gopkg.in/yaml.v2"
 )
 
-func CreateRepo(repo model.RepoDescriptor, store storage.Store) error {
+func CreateRepo(repo model.RepoDescriptor, stores context2.Stores) error {
+	store := getRepoStore(stores) // TODO: Integrate with WAL.
 	err := model.Validate(repo)
 	if err != nil {
 		return err

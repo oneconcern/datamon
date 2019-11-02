@@ -78,16 +78,57 @@ func (a AuthMock) Principal(_ string) (model.Contributor, error) {
 	}, nil
 }
 
+func setupConfig(t *testing.T, flags flagsT) func() {
+	r := internal.RandStringBytesMaskImprSrc(15)
+	bucketConfig := "datamon-deleteme-config" + r
+	testContext := "test-context"
+	client, err := gcsStorage.NewClient(context.Background(), option.WithScopes(gcsStorage.ScopeFullControl))
+	require.NoError(t, err, "couldn't create bucket client")
+	err = client.Bucket(bucketConfig).Create(context.Background(), "onec-co", nil)
+	require.NoError(t, err, "couldn't create config bucket")
+	runCmd(t, []string{
+		"context",
+		"create",
+		"--config",
+		bucketConfig,
+		"--context",
+		testContext,
+		"--blob",
+		flags.context.Descriptor.Blob,
+		"--wal",
+		flags.context.Descriptor.WAL,
+		"--vmeta",
+		flags.context.Descriptor.VMetadata,
+		"--meta",
+		flags.context.Descriptor.Metadata,
+		"--read-log",
+		flags.context.Descriptor.ReadLog,
+	}, "test and create context", false)
+	err = os.Setenv("DATAMON_GLOBAL_CONFIG", bucketConfig)
+	require.NoError(t, err)
+	err = os.Setenv("DATAMON_CONTEXT", testContext)
+	require.NoError(t, err)
+	cleanup := func() {
+		deleteBucket(context.Background(), t, client, bucketConfig)
+	}
+	return cleanup
+}
+
 func setupTests(t *testing.T) func() {
-	os.RemoveAll(destinationDir)
+	_ = os.RemoveAll(destinationDir)
 	ctx := context.Background()
 	exitMocks = NewExitMocks()
 	logFatalf = MakeFatalfMock(exitMocks)
 	logFatalln = MakeFatallnMock(exitMocks)
 	osExit = MakeExitMock(exitMocks)
+
 	btag := internal.RandStringBytesMaskImprSrc(15)
-	bucketMeta := "datamontestmeta-" + btag
-	bucketBlob := "datamontestblob-" + btag
+
+	bucketMeta := "datamon-deleteme-meta" + btag
+	bucketBlob := "datamon-deleteme-blob" + btag
+	bucketVMeta := "datamon-deleteme-vmeta" + btag
+	bucketWAL := "datamon-deleteme-wal" + btag
+	bucketReadLog := "datamon-deleteme-read-log" + btag
 
 	client, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err, "couldn't create bucket client")
@@ -95,24 +136,49 @@ func setupTests(t *testing.T) func() {
 	require.NoError(t, err, "couldn't create metadata bucket")
 	err = client.Bucket(bucketBlob).Create(ctx, "onec-co", nil)
 	require.NoError(t, err, "couldn't create blob bucket")
-	params.repo.MetadataBucket = bucketMeta
-	params.repo.BlobBucket = bucketBlob
+	err = client.Bucket(bucketWAL).Create(ctx, "onec-co", nil)
+	require.NoError(t, err, "couldn't create wal bucket")
+	err = client.Bucket(bucketReadLog).Create(ctx, "onec-co", nil)
+	require.NoError(t, err, "couldn't create readLog bucket")
+	err = client.Bucket(bucketVMeta).Create(ctx, "onec-co", nil)
+	require.NoError(t, err, "couldn't create vMeta bucket")
+
+	datamonFlags.context.Descriptor.Metadata = bucketMeta
+	datamonFlags.context.Descriptor.Blob = bucketBlob
+	datamonFlags.context.Descriptor.VMetadata = bucketVMeta
+	datamonFlags.context.Descriptor.WAL = bucketWAL
+	datamonFlags.context.Descriptor.ReadLog = bucketReadLog
+	c := setupConfig(t, datamonFlags)
+
 	createAllTestUploadTrees(t)
 	cleanup := func() {
-		os.RemoveAll(destinationDir)
+		c()
+		_ = os.RemoveAll(destinationDir)
 		deleteBucket(ctx, t, client, bucketMeta)
 		deleteBucket(ctx, t, client, bucketBlob)
+		deleteBucket(ctx, t, client, bucketWAL)
+		deleteBucket(ctx, t, client, bucketReadLog)
+		deleteBucket(ctx, t, client, bucketVMeta)
 	}
 	return cleanup
 }
 
 func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool, as ...AuthMock) {
 	fatalCallsBefore := exitMocks.fatalCalls()
-	bucketMeta := params.repo.MetadataBucket
-	bucketBlob := params.repo.BlobBucket
-	params = paramsT{}
-	params.repo.MetadataBucket = bucketMeta
-	params.repo.BlobBucket = bucketBlob
+	bucketMeta := datamonFlags.context.Descriptor.Metadata
+	bucketBlob := datamonFlags.context.Descriptor.Blob
+	bucketWAL := datamonFlags.context.Descriptor.WAL
+	bucketReadLog := datamonFlags.context.Descriptor.ReadLog
+	bucketVMeta := datamonFlags.context.Descriptor.VMetadata
+	config := datamonFlags.core.Config
+
+	datamonFlags = flagsT{}
+	datamonFlags.context.Descriptor.Metadata = bucketMeta
+	datamonFlags.context.Descriptor.Blob = bucketBlob
+	datamonFlags.context.Descriptor.WAL = bucketWAL
+	datamonFlags.context.Descriptor.ReadLog = bucketReadLog
+	datamonFlags.context.Descriptor.VMetadata = bucketVMeta
+	datamonFlags.core.Config = config
 
 	if len(as) == 0 {
 		authorizer = AuthMock{name: "tests", email: "datamon@oneconcern.com"}
@@ -122,7 +188,7 @@ func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool, as .
 		}
 	}
 
-	params.bundle.ID = ""
+	datamonFlags.bundle.ID = ""
 	rootCmd.SetArgs(cmd)
 	require.NoError(t, rootCmd.Execute(), "error executing '"+strings.Join(cmd, " ")+"' : "+intentMsg)
 	if expectError {

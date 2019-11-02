@@ -19,30 +19,33 @@ Prints corresponding bundle information if the label exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
 
-		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err == core.ErrNotFound {
-			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", params.label.Name)
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
 			return
 		}
 		if err != nil {
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		bundle := core.New(core.NewBDescriptor(),
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(remoteStores.meta),
-			core.BundleID(params.bundle.ID),
+
+		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+
+		bundle := core.NewBundle(core.NewBDescriptor(),
+			bundleOpts...,
 		)
 
 		err = core.DownloadMetadata(ctx, bundle)
 		if err == core.ErrNotFound {
-			wrapFatalWithCode(int(unix.ENOENT), "didn't find bundle %q", params.bundle.ID)
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find bundle %q", datamonFlags.bundle.ID)
 			return
 		}
 		if err != nil {
@@ -56,6 +59,9 @@ exits with ENOENT status otherwise.`,
 			log.Println("executing template:", err)
 		}
 		log.Println(buf.String())
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 

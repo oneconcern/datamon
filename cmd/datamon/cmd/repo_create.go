@@ -18,27 +18,30 @@ var repoCreate = &cobra.Command{
 		"Allowed characters Unicode characters, digits and hyphen. Example: dm-test-repo-1",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		contributor, err := paramsToContributor(params)
+		contributor, err := paramsToContributor(datamonFlags)
 		if err != nil {
 			wrapFatalln("populate contributor struct", err)
 			return
 		}
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
 		repo := model.RepoDescriptor{
-			Name:        params.repo.RepoName,
-			Description: params.repo.Description,
+			Name:        datamonFlags.repo.RepoName,
+			Description: datamonFlags.repo.Description,
 			Timestamp:   time.Now(),
 			Contributor: contributor,
 		}
-		err = core.CreateRepo(repo, remoteStores.meta)
+		err = core.CreateRepo(repo, remoteStores)
 		if err != nil {
 			wrapFatalln("create repo", err)
 			return
 		}
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 
@@ -51,7 +54,7 @@ func init() {
 
 	addContributorEmail(repoCreate)
 	addContributorName(repoCreate)
-	addBucketNameFlag(repoCreate)
+	addMetadataBucket(repoCreate)
 
 	for _, flag := range requiredFlags {
 		err := repoCreate.MarkFlagRequired(flag)
