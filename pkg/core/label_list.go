@@ -12,12 +12,13 @@ const (
 	maxLabelsToList = 1000000
 )
 
-func ListLabels(repo string, metaStore storage.Store) ([]model.LabelDescriptor, error) {
+func ListLabels(repo string, metaStore storage.Store, prefix string) ([]model.LabelDescriptor, error) {
 	e := RepoExists(repo, metaStore)
 	if e != nil {
 		return nil, e
 	}
-	ks, _, err := metaStore.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToLabels(repo), "", maxLabelsToList)
+	ks, _, err := metaStore.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToLabelPrefix(repo, prefix), "", maxLabelsToList)
+
 	if err != nil {
 		return nil, err
 	}
