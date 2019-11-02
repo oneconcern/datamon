@@ -3,8 +3,9 @@ package core
 import (
 	"sync"
 
+	"github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/core/status"
-	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 // keyBatchEvent catches a collection of keys with possible retrieval error
@@ -14,7 +15,7 @@ type keyBatchEvent struct {
 }
 
 // fetchKeys fetches keys for repos in batches, then close the keyBatchChan channel upon completion or error.
-func fetchKeys(store storage.Store, iterator func(string) ([]string, string, error), keyBatchChan chan<- keyBatchEvent,
+func fetchKeys(stores context.Stores, iterator func(string) ([]string, string, error), keyBatchChan chan<- keyBatchEvent,
 	doneChan <-chan struct{}, wg *sync.WaitGroup) {
 	defer func() {
 		close(keyBatchChan)

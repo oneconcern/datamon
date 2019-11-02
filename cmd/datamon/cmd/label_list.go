@@ -28,18 +28,23 @@ var LabelListCommand = &cobra.Command{
 	Long:  "List the labels in a repo",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		err = core.ListLabelsApply(params.repo.RepoName, remoteStores.meta, params.label.Prefix, applyLabelTemplate,
-			core.ConcurrentList(params.core.ConcurrencyFactor),
-			core.BatchSize(params.core.BatchSize))
+		err = core.ListLabelsApply(datamonFlags.repo.RepoName, remoteStores, datamonFlags.label.Prefix, applyLabelTemplate,
+			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
+			core.BatchSize(datamonFlags.core.BatchSize))
+
 		if err != nil {
 			wrapFatalln("download label list", err)
 			return
 		}
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 

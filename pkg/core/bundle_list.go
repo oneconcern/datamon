@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"errors"
 
 	"gopkg.in/yaml.v2"
@@ -74,7 +76,7 @@ type ApplyBundleFunc func(model.BundleDescriptor) error
 //				fmt.Fprintf(os.Stderr, "%v\n", bundle)
 //				return nil
 //			})
-func ListBundlesApply(repo string, store storage.Store, apply ApplyBundleFunc, opts ...ListOption) error {
+func ListBundlesApply(repo string, stores context2.Stores, apply ApplyBundleFunc, opts ...ListOption) error {
 	var (
 		err, applyErr error
 		once          sync.Once
@@ -95,7 +97,7 @@ func ListBundlesApply(repo string, store storage.Store, apply ApplyBundleFunc, o
 	go func(bundleChan chan<- model.BundleDescriptor, doneChan chan struct{}) {
 		defer close(bundleChan)
 
-		bundlesChan, workers := listBundlesChan(repo, store, append(opts, WithDoneChan(doneChan))...)
+		bundlesChan, workers := listBundlesChan(repo, stores, append(opts, WithDoneChan(doneChan))...)
 
 		err = doSelectBundles(bundlesChan, func(bundleBatch model.BundleDescriptors) {
 			for _, bundle := range bundleBatch {
@@ -133,10 +135,10 @@ func ListBundlesApply(repo string, store storage.Store, apply ApplyBundleFunc, o
 // ListBundles returns a list of bundle descriptors from a repo. It collects all bundles until completion.
 //
 // NOTE: this func could become deprecated. At this moment, however, it is used by pkg/web.
-func ListBundles(repo string, store storage.Store, opts ...ListOption) (model.BundleDescriptors, error) {
+func ListBundles(repo string, stores context2.Stores, opts ...ListOption) (model.BundleDescriptors, error) {
 	bundles := make(model.BundleDescriptors, 0, typicalBundlesNum)
 
-	bundlesChan, workers := listBundlesChan(repo, store, opts...)
+	bundlesChan, workers := listBundlesChan(repo, stores, opts...)
 
 	// consume batches of ordered bundles
 	err := doSelectBundles(bundlesChan, func(bundleBatch model.BundleDescriptors) {
@@ -157,7 +159,7 @@ func ListBundles(repo string, store storage.Store, opts ...ListOption) (model.Bu
 // A signaling channel may be given as option to interrupt background processing (e.g. on error).
 //
 // The sync.WaitGroup for internal goroutines is returned if caller wants to wait and avoid any leaked goroutines.
-func listBundlesChan(repo string, store storage.Store, opts ...ListOption) (chan bundlesEvent, *sync.WaitGroup) {
+func listBundlesChan(repo string, stores context2.Stores, opts ...ListOption) (chan bundlesEvent, *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	settings := defaultSettings()
@@ -167,7 +169,7 @@ func listBundlesChan(repo string, store storage.Store, opts ...ListOption) (chan
 
 	batchChan := make(chan bundlesEvent, 1) // buffered to 1 to avoid blocking on early errors
 
-	if err := RepoExists(repo, store); err != nil {
+	if err := RepoExists(repo, stores); err != nil {
 		batchChan <- bundlesEvent{err: err}
 		close(batchChan)
 		return batchChan, &wg
@@ -186,15 +188,15 @@ func listBundlesChan(repo string, store storage.Store, opts ...ListOption) (chan
 	keysChan := make(chan keyBatchEvent, 1)
 
 	iterator := func(next string) ([]string, string, error) {
-		return store.KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToBundles(repo), "/", settings.batchSize)
+		return GetBundleStore(stores).KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToBundles(repo), "/", settings.batchSize)
 	}
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(store, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	go fetchKeys(stores, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
 
 	// start bundle metadata retrieval
 	wg.Add(1)
-	go fetchBundles(repo, store, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+	go fetchBundles(repo, getMetaStore(stores), settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
 
 	// let the gc clean up internal signaling channels left open after wg goroutines are done.
 
@@ -337,12 +339,12 @@ func getBundleAsync(repo string, store storage.Store, input <-chan string, outpu
 }
 
 // GetLatestBundle returns the latest bundle descriptor from a repo
-func GetLatestBundle(repo string, store storage.Store) (string, error) {
-	e := RepoExists(repo, store)
+func GetLatestBundle(repo string, stores context2.Stores) (string, error) {
+	e := RepoExists(repo, stores)
 	if e != nil {
 		return "", e
 	}
-	ks, _, err := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", maxMetaFilesToProcess)
+	ks, _, err := getMetaStore(stores).KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToBundles(repo), "", maxMetaFilesToProcess)
 	if err != nil {
 		return "", err
 	}

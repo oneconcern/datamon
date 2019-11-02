@@ -15,20 +15,21 @@ var bundleFileList = &cobra.Command{
 	Long:  "List all the files in a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err != nil {
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		bundle := core.New(core.NewBDescriptor(),
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(remoteStores.meta),
-			core.BundleID(params.bundle.ID),
+		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundle := core.NewBundle(core.NewBDescriptor(),
+			bundleOpts...,
 		)
 		err = core.PopulateFiles(context.Background(), bundle)
 		if err != nil {
@@ -38,6 +39,9 @@ var bundleFileList = &cobra.Command{
 		for _, e := range bundle.BundleEntries {
 			log.Printf("name:%s, size:%d, hash:%s", e.NameWithPath, e.Size, e.Hash)
 		}
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 
@@ -49,8 +53,6 @@ func init() {
 	// Bundle to download
 	addBundleFlag(bundleFileList)
 
-	addBlobBucket(bundleFileList)
-	addBucketNameFlag(bundleFileList)
 	addLabelNameFlag(bundleFileList)
 
 	for _, flag := range requiredFlags {

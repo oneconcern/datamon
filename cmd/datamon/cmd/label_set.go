@@ -14,21 +14,25 @@ var SetLabelCommand = &cobra.Command{
 	Long:  "Set the label corresponding to a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		contributor, err := paramsToContributor(params)
+
+		contributor, err := paramsToContributor(datamonFlags)
 		if err != nil {
 			wrapFatalln("populate contributor struct", err)
 			return
 		}
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		bundle := core.New(core.NewBDescriptor(),
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(remoteStores.meta),
-			core.BundleID(params.bundle.ID),
+
+		bundle := core.NewBundle(core.NewBDescriptor(),
+			core.Repo(datamonFlags.repo.RepoName),
+			core.ContextStores(remoteStores),
+			core.BundleID(datamonFlags.bundle.ID),
 		)
+
 		bundleExists, err := bundle.Exists(ctx)
 		if err != nil {
 			wrapFatalln("poll for bundle existence", err)
@@ -38,17 +42,22 @@ var SetLabelCommand = &cobra.Command{
 			wrapFatalln(fmt.Sprintf("bundle %v not found", bundle), nil)
 			return
 		}
+
 		labelDescriptor := core.NewLabelDescriptor(
 			core.LabelContributor(contributor),
 		)
 		label := core.NewLabel(labelDescriptor,
-			core.LabelName(params.label.Name),
+			core.LabelName(datamonFlags.label.Name),
 		)
+
 		err = label.UploadDescriptor(ctx, bundle)
 		if err != nil {
 			wrapFatalln("upload label", err)
 			return
 		}
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 

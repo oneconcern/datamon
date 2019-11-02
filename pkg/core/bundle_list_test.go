@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/mockstorage"
@@ -476,7 +478,8 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListBundles-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedStore(testcase.name)
-			bundles, err := ListBundles(testcase.repo, mockStore, ConcurrentList(concurrency), BatchSize(testBatchSize))
+			stores := context2.NewStores(nil, nil, nil, mockStore, nil)
+			bundles, err := ListBundles(testcase.repo, stores, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertBundles(t, testcase, bundles, err)
 		})
 
@@ -484,8 +487,9 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListBundlesApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedStore(testcase.name)
+			stores := context2.NewStores(nil, nil, nil, mockStore, nil)
 			bundles := make(model.BundleDescriptors, 0, typicalBundlesNum)
-			err := ListBundlesApply(testcase.repo, mockStore, func(bundle model.BundleDescriptor) error {
+			err := ListBundlesApply(testcase.repo, stores, func(bundle model.BundleDescriptor) error {
 				bundles = append(bundles, bundle)
 				return nil
 			}, ConcurrentList(concurrency), BatchSize(testBatchSize))
@@ -496,9 +500,10 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListBundlesApplyFail-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedStore(testcase.name)
+			stores := context2.NewStores(nil, nil, nil, mockStore, nil)
 			bundles := make(model.BundleDescriptors, 0, typicalBundlesNum)
 			var fail bool
-			err := ListBundlesApply(testcase.repo, mockStore, func(bundle model.BundleDescriptor) error {
+			err := ListBundlesApply(testcase.repo, stores, func(bundle model.BundleDescriptor) error {
 				bundles = append(bundles, bundle)
 				fail = rand.Intn(2) > 0
 				if fail {

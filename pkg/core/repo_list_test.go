@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/mockstorage"
@@ -127,14 +128,16 @@ func testListRepos(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListRepos-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedRepoStore(testcase.name)
-			repos, err := ListRepos(mockStore, ConcurrentList(concurrency), BatchSize(testBatchSize))
+			stores := context2.NewStores(nil, nil, nil, nil, mockStore)
+			repos, err := ListRepos(stores, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertRepos(t, testcase, repos, err)
 		})
 		t.Run(fmt.Sprintf("ListReposApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedRepoStore(testcase.name)
+			stores := context2.NewStores(nil, nil, nil, nil, mockStore)
 			repos := make(model.RepoDescriptors, 0, typicalReposNum)
-			err := ListReposApply(mockStore, func(repo model.RepoDescriptor) error {
+			err := ListReposApply(stores, func(repo model.RepoDescriptor) error {
 				repos = append(repos, repo)
 				return nil
 			}, ConcurrentList(concurrency), BatchSize(testBatchSize))
@@ -160,7 +163,10 @@ func assertRepos(t *testing.T, testcase repoFixture, repos model.RepoDescriptors
 
 func TestGetRepoDescriptorByRepoName(t *testing.T) {
 	testcase := repoTestCases()[0]
-	repo, err := GetRepoDescriptorByRepoName(mockedRepoStore(testcase.name), "myRepo1")
+
+	mockStore := mockedRepoStore(testcase.name)
+	stores := context2.NewStores(nil, nil, nil, mockStore, mockStore)
+	repo, err := GetRepoDescriptorByRepoName(stores, "myRepo1")
 	assertRepos(t, testcase, model.RepoDescriptors{repo}, err)
 }
 

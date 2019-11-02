@@ -30,18 +30,21 @@ var BundleListCommand = &cobra.Command{
 	Long:  "List the bundles in a repo, ordered by their bundle ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		err = core.ListBundlesApply(params.repo.RepoName, remoteStores.meta, applyBundleTemplate,
-			core.ConcurrentList(params.core.ConcurrencyFactor),
-			core.BatchSize(params.core.BatchSize))
+		err = core.ListBundlesApply(datamonFlags.repo.RepoName, remoteStores, applyBundleTemplate,
+			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
+			core.BatchSize(datamonFlags.core.BatchSize))
 		if err != nil {
 			wrapFatalln("concurrent list bundles", err)
 			return
 		}
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 
@@ -49,8 +52,6 @@ func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(BundleListCommand)}
 
-	addBucketNameFlag(BundleListCommand)
-	addBlobBucket(BundleListCommand)
 	addCoreConcurrencyFactorFlag(BundleListCommand, 500)
 	addBatchSizeFlag(BundleListCommand)
 

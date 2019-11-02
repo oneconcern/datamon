@@ -22,42 +22,41 @@ var BundleDownloadCmd = &cobra.Command{
 	Long: "Download a readonly, non-interactive view of the entire data that is part of a bundle. If --bundle is not specified" +
 		" the latest bundle will be downloaded",
 	Run: func(cmd *cobra.Command, args []string) {
-		var nameFilterRe *regexp.Regexp
-
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		destinationStore, err := paramsToDestStore(params, destTEmpty, "")
+		destinationStore, err := paramsToDestStore(datamonFlags, destTEmpty, "")
 		if err != nil {
 			wrapFatalln("create destination store", err)
 			return
 		}
-
-		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err != nil {
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		bd := core.NewBDescriptor()
-		bundle := core.New(bd,
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(remoteStores.meta),
-			core.ConsumableStore(destinationStore),
-			core.BlobStore(remoteStores.blob),
-			core.BundleID(params.bundle.ID),
-			core.ConcurrentFileDownloads(
-				params.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor),
-			core.ConcurrentFilelistDownloads(
-				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
+
+		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+		bundleOpts = append(bundleOpts, core.ConsumableStore(destinationStore))
+		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundleOpts = append(bundleOpts, core.ConcurrentFileDownloads(
+			datamonFlags.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor))
+		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(
+			datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
+
+		bundle := core.NewBundle(core.NewBDescriptor(),
+			bundleOpts...,
 		)
 
-		if params.bundle.NameFilter != "" {
-			nameFilterRe, err = regexp.Compile(params.bundle.NameFilter)
+		if datamonFlags.bundle.NameFilter != "" {
+			var nameFilterRe *regexp.Regexp
+			nameFilterRe, err = regexp.Compile(datamonFlags.bundle.NameFilter)
 			if err != nil {
-				wrapFatalln(fmt.Sprintf("name filter regexp %s didn't build", params.bundle.NameFilter), err)
+				wrapFatalln(fmt.Sprintf("name filter regexp %s didn't build", datamonFlags.bundle.NameFilter), err)
 				return
 			}
 			err = core.PublishSelectBundleEntries(ctx, bundle, func(name string) (bool, error) {
@@ -75,6 +74,9 @@ var BundleDownloadCmd = &cobra.Command{
 			}
 		}
 	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	},
 }
 
 func init() {
@@ -87,9 +89,6 @@ func init() {
 
 	// Bundle to download
 	addBundleFlag(BundleDownloadCmd)
-	// Blob bucket
-	addBlobBucket(BundleDownloadCmd)
-	addBucketNameFlag(BundleDownloadCmd)
 
 	addLabelNameFlag(BundleDownloadCmd)
 

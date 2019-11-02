@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/mockstorage"
@@ -161,14 +163,16 @@ func testListLabels(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListLabels-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			//t.Parallel()
 			mockStore := mockedLabelStore(testcase.name)
-			labels, err := ListLabels(testcase.repo, mockStore, testcase.prefix, ConcurrentList(concurrency), BatchSize(testBatchSize))
+			stores := context2.NewStores(nil, nil, nil, mockStore, mockStore)
+			labels, err := ListLabels(testcase.repo, stores, testcase.prefix, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertLabels(t, testcase, labels, err)
 		})
 		t.Run(fmt.Sprintf("ListLabelsApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			//t.Parallel()
 			mockStore := mockedLabelStore(testcase.name)
 			labels := make(model.LabelDescriptors, 0, typicalReposNum)
-			err := ListLabelsApply(testcase.repo, mockStore, testcase.prefix, func(label model.LabelDescriptor) error {
+			stores := context2.NewStores(nil, nil, nil, mockStore, mockStore)
+			err := ListLabelsApply(testcase.repo, stores, testcase.prefix, func(label model.LabelDescriptor) error {
 				labels = append(labels, label)
 				return nil
 			}, ConcurrentList(concurrency), BatchSize(testBatchSize))

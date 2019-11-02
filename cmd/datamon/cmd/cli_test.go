@@ -932,7 +932,7 @@ func TestUpdateBundle(t *testing.T) {
 	ddpc := "bundle-download"
 	ddp, err := filepath.Abs(filepath.Join(consumedData, ddpc))
 	require.NoError(t, err, "couldn't build file path")
-	params.bundle.ID = ""
+	datamonFlags.bundle.ID = ""
 	runCmd(t, []string{"bundle",
 		"download",
 		"--repo", repo1,

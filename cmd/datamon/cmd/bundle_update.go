@@ -19,12 +19,12 @@ var bundleUpdateCmd = &cobra.Command{
 		"--destination is a location previously passed to the `bundle download` command.",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		destinationStore, err := paramsToDestStore(params, destTNonEmpty, "")
+		destinationStore, err := paramsToDestStore(datamonFlags, destTNonEmpty, "")
 		if err != nil {
 			wrapFatalln("create destination store", err)
 			return
@@ -34,7 +34,7 @@ var bundleUpdateCmd = &cobra.Command{
 		func() {
 			var path string
 			var cmdLockfilePath string
-			path, err = sanitizePath(params.bundle.DataPath)
+			path, err = sanitizePath(datamonFlags.bundle.DataPath)
 			if err != nil {
 				wrapFatalln("failed path validation", err)
 				return
@@ -63,19 +63,20 @@ var bundleUpdateCmd = &cobra.Command{
 			}
 		}()
 
-		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err != nil {
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		localBundle := core.New(core.NewBDescriptor(),
+		localBundle := core.NewBundle(core.NewBDescriptor(),
 			core.ConsumableStore(destinationStore),
 		)
-		remoteBundle := core.New(core.NewBDescriptor(),
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(remoteStores.meta),
-			core.BlobStore(remoteStores.blob),
-			core.BundleID(params.bundle.ID),
+
+		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		remoteBundle := core.NewBundle(core.NewBDescriptor(),
+			bundleOpts...,
 		)
 
 		err = core.Update(ctx, remoteBundle, localBundle)
@@ -84,6 +85,9 @@ var bundleUpdateCmd = &cobra.Command{
 			return
 		}
 
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 
@@ -97,9 +101,6 @@ func init() {
 
 	// Bundle to download
 	addBundleFlag(bundleUpdateCmd)
-	// Blob bucket
-	addBlobBucket(bundleUpdateCmd)
-	addBucketNameFlag(bundleUpdateCmd)
 
 	addLabelNameFlag(bundleUpdateCmd)
 

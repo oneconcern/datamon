@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oneconcern/datamon/pkg/model"
+
 	gcsStorage "cloud.google.com/go/storage"
 	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -165,7 +167,7 @@ func TestNewWAL1(t *testing.T) {
 				walStore:           s2,
 				l:                  l,
 				maxConcurrency:     11,
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 			},
 		},
 		{
@@ -181,7 +183,7 @@ func TestNewWAL1(t *testing.T) {
 				walStore:           s2,
 				l:                  l,
 				maxConcurrency:     maxConcurrency,
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 			},
 		},
 	}
@@ -205,7 +207,7 @@ func TestWAL_GetToken(t *testing.T) {
 	defer cleanupMutable()
 	walStore, cleanupWal := setup(t, 0)
 	defer cleanupWal()
-	_ = mutableStore.Put(context.Background(), tokenGeneratorPath, strings.NewReader(""), storage.OverWrite)
+	_ = mutableStore.Put(context.Background(), model.TokenGeneratorPath, strings.NewReader(""), storage.OverWrite)
 	l, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
@@ -231,7 +233,7 @@ func TestWAL_GetToken(t *testing.T) {
 			name: "Get a token",
 			fields: fields{
 				mutableStore:       mutableStore,
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 				walStore:           walStore,
 				maxConcurrency:     maxConcurrency,
 				connectionControl:  make(chan struct{}),
@@ -246,7 +248,7 @@ func TestWAL_GetToken(t *testing.T) {
 			name: "Get a second token",
 			fields: fields{
 				mutableStore:       mutableStore,
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 				walStore:           walStore,
 				maxConcurrency:     maxConcurrency,
 				connectionControl:  make(chan struct{}),
@@ -261,7 +263,7 @@ func TestWAL_GetToken(t *testing.T) {
 			name: "Get a third token",
 			fields: fields{
 				mutableStore:       mutableStore,
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 				walStore:           walStore,
 				maxConcurrency:     maxConcurrency,
 				connectionControl:  make(chan struct{}),
@@ -359,8 +361,8 @@ func (m *mockMutableStoreTestAdd) Touch(_ context.Context, path string) error {
 	if m.storeType != mutable {
 		return fmt.Errorf("touch expected only on mutable store")
 	}
-	if path != tokenGeneratorPath {
-		return fmt.Errorf("expected path: %s", tokenGeneratorPath)
+	if path != model.TokenGeneratorPath {
+		return fmt.Errorf("expected path: %s", model.TokenGeneratorPath)
 	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -446,7 +448,7 @@ func TestWAL_Add(t *testing.T) {
 					mutex:      sync.Mutex{},
 					storeType:  "mutable",
 				},
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 				walStore: &mockMutableStoreTestAdd{
 					createTime: time.Now(),
 					updateTime: time.Now(),
@@ -473,7 +475,7 @@ func TestWAL_Add(t *testing.T) {
 					storeType:   "mutable",
 					failGetAttr: true,
 				},
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 				walStore: &mockMutableStoreTestAdd{
 					createTime: time.Now(),
 					updateTime: time.Now(),
@@ -503,7 +505,7 @@ func TestWAL_Add(t *testing.T) {
 					storeType:  "mutable",
 					failTouch:  true,
 				},
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 				walStore: &mockMutableStoreTestAdd{
 					createTime: time.Now(),
 					updateTime: time.Now(),
@@ -532,7 +534,7 @@ func TestWAL_Add(t *testing.T) {
 					mutex:      sync.Mutex{},
 					storeType:  "mutable",
 				},
-				tokenGeneratorPath: tokenGeneratorPath,
+				tokenGeneratorPath: model.TokenGeneratorPath,
 				walStore: &mockMutableStoreTestAdd{
 					createTime: time.Now(),
 					updateTime: time.Now(),
@@ -614,11 +616,11 @@ func (r *rc) Close() error {
 }
 
 func (r *rc) Read(p []byte) (n int, err error) {
-	e := Entry{
+	e := model.Entry{
 		Token:   r.s,
 		Payload: r.s,
 	}
-	b, err := Marshal(&e)
+	b, err := model.MarshalWAL(&e)
 	if err != nil {
 		return 0, err
 	}

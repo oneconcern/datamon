@@ -12,50 +12,55 @@ var bundleDownloadFileCmd = &cobra.Command{
 	Short: "Download a file from bundle",
 	Long:  "Download a readonly, non-interactive view of a single file from a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
+
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		destinationStore, err := paramsToDestStore(params, destTMaybeNonEmpty, "")
+
+		destinationStore, err := paramsToDestStore(datamonFlags, destTMaybeNonEmpty, "")
 		if err != nil {
 			wrapFatalln("create destination store", err)
 			return
 		}
 
-		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err != nil {
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		bd := core.NewBDescriptor()
-		bundle := core.New(bd,
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(remoteStores.meta),
-			core.ConsumableStore(destinationStore),
-			core.BlobStore(remoteStores.blob),
-			core.BundleID(params.bundle.ID),
+
+		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+		bundleOpts = append(bundleOpts, core.ConsumableStore(destinationStore))
+		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+
+		bundle := core.NewBundle(core.NewBDescriptor(),
+			bundleOpts...,
 		)
 
-		err = core.PublishFile(ctx, bundle, params.bundle.File)
+		err = core.PublishFile(ctx, bundle, datamonFlags.bundle.File)
 		if err != nil {
 			wrapFatalln("publish bundle", err)
 			return
 		}
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 
 func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(bundleDownloadFileCmd)}
-	addBundleFlag(bundleDownloadFileCmd)
 	requiredFlags = append(requiredFlags, addDataPathFlag(bundleDownloadFileCmd))
 	requiredFlags = append(requiredFlags, addBundleFileFlag(bundleDownloadFileCmd))
 
-	addBlobBucket(bundleDownloadFileCmd)
-	addBucketNameFlag(bundleDownloadFileCmd)
 	addLabelNameFlag(bundleDownloadFileCmd)
+	addBundleFlag(bundleDownloadFileCmd)
 
 	for _, flag := range requiredFlags {
 		err := bundleDownloadFileCmd.MarkFlagRequired(flag)

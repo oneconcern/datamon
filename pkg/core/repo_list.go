@@ -8,9 +8,9 @@ import (
 	"sort"
 	"sync"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/model"
-	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -21,14 +21,15 @@ const (
 )
 
 // GetRepoDescriptorByRepoName returns the descriptor of a named repo
-func GetRepoDescriptorByRepoName(store storage.Store, repoName string) (model.RepoDescriptor, error) {
-	return getRepoDescriptorByRepoName(store, repoName)
+func GetRepoDescriptorByRepoName(stores context2.Stores, repoName string) (model.RepoDescriptor, error) {
+	return getRepoDescriptorByRepoName(stores, repoName)
 }
 
-func getRepoDescriptorByRepoName(store storage.Store, repoName string) (model.RepoDescriptor, error) {
+func getRepoDescriptorByRepoName(stores context2.Stores, repoName string) (model.RepoDescriptor, error) {
 	var rd model.RepoDescriptor
+	store := GetRepoStore(stores) // TODO: ReadLog integration
 	archivePathToRepoDescriptor := model.GetArchivePathToRepoDescriptor(repoName)
-	has, err := store.Has(context.Background(), archivePathToRepoDescriptor)
+	has, err := GetRepoStore(stores).Has(context.Background(), archivePathToRepoDescriptor)
 	if err != nil {
 		return rd, err
 	}
@@ -55,10 +56,10 @@ func getRepoDescriptorByRepoName(store storage.Store, repoName string) (model.Re
 }
 
 // ListRepos returns all repos from a store
-func ListRepos(store storage.Store, opts ...ListOption) ([]model.RepoDescriptor, error) {
+func ListRepos(stores context2.Stores, opts ...ListOption) ([]model.RepoDescriptor, error) {
 	repos := make(model.RepoDescriptors, 0, typicalReposNum)
 
-	reposChan, workers := listReposChan(store, opts...)
+	reposChan, workers := listReposChan(stores, opts...)
 
 	// consume batches of ordered repos
 	err := doSelectRepos(reposChan, func(repoBatch model.RepoDescriptors) {
@@ -72,9 +73,9 @@ func ListRepos(store storage.Store, opts ...ListOption) ([]model.RepoDescriptor,
 
 // ListReposPaginated is at this moment only used by the CSI package.
 // Question: shall we deprecate this?
-func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescriptor, error) {
+func ListReposPaginated(stores context2.Stores, token string) ([]model.RepoDescriptor, error) {
 	// Get a list
-	ks, _, _ := store.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
+	ks, _, _ := GetRepoStore(stores).KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
 	var repos = make([]model.RepoDescriptor, 0)
 	tokenHit := false
 	for _, k := range ks {
@@ -90,7 +91,7 @@ func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescript
 		}
 
 		var rd model.RepoDescriptor
-		rd, err = GetRepoDescriptorByRepoName(store, apc.Repo)
+		rd, err = GetRepoDescriptorByRepoName(stores, apc.Repo)
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +104,7 @@ func ListReposPaginated(store storage.Store, token string) ([]model.RepoDescript
 type ApplyRepoFunc func(model.RepoDescriptor) error
 
 // ListReposApply applies some function to the retrieved repos, in lexicographic order of keys.
-func ListReposApply(store storage.Store, apply ApplyRepoFunc, opts ...ListOption) error {
+func ListReposApply(stores context2.Stores, apply ApplyRepoFunc, opts ...ListOption) error {
 	var (
 		err, applyErr error
 		once          sync.Once
@@ -124,7 +125,7 @@ func ListReposApply(store storage.Store, apply ApplyRepoFunc, opts ...ListOption
 	go func(repoChan chan<- model.RepoDescriptor, doneChan chan struct{}) {
 		defer close(repoChan)
 
-		reposChan, workers := listReposChan(store, append(opts, WithDoneChan(doneChan))...)
+		reposChan, workers := listReposChan(stores, append(opts, WithDoneChan(doneChan))...)
 
 		err = doSelectRepos(reposChan, func(repoBatch model.RepoDescriptors) {
 			for _, repo := range repoBatch {
@@ -171,7 +172,7 @@ type reposEvent struct {
 	err   error
 }
 
-func listReposChan(store storage.Store, opts ...ListOption) (chan reposEvent, *sync.WaitGroup) {
+func listReposChan(stores context2.Stores, opts ...ListOption) (chan reposEvent, *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	settings := defaultSettings()
@@ -194,15 +195,15 @@ func listReposChan(store storage.Store, opts ...ListOption) (chan reposEvent, *s
 	keysChan := make(chan keyBatchEvent, 1)
 
 	iterator := func(next string) ([]string, string, error) {
-		return store.KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToRepos(), "", settings.batchSize)
+		return GetRepoStore(stores).KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToRepos(), "", settings.batchSize)
 	}
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(store, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	go fetchKeys(stores, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
 
 	// start repo metadata retrieval
 	wg.Add(1)
-	go fetchRepos(store, settings, keysChan, batchChan, doneWithKeysChan, doneWithReposChan, &wg)
+	go fetchRepos(stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithReposChan, &wg)
 
 	// let the gc clean up internal signaling channels left open after wg goroutines are done.
 
@@ -222,7 +223,7 @@ func doSelectRepos(reposChan <-chan reposEvent, do func(model.RepoDescriptors)) 
 }
 
 // fetchRepos waits on a channel of key batches and outputs batches of descriptors corresponding to these keys
-func fetchRepos(store storage.Store, settings Settings,
+func fetchRepos(stores context2.Stores, settings Settings,
 	keysChan <-chan keyBatchEvent, batchChan chan<- reposEvent,
 	doneWithKeysChan chan<- struct{}, doneChan <-chan struct{}, wg *sync.WaitGroup) {
 	defer func() {
@@ -243,7 +244,7 @@ func fetchRepos(store storage.Store, settings Settings,
 				batchChan <- reposEvent{err: keyBatch.err}
 				return
 			}
-			batch, err := fetchRepoBatch(store, settings, keyBatch.keys)
+			batch, err := fetchRepoBatch(stores, settings, keyBatch.keys)
 			if err != nil {
 				doneWithKeysChan <- struct{}{} // stop co-worker
 				batchChan <- reposEvent{err: err}
@@ -257,7 +258,7 @@ func fetchRepos(store storage.Store, settings Settings,
 
 // fetchRepoBatch performs a parallel fetch for a batch of repos identified by their keys,
 // then reorders the result by key.
-func fetchRepoBatch(store storage.Store, settings Settings, keys []string) (model.RepoDescriptors, error) {
+func fetchRepoBatch(stores context2.Stores, settings Settings, keys []string) (model.RepoDescriptors, error) {
 	var (
 		workers, wg sync.WaitGroup
 		werr        error
@@ -271,7 +272,7 @@ func fetchRepoBatch(store storage.Store, settings Settings, keys []string) (mode
 	// spin up workers pool
 	for i := 0; i < minInt(settings.concurrentList, len(keys)); i++ {
 		workers.Add(1)
-		go getRepoAsync(store, keyChan, repoChan, &workers)
+		go getRepoAsync(stores, keyChan, repoChan, &workers)
 	}
 
 	rps := make(model.RepoDescriptors, 0, len(keys))
@@ -312,7 +313,7 @@ func fetchRepoBatch(store storage.Store, settings Settings, keys []string) (mode
 }
 
 // getRepoAsync fetches and unmarshalls the repo descriptor for each single key submitted as input
-func getRepoAsync(store storage.Store, input <-chan string, output chan<- repoEvent, wg *sync.WaitGroup) {
+func getRepoAsync(stores context2.Stores, input <-chan string, output chan<- repoEvent, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for k := range input {
 		apc, err := model.GetArchivePathComponents(k)
@@ -320,7 +321,7 @@ func getRepoAsync(store storage.Store, input <-chan string, output chan<- repoEv
 			output <- repoEvent{err: err}
 			continue
 		}
-		rd, err := getRepoDescriptorByRepoName(store, apc.Repo)
+		rd, err := getRepoDescriptorByRepoName(stores, apc.Repo)
 		if err != nil {
 			if errors.Is(err, storagestatus.ErrNotExists) {
 				continue
