@@ -34,13 +34,19 @@ func (g Auth) Principal(credFile string) (model.Contributor, error) {
 		goption.WithScopes(goauth.UserinfoEmailScope, goauth.UserinfoProfileScope),
 	)
 	if err != nil {
-		return model.Contributor{}, fmt.Errorf("invalid credentials: %w", err)
+		return model.Contributor{}, fmt.Errorf("cannot create oauth service: %w", err)
 	}
 
 	u, err := svc.Userinfo.Get().Do()
 	if err != nil {
 		return model.Contributor{}, fmt.Errorf("cannot retrieve userinfo: %w", err)
 	}
+
+	if u.Email == "" {
+		return model.Contributor{}, fmt.Errorf("email scope is mandatory to run datamon")
+	}
+	// NOTE(frederic): at this moment, the profile scope is not required and we fall back
+	// on email for the name if the full name is not available.
 
 	return model.Contributor{
 		Email: u.Email,
