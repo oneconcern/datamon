@@ -52,7 +52,7 @@ var logFatalf = log.Fatalf
 var osExit = os.Exit
 
 // used to patch over calls to Authable.Principal() during test
-var authorizer auth.Authable = gauth.New()
+var authorizer auth.Authable
 
 // infoLogger wraps informative messages to os.Stdout without cluttering expected output in tests.
 // To be used instead on fmt.Printf(os.Stdout, ...)
@@ -85,6 +85,7 @@ func Execute() {
 func init() {
 	log.SetFlags(0)
 	cobra.OnInitialize(initConfig)
+	authorizer = gauth.New()
 }
 
 // initConfig reads in config file and ENV variables if set.
