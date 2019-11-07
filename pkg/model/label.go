@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -17,12 +18,8 @@ func getArchivePathToLabels() string {
 	return fmt.Sprint("labels/")
 }
 
-func GetArchivePathPrefixToLabels(repo string) string {
-	return fmt.Sprint(getArchivePathToLabels(), repo+"/")
-}
-
-func GetArchivePathPrefixToLabelPrefix(repo string, prefix string) string {
-	return fmt.Sprint(getArchivePathToLabels(), repo+"/"+prefix)
+func GetArchivePathPrefixToLabels(repo string, prefixes ...string) string {
+	return fmt.Sprint(getArchivePathToLabels(), repo+"/"+strings.Join(prefixes, "/"))
 }
 
 func GetArchivePathToLabel(repo string, labelName string) string {

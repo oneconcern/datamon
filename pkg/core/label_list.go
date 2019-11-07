@@ -17,7 +17,9 @@ func ListLabels(repo string, metaStore storage.Store, prefix string) ([]model.La
 	if e != nil {
 		return nil, e
 	}
-	ks, _, err := metaStore.KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToLabelPrefix(repo, prefix), "", maxLabelsToList)
+	ks, _, err := metaStore.KeysPrefix(context.Background(), "",
+		model.GetArchivePathPrefixToLabels(repo, prefix), "",
+		maxLabelsToList)
 
 	if err != nil {
 		return nil, err

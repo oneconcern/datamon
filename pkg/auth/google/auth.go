@@ -27,6 +27,7 @@ type Auth struct {
 // By default, credentials are taken from your default application_default_credentials.
 // On linux, this is located at ~/.config/gcloud/application_default_credentials.json.
 func (g Auth) Principal(credFile string) (model.Contributor, error) {
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	svc, err := goauth.NewService(ctx,
@@ -37,9 +38,27 @@ func (g Auth) Principal(credFile string) (model.Contributor, error) {
 		return model.Contributor{}, status.ErrAuthService.Wrap(err)
 	}
 
-	u, err := svc.Userinfo.Get().Do()
+	var u *goauth.Userinfoplus
+	u, err = svc.Userinfo.Get().Do()
 	if err != nil {
 		return model.Contributor{}, status.ErrUserinfo.Wrap(err)
+	}
+	fullName := func() (name string) {
+		if u.Name != "" {
+			name = u.Name
+			return
+		}
+		if u.GivenName != "" {
+			name += u.GivenName + " "
+		}
+		if u.FamilyName != "" {
+			name += u.FamilyName + " "
+		}
+		if name == "" {
+			// fall back on email if no nominative attributes are set
+			name = u.Email
+		}
+		return
 	}
 
 	if u.Email == "" {
@@ -50,24 +69,6 @@ func (g Auth) Principal(credFile string) (model.Contributor, error) {
 
 	return model.Contributor{
 		Email: u.Email,
-		Name:  fullName(u),
+		Name:  fullName(),
 	}, nil
-}
-
-func fullName(u *goauth.Userinfoplus) (name string) {
-	if u.Name != "" {
-		name = u.Name
-		return
-	}
-	if u.GivenName != "" {
-		name += u.GivenName + " "
-	}
-	if u.FamilyName != "" {
-		name += u.FamilyName + " "
-	}
-	if name == "" {
-		// fall back on email if no nominative attributes are set
-		name = u.Email
-	}
-	return
 }
