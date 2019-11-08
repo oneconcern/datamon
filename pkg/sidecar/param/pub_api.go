@@ -22,16 +22,16 @@ type Cerializer interface {
 }
 
 type fuseParamsBundleParams struct {
-	Name         string `json:"name" yaml:"name"`
-	SrcPath      string `json:"srcPath" yaml:"srcPath"`
-	SrcRepo      string `json:"srcRepo" yaml:"srcRepo"`
-	SrcLabel     string `json:"srcLabel" yaml:"srcLabel"`
-	SrcBundle    string `json:"srcBundle" yaml:"srcBundle"`
-	DestPath     string `json:"destPath" yaml:"destPath"`
-	DestRepo     string `json:"destRepo" yaml:"destRepo"`
-	DestMessage  string `json:"destMessage" yaml:"destMessage"`
-	DestLabel    string `json:"destLabel" yaml:"destLabel"`
-	DestBundleID string `json:"destBundleID" yaml:"destBundleID"`
+	name         string `json:"name" yaml:"name"`
+	srcPath      string `json:"srcPath" yaml:"srcPath"`
+	srcRepo      string `json:"srcRepo" yaml:"srcRepo"`
+	srcLabel     string `json:"srcLabel" yaml:"srcLabel"`
+	srcBundle    string `json:"srcBundle" yaml:"srcBundle"`
+	destPath     string `json:"destPath" yaml:"destPath"`
+	destRepo     string `json:"destRepo" yaml:"destRepo"`
+	destMessage  string `json:"destMessage" yaml:"destMessage"`
+	destLabel    string `json:"destLabel" yaml:"destLabel"`
+	destBundleID string `json:"destBundleID" yaml:"destBundleID"`
 	_            struct{}
 }
 
@@ -178,42 +178,42 @@ type FUSEParamsBDOption func(bdParams *fuseParamsBundleParams)
 
 func BDName(name string) FUSEParamsBDOption {
 	return func(bdParams *fuseParamsBundleParams) {
-		bdParams.Name = name
+		bdParams.name = name
 	}
 }
 
 func BDSrcByLabel(path string, repo string, label string) FUSEParamsBDOption {
 	return func(bdParams *fuseParamsBundleParams) {
-		bdParams.SrcPath = path
-		bdParams.SrcRepo = repo
-		bdParams.SrcLabel = label
+		bdParams.srcPath = path
+		bdParams.srcRepo = repo
+		bdParams.srcLabel = label
 	}
 }
 
 func BDSrcByBundleID(path string, repo string, bundle string) FUSEParamsBDOption {
 	return func(bdParams *fuseParamsBundleParams) {
-		bdParams.SrcPath = path
-		bdParams.SrcRepo = repo
-		bdParams.SrcBundle = bundle
+		bdParams.srcPath = path
+		bdParams.srcRepo = repo
+		bdParams.srcBundle = bundle
 	}
 }
 
 func BDDest(repo string, msg string) FUSEParamsBDOption {
 	return func(bdParams *fuseParamsBundleParams) {
-		bdParams.DestRepo = repo
-		bdParams.DestMessage = msg
+		bdParams.destRepo = repo
+		bdParams.destMessage = msg
 	}
 }
 
 func BDDestLabel(label string) FUSEParamsBDOption {
 	return func(bdParams *fuseParamsBundleParams) {
-		bdParams.DestLabel = label
+		bdParams.destLabel = label
 	}
 }
 
 func BDDestBundleIDFile(bundleIDFile string) FUSEParamsBDOption {
 	return func(bdParams *fuseParamsBundleParams) {
-		bdParams.DestBundleID = bundleIDFile
+		bdParams.destBundleID = bundleIDFile
 	}
 }
 
@@ -222,17 +222,17 @@ func (fuseParams *FUSEParams) AddBundle(bdOpts ...FUSEParamsBDOption) error {
 	for _, apply := range bdOpts {
 		apply(&bdParams)
 	}
-	if bdParams.Name == "" {
+	if bdParams.name == "" {
 		return errors.New("bundle name not set")
 	}
-	if bdParams.SrcLabel != "" && bdParams.SrcBundle != "" {
+	if bdParams.srcLabel != "" && bdParams.srcBundle != "" {
 		return errors.New("label and bundle id are mutually exclusive")
 	}
-	destIsSet := bdParams.DestRepo != "" && bdParams.DestMessage != ""
-	if bdParams.DestLabel != "" && !destIsSet {
+	destIsSet := bdParams.destRepo != "" && bdParams.destMessage != ""
+	if bdParams.destLabel != "" && !destIsSet {
 		return errors.New("destination label setting requires destination being set")
 	}
-	if bdParams.DestBundleID != "" && !destIsSet {
+	if bdParams.destBundleID != "" && !destIsSet {
 		return errors.New("destination bundle id file setting requires destination being set")
 	}
 	fuseParams.Bundles = append(fuseParams.Bundles, bdParams)
