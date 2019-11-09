@@ -23,6 +23,7 @@ type BundleDescriptor struct {
 	Contributors           []Contributor `json:"contributors" yaml:"contributors"`
 	BundleEntriesFileCount uint64        `json:"count" yaml:"count"`                         // Number of files which have BundleDescriptor Entries
 	Version                uint64        `json:"version,omitempty" yaml:"version,omitempty"` // Version for the bundle
+	RunID                  string        `json:"runid,omitempty" yaml:"runid,omitempty"`
 	_                      struct{}
 }
 
