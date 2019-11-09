@@ -67,7 +67,7 @@ func buildRepoBatchFixture(t *testing.T) func() {
 		repoBatchFixture = make([]string, maxTestKeys)
 		expectedRepoBatchFixture = make(model.RepoDescriptors, maxTestKeys)
 		for i := 0; i < maxTestKeys; i++ {
-			repoBatchFixture[i] = fmt.Sprintf("repos/myRepo%0.3d/repo.json", i)
+			repoBatchFixture[i] = fmt.Sprintf("repos/myRepo%0.3d/repo.yaml", i)
 			expectedRepoBatchFixture[i] = model.RepoDescriptor{
 				Name:        fmt.Sprintf("myRepo%0.3d", i),
 				Description: fmt.Sprintf("test myRepo%0.3d", i),
@@ -86,7 +86,7 @@ func mockedRepoStore(testcase string) storage.Store {
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"repos/myRepo1/repo.json"}, "", nil
+				return []string{"repos/myRepo1/repo.yaml"}, "", nil
 			},
 			KeysFunc: func(_ context.Context) ([]string, error) {
 				return nil, nil
@@ -128,14 +128,14 @@ func testListRepos(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListRepos-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedRepoStore(testcase.name)
-			stores := context2.NewStores(nil, nil, nil, nil, mockStore)
+			stores := context2.NewStores(nil, nil, nil, mockStore, mockStore)
 			repos, err := ListRepos(stores, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertRepos(t, testcase, repos, err)
 		})
 		t.Run(fmt.Sprintf("ListReposApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedRepoStore(testcase.name)
-			stores := context2.NewStores(nil, nil, nil, nil, mockStore)
+			stores := context2.NewStores(nil, nil, nil, mockStore, mockStore)
 			repos := make(model.RepoDescriptors, 0, typicalReposNum)
 			err := ListReposApply(stores, func(repo model.RepoDescriptor) error {
 				repos = append(repos, repo)

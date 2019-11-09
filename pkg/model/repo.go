@@ -34,7 +34,7 @@ func (b RepoDescriptors) Last() RepoDescriptor {
 
 // GetArchivePathToRepoDescriptor returns the path for a repo descriptor
 func GetArchivePathToRepoDescriptor(repo string) string {
-	return fmt.Sprint("repos/", repo, "/", "repo.json")
+	return fmt.Sprint("repos/", repo, "/", "repo.yaml")
 }
 
 func getArchivePathToRepos() string {

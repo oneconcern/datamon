@@ -47,7 +47,7 @@ func bundleTestCases() []bundleFixture {
 	return []bundleFixture{
 		{
 			name: happyPath,
-			repo: "happy/repo.json",
+			repo: "happy/repo.yaml",
 			expected: model.BundleDescriptors{
 				{
 					ID:           "myID1",
@@ -74,56 +74,56 @@ func bundleTestCases() []bundleFixture {
 		},
 		{
 			name:     happyWithBatches,
-			repo:     "happy/repo.json",
+			repo:     "happy/repo.yaml",
 			expected: expectedBatchFixture,
 		},
 		// error cases
 		{
 			name:          "no repo",
-			repo:          "norepo/repo.json",
+			repo:          "norepo/repo.yaml",
 			wantError:     true,
 			errorContains: []string{"repo validation: Repo", "does not exist"},
 		},
 		{
 			name:          "no key",
-			repo:          "nokey/repo.json",
+			repo:          "nokey/repo.yaml",
 			wantError:     true,
 			errorContains: []string{"storage error"},
 		},
 		{
 			name:          "invalid file name",
-			repo:          "invalid/repo.json",
+			repo:          "invalid/repo.yaml",
 			wantError:     true,
 			errorContains: []string{"expected label"},
 		},
 		{
 			name:          "no archive path",
-			repo:          "noarchive/repo.json",
+			repo:          "noarchive/repo.yaml",
 			wantError:     true,
 			errorContains: []string{"get store error"},
 		},
 		{
 			name:          "invalid yaml",
-			repo:          "badyaml/repo.json",
+			repo:          "badyaml/repo.yaml",
 			wantError:     true,
 			errorContains: []string{"yaml:"},
 		},
 		{
 			name:          "inconsistent bundle ID",
-			repo:          "badID/repo.json",
+			repo:          "badID/repo.yaml",
 			wantError:     true,
 			errorContains: []string{"bundle IDs in descriptor", "archive path"},
 		},
 		{
 			name:          "io error",
-			repo:          "ioerr/repo.json",
+			repo:          "ioerr/repo.yaml",
 			wantError:     true,
 			errorContains: []string{"io error"},
 		},
 		// skipped bundle
 		{
 			name: "skipped bundle",
-			repo: "skipped/repo.json",
+			repo: "skipped/repo.yaml",
 			expected: []model.BundleDescriptor{
 				{
 					ID:           "myID1",
@@ -144,7 +144,7 @@ func bundleTestCases() []bundleFixture {
 		// n-th batch returns an error while fetching keys
 		{
 			name:          batchErrorTestcase,
-			repo:          "batch/repo.json",
+			repo:          "batch/repo.yaml",
 			expected:      expectedBatchFixture[0:25], // returned 5 first batches then bailed
 			wantError:     true,
 			errorContains: []string{"test key fetch error"},
@@ -152,7 +152,7 @@ func bundleTestCases() []bundleFixture {
 		// n-th batch returns an error while fetching bundle
 		{
 			name:          batchErrorRepoTestcase,
-			repo:          "batch/repo.json",
+			repo:          "batch/repo.yaml",
 			expected:      expectedBatchFixture[0:25], // returned 5 first batches then bailed
 			wantError:     true,
 			errorContains: []string{"test repo fetch error"},
@@ -178,7 +178,7 @@ func buildKeysBatchFixture(t *testing.T) func() {
 		keysBatchFixture = make([]string, maxTestKeys)
 		expectedBatchFixture = make(model.BundleDescriptors, maxTestKeys)
 		for i := 0; i < maxTestKeys; i++ {
-			keysBatchFixture[i] = fmt.Sprintf("/key%0.3d/myID%0.3d/bundle.json", i, i)
+			keysBatchFixture[i] = fmt.Sprintf("/key%0.3d/myID%0.3d/bundle.yaml", i, i)
 			expectedBatchFixture[i] = model.BundleDescriptor{
 				ID:           fmt.Sprintf("myID%0.3d", i),
 				LeafSize:     16,
@@ -212,7 +212,7 @@ func mockedStore(testcase string) storage.Store {
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"/key1/myID1/bundle.json", "/key2/myID2/bundle.json", "/key3/myID3/bundle.json"}, "", nil
+				return []string{"/key1/myID1/bundle.yaml", "/key2/myID2/bundle.yaml", "/key3/myID3/bundle.yaml"}, "", nil
 			},
 			KeysFunc: func(_ context.Context) ([]string, error) {
 				return nil, nil
@@ -281,7 +281,7 @@ func mockedStore(testcase string) storage.Store {
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"/key1/myID1/bundle.json", "labels/x/wrong/bundle.json"}, "", nil
+				return []string{"/key1/myID1/bundle.yaml", "labels/x/wrong/bundle.yaml"}, "", nil
 			},
 			GetFunc: func(_ context.Context, pth string) (io.ReadCloser, error) {
 				parts := strings.Split(pth, "/")
@@ -295,7 +295,7 @@ func mockedStore(testcase string) storage.Store {
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"/key1/myID1/bundle.json", "/key2/myID2/bundle.json", "/key3/myID3/bundle.json"}, "", nil
+				return []string{"/key1/myID1/bundle.yaml", "/key2/myID2/bundle.yaml", "/key3/myID3/bundle.yaml"}, "", nil
 			},
 			GetFunc: func(_ context.Context, pth string) (io.ReadCloser, error) {
 				return nil, errors.New("get store error")
@@ -307,7 +307,7 @@ func mockedStore(testcase string) storage.Store {
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"/key1/myID1/bundle.json", "/key2/myID2/bundle.json", "/key3/myID3/bundle.json"}, "", nil
+				return []string{"/key1/myID1/bundle.yaml", "/key2/myID2/bundle.yaml", "/key3/myID3/bundle.yaml"}, "", nil
 			},
 			KeysFunc: func(_ context.Context) ([]string, error) {
 				return nil, nil
@@ -328,7 +328,7 @@ version: 4`, id))), nil
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"/key1/myID1/bundle.json", "/key2/myID2/bundle.json", "/key3/myID3/bundle.json"}, "", nil
+				return []string{"/key1/myID1/bundle.yaml", "/key2/myID2/bundle.yaml", "/key3/myID3/bundle.yaml"}, "", nil
 			},
 			KeysFunc: func(_ context.Context) ([]string, error) {
 				return nil, nil
@@ -343,7 +343,7 @@ version: 4`, id))), nil
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"/key1/myID1/bundle.json", "/key2/myID2/bundle.json", "/key3/myID3/bundle.json"}, "", nil
+				return []string{"/key1/myID1/bundle.yaml", "/key2/myID2/bundle.yaml", "/key3/myID3/bundle.yaml"}, "", nil
 			},
 			GetFunc: func(_ context.Context, pth string) (io.ReadCloser, error) {
 				return testReadCloserWithErr{}, nil
@@ -355,7 +355,7 @@ version: 4`, id))), nil
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"/key1/myID1/bundle.json", "/key2/myID2/smurf.json", "/key3/myID3/bundle.json"}, "", nil
+				return []string{"/key1/myID1/bundle.yaml", "/key2/myID2/smurf.yaml", "/key3/myID3/bundle.yaml"}, "", nil
 			},
 			KeysFunc: func(_ context.Context) ([]string, error) {
 				return nil, nil

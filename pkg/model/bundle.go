@@ -91,7 +91,7 @@ func (e ConsumableStorePathMetadataErr) Error() string {
  * parses the path and returns the input values to that function.
  */
 func GetConsumableStorePathMetadata(path string) (ConsumableStorePathMetadata, error) {
-	metaRe := regexp.MustCompile(`^\.datamon/(.*)\.json$`)
+	metaRe := regexp.MustCompile(`^\.datamon/(.*)\.yaml$`)
 	flRe := regexp.MustCompile(`^(.*)-bundle-files-(.*)$`)
 	info := ConsumableStorePathMetadata{}
 	metaMatch := metaRe.FindStringSubmatch(path)
@@ -117,7 +117,7 @@ func GetConsumableStorePathMetadata(path string) (ConsumableStorePathMetadata, e
 }
 
 func GetConsumablePathToBundle(bundleID string) string {
-	path := fmt.Sprint(".datamon/", bundleID, ".json")
+	path := fmt.Sprint(".datamon/", bundleID, ".yaml")
 	info, err := GetConsumableStorePathMetadata(path)
 	if err != nil {
 		panic(fmt.Errorf("path not valid against inverse function (programming error): %v", err))
@@ -133,7 +133,7 @@ func GetConsumablePathToBundle(bundleID string) string {
 }
 
 func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
-	path := fmt.Sprint(".datamon/", bundleID, "-bundle-files-", index, ".json")
+	path := fmt.Sprint(".datamon/", bundleID, "-bundle-files-", index, ".yaml")
 	info, err := GetConsumableStorePathMetadata(path)
 	if err != nil {
 		panic(fmt.Errorf("path not valid against inverse function (programming error): %v", err))
@@ -153,7 +153,7 @@ func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
 }
 
 func GetArchivePathToBundle(repo string, bundleID string) string {
-	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle.json")
+	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle.yaml")
 }
 
 func GetArchivePathPrefixToBundles(repo string) string {
@@ -165,8 +165,8 @@ func getArchivePathToBundles() string {
 }
 
 func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
-	// <repo>-bundles/<bundle>/bundlefiles-<index>.json
-	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".json")
+	// <repo>-bundles/<bundle>/bundlefiles-<index>.yaml
+	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".yaml")
 }
 
 var labelNameRe *regexp.Regexp
@@ -192,7 +192,7 @@ func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error)
 			Repo:      cs[1],
 		}, nil
 	}
-	if cs[2] == "repo.json" {
+	if cs[2] == "repo.yaml" {
 		return ArchivePathComponents{Repo: cs[1]}, nil
 	}
 	return ArchivePathComponents{
@@ -215,5 +215,5 @@ func IsGeneratedFile(file string) bool {
 }
 
 func init() {
-	labelNameRe = regexp.MustCompile(`^(.*)\.json$`)
+	labelNameRe = regexp.MustCompile(`^(.*)\.yaml$`)
 }
