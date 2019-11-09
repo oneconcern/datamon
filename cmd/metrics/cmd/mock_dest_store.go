@@ -25,7 +25,7 @@ func (mds *mockDestStore) String() string {
 
 func (mds *mockDestStore) Has(ctx context.Context, key string) (bool, error) {
 	// detect and respond to RepoExists() call
-	if strings.HasPrefix(key, "repos/") && strings.HasSuffix(key, "/repo.json") {
+	if strings.HasPrefix(key, "repos/") && strings.HasSuffix(key, "/repo.yaml") {
 		return true, nil
 	}
 	return false, errors.New("mock destination store Has() unimpl (other than for RepoExists calls)")
@@ -50,7 +50,7 @@ func (mds *mockDestStore) Touch(ctx context.Context, objectName string) error {
 var fileListRe *regexp.Regexp
 
 func init() {
-	fileListRe = regexp.MustCompile(`bundle-files-\d+.json$`)
+	fileListRe = regexp.MustCompile(`bundle-files-\d+.yaml$`)
 }
 
 func (mds *mockDestStore) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {

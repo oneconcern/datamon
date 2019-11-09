@@ -15,7 +15,7 @@ type RepoDescriptor struct {
 }
 
 func GetArchivePathToRepoDescriptor(repo string) string {
-	return fmt.Sprint("repos/", repo, "/", "repo.json")
+	return fmt.Sprint("repos/", repo, "/", "repo.yaml")
 }
 
 func getArchivePathToRepos() string {

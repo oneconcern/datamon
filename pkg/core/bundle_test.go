@@ -214,7 +214,7 @@ func validatePublishMetadata(t *testing.T, bundle *Bundle, publish bool) {
 	if publish {
 		consumableBundleEntries := readBundleEntries(consumableStore,
 			func(i uint64) string {
-				return ".datamon/" + bundleID + "-bundle-files-" + strconv.Itoa(int(i)) + ".json"
+				return ".datamon/" + bundleID + "-bundle-files-" + strconv.Itoa(int(i)) + ".yaml"
 			},
 			model.GetConsumablePathToBundle(bundleID))
 		compareBundleEntriesLists(consumableBundleEntries, metaBundleEntries)
