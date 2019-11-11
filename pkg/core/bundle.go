@@ -1,10 +1,10 @@
 // Copyright © 2018 One Concern
+
 package core
 
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
@@ -19,17 +19,9 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-type errString string
-
-func (e errString) Error() string { return string(e) }
-
-const (
-	ErrNotFound errString = "not found"
-)
-
 var MemProfDir string
 
-// ArchiveBundle represents the bundle in it's archive state
+// Bundle represents the bundle in its archived state
 type Bundle struct {
 	RepoID                      string
 	BundleID                    string
@@ -171,60 +163,6 @@ func ConcurrentFileDownloads(concurrentFileDownloads int) BundleOption {
 func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
 	return func(b *Bundle) {
 		b.concurrentFilelistDownloads = concurrentFilelistDownloads
-	}
-}
-
-// BundleListOption sets options for ListBundles
-type BundleListOption func(*Settings)
-
-// Settings defines various settings for core features
-type Settings struct {
-	concurrentBundleList int
-	bundleBatchSize      int
-	doneChannel          chan struct{}
-}
-
-const (
-	defaultBundleBatchSize = 1024
-)
-
-var (
-	defaultBundleListConcurrency = 2 * runtime.NumCPU()
-)
-
-// ConcurrentBundleList sets the max level of concurrency to retrieve bundles. It defaults to 2 x #cpus.
-func ConcurrentBundleList(concurrentBundleList int) BundleListOption {
-	return func(s *Settings) {
-		if concurrentBundleList == 0 {
-			s.concurrentBundleList = defaultBundleListConcurrency
-			return
-		}
-		s.concurrentBundleList = concurrentBundleList
-	}
-}
-
-// BundleBatchSize sets the batch window to fetch bundle IDs. It defaults to defaultBundleBatchSize
-func BundleBatchSize(batchSize int) BundleListOption {
-	return func(s *Settings) {
-		if batchSize == 0 {
-			s.bundleBatchSize = defaultBundleBatchSize
-			return
-		}
-		s.bundleBatchSize = batchSize
-	}
-}
-
-// WithBundleDoneChan sets a signaling channel controlled by the caller to interrupt ongoing goroutines
-func WithBundleDoneChan(done chan struct{}) BundleListOption {
-	return func(s *Settings) {
-		s.doneChannel = done
-	}
-}
-
-func defaultSettings() Settings {
-	return Settings{
-		concurrentBundleList: defaultBundleListConcurrency,
-		bundleBatchSize:      defaultBundleBatchSize,
 	}
 }
 

@@ -42,7 +42,7 @@ func (testReadCloserWithErr) Close() error {
 func bundleTestCases() []bundleFixture {
 	return []bundleFixture{
 		{
-			name: "happy path",
+			name: happyPath,
 			repo: "happy/repo.json",
 			expected: model.BundleDescriptors{
 				{
@@ -66,7 +66,7 @@ func bundleTestCases() []bundleFixture {
 			},
 		},
 		{
-			name:     "happy with batches",
+			name:     happyWithBatches,
 			repo:     "happy/repo.json",
 			expected: expectedBatchFixture,
 		},
@@ -152,6 +152,8 @@ func bundleTestCases() []bundleFixture {
 }
 
 const (
+	happyPath              = "happy path"
+	happyWithBatches       = "happy with batches"
 	batchErrorRepoTestcase = "batch error repo"
 	batchErrorTestcase     = "batch error"
 )
@@ -189,7 +191,7 @@ version: 4`, id)
 func mockedStore(testcase string) storage.Store {
 	// builds mocked up test scenarios
 	switch testcase {
-	case "happy path":
+	case happyPath:
 		return &mockstorage.StoreMock{
 			HasFunc: func(_ context.Context, _ string) (bool, error) {
 				return true, nil
@@ -206,7 +208,7 @@ func mockedStore(testcase string) storage.Store {
 				return ioutil.NopCloser(strings.NewReader(buildYaml(id))), nil
 			},
 		}
-	case "happy with batches":
+	case happyWithBatches:
 		return &mockstorage.StoreMock{
 			HasFunc: func(_ context.Context, _ string) (bool, error) {
 				return true, nil
@@ -461,7 +463,7 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListBundles-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedStore(testcase.name)
-			bundles, err := ListBundles(testcase.repo, mockStore, ConcurrentBundleList(concurrency), BundleBatchSize(testBatchSize))
+			bundles, err := ListBundles(testcase.repo, mockStore, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertBundles(t, testcase, bundles, err)
 		})
 
@@ -473,7 +475,7 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 			err := ListBundlesApply(testcase.repo, mockStore, func(bundle model.BundleDescriptor) error {
 				bundles = append(bundles, bundle)
 				return nil
-			}, ConcurrentBundleList(concurrency), BundleBatchSize(testBatchSize))
+			}, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertBundles(t, testcase, bundles, err)
 		})
 
@@ -490,7 +492,7 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 					return errors.New("applied test func error")
 				}
 				return nil
-			}, ConcurrentBundleList(concurrency), BundleBatchSize(testBatchSize))
+			}, ConcurrentList(concurrency), BatchSize(testBatchSize))
 
 			if fail {
 				require.Error(t, err)

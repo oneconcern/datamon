@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 
@@ -123,7 +124,7 @@ func unpackBundleDescriptor(ctx context.Context, bundle *Bundle, publish bool) e
 			return err
 		}
 		if !has {
-			return ErrNotFound
+			return status.ErrNotFound
 		}
 		rdr, err = bundle.MetaStore.Get(ctx, archivePathToBundle)
 		if err != nil {
