@@ -3,13 +3,25 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/spf13/cobra"
 )
 
+func applyLabelTemplate(label model.LabelDescriptor) error {
+	var buf bytes.Buffer
+	if err := labelDescriptorTemplate.Execute(&buf, label); err != nil {
+		return fmt.Errorf("executing template: %w", err)
+	}
+	log.Println(buf.String())
+	return nil
+}
+
+// LabelListCommand lists the labels in a repo
 var LabelListCommand = &cobra.Command{
 	Use:   "list",
 	Short: "List labels",
@@ -21,19 +33,12 @@ var LabelListCommand = &cobra.Command{
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		labelDescriptors, err := core.ListLabels(params.repo.RepoName, remoteStores.meta, params.label.Prefix)
+		err = core.ListLabelsApply(params.repo.RepoName, remoteStores.meta, params.label.Prefix, applyLabelTemplate,
+			core.ConcurrentList(params.core.ConcurrencyFactor),
+			core.BatchSize(params.core.BatchSize))
 		if err != nil {
 			wrapFatalln("download label list", err)
 			return
-		}
-		for _, ld := range labelDescriptors {
-			var buf bytes.Buffer
-			err := labelDescriptorTemplate.Execute(&buf, ld)
-			if err != nil {
-				wrapFatalln("executing template", err)
-				return
-			}
-			log.Println(buf.String())
 		}
 	},
 }
