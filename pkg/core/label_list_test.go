@@ -156,13 +156,13 @@ func testListLabels(t *testing.T, concurrency int, i int) {
 		testcase := toPin
 
 		t.Run(fmt.Sprintf("ListLabels-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
 			mockStore := mockedLabelStore(testcase.name)
 			labels, err := ListLabels(testcase.repo, mockStore, testcase.prefix, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertLabels(t, testcase, labels, err)
 		})
 		t.Run(fmt.Sprintf("ListLabelsApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
 			mockStore := mockedLabelStore(testcase.name)
 			labels := make(model.LabelDescriptors, 0, typicalReposNum)
 			err := ListLabelsApply(testcase.repo, mockStore, testcase.prefix, func(label model.LabelDescriptor) error {
