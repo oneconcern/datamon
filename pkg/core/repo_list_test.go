@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"gopkg.in/yaml.v2"
 )
 
 type repoFixture struct {
@@ -45,10 +46,13 @@ func repoTestCases() []repoFixture {
 }
 
 func buildRepoYaml(repo string) string {
-	return fmt.Sprintf(`name: '%s'
-description: 'test %s'
-contributor:
-  email: test@example.com`, repo, repo)
+	r := model.RepoDescriptor{
+		Name:        repo,
+		Description: fmt.Sprintf("test %s", repo),
+		Contributor: model.Contributor{Email: "test@example.com"},
+	}
+	asYaml, _ := yaml.Marshal(r)
+	return string(asYaml)
 }
 
 var (

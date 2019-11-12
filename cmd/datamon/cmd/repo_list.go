@@ -43,5 +43,7 @@ var repoList = &cobra.Command{
 
 func init() {
 	addBucketNameFlag(repoList)
+	addCoreConcurrencyFactorFlag(repoList)
+	addBatchSizeFlag(repoList)
 	repoCmd.AddCommand(repoList)
 }
