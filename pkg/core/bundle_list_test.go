@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"gopkg.in/yaml.v2"
 )
 
 type bundleFixture struct {
@@ -46,22 +48,25 @@ func bundleTestCases() []bundleFixture {
 			repo: "happy/repo.json",
 			expected: model.BundleDescriptors{
 				{
-					ID:       "myID1",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID1",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 				{
-					ID:       "myID2",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID2",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 				{
-					ID:       "myID3",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID3",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 			},
 		},
@@ -119,16 +124,18 @@ func bundleTestCases() []bundleFixture {
 			repo: "skipped/repo.json",
 			expected: []model.BundleDescriptor{
 				{
-					ID:       "myID1",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID1",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 				{
-					ID:       "myID3",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID3",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 			},
 		},
@@ -171,10 +178,11 @@ func buildKeysBatchFixture(t *testing.T) func() {
 		for i := 0; i < maxTestKeys; i++ {
 			keysBatchFixture[i] = fmt.Sprintf("/key%0.3d/myID%0.3d/bundle.json", i, i)
 			expectedBatchFixture[i] = model.BundleDescriptor{
-				ID:       fmt.Sprintf("myID%0.3d", i),
-				LeafSize: 16,
-				Message:  "this is a message",
-				Version:  4,
+				ID:           fmt.Sprintf("myID%0.3d", i),
+				LeafSize:     16,
+				Message:      "this is a message",
+				Version:      4,
+				Contributors: []model.Contributor{},
 			}
 		}
 		require.Truef(t, sort.IsSorted(expectedBatchFixture), "got %v", expectedBatchFixture)
@@ -182,10 +190,15 @@ func buildKeysBatchFixture(t *testing.T) func() {
 }
 
 func buildYaml(id string) string {
-	return fmt.Sprintf(`id: '%s'
-leafSize: 16
-message: 'this is a message'
-version: 4`, id)
+	bundle := model.BundleDescriptor{
+		ID:           id,
+		LeafSize:     16,
+		Message:      "this is a message",
+		Version:      4,
+		Contributors: []model.Contributor{},
+	}
+	asYaml, _ := yaml.Marshal(bundle)
+	return string(asYaml)
 }
 
 func mockedStore(testcase string) storage.Store {
@@ -525,7 +538,12 @@ func assertBundles(t *testing.T, testcase bundleFixture, bundles model.BundleDes
 	}
 	require.NoError(t, err)
 
-	assert.ElementsMatch(t, testcase.expected, bundles)
+	if !assert.ElementsMatch(t, testcase.expected, bundles) {
+		// show details
+		exp, _ := json.MarshalIndent(testcase.expected, "", " ")
+		act, _ := json.MarshalIndent(bundles, "", " ")
+		assert.JSONEqf(t, string(exp), string(act), "expected equal JSON bundles")
+	}
 	assert.Truef(t, sort.IsSorted(bundles), "expected a sorted output, got: %v", bundles)
 }
 
