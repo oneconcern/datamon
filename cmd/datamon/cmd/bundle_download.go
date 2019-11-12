@@ -93,7 +93,7 @@ func init() {
 
 	addLabelNameFlag(BundleDownloadCmd)
 
-	addConcurrencyFactorFlag(BundleDownloadCmd)
+	addConcurrencyFactorFlag(BundleDownloadCmd, 100)
 
 	addNameFilterFlag(BundleDownloadCmd)
 

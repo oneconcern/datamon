@@ -130,18 +130,18 @@ func addSkipMissingFlag(cmd *cobra.Command) string {
 
 const concurrencyFactorFlag = "concurrency-factor"
 
-func addConcurrencyFactorFlag(cmd *cobra.Command) string {
+func addConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) string {
 	concurrencyFactor := concurrencyFactorFlag
-	cmd.Flags().IntVar(&params.bundle.ConcurrencyFactor, concurrencyFactor, 100,
+	cmd.Flags().IntVar(&params.bundle.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
 		"Heuristic on the amount of concurrency used by various operations.  "+
 			"Turn this value down to use less memory, increase for faster operations.")
 	return concurrencyFactor
 }
 
-func addCoreConcurrencyFactorFlag(cmd *cobra.Command) string {
+func addCoreConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) string {
 	// this takes the usual "concurrency-factor" flag, but sets non-object specific settings
 	concurrencyFactor := concurrencyFactorFlag
-	cmd.Flags().IntVar(&params.core.ConcurrencyFactor, concurrencyFactor, 100,
+	cmd.Flags().IntVar(&params.core.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
 		"Heuristic on the amount of concurrency used by core operations. "+
 			"Concurrent retrieval of metadata is capped by the 'batch-size' parameter. "+
 			"Turn this value down to use less memory, increase for faster operations.")
