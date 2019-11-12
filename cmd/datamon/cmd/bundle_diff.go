@@ -99,7 +99,7 @@ func init() {
 
 	addLabelNameFlag(bundleDiffCmd)
 
-	addConcurrencyFactorFlag(bundleDiffCmd)
+	addConcurrencyFactorFlag(bundleDiffCmd, 100)
 
 	for _, flag := range requiredFlags {
 		err := bundleDiffCmd.MarkFlagRequired(flag)

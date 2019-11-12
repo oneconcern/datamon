@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	status "github.com/oneconcern/datamon/pkg/core/status"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
@@ -32,7 +33,7 @@ exits with ENOENT status otherwise.`,
 			core.LabelName(params.label.Name),
 		)
 		err = label.DownloadDescriptor(ctx, bundle, true)
-		if err == core.ErrNotFound {
+		if err == status.ErrNotFound {
 			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", params.label.Name)
 			return
 		}

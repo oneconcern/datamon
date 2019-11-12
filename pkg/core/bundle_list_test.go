@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"gopkg.in/yaml.v2"
 )
 
 type bundleFixture struct {
@@ -42,31 +44,34 @@ func (testReadCloserWithErr) Close() error {
 func bundleTestCases() []bundleFixture {
 	return []bundleFixture{
 		{
-			name: "happy path",
+			name: happyPath,
 			repo: "happy/repo.json",
 			expected: model.BundleDescriptors{
 				{
-					ID:       "myID1",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID1",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 				{
-					ID:       "myID2",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID2",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 				{
-					ID:       "myID3",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID3",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 			},
 		},
 		{
-			name:     "happy with batches",
+			name:     happyWithBatches,
 			repo:     "happy/repo.json",
 			expected: expectedBatchFixture,
 		},
@@ -119,16 +124,18 @@ func bundleTestCases() []bundleFixture {
 			repo: "skipped/repo.json",
 			expected: []model.BundleDescriptor{
 				{
-					ID:       "myID1",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID1",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 				{
-					ID:       "myID3",
-					LeafSize: 16,
-					Message:  "this is a message",
-					Version:  4,
+					ID:           "myID3",
+					LeafSize:     16,
+					Message:      "this is a message",
+					Version:      4,
+					Contributors: []model.Contributor{},
 				},
 			},
 		},
@@ -152,6 +159,8 @@ func bundleTestCases() []bundleFixture {
 }
 
 const (
+	happyPath              = "happy path"
+	happyWithBatches       = "happy with batches"
 	batchErrorRepoTestcase = "batch error repo"
 	batchErrorTestcase     = "batch error"
 )
@@ -169,10 +178,11 @@ func buildKeysBatchFixture(t *testing.T) func() {
 		for i := 0; i < maxTestKeys; i++ {
 			keysBatchFixture[i] = fmt.Sprintf("/key%0.3d/myID%0.3d/bundle.json", i, i)
 			expectedBatchFixture[i] = model.BundleDescriptor{
-				ID:       fmt.Sprintf("myID%0.3d", i),
-				LeafSize: 16,
-				Message:  "this is a message",
-				Version:  4,
+				ID:           fmt.Sprintf("myID%0.3d", i),
+				LeafSize:     16,
+				Message:      "this is a message",
+				Version:      4,
+				Contributors: []model.Contributor{},
 			}
 		}
 		require.Truef(t, sort.IsSorted(expectedBatchFixture), "got %v", expectedBatchFixture)
@@ -180,16 +190,21 @@ func buildKeysBatchFixture(t *testing.T) func() {
 }
 
 func buildYaml(id string) string {
-	return fmt.Sprintf(`id: '%s'
-leafSize: 16
-message: 'this is a message'
-version: 4`, id)
+	bundle := model.BundleDescriptor{
+		ID:           id,
+		LeafSize:     16,
+		Message:      "this is a message",
+		Version:      4,
+		Contributors: []model.Contributor{},
+	}
+	asYaml, _ := yaml.Marshal(bundle)
+	return string(asYaml)
 }
 
 func mockedStore(testcase string) storage.Store {
 	// builds mocked up test scenarios
 	switch testcase {
-	case "happy path":
+	case happyPath:
 		return &mockstorage.StoreMock{
 			HasFunc: func(_ context.Context, _ string) (bool, error) {
 				return true, nil
@@ -206,7 +221,7 @@ func mockedStore(testcase string) storage.Store {
 				return ioutil.NopCloser(strings.NewReader(buildYaml(id))), nil
 			},
 		}
-	case "happy with batches":
+	case happyWithBatches:
 		return &mockstorage.StoreMock{
 			HasFunc: func(_ context.Context, _ string) (bool, error) {
 				return true, nil
@@ -461,7 +476,7 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListBundles-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			t.Parallel()
 			mockStore := mockedStore(testcase.name)
-			bundles, err := ListBundles(testcase.repo, mockStore, ConcurrentBundleList(concurrency), BundleBatchSize(testBatchSize))
+			bundles, err := ListBundles(testcase.repo, mockStore, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertBundles(t, testcase, bundles, err)
 		})
 
@@ -473,7 +488,7 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 			err := ListBundlesApply(testcase.repo, mockStore, func(bundle model.BundleDescriptor) error {
 				bundles = append(bundles, bundle)
 				return nil
-			}, ConcurrentBundleList(concurrency), BundleBatchSize(testBatchSize))
+			}, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertBundles(t, testcase, bundles, err)
 		})
 
@@ -490,7 +505,7 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 					return errors.New("applied test func error")
 				}
 				return nil
-			}, ConcurrentBundleList(concurrency), BundleBatchSize(testBatchSize))
+			}, ConcurrentList(concurrency), BatchSize(testBatchSize))
 
 			if fail {
 				require.Error(t, err)
@@ -523,7 +538,12 @@ func assertBundles(t *testing.T, testcase bundleFixture, bundles model.BundleDes
 	}
 	require.NoError(t, err)
 
-	assert.ElementsMatch(t, testcase.expected, bundles)
+	if !assert.ElementsMatch(t, testcase.expected, bundles) {
+		// show details
+		exp, _ := json.MarshalIndent(testcase.expected, "", " ")
+		act, _ := json.MarshalIndent(bundles, "", " ")
+		assert.JSONEqf(t, string(exp), string(act), "expected equal JSON bundles")
+	}
 	assert.Truef(t, sort.IsSorted(bundles), "expected a sorted output, got: %v", bundles)
 }
 

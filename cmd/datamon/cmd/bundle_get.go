@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	status "github.com/oneconcern/datamon/pkg/core/status"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
@@ -26,7 +27,7 @@ exits with ENOENT status otherwise.`,
 		}
 
 		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
-		if err == core.ErrNotFound {
+		if err == status.ErrNotFound {
 			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", params.label.Name)
 			return
 		}
@@ -41,7 +42,7 @@ exits with ENOENT status otherwise.`,
 		)
 
 		err = core.DownloadMetadata(ctx, bundle)
-		if err == core.ErrNotFound {
+		if err == status.ErrNotFound {
 			wrapFatalWithCode(int(unix.ENOENT), "didn't find bundle %q", params.bundle.ID)
 			return
 		}

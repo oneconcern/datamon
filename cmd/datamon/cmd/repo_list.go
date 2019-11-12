@@ -3,11 +3,22 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/spf13/cobra"
 )
+
+func applyRepoTemplate(repo model.RepoDescriptor) error {
+	var buf bytes.Buffer
+	if err := repoDescriptorTemplate.Execute(&buf, repo); err != nil {
+		return fmt.Errorf("executing template: %w", err)
+	}
+	log.Println(buf.String())
+	return nil
+}
 
 var repoList = &cobra.Command{
 	Use:   "list",
@@ -20,24 +31,19 @@ var repoList = &cobra.Command{
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		repos, err := core.ListRepos(remoteStores.meta)
+		err = core.ListReposApply(remoteStores.meta, applyRepoTemplate,
+			core.ConcurrentList(params.core.ConcurrencyFactor),
+			core.BatchSize(params.core.BatchSize))
 		if err != nil {
 			wrapFatalln("download repo list", err)
 			return
-		}
-		for _, rd := range repos {
-			var buf bytes.Buffer
-			err := repoDescriptorTemplate.Execute(&buf, rd)
-			if err != nil {
-				wrapFatalln("executing template", err)
-				return
-			}
-			log.Println(buf.String())
 		}
 	},
 }
 
 func init() {
 	addBucketNameFlag(repoList)
+	addCoreConcurrencyFactorFlag(repoList, 2000)
+	addBatchSizeFlag(repoList)
 	repoCmd.AddCommand(repoList)
 }

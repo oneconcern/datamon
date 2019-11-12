@@ -8,9 +8,8 @@ import (
 	"io"
 	"io/ioutil"
 
-	//	"regexp"
-
 	"github.com/oneconcern/datamon/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 
@@ -125,7 +124,7 @@ func unpackBundleDescriptor(ctx context.Context, bundle *Bundle, publish bool) e
 			return err
 		}
 		if !has {
-			return ErrNotFound
+			return status.ErrNotFound
 		}
 		rdr, err = bundle.MetaStore.Get(ctx, archivePathToBundle)
 		if err != nil {
@@ -289,16 +288,16 @@ func unpackBundleFileList(ctx context.Context, bundle *Bundle,
 			if res.idx+1 == bundle.BundleDescriptor.BundleEntriesFileCount {
 				missingEntries := int(bundleEntriesPerFile) - len(res.bundleEntries.BundleEntries)
 				if missingEntries < 0 {
-					return fmt.Errorf("%v is greater than expected number of bundler entries %v",
+					return fmt.Errorf("%v is greater than expected number of bundle entries %v",
 						len(res.bundleEntries.BundleEntries), bundleEntriesPerFile)
 				}
 				bundle.BundleEntries = bundle.BundleEntries[:len(bundle.BundleEntries)-missingEntries]
 			} else if uint(len(res.bundleEntries.BundleEntries)) != bundleEntriesPerFile {
-				return fmt.Errorf("%v is not expected number of bundler entries %v",
+				return fmt.Errorf("%v is not expected number of bundle entries %v",
 					len(res.bundleEntries.BundleEntries), bundleEntriesPerFile)
 			}
 		case err := <-errorC:
-			bundle.l.Error("Unpack bundle filelist failed", zap.Error(err))
+			bundle.l.Error("unpack bundle filelist failed", zap.Error(err))
 			return err
 		case <-doneOkC:
 			gotDoneSignal = true

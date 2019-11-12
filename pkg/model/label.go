@@ -14,8 +14,24 @@ type LabelDescriptor struct {
 	_            struct{}
 }
 
+// LabelDescriptors is a sortable slice of LabelDescriptor
+type LabelDescriptors []LabelDescriptor
+
+func (b LabelDescriptors) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+func (b LabelDescriptors) Len() int {
+	return len(b)
+}
+func (b LabelDescriptors) Less(i, j int) bool {
+	return b[i].BundleID < b[j].BundleID
+}
+func (b LabelDescriptors) Last() LabelDescriptor {
+	return b[len(b)-1]
+}
+
 func getArchivePathToLabels() string {
-	return fmt.Sprint("labels/")
+	return "labels/"
 }
 
 func GetArchivePathPrefixToLabels(repo string, prefixes ...string) string {
