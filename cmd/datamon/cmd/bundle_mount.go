@@ -154,7 +154,7 @@ func init() {
 	addLogLevel(mountBundleCmd)
 	addStreamFlag(mountBundleCmd)
 	addLabelNameFlag(mountBundleCmd)
-	addConcurrencyFactorFlag(mountBundleCmd)
+	addConcurrencyFactorFlag(mountBundleCmd, 100)
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	addDataPathFlag(mountBundleCmd)

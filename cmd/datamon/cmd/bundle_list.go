@@ -51,7 +51,7 @@ func init() {
 
 	addBucketNameFlag(BundleListCommand)
 	addBlobBucket(BundleListCommand)
-	addCoreConcurrencyFactorFlag(BundleListCommand)
+	addCoreConcurrencyFactorFlag(BundleListCommand, 2000)
 	addBatchSizeFlag(BundleListCommand)
 
 	for _, flag := range requiredFlags {

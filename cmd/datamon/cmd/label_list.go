@@ -47,6 +47,7 @@ func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(LabelListCommand)}
 	addLabelPrefixFlag(LabelListCommand)
+	addCoreConcurrencyFactorFlag(LabelListCommand, 10000)
 	for _, flag := range requiredFlags {
 		err := LabelListCommand.MarkFlagRequired(flag)
 		if err != nil {
