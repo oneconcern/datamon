@@ -85,6 +85,11 @@ func Parents(p []string) BundleDescriptorOption {
 		b.Parents = p
 	}
 }
+func Deduplication(d string) BundleDescriptorOption {
+	return func(b *model.BundleDescriptor) {
+		b.Deduplication = d
+	}
+}
 
 func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescriptor {
 	bd := model.BundleDescriptor{
@@ -96,6 +101,7 @@ func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescri
 		Contributors:           nil,
 		BundleEntriesFileCount: 0,
 		Version:                model.CurrentBundleVersion,
+		Deduplication:          cafs.DeduplicationBlake,
 	}
 	for _, apply := range descriptorOps {
 		apply(&bd)
