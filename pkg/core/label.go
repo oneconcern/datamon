@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
@@ -100,7 +101,7 @@ func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, chec
 		return err
 	}
 	if !has {
-		return ErrNotFound
+		return status.ErrNotFound
 	}
 	rdr, err := bundle.MetaStore.Get(context.Background(), archivePath)
 	if err != nil {

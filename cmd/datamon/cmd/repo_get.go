@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	status "github.com/oneconcern/datamon/pkg/core/status"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
@@ -26,7 +27,7 @@ exits with ENOENT status otherwise.`,
 		}
 		repoDescriptor, err := core.GetRepoDescriptorByRepoName(
 			remoteStores.meta, params.repo.RepoName)
-		if err == core.ErrNotFound {
+		if err == status.ErrNotFound {
 			wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", params.repo.RepoName)
 			return
 		}

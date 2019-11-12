@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-// BundleDescriptor represents a commit which is a file tree with the changes to the repository.
+// RepoDescriptor represents a commit which is a file tree with the changes to the repository.
 type RepoDescriptor struct {
 	Name        string      `json:"name,omitempty" yaml:"name,omitempty"`
 	Description string      `json:"description,omitempty" yaml:"description,omitempty"`
@@ -14,12 +14,31 @@ type RepoDescriptor struct {
 	Contributor Contributor `json:"contributor,omitempty" yaml:"contributor,omitempty"`
 }
 
+// RepoDescriptors is a sortable slice of RepoDescriptor
+type RepoDescriptors []RepoDescriptor
+
+func (b RepoDescriptors) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+func (b RepoDescriptors) Len() int {
+	return len(b)
+}
+func (b RepoDescriptors) Less(i, j int) bool {
+	return b[i].Name < b[j].Name
+}
+
+// Last return the last entry in a slice of RepoDescriptors
+func (b RepoDescriptors) Last() RepoDescriptor {
+	return b[len(b)-1]
+}
+
+// GetArchivePathToRepoDescriptor returns the path for a repo descriptor
 func GetArchivePathToRepoDescriptor(repo string) string {
 	return fmt.Sprint("repos/", repo, "/", "repo.json")
 }
 
 func getArchivePathToRepos() string {
-	return fmt.Sprint("repos/")
+	return "repos/"
 }
 
 func GetArchivePathPrefixToRepos() string {
