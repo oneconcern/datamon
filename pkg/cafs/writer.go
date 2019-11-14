@@ -137,7 +137,7 @@ func pFlush(
 			err = destination.Put(context.TODO(), pather(leafKey.String()), bytes.NewReader(buffer), storage.OverWrite)
 		}
 		if err != nil {
-			errC <- fmt.Errorf("write segment file: %v", err)
+			errC <- fmt.Errorf("write segment file: %s, err: %w", pather(leafKey.String()), err)
 			return
 		}
 		fmt.Printf("Uploading blob:%s\n", leafKey.String())
@@ -194,7 +194,7 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 			err = w.store.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
 		}
 		if err != nil {
-			return 0, fmt.Errorf("write segment file: %v", err)
+			return 0, fmt.Errorf("write segment file: %s err:%w", w.pather(leafKey.String()), err)
 		}
 		fmt.Printf("Uploading blob:%s, bytes:%d\n", leafKey.String(), w.offset)
 	} else {

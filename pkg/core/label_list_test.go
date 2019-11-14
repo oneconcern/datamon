@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"gopkg.in/yaml.v2"
 )
 
 type labelFixture struct {
@@ -58,12 +59,14 @@ func labelTestCases() []labelFixture {
 }
 
 func buildLabelYaml(id string) string {
-	return fmt.Sprintf(`name: '%s'
-id: 'bundle-%s'
-timestamp: '%s'
-contributors:
-  - email: test1@example.com
-  - email: test2@example.com`, id, id, testTime().Format(time.RFC3339Nano))
+	label := model.LabelDescriptor{
+		Name:         id,
+		BundleID:     fmt.Sprintf("bundle-%s", id),
+		Timestamp:    testTime(),
+		Contributors: []model.Contributor{{Email: "test1@example.com"}, {Email: "test2@example.com"}},
+	}
+	asYaml, _ := yaml.Marshal(label)
+	return string(asYaml)
 }
 
 var (
