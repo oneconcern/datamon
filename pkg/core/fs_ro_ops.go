@@ -27,7 +27,7 @@ func (fs *readOnlyFsInternal) StatFS(
 func (fs *readOnlyFsInternal) opStart(op interface{}) {
 	switch t := op.(type) {
 	case *fuseops.ReadFileOp:
-		fs.l.Info("Start",
+		fs.l.Debug("Start",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
@@ -37,7 +37,7 @@ func (fs *readOnlyFsInternal) opStart(op interface{}) {
 		)
 		return
 	case *fuseops.WriteFileOp:
-		fs.l.Info("Start",
+		fs.l.Debug("Start",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
@@ -45,7 +45,7 @@ func (fs *readOnlyFsInternal) opStart(op interface{}) {
 		)
 		return
 	case *fuseops.ReadDirOp:
-		fs.l.Info("Start",
+		fs.l.Debug("Start",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
@@ -53,7 +53,7 @@ func (fs *readOnlyFsInternal) opStart(op interface{}) {
 		)
 		return
 	}
-	fs.l.Info("Start",
+	fs.l.Debug("Start",
 		zap.String("Request", fmt.Sprintf("%T", op)),
 		zap.String("repo", fs.bundle.RepoID),
 		zap.String("bundle", fs.bundle.BundleID),
@@ -63,7 +63,7 @@ func (fs *readOnlyFsInternal) opStart(op interface{}) {
 func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 	switch t := op.(type) {
 	case *fuseops.ReadFileOp:
-		fs.l.Info("End",
+		fs.l.Debug("End",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
@@ -73,7 +73,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		)
 		return
 	case *fuseops.WriteFileOp:
-		fs.l.Info("End",
+		fs.l.Debug("End",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
@@ -82,7 +82,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		)
 		return
 	case *fuseops.ReadDirOp:
-		fs.l.Info("End",
+		fs.l.Debug("End",
 			zap.String("Request", fmt.Sprintf("%T", op)),
 			zap.String("repo", fs.bundle.RepoID),
 			zap.String("bundle", fs.bundle.BundleID),
@@ -91,7 +91,7 @@ func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
 		)
 		return
 	}
-	fs.l.Info("End",
+	fs.l.Debug("End",
 		zap.String("Request", fmt.Sprintf("%T", op)),
 		zap.String("repo", fs.bundle.RepoID),
 		zap.String("bundle", fs.bundle.BundleID),
