@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 ### application wrapper (demo)
 # half of the container coordination sketch, a script like this one
@@ -17,7 +17,7 @@ SLEEP_INSTEAD_OF_EXIT=
 
 SC_FUSE=
 SC_PG=
-
+WRONG_PARAM=
 while getopts sc:b: opt; do
     case $opt in
         (s)
@@ -29,8 +29,10 @@ while getopts sc:b: opt; do
         (b)
             battery_type="$OPTARG"
             if [ "$battery_type" = "fuse" ]; then
+                WRONG_PARAM="false"
                 SC_FUSE=true
             elif [ "$battery_type" = "postgres" ]; then
+                WRONG_PARAM="false"
                 SC_PG=true
             else
                 echo "unkown battery type $battery_type" 1>&2
@@ -50,6 +52,11 @@ fi
 if [ -z "$COORD_POINT" ]; then
     echo "coordination point not set" 1>&2
     exit 1
+fi
+
+if [ -z "$WRONG_PARAM" ]; then
+  echo "Datamon Wrap Application Script: Set type of mount (-b) to be fuse or postgres"
+  exit 1
 fi
 
 ### util

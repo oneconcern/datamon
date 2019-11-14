@@ -189,7 +189,7 @@ for mount_cmd in $MOUNT_CMDS; do
     fi
     log_file_mount="/tmp/datamon_mount.${mount_idx}.log"
     unsetopt ERR_EXIT
-    run_datamon_cmd $mount_cmd > "$log_file_mount" 2>&1 &
+    run_datamon_cmd $mount_cmd | tee -a "$log_file_mount" 2>&1 &
     datamon_status=$?
     datamon_pid=$!
     setopt ERR_EXIT
@@ -263,7 +263,7 @@ for upload_cmd in $UPLOAD_CMDS; do
     dbg_print "running upload command '${upload_cmd}' (${upload_idx})"
     log_file_upload="/tmp/datamon_upload.${upload_idx}.log"
     unsetopt ERR_EXIT
-    run_datamon_cmd "$upload_cmd" > "$log_file_upload" 2>&1
+    run_datamon_cmd "$upload_cmd" | tee -a "$log_file_upload" 2>&1
     datamon_status=$?
     setopt ERR_EXIT
     if [[ ! $datamon_status -eq 0 ]]; then
