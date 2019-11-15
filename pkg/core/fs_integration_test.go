@@ -34,7 +34,7 @@ func TestMount(t *testing.T) {
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	bd := NewBDescriptor()
-	bundle := New(bd,
+	bundle := NewBundle(bd,
 		Repo(repo),
 		BundleID(bundleID),
 		MetaStore(metaStore),
@@ -65,7 +65,7 @@ func TestMutableMount(t *testing.T) {
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	bd := NewBDescriptor()
-	bundle := New(bd,
+	bundle := NewBundle(bd,
 		Repo(repo),
 		BundleID(bundleID),
 		MetaStore(metaStore),
@@ -137,7 +137,7 @@ func TestMutableMountWrite(t *testing.T) {
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	bd := NewBDescriptor()
-	bundle := New(bd,
+	bundle := NewBundle(bd,
 		Repo(repo),
 		MetaStore(metaStore),
 		ConsumableStore(consumableStore),
@@ -173,7 +173,7 @@ func TestMutableMountWrite(t *testing.T) {
 	metaStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	bd = NewBDescriptor()
-	bundle = New(bd,
+	bundle = NewBundle(bd,
 		Repo(repo),
 		BundleID(bundle.BundleID),
 		MetaStore(metaStore),
@@ -207,7 +207,7 @@ func TestMutableMountCommitError(t *testing.T) {
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	bd := NewBDescriptor()
-	bundle := New(bd,
+	bundle := NewBundle(bd,
 		Repo(repo),
 		MetaStore(metaStore),
 		ConsumableStore(consumableStore),
@@ -315,7 +315,7 @@ func TestMutableMountMkdir(t *testing.T) {
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	bd := NewBDescriptor()
-	bundle := New(bd,
+	bundle := NewBundle(bd,
 		Repo(repo),
 		BundleID(bundleID),
 		MetaStore(metaStore),

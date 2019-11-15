@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -19,18 +20,22 @@ var webSrv = &cobra.Command{
 	Long:  "A webserver process to browse Datamon data",
 	Run: func(cmd *cobra.Command, args []string) {
 		infoLogger.Println("begin webserver")
-		// todo: pass storage.Store
+		stores, err := paramsToDatamonContext(context.Background(), datamonFlags)
+		if err != nil {
+			wrapFatalln("create remote stores", err)
+			return
+		}
 		s, err := web.NewServer(web.ServerParams{
-			MetadataBucket: params.repo.MetadataBucket,
-			Credential:     config.Credential,
+			Stores:     stores,
+			Credential: config.Credential,
 		})
 		if err != nil {
 			wrapFatalln("server init error", err)
 			return
 		}
 		r := web.InitRouter(s)
-		infoLogger.Printf("serving on %d...", params.web.port)
-		err = http.ListenAndServe(fmt.Sprintf(":%d", params.web.port), r)
+		infoLogger.Printf("serving on %d...", datamonFlags.web.port)
+		err = http.ListenAndServe(fmt.Sprintf(":%d", datamonFlags.web.port), r)
 		if err != nil {
 			wrapFatalln("server listen error", err)
 			return
@@ -39,11 +44,11 @@ var webSrv = &cobra.Command{
 }
 
 func init() {
-	/* web params */
+	/* web datamonFlags */
 	addWebPortFlag(webSrv)
 
-	/* core params */
-	//	addBucketNameFlag(repoList)
+	/* core datamonFlags */
+	//	addMetadataBucket(repoList)
 
 	rootCmd.AddCommand(webSrv)
 }

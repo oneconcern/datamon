@@ -11,14 +11,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const datamonDir = ".datamon2"
+
 var configGen = &cobra.Command{
 	Use:   "create",
 	Short: "Create a config",
-	Long:  "Create a config to use for datamon. Config file will be placed in $HOME/.datamon/datamon.yaml",
+	Long:  "Create a config to use for datamon. Config file will be placed in $HOME/" + datamonDir + "/datamon.yaml",
 	Run: func(cmd *cobra.Command, args []string) {
-		_, err := paramsToContributor(params)
+		_, err := paramsToContributor(datamonFlags)
 		if err != nil {
-			wrapFatalln("contributor params present", err)
+			wrapFatalln("contributor datamonFlags present", err)
 			return
 		}
 		user, err := user.Current()
@@ -26,18 +28,18 @@ var configGen = &cobra.Command{
 			wrapFatalln("Could not get home directory for user", nil)
 			return
 		}
-		config := Config{
-			Metadata:   params.repo.MetadataBucket,
-			Blob:       params.repo.BlobBucket,
-			Credential: params.root.credFile,
+		config := CLIConfig{
+			Config:     datamonFlags.core.Config,
+			Context:    datamonFlags.context.Descriptor.Name,
+			Credential: datamonFlags.root.credFile,
 		}
 		o, e := yaml.Marshal(config)
 		if e != nil {
 			wrapFatalln("serialize config to yaml", e)
 			return
 		}
-		_ = os.Mkdir(filepath.Join(user.HomeDir, ".datamon"), 0777)
-		err = ioutil.WriteFile(filepath.Join(user.HomeDir, ".datamon", "datamon.yaml"), o, 0666)
+		_ = os.Mkdir(filepath.Join(user.HomeDir, datamonDir), 0777)
+		err = ioutil.WriteFile(filepath.Join(user.HomeDir, datamonDir, "datamon.yaml"), o, 0666)
 		if err != nil {
 			wrapFatalln("write config file", err)
 			return
@@ -46,11 +48,8 @@ var configGen = &cobra.Command{
 }
 
 func init() {
-	addContributorEmail(configGen)
-	addContributorName(configGen)
-	addBucketNameFlag(configGen)
-	addBlobBucket(configGen)
 	addCredentialFile(configGen)
-
+	addContextFlag(configGen)
+	addConfigFlag(configGen)
 	configCmd.AddCommand(configGen)
 }

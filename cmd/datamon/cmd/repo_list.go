@@ -26,23 +26,25 @@ var repoList = &cobra.Command{
 	Long:  "List repos that have been created",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		err = core.ListReposApply(remoteStores.meta, applyRepoTemplate,
-			core.ConcurrentList(params.core.ConcurrencyFactor),
-			core.BatchSize(params.core.BatchSize))
+		err = core.ListReposApply(remoteStores, applyRepoTemplate,
+			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
+			core.BatchSize(datamonFlags.core.BatchSize))
 		if err != nil {
 			wrapFatalln("download repo list", err)
 			return
 		}
 	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	}, // https://github.com/spf13/cobra/issues/458
 }
 
 func init() {
-	addBucketNameFlag(repoList)
 	addCoreConcurrencyFactorFlag(repoList, 500)
 	addBatchSizeFlag(repoList)
 	repoCmd.AddCommand(repoList)

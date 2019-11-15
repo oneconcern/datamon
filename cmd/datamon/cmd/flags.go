@@ -8,6 +8,10 @@ import (
 	"io/ioutil"
 	"strings"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
+	"github.com/oneconcern/datamon/pkg/core"
+
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -16,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type paramsT struct {
+type flagsT struct {
 	bundle struct {
 		ID                string
 		DataPath          string
@@ -37,11 +41,12 @@ type paramsT struct {
 		Prefix string
 		Name   string
 	}
+	context struct {
+		Descriptor model.Context
+	}
 	repo struct {
-		MetadataBucket string
-		RepoName       string
-		BlobBucket     string
-		Description    string
+		RepoName    string
+		Description string
 	}
 	root struct {
 		credFile string
@@ -49,81 +54,82 @@ type paramsT struct {
 		cpuProf  bool
 	}
 	core struct {
+		Config            string
 		ConcurrencyFactor int
 		BatchSize         int
 	}
 }
 
-var params = paramsT{}
+var datamonFlags = flagsT{}
 
 func addBundleFlag(cmd *cobra.Command) string {
 	bundleID := "bundle"
 	if cmd != nil {
-		cmd.Flags().StringVar(&params.bundle.ID, bundleID, "", "The hash id for the bundle, if not specified the latest bundle will be used")
+		cmd.Flags().StringVar(&datamonFlags.bundle.ID, bundleID, "", "The hash id for the bundle, if not specified the latest bundle will be used")
 	}
 	return bundleID
 }
 
 func addDataPathFlag(cmd *cobra.Command) string {
 	destination := "destination"
-	cmd.Flags().StringVar(&params.bundle.DataPath, destination, "", "The path to the download dir")
+	cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, destination, "", "The path to the download dir")
 	return destination
 }
 
 func addNameFilterFlag(cmd *cobra.Command) string {
 	nameFilter := "name-filter"
-	cmd.Flags().StringVar(&params.bundle.NameFilter, nameFilter, "",
+	cmd.Flags().StringVar(&datamonFlags.bundle.NameFilter, nameFilter, "",
 		"A regular expression (RE2) to match names of bundle entries.")
 	return nameFilter
 }
 
 func addMountPathFlag(cmd *cobra.Command) string {
 	mount := "mount"
-	cmd.Flags().StringVar(&params.bundle.MountPath, mount, "", "The path to the mount dir")
+	cmd.Flags().StringVar(&datamonFlags.bundle.MountPath, mount, "", "The path to the mount dir")
 	return mount
 }
 
 func addPathFlag(cmd *cobra.Command) string {
 	path := "path"
-	cmd.Flags().StringVar(&params.bundle.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
+	cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
 	return path
 }
 
 func addCommitMessageFlag(cmd *cobra.Command) string {
 	message := "message"
-	cmd.Flags().StringVar(&params.bundle.Message, message, "", "The message describing the new bundle")
+	cmd.Flags().StringVar(&datamonFlags.bundle.Message, message, "", "The message describing the new bundle")
 	return message
 }
 
 func addFileListFlag(cmd *cobra.Command) string {
 	fileList := "files"
-	cmd.Flags().StringVar(&params.bundle.FileList, fileList, "", "Text file containing list of files separated by newline.")
+	cmd.Flags().StringVar(&datamonFlags.bundle.FileList, fileList, "", "Text file containing list of files separated by newline.")
 	return fileList
 }
 
 func addBundleFileFlag(cmd *cobra.Command) string {
 	file := "file"
-	cmd.Flags().StringVar(&params.bundle.File, file, "", "The file to download from the bundle")
+	cmd.Flags().StringVar(&datamonFlags.bundle.File, file, "", "The file to download from the bundle")
 	return file
 }
 
 func addDaemonizeFlag(cmd *cobra.Command) string {
 	daemonize := "daemonize"
 	if cmd != nil {
-		cmd.Flags().BoolVar(&params.bundle.Daemonize, daemonize, false, "Whether to run the command as a daemonized process")
+		cmd.Flags().BoolVar(&datamonFlags.bundle.Daemonize, daemonize, false, "Whether to run the command as a daemonized process")
 	}
 	return daemonize
 }
 
 func addStreamFlag(cmd *cobra.Command) string {
 	stream := "stream"
-	cmd.Flags().BoolVar(&params.bundle.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
+	cmd.Flags().BoolVar(&datamonFlags.bundle.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
 	return stream
 }
 
 func addSkipMissingFlag(cmd *cobra.Command) string {
 	skipOnError := "skip-on-error"
-	cmd.Flags().BoolVar(&params.bundle.SkipOnError, skipOnError, false, "Skip files encounter errors while reading."+
+	cmd.Flags().BoolVar(&datamonFlags.bundle.SkipOnError, skipOnError, false, "Skip files encounter errors while reading."+
 		"The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false")
 	return skipOnError
 }
@@ -132,7 +138,7 @@ const concurrencyFactorFlag = "concurrency-factor"
 
 func addConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) string {
 	concurrencyFactor := concurrencyFactorFlag
-	cmd.Flags().IntVar(&params.bundle.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
+	cmd.Flags().IntVar(&datamonFlags.bundle.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
 		"Heuristic on the amount of concurrency used by various operations.  "+
 			"Turn this value down to use less memory, increase for faster operations.")
 	return concurrencyFactor
@@ -141,106 +147,154 @@ func addConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) string
 func addCoreConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) string {
 	// this takes the usual "concurrency-factor" flag, but sets non-object specific settings
 	concurrencyFactor := concurrencyFactorFlag
-	cmd.Flags().IntVar(&params.core.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
+	cmd.Flags().IntVar(&datamonFlags.core.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
 		"Heuristic on the amount of concurrency used by core operations. "+
 			"Concurrent retrieval of metadata is capped by the 'batch-size' parameter. "+
 			"Turn this value down to use less memory, increase for faster operations.")
 	return concurrencyFactor
 }
+func addContextFlag(cmd *cobra.Command) string {
+	c := "context"
+	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Name, c, "dev", "Set the context for datamon")
+	return c
+}
+
+func addConfigFlag(cmd *cobra.Command) string {
+	config := "config"
+	cmd.Flags().StringVar(&datamonFlags.core.Config, config, "", "Set the config to use")
+	return config
+}
 
 func addBatchSizeFlag(cmd *cobra.Command) string {
 	batchSize := "batch-size"
-	cmd.Flags().IntVar(&params.core.BatchSize, batchSize, 1024,
-		"Number of objects streamed together as a batch. This can be tuned for performance based on network connectivity")
+	cmd.Flags().IntVar(&datamonFlags.core.BatchSize, batchSize, 1024,
+		"Number of bundles streamed together as a batch. This can be tuned for performance based on network connectivity")
 	return batchSize
 }
 
 func addWebPortFlag(cmd *cobra.Command) string {
-	cmd.Flags().IntVar(&params.web.port, webPort, 3003, "Port number for the web server")
+	cmd.Flags().IntVar(&datamonFlags.web.port, webPort, 3003, "Port number for the web server")
 	return webPort
 }
 
 func addLabelNameFlag(cmd *cobra.Command) string {
 	labelName := "label"
-	cmd.Flags().StringVar(&params.label.Name, labelName, "", "The human-readable name of a label")
+	cmd.Flags().StringVar(&datamonFlags.label.Name, labelName, "", "The human-readable name of a label")
 	return labelName
 }
 
 func addLabelPrefixFlag(cmd *cobra.Command) string {
 	prefixString := "prefix"
-	cmd.Flags().StringVar(&params.label.Prefix, prefixString, "", "List labels starting with a prefix.")
+	cmd.Flags().StringVar(&datamonFlags.label.Prefix, prefixString, "", "List labels starting with a prefix.")
 	return prefixString
 }
 
 func addRepoNameOptionFlag(cmd *cobra.Command) string {
 	repo := "repo"
-	cmd.Flags().StringVar(&params.repo.RepoName, repo, "", "The name of this repository")
+	cmd.Flags().StringVar(&datamonFlags.repo.RepoName, repo, "", "The name of this repository")
 	return repo
-}
-
-func addBucketNameFlag(cmd *cobra.Command) string {
-	meta := "meta"
-	cmd.Flags().StringVar(&params.repo.MetadataBucket, meta, "", "The name of the bucket used by datamon metadata")
-	_ = cmd.Flags().MarkHidden(meta)
-	return meta
 }
 
 func addRepoDescription(cmd *cobra.Command) string {
 	description := "description"
-	cmd.Flags().StringVar(&params.repo.Description, description, "", "The description for the repo")
+	cmd.Flags().StringVar(&datamonFlags.repo.Description, description, "", "The description for the repo")
 	return description
 }
 
 func addBlobBucket(cmd *cobra.Command) string {
 	blob := "blob"
-	cmd.Flags().StringVar(&params.repo.BlobBucket, blob, "", "The name of the bucket hosting the datamon blobs")
-	_ = cmd.Flags().MarkHidden(blob)
+	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Blob, blob, "", "The name of the bucket hosting the datamon blobs")
 	return blob
+}
+
+func addMetadataBucket(cmd *cobra.Command) string {
+	meta := "meta"
+	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Metadata, meta, "", "The name of the bucket used by datamon metadata")
+	return meta
+}
+
+func addVMetadataBucket(cmd *cobra.Command) string {
+	vm := "vmeta"
+	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.VMetadata, vm, "", "The name of the bucket hosting the versioned metadata")
+	return vm
+}
+
+func addWALBucket(cmd *cobra.Command) string {
+	b := "wal"
+	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.WAL, b, "", "The name of the bucket hosting the WAL")
+	return b
+}
+
+func addReadLogBucket(cmd *cobra.Command) string {
+	b := "read-log"
+	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.ReadLog, b, "", "The name of the bucket hosting the read log")
+	return b
 }
 
 func addCredentialFile(cmd *cobra.Command) string {
 	credential := "credential"
-	cmd.Flags().StringVar(&params.root.credFile, credential, "", "The path to the credential file")
+	cmd.Flags().StringVar(&datamonFlags.root.credFile, credential, "", "The path to the credential file")
 	return credential
 }
 
 func addLogLevel(cmd *cobra.Command) string {
 	loglevel := "loglevel"
-	cmd.Flags().StringVar(&params.root.logLevel, loglevel, "info", "The logging level")
+	cmd.Flags().StringVar(&datamonFlags.root.logLevel, loglevel, "info", "The logging level")
 	return loglevel
 }
 
 func addCPUProfFlag(cmd *cobra.Command) string {
-	cpuprof := "cpuprof"
-	cmd.Flags().BoolVar(&params.root.cpuProf, cpuprof, false, "Toggle runtime profiling")
-	return cpuprof
+	c := "cpuprof"
+	cmd.Flags().BoolVar(&datamonFlags.root.cpuProf, c, false, "Toggle runtime profiling")
+	return c
 }
 
 /** parameters struct to other formats */
 
-type cmdStoresRemote struct {
-	meta storage.Store
-	blob storage.Store
-}
+func paramsToDatamonContext(ctx context.Context, params flagsT) (context2.Stores, error) {
+	stores := context2.Stores{}
 
-func paramsToRemoteCmdStores(ctx context.Context, params paramsT) (cmdStoresRemote, error) {
-	stores := cmdStoresRemote{}
-	meta, err := gcs.New(ctx, params.repo.MetadataBucket, config.Credential)
+	meta, err := gcs.New(ctx, params.context.Descriptor.Metadata, config.Credential)
 	if err != nil {
-		return cmdStoresRemote{}, err
+		return context2.Stores{}, fmt.Errorf("failed to initialize metadata store, err:%s", err)
 	}
-	stores.meta = meta
-	if params.repo.BlobBucket != "" {
-		blob, err := gcs.New(ctx, params.repo.BlobBucket, config.Credential)
-		if err != nil {
-			return cmdStoresRemote{}, err
-		}
-		stores.blob = blob
+	stores.SetMetadata(meta)
+
+	blob, err := gcs.New(ctx, params.context.Descriptor.Blob, config.Credential)
+	if err != nil {
+		return context2.Stores{}, fmt.Errorf("failed to initialize blob store, err:%s", err)
 	}
+	stores.SetBlob(blob)
+
+	v, err := gcs.New(ctx, params.context.Descriptor.VMetadata, config.Credential)
+	if err != nil {
+		return context2.Stores{}, fmt.Errorf("failed to initialize vmetadata store, err:%s", err)
+	}
+	stores.SetVMetadata(v)
+
+	w, err := gcs.New(ctx, params.context.Descriptor.WAL, config.Credential)
+	if err != nil {
+		return context2.Stores{}, fmt.Errorf("failed to initialize wal store, err:%s", err)
+	}
+	stores.SetWal(w)
+
+	r, err := gcs.New(ctx, params.context.Descriptor.ReadLog, config.Credential)
+	if err != nil {
+		return context2.Stores{}, fmt.Errorf("failed to initialize read log store, err:%s", err)
+	}
+	stores.SetReadLog(r)
+
 	return stores, nil
 }
 
-func paramsToSrcStore(ctx context.Context, params paramsT, create bool) (storage.Store, error) {
+func paramsToBundleOpts(stores context2.Stores) []core.BundleOption {
+	ops := []core.BundleOption{
+		core.ContextStores(stores),
+	}
+	return ops
+}
+
+func paramsToSrcStore(ctx context.Context, params flagsT, create bool) (storage.Store, error) {
 	var err error
 	var consumableStorePath string
 
@@ -288,7 +342,7 @@ const (
 	destTNonEmpty
 )
 
-func paramsToDestStore(params paramsT,
+func paramsToDestStore(params flagsT,
 	destT DestT,
 	tmpdirPrefix string,
 ) (storage.Store, error) {
@@ -344,6 +398,6 @@ func paramsToDestStore(params paramsT,
 	return destStore, nil
 }
 
-func paramsToContributor(_ paramsT) (model.Contributor, error) {
+func paramsToContributor(_ flagsT) (model.Contributor, error) {
 	return authorizer.Principal(config.Credential)
 }

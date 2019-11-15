@@ -9,16 +9,16 @@ import (
 	"strings"
 	"time"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
-	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/web/reverse"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/gobuffalo/packd"
 	"github.com/gobuffalo/packr/v2"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 )
 
 /* templates are divided into "drivers" and "helpers" as in examples at
@@ -101,22 +101,13 @@ func loadTemplates() (appTemplates, error) {
 }
 
 type ServerParams struct {
-	MetadataBucket string
-	Credential     string
+	Stores     context2.Stores
+	Credential string
 }
 
 type Server struct {
 	tmpl   appTemplates
 	params ServerParams
-}
-
-func (s *Server) metadataStore() storage.Store {
-	var err error
-	store, err := gcs.New(context.TODO(), s.params.MetadataBucket, s.params.Credential)
-	if err != nil {
-		panic(err)
-	}
-	return store
 }
 
 func NewServer(params ServerParams) (*Server, error) {
@@ -131,7 +122,7 @@ func NewServer(params ServerParams) (*Server, error) {
 
 func (s *Server) HandleHome() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repos, err := core.ListRepos(s.metadataStore())
+		repos, err := core.ListRepos(s.params.Stores)
 		if err != nil {
 			panic(err)
 		}
@@ -151,7 +142,7 @@ func (s *Server) HandleHome() http.HandlerFunc {
 func (s *Server) HandleRepoListBundles() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoName := chi.URLParam(r, "repoName")
-		bundles, err := core.ListBundles(repoName, s.metadataStore())
+		bundles, err := core.ListBundles(repoName, s.params.Stores)
 		if err != nil {
 			panic(err)
 		}
@@ -172,9 +163,9 @@ func (s *Server) HandleBundleListFiles() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoName := chi.URLParam(r, "repoName")
 		bundleID := chi.URLParam(r, "bundleID")
-		bundle := core.New(core.NewBDescriptor(),
+		bundle := core.NewBundle(core.NewBDescriptor(),
 			core.Repo(repoName),
-			core.MetaStore(s.metadataStore()),
+			core.ContextStores(s.params.Stores),
 			core.BundleID(bundleID),
 		)
 		err := core.PopulateFiles(context.Background(), bundle)
@@ -226,8 +217,7 @@ func fileServer(r chi.Router, path string, box packd.HTTPBox) {
 		path += "/"
 	}
 	path += "*"
-	r.Get(path, http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			fs.ServeHTTP(w, r)
-		}))
+	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
+		fs.ServeHTTP(w, r)
+	})
 }

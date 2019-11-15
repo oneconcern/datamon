@@ -11,6 +11,7 @@ import (
 const bash = "bash"
 const zsh = "zsh"
 
+// TODO: This does not work and/or is not tested.
 // completionCmd represents the completion command
 var completionCmd = &cobra.Command{
 	Use:   "completion SHELL",

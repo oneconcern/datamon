@@ -6,9 +6,10 @@ import (
 	"sort"
 	"sync"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core/status"
+
 	"github.com/oneconcern/datamon/pkg/model"
-	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 const (
@@ -16,10 +17,10 @@ const (
 )
 
 // ListLabels returns all labels from a repo
-func ListLabels(repo string, store storage.Store, prefix string, opts ...ListOption) ([]model.LabelDescriptor, error) {
+func ListLabels(repo string, stores context2.Stores, prefix string, opts ...ListOption) ([]model.LabelDescriptor, error) {
 	labels := make(model.LabelDescriptors, 0, typicalLabelsNum)
 
-	labelsChan, workers := listLabelsChan(repo, store, prefix, opts...)
+	labelsChan, workers := listLabelsChan(repo, stores, prefix, opts...)
 
 	// consume batches of ordered labels
 	err := doSelectLabels(labelsChan, func(labelBatch model.LabelDescriptors) {
@@ -35,7 +36,7 @@ func ListLabels(repo string, store storage.Store, prefix string, opts ...ListOpt
 type ApplyLabelFunc func(model.LabelDescriptor) error
 
 // ListLabelsApply applies some function to the retrieved labels, in lexicographic order of keys.
-func ListLabelsApply(repo string, store storage.Store, prefix string, apply ApplyLabelFunc, opts ...ListOption) error {
+func ListLabelsApply(repo string, store context2.Stores, prefix string, apply ApplyLabelFunc, opts ...ListOption) error {
 	var (
 		err, applyErr error
 		once          sync.Once
@@ -103,7 +104,7 @@ type labelsEvent struct {
 	err    error
 }
 
-func listLabelsChan(repo string, store storage.Store, prefix string, opts ...ListOption) (chan labelsEvent, *sync.WaitGroup) {
+func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...ListOption) (chan labelsEvent, *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	settings := defaultSettings()
@@ -113,7 +114,7 @@ func listLabelsChan(repo string, store storage.Store, prefix string, opts ...Lis
 
 	batchChan := make(chan labelsEvent, 1) // buffered to 1 to avoid blocking on early errors
 
-	if err := RepoExists(repo, store); err != nil {
+	if err := RepoExists(repo, stores); err != nil {
 		batchChan <- labelsEvent{err: err}
 		close(batchChan)
 		return batchChan, &wg
@@ -132,15 +133,15 @@ func listLabelsChan(repo string, store storage.Store, prefix string, opts ...Lis
 	keysChan := make(chan keyBatchEvent, 1)
 
 	iterator := func(next string) ([]string, string, error) {
-		return store.KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToLabels(repo, prefix), "", settings.batchSize)
+		return GetLabelStore(stores).KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToLabels(repo, prefix), "", settings.batchSize)
 	}
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(store, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	go fetchKeys(stores, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
 
 	// start repo metadata retrieval
 	wg.Add(1)
-	go fetchLabels(repo, store, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+	go fetchLabels(repo, stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
 
 	// let the gc clean up internal signaling channels left open after wg goroutines are done.
 
@@ -160,7 +161,7 @@ func doSelectLabels(labelsChan <-chan labelsEvent, do func(model.LabelDescriptor
 }
 
 // fetchLabels waits on a channel of key batches and outputs batches of descriptors corresponding to these keys
-func fetchLabels(repo string, store storage.Store, settings Settings,
+func fetchLabels(repo string, stores context2.Stores, settings Settings,
 	keysChan <-chan keyBatchEvent, batchChan chan<- labelsEvent,
 	doneWithKeysChan chan<- struct{}, doneChan <-chan struct{}, wg *sync.WaitGroup) {
 	defer func() {
@@ -181,7 +182,7 @@ func fetchLabels(repo string, store storage.Store, settings Settings,
 				batchChan <- labelsEvent{err: keyBatch.err}
 				return
 			}
-			batch, err := fetchLabelBatch(repo, store, settings, keyBatch.keys)
+			batch, err := fetchLabelBatch(repo, stores, settings, keyBatch.keys)
 			if err != nil {
 				doneWithKeysChan <- struct{}{} // stop co-worker
 				batchChan <- labelsEvent{err: err}
@@ -195,7 +196,7 @@ func fetchLabels(repo string, store storage.Store, settings Settings,
 
 // fetchLabelBatch performs a parallel fetch for a batch of labels identified by their keys,
 // then reorders the result by key.
-func fetchLabelBatch(repo string, store storage.Store, settings Settings, keys []string) (model.LabelDescriptors, error) {
+func fetchLabelBatch(repo string, stores context2.Stores, settings Settings, keys []string) (model.LabelDescriptors, error) {
 	var (
 		workers, wg sync.WaitGroup
 		werr        error
@@ -209,7 +210,7 @@ func fetchLabelBatch(repo string, store storage.Store, settings Settings, keys [
 	// spin up workers pool
 	for i := 0; i < minInt(settings.concurrentList, len(keys)); i++ {
 		workers.Add(1)
-		go getLabelAsync(repo, store, keyChan, labelChan, &workers)
+		go getLabelAsync(repo, stores, keyChan, labelChan, &workers)
 	}
 
 	lbs := make(model.LabelDescriptors, 0, len(keys))
@@ -250,7 +251,7 @@ func fetchLabelBatch(repo string, store storage.Store, settings Settings, keys [
 }
 
 // getLabelAsync fetches and unmarshalls the label descriptor for each single key submitted as input
-func getLabelAsync(repo string, store storage.Store, input <-chan string, output chan<- labelEvent, wg *sync.WaitGroup) {
+func getLabelAsync(repo string, stores context2.Stores, input <-chan string, output chan<- labelEvent, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for k := range input {
 		apc, err := model.GetArchivePathComponents(k)
@@ -258,7 +259,7 @@ func getLabelAsync(repo string, store storage.Store, input <-chan string, output
 			output <- labelEvent{err: err}
 			continue
 		}
-		bundle := New(NewBDescriptor(), Repo(repo), MetaStore(store))
+		bundle := NewBundle(NewBDescriptor(), Repo(repo), ContextStores(stores))
 		labelName := apc.LabelName
 		label := NewLabel(nil, LabelName(labelName))
 		if err = label.DownloadDescriptor(context.Background(), bundle, false); err != nil {

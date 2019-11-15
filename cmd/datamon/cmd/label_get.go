@@ -20,21 +20,21 @@ Prints corresponding bundle information if the label exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		bundle := core.New(core.NewBDescriptor(),
-			core.Repo(params.repo.RepoName),
-			core.MetaStore(remoteStores.meta),
+		bundle := core.NewBundle(core.NewBDescriptor(),
+			core.Repo(datamonFlags.repo.RepoName),
+			core.ContextStores(remoteStores),
 		)
 		label := core.NewLabel(core.NewLabelDescriptor(),
-			core.LabelName(params.label.Name),
+			core.LabelName(datamonFlags.label.Name),
 		)
 		err = label.DownloadDescriptor(ctx, bundle, true)
 		if err == status.ErrNotFound {
-			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", params.label.Name)
+			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
 			return
 		}
 		if err != nil {
@@ -49,6 +49,9 @@ exits with ENOENT status otherwise.`,
 		}
 		log.Println(buf.String())
 
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
 	},
 }
 

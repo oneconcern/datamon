@@ -86,38 +86,38 @@ var mountBundleCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		// cf. comments on runDaemonized
-		if params.bundle.Daemonize {
+		if datamonFlags.bundle.Daemonize {
 			runDaemonized()
 			return
 		}
-		remoteStores, err := paramsToRemoteCmdStores(ctx, params)
+		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			onDaemonError("create remote stores", err)
 			return
 		}
-		consumableStore, err := paramsToDestStore(params, destTEmpty, "datamon-mount-destination")
+		consumableStore, err := paramsToDestStore(datamonFlags, destTEmpty, "datamon-mount-destination")
 		if err != nil {
 			onDaemonError("create destination store", err)
 			return
 		}
 
-		err = setLatestOrLabelledBundle(ctx, remoteStores.meta)
+		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err != nil {
 			onDaemonError("determine bundle id", err)
 			return
 		}
 		bd := core.NewBDescriptor()
-		bundle := core.New(bd,
-			core.Repo(params.repo.RepoName),
-			core.BundleID(params.bundle.ID),
-			core.BlobStore(remoteStores.blob),
-			core.ConsumableStore(consumableStore),
-			core.MetaStore(remoteStores.meta),
-			core.Streaming(params.bundle.Stream),
-			core.ConcurrentFilelistDownloads(
-				params.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor),
+		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
+		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundleOpts = append(bundleOpts, core.Streaming(datamonFlags.bundle.Stream))
+		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(
+			datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
+		bundle := core.NewBundle(bd,
+			bundleOpts...,
 		)
-		logger, err := dlogger.GetLogger(params.root.logLevel)
+		logger, err := dlogger.GetLogger(datamonFlags.root.logLevel)
 		if err != nil {
 			onDaemonError("failed to set log level", err)
 			return
@@ -127,12 +127,12 @@ var mountBundleCmd = &cobra.Command{
 			onDaemonError("create read only filesystem", err)
 			return
 		}
-		if err = fs.MountReadOnly(params.bundle.MountPath); err != nil {
+		if err = fs.MountReadOnly(datamonFlags.bundle.MountPath); err != nil {
 			onDaemonError("mount read only filesystem", err)
 			return
 		}
 
-		registerSIGINTHandlerMount(params.bundle.MountPath)
+		registerSIGINTHandlerMount(datamonFlags.bundle.MountPath)
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			wrapFatalln("send event from possibly daemonized process", err)
 			return
@@ -142,14 +142,15 @@ var mountBundleCmd = &cobra.Command{
 			return
 		}
 	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	},
 }
 
 func init() {
 
 	requiredFlags := []string{addRepoNameOptionFlag(mountBundleCmd)}
-	addBucketNameFlag(mountBundleCmd)
 	addDaemonizeFlag(mountBundleCmd)
-	addBlobBucket(mountBundleCmd)
 	addBundleFlag(mountBundleCmd)
 	addLogLevel(mountBundleCmd)
 	addStreamFlag(mountBundleCmd)

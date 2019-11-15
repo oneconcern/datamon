@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"go.uber.org/zap"
@@ -25,9 +27,8 @@ var MemProfDir string
 type Bundle struct {
 	RepoID                      string
 	BundleID                    string
-	MetaStore                   storage.Store
 	ConsumableStore             storage.Store
-	BlobStore                   storage.Store
+	contextStores               context2.Stores
 	cafs                        cafs.Fs
 	BundleDescriptor            model.BundleDescriptor
 	BundleEntries               []model.BundleEntry
@@ -108,20 +109,46 @@ func Repo(r string) BundleOption {
 	}
 }
 
-func MetaStore(store storage.Store) BundleOption {
-	return func(b *Bundle) {
-		b.MetaStore = store
-	}
-}
 func ConsumableStore(store storage.Store) BundleOption {
 	return func(b *Bundle) {
 		b.ConsumableStore = store
 	}
 }
-func BlobStore(store storage.Store) BundleOption {
+func ContextStores(cs context2.Stores) BundleOption {
 	return func(b *Bundle) {
-		b.BlobStore = store
+		b.contextStores = cs
 	}
+}
+func (b *Bundle) BlobStore() storage.Store {
+	return getBlobStore(b.contextStores)
+}
+
+func getBlobStore(stores context2.Stores) storage.Store {
+	return stores.Blob()
+}
+func (b *Bundle) MetaStore() storage.Store {
+	return getMetaStore(b.contextStores)
+}
+func getMetaStore(stores context2.Stores) storage.Store {
+	return stores.Metadata()
+}
+func (b *Bundle) VMetaStore() storage.Store {
+	return getVMetaStore(b.contextStores)
+}
+func getVMetaStore(stores context2.Stores) storage.Store {
+	return stores.VMetadata()
+}
+func (b *Bundle) WALStore() storage.Store {
+	return getWALStore(b.contextStores)
+}
+func getWALStore(stores context2.Stores) storage.Store {
+	return stores.Wal()
+}
+func (b *Bundle) ReadLogStore() storage.Store {
+	return getReadLogStore(b.contextStores)
+}
+func getReadLogStore(stores context2.Stores) storage.Store {
+	return stores.ReadLog()
 }
 
 func BundleID(bID string) BundleOption {
@@ -170,9 +197,7 @@ func defaultBundle() Bundle {
 	return Bundle{
 		RepoID:                      "",
 		BundleID:                    "",
-		MetaStore:                   nil,
 		ConsumableStore:             nil,
-		BlobStore:                   nil,
 		BundleEntries:               make([]model.BundleEntry, 0, 1024),
 		Streamed:                    false,
 		concurrentFileUploads:       20,
@@ -181,7 +206,7 @@ func defaultBundle() Bundle {
 	}
 }
 
-func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
+func NewBundle(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b := defaultBundle()
 	b.BundleDescriptor = *bd
 
@@ -195,7 +220,7 @@ func New(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 		fs, _ := cafs.New(
 			cafs.LeafSize(ls),
 			cafs.LeafTruncation(b.BundleDescriptor.Version < 1),
-			cafs.Backend(b.BlobStore),
+			cafs.Backend(b.BlobStore()),
 		)
 		b.cafs = fs
 	}
@@ -273,7 +298,7 @@ func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]s
 
 // implementation of Upload() with some additional parameters for test
 func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error)) error {
-	err := RepoExists(bundle.RepoID, bundle.MetaStore)
+	err := RepoExists(bundle.RepoID, bundle.contextStores)
 	if err != nil {
 		return err
 	}
@@ -282,7 +307,7 @@ func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, 
 
 func PopulateFiles(ctx context.Context, bundle *Bundle) error {
 	switch {
-	case bundle.ConsumableStore != nil && bundle.MetaStore != nil:
+	case bundle.ConsumableStore != nil && bundle.MetaStore() != nil:
 		return fmt.Errorf("ambiguous bundle to populate files:  consumable store and meta store both exist")
 	case bundle.ConsumableStore != nil:
 		if bundle.BundleID == "" {
@@ -290,8 +315,8 @@ func PopulateFiles(ctx context.Context, bundle *Bundle) error {
 				return err
 			}
 		}
-	case bundle.MetaStore != nil:
-		if err := RepoExists(bundle.RepoID, bundle.MetaStore); err != nil {
+	case bundle.MetaStore() != nil:
+		if err := RepoExists(bundle.RepoID, bundle.contextStores); err != nil {
 			return err
 		}
 	default:
@@ -317,7 +342,7 @@ func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
 }
 
 func (b *Bundle) Exists(ctx context.Context) (bool, error) {
-	return b.MetaStore.Has(ctx, model.GetArchivePathToBundle(b.RepoID, b.BundleID))
+	return b.MetaStore().Has(ctx, model.GetArchivePathToBundle(b.RepoID, b.BundleID))
 }
 
 func Diff(ctx context.Context, bundleExisting *Bundle, bundleAdditional *Bundle) (BundleDiff, error) {
@@ -341,4 +366,8 @@ func Update(ctx context.Context, bundleSrc *Bundle, bundleDest *Bundle) error {
 		return err
 	}
 	return nil
+}
+
+func GetBundleStore(stores context2.Stores) storage.Store {
+	return getMetaStore(stores)
 }

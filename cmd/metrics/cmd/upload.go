@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -21,8 +23,11 @@ import (
 )
 
 type GCSParams struct {
-	MetadataBucket string
-	BlobBucket     string
+	MetadataBucket  string
+	BlobBucket      string
+	VMetadataBucket string
+	WAL             string
+	ReadLog         string
 }
 
 var gcsParams GCSParams
@@ -91,9 +96,15 @@ var uploadCmd = &cobra.Command{
 
 		var metaStore storage.Store
 		var blobStore storage.Store
+		var vmetadata storage.Store
+		var wal storage.Store
+		var readLog storage.Store
 		if params.upload.mockDest {
 			metaStore = newMockDestStore("meta", logger)
 			blobStore = newMockDestStore("blob", logger)
+			vmetadata = newMockDestStore("vmetadata", logger)
+			wal = newMockDestStore("wal", logger)
+			readLog = newMockDestStore("readLog", logger)
 		} else {
 			deleteBuckets, err := setupBuckets()
 			if err != nil {
@@ -106,7 +117,17 @@ var uploadCmd = &cobra.Command{
 			if blobStore, err = gcs.New(context.TODO(), gcsParams.BlobBucket, gcsCredential); err != nil {
 				log.Fatalln(err)
 			}
+			if vmetadata, err = gcs.New(context.TODO(), gcsParams.VMetadataBucket, gcsCredential); err != nil {
+				log.Fatalln(err)
+			}
+			if wal, err = gcs.New(context.TODO(), gcsParams.WAL, gcsCredential); err != nil {
+				log.Fatalln(err)
+			}
+			if readLog, err = gcs.New(context.TODO(), gcsParams.ReadLog, gcsCredential); err != nil {
+				log.Fatalln(err)
+			}
 		}
+		dmc := context2.NewStores(wal, readLog, blobStore, metaStore, vmetadata)
 
 		var err error
 		sourceStore := func() storage.Store {
@@ -155,15 +176,14 @@ var uploadCmd = &cobra.Command{
 			Timestamp:   time.Now(),
 			Contributor: contributors[0],
 		}
-		err = core.CreateRepo(repo, metaStore)
+		err = core.CreateRepo(repo, dmc)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		bundle := core.New(bd,
+		bundle := core.NewBundle(bd,
 			core.Repo(repoName),
-			core.MetaStore(metaStore),
-			core.BlobStore(blobStore),
+			core.ContextStores(dmc),
 			core.ConsumableStore(sourceStore),
 			core.Logger(logger),
 		)

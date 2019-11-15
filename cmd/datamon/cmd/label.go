@@ -14,6 +14,9 @@ var labelCmd = &cobra.Command{
 A label is a key-value map from human-readable names to machine-readable
 bundle ids.
 `,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	},
 }
 
 var labelDescriptorTemplate *template.Template
