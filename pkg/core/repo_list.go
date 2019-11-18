@@ -71,35 +71,6 @@ func ListRepos(stores context2.Stores, opts ...ListOption) ([]model.RepoDescript
 	return repos, err // we may have some batches resolved before the error occurred
 }
 
-// ListReposPaginated is at this moment only used by the CSI package.
-// Question: shall we deprecate this?
-func ListReposPaginated(stores context2.Stores, token string) ([]model.RepoDescriptor, error) {
-	// Get a list
-	ks, _, _ := GetRepoStore(stores).KeysPrefix(context.Background(), "", model.GetArchivePathPrefixToRepos(), "", maxReposToList)
-	var repos = make([]model.RepoDescriptor, 0)
-	tokenHit := false
-	for _, k := range ks {
-		apc, err := model.GetArchivePathComponents(k)
-		if err != nil {
-			return nil, err
-		}
-		if apc.Repo == token {
-			tokenHit = true
-		}
-		if !tokenHit {
-			continue
-		}
-
-		var rd model.RepoDescriptor
-		rd, err = GetRepoDescriptorByRepoName(stores, apc.Repo)
-		if err != nil {
-			return nil, err
-		}
-		repos = append(repos, rd)
-	}
-	return repos, nil
-}
-
 // ApplyRepoFunc is a function to be applied on a repo
 type ApplyRepoFunc func(model.RepoDescriptor) error
 
@@ -199,7 +170,7 @@ func listReposChan(stores context2.Stores, opts ...ListOption) (chan reposEvent,
 	}
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(stores, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
 
 	// start repo metadata retrieval
 	wg.Add(1)
