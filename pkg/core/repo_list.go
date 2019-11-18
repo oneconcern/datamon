@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	maxReposToList  = 1000000
 	typicalReposNum = 1000 // default number of allocated slots for repos
 )
 
