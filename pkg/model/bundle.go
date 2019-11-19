@@ -10,12 +10,13 @@ import (
 )
 
 const (
-	CurrentBundleVersion = 1
+	// CurrentBundleVersion indicates the version of the bundle model
+	CurrentBundleVersion = 1.0
 )
 
 // BundleDescriptor represents a commit which is a file tree with the changes to the repository.
 type BundleDescriptor struct {
-	LeafSize               uint32        `json:"leafSize" yaml:"leafSize"`                               // Each bundles blobs are independently generated
+	LeafSize               uint32        `json:"leafSize" yaml:"leafSize"`                               // Bundles blobs are independently generated
 	ID                     string        `json:"id" yaml:"id"`                                           // Unique ID for the bundle.
 	Message                string        `json:"message" yaml:"message"`                                 // Message for the commit/bundle
 	Parents                []string      `json:"parents,omitempty" yaml:"parents,omitempty"`             // Bundles with parent child relation
@@ -39,16 +40,19 @@ func (b BundleDescriptors) Len() int {
 func (b BundleDescriptors) Less(i, j int) bool {
 	return b[i].ID < b[j].ID
 }
+
+// Last bundle descriptor in slice
 func (b BundleDescriptors) Last() BundleDescriptor {
 	return b[len(b)-1]
 }
 
-// List of files part of a bundle.
+// BundleEntries are the files in this bundle.
 type BundleEntries struct {
 	BundleEntries []BundleEntry `json:"BundleEntries" yaml:"BundleEntries"`
 	_             struct{}
 }
 
+// ArchivePathComponents defines the unique path parts to retrieve a file in a bundle
 type ArchivePathComponents struct {
 	Repo            string
 	BundleID        string
@@ -56,7 +60,7 @@ type ArchivePathComponents struct {
 	LabelName       string
 }
 
-// List of files, directories (empty) skipped
+// BundleEntry describes a file in the bundle. Empty directories are skipped
 type BundleEntry struct {
 	Hash         string      `json:"hash" yaml:"hash"`
 	NameWithPath string      `json:"name" yaml:"name"`
@@ -66,34 +70,27 @@ type BundleEntry struct {
 }
 
 const (
-	ConsumableStorePathTypeDescriptor = iota
+	// ConsumableStorePathTypeDescriptor defines consumable store metadata of type "descriptor"
+	ConsumableStorePathTypeDescriptor byte = iota
+	// ConsumableStorePathTypeFileList defines consumable store metadata of type "file list"
 	ConsumableStorePathTypeFileList
 )
 
+// ConsumableStorePathMetadata defines the metadata associated to a consumable store.
 type ConsumableStorePathMetadata struct {
 	Type     byte
 	BundleID string
 	Index    uint64
 }
 
-type ConsumableStorePathMetadataErr struct {
-	msg string
-}
-
-func (e ConsumableStorePathMetadataErr) Error() string {
-	return e.msg
-}
-
-/**
- * this function is the inverse of GetConsumablePath* functions.
- * the GetConsumablePath* functions return bundle.ConsumableStore keys (paths)
- * given some parameters from the bundle.
- * this function, given one of the paths returned by a GetConsumablePath* function,
- * parses the path and returns the input values to that function.
- */
+// GetConsumableStorePathMetadata is the inverse of GetConsumablePath* functions.
+//
+// The GetConsumablePath* functions return bundle.ConsumableStore keys (paths)
+// given some parameters from the bundle.
+//
+// This function, given one of the paths returned by a GetConsumablePath* function,
+// parses the path and returns the input values to that function.
 func GetConsumableStorePathMetadata(path string) (ConsumableStorePathMetadata, error) {
-	metaRe := regexp.MustCompile(`^\.datamon/(.*)\.yaml$`)
-	flRe := regexp.MustCompile(`^(.*)-bundle-files-(.*)$`)
 	info := ConsumableStorePathMetadata{}
 	metaMatch := metaRe.FindStringSubmatch(path)
 	if metaMatch == nil {
@@ -117,6 +114,7 @@ func GetConsumableStorePathMetadata(path string) (ConsumableStorePathMetadata, e
 	return info, nil
 }
 
+// GetConsumablePathToBundle yields a path to some bundle metadata
 func GetConsumablePathToBundle(bundleID string) string {
 	path := fmt.Sprint(".datamon/", bundleID, ".yaml")
 	info, err := GetConsumableStorePathMetadata(path)
@@ -133,6 +131,7 @@ func GetConsumablePathToBundle(bundleID string) string {
 	return path
 }
 
+// GetConsumablePathToBundleFileList yields a path to some bundle file
 func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
 	path := fmt.Sprint(".datamon/", bundleID, "-bundle-files-", index, ".yaml")
 	info, err := GetConsumableStorePathMetadata(path)
@@ -153,10 +152,12 @@ func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
 	return path
 }
 
+// GetArchivePathToBundle yields a path in a repo to some bundle
 func GetArchivePathToBundle(repo string, bundleID string) string {
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle.yaml")
 }
 
+// GetArchivePathPrefixToBundles yields a path to all bundles in a repo
 func GetArchivePathPrefixToBundles(repo string) string {
 	return fmt.Sprint(getArchivePathToBundles(), repo+"/")
 }
@@ -165,16 +166,20 @@ func getArchivePathToBundles() string {
 	return fmt.Sprint("bundles/")
 }
 
+// GetArchivePathToBundleFileList yields a path to the file list of a bundle
 func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
 	// <repo>-bundles/<bundle>/bundlefiles-<index>.yaml
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".yaml")
 }
 
-/* this function's design is converging on being able to return something meaningful
- * given any path in the metadata archive, not just those corresponding to bundles.
- *
- * the return value might be changed to an interface type in later iterations.
- */
+var metaRe, flRe, genFileRe *regexp.Regexp
+
+// GetArchivePathComponents yields all components from an archive path.
+//
+// NOTE: this function's design is converging on being able to return something meaningful
+// given any path in the metadata archive, not just those corresponding to bundles.
+//
+// The return value might be changed to an interface type in later iterations.
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	cs := strings.SplitN(archivePath, "/", 4)
 	if cs[0] == "labels" {
@@ -211,14 +216,21 @@ func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error)
 	//return ArchivePathComponents{}, fmt.Errorf("path is invalid: %v, path: %s", cs, archivePath)
 }
 
+// GetBundleTimeStamp yields the current UTC time
 func GetBundleTimeStamp() time.Time {
 	t := time.Now()
 	return t.UTC()
 }
 
+// IsGeneratedFile indicate if some file comes from auto-generation (e.g. .datamon files)
 func IsGeneratedFile(file string) bool {
 	// TODO: Need to find a way for AeroFs to convert to abs patch while honoring the fake root
 	//path, err := filepath.Abs(file)
-	match, _ := regexp.MatchString("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$", file)
-	return match
+	return genFileRe.MatchString(file)
+}
+
+func init() {
+	metaRe = regexp.MustCompile(`^\.datamon/(.*)\.yaml$`)
+	flRe = regexp.MustCompile(`^(.*)-bundle-files-(.*)$`)
+	genFileRe = regexp.MustCompile("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$")
 }

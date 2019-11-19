@@ -21,9 +21,10 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-var MemProfDir string
-
-// Bundle represents the bundle in its archived state
+// Bundle represents a bundle in its archived state.
+//
+// A bundle is a point in time read-only view of a rep:branch and is composed
+// of individual files. Analogous to a commit in git.
 type Bundle struct {
 	RepoID                      string
 	BundleID                    string
@@ -46,7 +47,7 @@ func (b *Bundle) setBundleID(id string) {
 	b.BundleDescriptor.ID = id
 }
 
-// InitializeBundleID create and set a new bundle ID
+// InitializeBundleID creates and sets a new bundle ID
 func (b *Bundle) InitializeBundleID() error {
 	id, err := ksuid.NewRandom()
 	if err != nil {
@@ -56,41 +57,12 @@ func (b *Bundle) InitializeBundleID() error {
 	return nil
 }
 
+// GetBundleEntries retrieves all entries in a bundle
 func (b *Bundle) GetBundleEntries() []model.BundleEntry {
 	return b.BundleEntries
 }
 
-type BundleOption func(*Bundle)
-
-type BundleDescriptorOption func(descriptor *model.BundleDescriptor)
-
-func Message(m string) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Message = m
-	}
-}
-
-func Contributors(c []model.Contributor) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Contributors = c
-	}
-}
-
-func Contributor(c model.Contributor) BundleDescriptorOption {
-	return Contributors([]model.Contributor{c})
-}
-
-func Parents(p []string) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Parents = p
-	}
-}
-func Deduplication(d string) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Deduplication = d
-	}
-}
-
+// NewBDescriptor builds a new default bundle descriptor
 func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescriptor {
 	bd := model.BundleDescriptor{
 		LeafSize:               cafs.DefaultLeafSize, // For now, fixed leaf size
@@ -109,22 +81,7 @@ func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescri
 	return &bd
 }
 
-func Repo(r string) BundleOption {
-	return func(b *Bundle) {
-		b.RepoID = r
-	}
-}
-
-func ConsumableStore(store storage.Store) BundleOption {
-	return func(b *Bundle) {
-		b.ConsumableStore = store
-	}
-}
-func ContextStores(cs context2.Stores) BundleOption {
-	return func(b *Bundle) {
-		b.contextStores = cs
-	}
-}
+// BlobStore defines the blob storage (part of the context) for a bundle
 func (b *Bundle) BlobStore() storage.Store {
 	return getBlobStore(b.contextStores)
 }
@@ -132,71 +89,39 @@ func (b *Bundle) BlobStore() storage.Store {
 func getBlobStore(stores context2.Stores) storage.Store {
 	return stores.Blob()
 }
+
+// MetaStore yields the metadata store for the current bundle context
 func (b *Bundle) MetaStore() storage.Store {
 	return getMetaStore(b.contextStores)
 }
+
 func getMetaStore(stores context2.Stores) storage.Store {
 	return stores.Metadata()
 }
+
+// VMetaStore yields the metadata store for the current bundle context
 func (b *Bundle) VMetaStore() storage.Store {
 	return getVMetaStore(b.contextStores)
 }
 func getVMetaStore(stores context2.Stores) storage.Store {
 	return stores.VMetadata()
 }
+
+// WALStore yields the Write Ahead Log storage for the bundle context
 func (b *Bundle) WALStore() storage.Store {
 	return getWALStore(b.contextStores)
 }
+
 func getWALStore(stores context2.Stores) storage.Store {
 	return stores.Wal()
 }
+
+// ReadLogStore yields the Read Log storage for the bundle context
 func (b *Bundle) ReadLogStore() storage.Store {
 	return getReadLogStore(b.contextStores)
 }
 func getReadLogStore(stores context2.Stores) storage.Store {
 	return stores.ReadLog()
-}
-
-func BundleID(bID string) BundleOption {
-	return func(b *Bundle) {
-		b.BundleID = bID
-	}
-}
-
-func Streaming(s bool) BundleOption {
-	return func(b *Bundle) {
-		b.Streamed = s
-	}
-}
-
-func SkipMissing(s bool) BundleOption {
-	return func(b *Bundle) {
-		b.SkipOnError = s
-	}
-}
-
-func Logger(l *zap.Logger) BundleOption {
-	return func(b *Bundle) {
-		b.l = l
-	}
-}
-
-func ConcurrentFileUploads(concurrentFileUploads int) BundleOption {
-	return func(b *Bundle) {
-		b.concurrentFileUploads = concurrentFileUploads
-	}
-}
-
-func ConcurrentFileDownloads(concurrentFileDownloads int) BundleOption {
-	return func(b *Bundle) {
-		b.concurrentFileDownloads = concurrentFileDownloads
-	}
-}
-
-func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
-	return func(b *Bundle) {
-		b.concurrentFilelistDownloads = concurrentFilelistDownloads
-	}
 }
 
 func defaultBundle() Bundle {
@@ -212,6 +137,7 @@ func defaultBundle() Bundle {
 	}
 }
 
+// NewBundle creates a new bundle
 func NewBundle(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b := defaultBundle()
 	b.BundleDescriptor = *bd
@@ -233,11 +159,12 @@ func NewBundle(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	return &b
 }
 
-// Publish an bundle to a consumable store
+// Publish a bundle to a consumable store
 func Publish(ctx context.Context, bundle *Bundle) error {
 	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
 }
 
+// PublishSelectBundleEntries publish a selected list of entries from a bundle to a ConsumableStore, based on a predicate filter
 func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) error {
 	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
 }
@@ -293,24 +220,24 @@ func implPublishMetadata(ctx context.Context, bundle *Bundle,
 }
 
 // Upload an bundle to archive
-func Upload(ctx context.Context, bundle *Bundle) error {
-	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, nil)
+func Upload(ctx context.Context, bundle *Bundle, opts ...ListOption) error {
+	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, nil, opts...)
 }
 
-// Upload specified keys (files) within a bundle's consumable store
-func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error)) error {
-	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, getKeys)
+// UploadSpecificKeys uploads some specified keys (files) within a bundle's consumable store
+func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error), opts ...ListOption) error {
+	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, getKeys, opts...)
 }
 
 // implementation of Upload() with some additional parameters for test
-func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error)) error {
-	err := RepoExists(bundle.RepoID, bundle.contextStores)
-	if err != nil {
+func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...ListOption) error {
+	if err := RepoExists(bundle.RepoID, bundle.contextStores); err != nil {
 		return err
 	}
-	return uploadBundle(ctx, bundle, bundleEntriesPerFile, getKeys)
+	return uploadBundle(ctx, bundle, bundleEntriesPerFile, getKeys, opts...)
 }
 
+// PopulateFiles populates a ConsumableStore with a bundle's files
 func PopulateFiles(ctx context.Context, bundle *Bundle) error {
 	switch {
 	case bundle.ConsumableStore != nil && bundle.MetaStore() != nil:
@@ -334,6 +261,7 @@ func PopulateFiles(ctx context.Context, bundle *Bundle) error {
 	return nil
 }
 
+// PublishFile publish a single bundle file to a ConsumableStore
 func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
 	err := PublishMetadata(ctx, bundle)
 	if err != nil {
@@ -347,11 +275,13 @@ func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
 	return nil
 }
 
+// Exists checks for the existence of this bundle in the repository
 func (b *Bundle) Exists(ctx context.Context) (bool, error) {
 	return b.MetaStore().Has(ctx, model.GetArchivePathToBundle(b.RepoID, b.BundleID))
 }
 
-func Diff(ctx context.Context, bundleExisting *Bundle, bundleAdditional *Bundle) (BundleDiff, error) {
+// Diff shows the differences between two bundles
+func Diff(ctx context.Context, bundleExisting, bundleAdditional *Bundle) (BundleDiff, error) {
 	if err := PopulateFiles(ctx, bundleExisting); err != nil {
 		return BundleDiff{}, err
 	}
@@ -361,7 +291,8 @@ func Diff(ctx context.Context, bundleExisting *Bundle, bundleAdditional *Bundle)
 	return diffBundles(bundleExisting, bundleAdditional)
 }
 
-func Update(ctx context.Context, bundleSrc *Bundle, bundleDest *Bundle) error {
+// Update a destination bundle from a source bundle
+func Update(ctx context.Context, bundleSrc, bundleDest *Bundle) error {
 	if err := implPublishMetadata(ctx, bundleSrc, false, defaultBundleEntriesPerFile); err != nil {
 		return err
 	}
@@ -374,6 +305,7 @@ func Update(ctx context.Context, bundleSrc *Bundle, bundleDest *Bundle) error {
 	return nil
 }
 
+// GetBundleStore extracts the metadata store for bundles from some context's stores
 func GetBundleStore(stores context2.Stores) storage.Store {
 	return getMetaStore(stores)
 }

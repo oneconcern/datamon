@@ -1,6 +1,6 @@
 // +build !appengine
 
-package model
+package convert
 
 import (
 	"reflect"
@@ -21,18 +21,22 @@ func UnsafeStringToBytes(s string) []byte {
 	}))
 }
 
+// Uint64ToBytes converts a uint64 to []byte without memcopy
 func Uint64ToBytes(u *uint64) []byte {
 	return (*[sizeOfUintPtr]byte)(unsafe.Pointer(u))[:]
 }
 
+// Int64ToBytes converts a int64 to []byte without memcopy
 func Int64ToBytes(u *int64) []byte {
 	return (*[sizeOfUintPtr]byte)(unsafe.Pointer(u))[:]
 }
 
+// BytesToUint64 converts []byte to uint64 without memcopy
 func BytesToUint64(b []byte) uint64 {
 	return *(*uint64)(unsafe.Pointer(&b[0]))
 }
 
+// BytesToInt64 converts []byte to int64 without memcopy
 func BytesToInt64(b []byte) int64 {
 	return *(*int64)(unsafe.Pointer(&b[0]))
 }

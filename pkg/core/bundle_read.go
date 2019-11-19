@@ -14,9 +14,9 @@ func errNotEOF(err error) bool {
 	return err != nil && err.Error() != "EOF"
 }
 
+// ReadAt reads some bundle data with an optional offset. Streamed bundles ignore the offset.
 func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (int, error) {
 	if !b.Streamed {
-
 		reader, err := b.ConsumableStore.GetAt(context.Background(), file.fullPath)
 		if err != nil {
 			return 0, fuse.EIO

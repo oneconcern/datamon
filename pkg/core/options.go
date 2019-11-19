@@ -7,9 +7,11 @@ type ListOption func(*Settings)
 
 // Settings defines various settings for core features
 type Settings struct {
-	concurrentList int
-	batchSize      int
-	doneChannel    chan struct{}
+	concurrentList   int
+	batchSize        int
+	doneChannel      chan struct{}
+	profilingEnabled bool
+	memProfDir       string
 }
 
 const (
@@ -49,9 +51,21 @@ func WithDoneChan(done chan struct{}) ListOption {
 	}
 }
 
+// WithMemProf enables profiling and sets the memory profile directory (defaults to the current working directory).
+// Currently, extra
+func WithMemProf(memProfDir string) ListOption {
+	return func(s *Settings) {
+		s.profilingEnabled = true
+		if memProfDir != "" {
+			s.memProfDir = memProfDir
+		}
+	}
+}
+
 func defaultSettings() Settings {
 	return Settings{
 		concurrentList: defaultListConcurrency,
 		batchSize:      defaultBatchSize,
+		memProfDir:     ".",
 	}
 }

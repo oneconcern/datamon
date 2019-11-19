@@ -12,6 +12,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/model"
 )
 
+// RepoExists checks for the existence of a repository by name in storage
 func RepoExists(repo string, stores context2.Stores) error {
 	exists, err := GetRepoStore(stores).Has(context.Background(), model.GetArchivePathToRepoDescriptor(repo))
 	if err != nil {
@@ -23,6 +24,7 @@ func RepoExists(repo string, stores context2.Stores) error {
 	return nil
 }
 
+// GetRepo retrieves a repository
 func GetRepo(repo string, stores context2.Stores) (*model.RepoDescriptor, error) {
 	store := stores.Metadata()
 	r, err := store.Get(context.Background(), model.GetArchivePathToRepoDescriptor(repo))

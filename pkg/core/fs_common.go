@@ -14,7 +14,7 @@ import (
 	"github.com/jacobsa/fuse/fuseops"
 	"github.com/jacobsa/fuse/fuseutil"
 
-	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/convert"
 )
 
 func statFS() (err error) {
@@ -25,7 +25,7 @@ func statFS() (err error) {
 
 func formLookupKey(id fuseops.InodeID, childName string) []byte {
 	i := formKey(id)
-	c := model.UnsafeStringToBytes(childName)
+	c := convert.UnsafeStringToBytes(childName)
 	return append(i, c...)
 }
 

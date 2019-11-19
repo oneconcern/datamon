@@ -33,6 +33,5 @@ linters:
     - unparam
     - wsl
     - gocognit
-    - gomnd
 
 max-same-issues: 0
