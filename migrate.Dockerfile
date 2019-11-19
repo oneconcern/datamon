@@ -1,5 +1,6 @@
 FROM golang:alpine as base
 
+# TODO: unused args
 ARG github_user
 ARG github_token
 
@@ -17,21 +18,20 @@ RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
 
 # https://golang.org/src/time/zoneinfo.go Copy the zoneinfo installed by musl-dev
 WORKDIR /usr/share/zoneinfo
-RUN zip -r -0 /stage/zoneinfo.zip .
+RUN zip -qr -0 /stage/zoneinfo.zip .
 
 ADD . /datamon
 WORKDIR /datamon
 
-RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/datamon
-RUN go build -o /stage/usr/bin/migrate --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/backup2blobs/
-RUN upx /stage/usr/bin/datamon
-RUN upx /stage/usr/bin/migrate
-RUN md5sum /stage/usr/bin/datamon
-RUN md5sum /stage/usr/bin/migrate
+RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/datamon &&\
+    go build -o /stage/usr/bin/migrate --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/backup2blobs/ &&\
+    upx /stage/usr/bin/datamon &&\
+    upx /stage/usr/bin/migrate &&\
+    md5sum /stage/usr/bin/datamon &&\
+    md5sum /stage/usr/bin/migrate
 # Build the dist image
 # FROM scratch
 # COPY --from=base /stage /
 # ENV ZONEINFO /zoneinfo.zip
 # ENTRYPOINT [ "datamon" ]
 # CMD ["--help"]
-

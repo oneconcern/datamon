@@ -43,7 +43,7 @@ if $build_datamon_base; then
     make build-datamon-binaries
 fi
 if $build_sidecar; then
-    make build-and-push-pg-sidecar-img
+    make build-and-push-pg-sidecar
 fi
 if $build_demo_app; then
     make pg-demo-coord-build-app

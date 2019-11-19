@@ -4,29 +4,12 @@ FROM datamon-binaries as base
 # Build the dist image
 FROM ubuntu:latest
 
-RUN apt-get update && \
-  apt-get install -y --no-install-recommends \
-    git \
-    zsh \
-    less \
-    watch \
-    curl \
-    tmux \
-    bc \
-    vim \
-    mc \
-    htop &&\
+RUN apt-get update --quiet && \
+  apt-get install -y --quiet --no-install-recommends git zsh less watch curl tmux bc vim mc htop &&\
   apt-get autoremove -yqq &&\
   apt-get clean -y &&\
   apt-get autoclean -yqq &&\
-  rm -rf \
-    /tmp/* \
-    /var/tmp/* \
-    /var/lib/apt/lists/* \
-    /usr/share/doc/* \
-    /usr/share/locale/* \
-    /var/cache/debconf/*-old
-
+  rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/* /usr/share/doc/*  /usr/share/locale/* /var/cache/debconf/*-old
 
 ### BEGIN tini
 
@@ -62,27 +45,22 @@ ADD ./hack/datamover/datamover.sh /usr/bin/datamover
 ADD ./hack/datamover/datamover_metrics.sh /usr/bin/datamover_metrics
 ADD ./hack/datamover/backup.sh /usr/bin/backup
 
-RUN chmod a+x /usr/bin/datamover
-RUN chmod a+x /usr/bin/datamover_metrics
-RUN chmod a+x /usr/bin/backup
-
-# USER root
-# USER developer
-
-RUN useradd -u 1020 -ms /bin/bash developer
-RUN groupadd -g 2000 developers
-RUN usermod -g developers developer
-RUN chown -R developer:developers /usr/bin/datamon
+RUN chmod a+x /usr/bin/datamover &&\
+    chmod a+x /usr/bin/datamover_metrics &&\
+    chmod a+x /usr/bin/backup &&\
+    useradd -u 1020 -ms /bin/bash developer &&\
+    groupadd -g 2000 developers &&\
+    usermod -g developers developer &&\
+    chown -R developer:developers /usr/bin/datamon
 
 USER developer
-RUN touch ~/.zshrc
-
-RUN cp /usr/bin/datamover /home/developer/datamover.sh && \
-  chmod +x /home/developer/datamover.sh
-RUN cp /usr/bin/datamover_metrics /home/developer/datamover_metrics.sh && \
-  chmod +x /home/developer/datamover_metrics.sh
-RUN cp /usr/bin/backup /home/developer/backup.sh && \
-  chmod +x /home/developer/backup.sh
+RUN touch ~/.zshrc &&\
+    cp /usr/bin/datamover /home/developer/datamover.sh &&\
+    chmod +x /home/developer/datamover.sh &&\
+    cp /usr/bin/datamover_metrics /home/developer/datamover_metrics.sh &&\
+    chmod +x /home/developer/datamover_metrics.sh &&\
+    cp /usr/bin/backup /home/developer/backup.sh &&\
+    chmod +x /home/developer/backup.sh
 
 ENTRYPOINT [ "datamon" ]
 

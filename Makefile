@@ -1,28 +1,22 @@
-# Needed to bring in private packages from GitHub
-ifndef GITHUB_USER
-$(error "Must set GITHUB_USER") # this is a Make error
-endif
-ifndef GITHUB_TOKEN
-$(error "Must set GITHUB_TOKEN") # this is a Make error
-endif
-
+SHELL=/bin/bash
 # COLORS
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
-GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+
 LOCAL_KUBECTX ?= "docker-for-desktop"
-TARGET_MAX_CHAR_NUM=25
+TARGET_MAX_CHAR_NUM=30
 
 # Version and repo
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 VERSION=$(shell git describe --tags)
 COMMIT=$(shell git rev-parse HEAD)
 RELEASE_TAG=$(shell ./hack/release_tag.sh)
 RELEASE_TAG_LATEST=$(shell ./hack/release_tag.sh -l)
 GITDIRTY=$(shell git diff --quiet || echo 'dirty')
-REPOSITORY ?= "gcr.io/onec-co"
 
+# Build tagging parameters
 VERSION_INFO_IMPORT_PATH ?= github.com/oneconcern/datamon/cmd/datamon/cmd.
 BASE_LD_FLAGS ?= -s -w -linkmode external
 VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)Version=$(VERSION)'
@@ -30,6 +24,15 @@ VERSION_LD_FLAG_DATE ?= -X '$(VERSION_INFO_IMPORT_PATH)BuildDate=$(shell date -u
 VERSION_LD_FLAG_COMMIT ?= -X '$(VERSION_INFO_IMPORT_PATH)GitCommit=$(COMMIT)'
 VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)GitState=$(GITDIRTY)'
 VERSION_LD_FLAGS ?= $(VERSION_LD_FLAG_VERSION) $(VERSION_LD_FLAG_DATE) $(VERSION_LD_FLAG_COMMIT) $(VERSION_LD_FLAG_VERSION)
+
+REPOSITORY ?= gcr.io/onec-co
+VERSION_ARGS := --build-arg version_import_path=$(VERSION_INFO_IMPORT_PATH) --build-arg version=$(VERSION) --build-arg commit=$(COMMIT) --build-arg dirty=$(GITDIRTY)
+BUILD_USER := $(subst @,_,$(GITHUB_USER))
+USER_TAG := $(shell if [[ -n "$(BUILD_USER)" && "$(BUILD_USER)" != "onecrobot" ]] ; then echo $(BUILD_USER)-$$(date '+%Y%m%d') ; fi)
+BRANCH_TAG := $(subst /,_,$(GIT_BRANCH))
+
+# Docker args
+BUILDER := DOCKER_BUILDKIT=1 docker build --ssh default --progress plain
 
 ## Show help
 help:
@@ -48,114 +51,94 @@ help:
 	} \
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
-.PHONY: build-and-push-fuse-sidecar-img
-## build FUSE sidecar container used in Argo workflows
-build-and-push-fuse-sidecar-img:
-	@echo 'building fuse sidecar container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-fuse-sidecar \
-		-t gcr.io/onec-co/datamon-fuse-sidecar:${GITHUB_USER}-$$(date '+%Y%m%d') \
-		-t gcr.io/onec-co/datamon-fuse-sidecar:$(subst /,_,$(GIT_BRANCH)) \
-		-t gcr.io/onec-co/datamon-fuse-sidecar:$(RELEASE_TAG) \
-		-t gcr.io/onec-co/datamon-fuse-sidecar:$(RELEASE_TAG_LATEST) \
-		--ssh default \
-		-f sidecar.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-fuse-sidecar
+.PHONY: build-target
+build-target:
+	@echo '$(GREEN)building $(YELLOW)$(BUILD_TARGET)$(GREEN) container...$(RESET)'
+	@echo "$(GREEN)with tags: $(TAGS)$(RESET)"
+	$(BUILDER) -f $(DOCKERFILE) $(BUILD_ARGS) -t $(BUILD_TARGET) \
+	$(shell for tag in $(TAGS) ; do echo "-t $(BUILD_TARGET):$$tag" ; done) \
+	.
+
+.PHONY: push-target
+push-target:
+	docker push $(BUILD_TARGET)
+
+.PHONY: build-datamon-binaries
+build-datamon-binaries:
+	$(MAKE) build-target \
+		BUILD_TARGET=datamon-binaries \
+		DOCKERFILE=binaries.Dockerfile BUILD_ARGS="--pull $(VERSION_ARGS)" TAGS=""
+	@./hack/release_from_docker_build.sh
 
 .PHONY: build-and-push-fuse-sidecar
 ## build FUSE sidecar container used in Argo workflows
-build-and-push-fuse-sidecar: build-datamon-binaries build-and-push-fuse-sidecar-img
-
-.PHONY: build-and-push-pg-sidecar-img
-## build postgres sidecar container used in Argo workflows
-build-and-push-pg-sidecar-img:
-	@echo 'building pg sidecar container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-pg-sidecar \
-		-t gcr.io/onec-co/datamon-pg-sidecar:${GITHUB_USER}-$$(date '+%Y%m%d') \
-		-t gcr.io/onec-co/datamon-pg-sidecar:$(subst /,_,$(GIT_BRANCH)) \
-		--ssh default \
-		-f sidecar-pg.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-pg-sidecar
+build-and-push-fuse-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-sidecar
+build-and-push-fuse-sidecar: export DOCKERFILE=sidecar.Dockerfile
+build-and-push-fuse-sidecar: export BUILD_ARGS=
+build-and-push-fuse-sidecar: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
+build-and-push-fuse-sidecar: build-datamon-binaries
+	$(MAKE) build-target
+	$(MAKE) push-target
 
 .PHONY: build-and-push-pg-sidecar
 ## build postgres sidecar container used in Argo workflows
-build-and-push-pg-sidecar: build-datamon-binaries build-and-push-pg-sidecar-img
+build-and-push-pg-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-pg-sidecar
+build-and-push-pg-sidecar: export DOCKERFILE=sidecar-pg.Dockerfile
+build-and-push-pg-sidecar: export BUILD_ARGS=
+build-and-push-pg-sidecar: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
+build-and-push-pg-sidecar: build-datamon-binaries
+	$(MAKE) build-target
+	$(MAKE) push-target
 
 .PHONY: build-and-push-datamover
 ## build sidecar container used in Argo workflows
+build-and-push-datamover: export BUILD_TARGET=$(REPOSITORY)/datamon-datamover
+build-and-push-datamover: export DOCKERFILE=datamover.Dockerfile
+build-and-push-datamover: export BUILD_ARGS=
+build-and-push-datamover: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
 build-and-push-datamover: build-datamon-binaries
-	@echo 'building fuse sidecar container'
-	docker build \
-		--progress plain \
-		--build-arg version_import_path=$(VERSION_INFO_IMPORT_PATH) \
-		--build-arg version=$(VERSION) \
-		--build-arg commit=$(COMMIT) \
-		--build-arg dirty=$(GITDIRTY) \
-		-t gcr.io/onec-co/datamon-datamover \
-		-t gcr.io/onec-co/datamon-datamover:${GITHUB_USER}-$$(date '+%Y%m%d') \
-		-t gcr.io/onec-co/datamon-datamover:$(subst /,_,$(GIT_BRANCH)) \
-		-t gcr.io/onec-co/datamon-datamover:$(RELEASE_TAG) \
-		-t gcr.io/onec-co/datamon-datamover:$(RELEASE_TAG_LATEST) \
-		--ssh default \
-		-f datamover.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-datamover
+	$(MAKE) build-target
+	$(MAKE) push-target
 
-.PHONY: build-and-push-release-docker-images
+.PHONY: build-and-push-release-images
 ## build all docker images associated with a release
-build-and-push-release-docker-images: build-and-push-fuse-sidecar build-and-push-datamover
+build-and-push-release-images: build-and-push-fuse-sidecar build-and-push-datamover
 
 .PHONY: build-datamon
-## Build datamon docker container (datamon)
+## Build datamon docker container on local registry
+build-datamon: export BUILD_TARGET=reg.onec.co/datamon
+build-datamon: export DOCKERFILE=Dockerfile
+build-datamon: export BUILD_ARGS=--pull
+build-datamon: export TAGS=$(USER_TAG) $(BRANCH_TAG)
 build-datamon:
-	@echo 'building ${YELLOW}datamon${RESET} container'
-	@docker build \
-		--pull \
-		--build-arg github_user=$(GITHUB_USER) \
-		--build-arg github_token=$(GITHUB_TOKEN) \
-		--build-arg version=$(VERSION) \
-		--build-arg commit=$(COMMIT) \
-		--build-arg dirty=$(GITDIRTY) \
-		-t reg.onec.co/datamon:${GITHUB_USER}-$$(date '+%Y%m%d') \
-		-t reg.onec.co/datamon:$(subst /,_,$(GIT_BRANCH)) \
-		.
+	$(MAKE) build-target
 
-.PHONY: build-datamon-binaries
-## Use cross-compilation in a docker container to build binaries
-build-datamon-binaries:
-	@echo 'building ${YELLOW}datamon${RESET} container'
-	@docker build \
-		--pull \
-		--build-arg version_import_path=$(VERSION_INFO_IMPORT_PATH) \
-		--build-arg version=$(VERSION) \
-		--build-arg commit=$(COMMIT) \
-		--build-arg dirty=$(GITDIRTY) \
-		-t datamon-binaries \
-		-f binaries.Dockerfile \
-		.
-	@./hack/release_from_docker_build.sh
+.PHONY: build-assets
+## Prepare static assets for embedding in compiled binary
+build-assets:
+	go get -u github.com/gobuffalo/packr/v2/packr2
+	(cd pkg/web && packr2 clean && packr2)
 
-.PHONY: build-datamon-mac
-## Build datamon executable for mac os x (on mac os x)
-build-datamon-mac: export LDFLAGS=${BASE_LD_FLAGS} ${VERSION_LD_FLAGS}
-build-datamon-mac:
+.PHONY: compile-datamon
+## Build datamon executable on local OS
+compile-datamon: export LDFLAGS=${BASE_LD_FLAGS} ${VERSION_LD_FLAGS}
+compile-datamon: build-assets
 	@echo 'building ${YELLOW}datamon${RESET} executable'
 	@echo "${VERSION_LD_FLAGS}"
 	@echo "${LDFLAGS}"
-	go get -u github.com/gobuffalo/packr/v2/packr2
-	(cd pkg/web && packr2)
-	go build -o out/datamon.mac --ldflags "${LDFLAGS}" ./cmd/datamon
-	(cd pkg/web && packr2 clean)
+	go build -o $(TARGET) --ldflags "${LDFLAGS}" ./cmd/datamon
 
 .PHONY: build-datamon-local
-## Build datamon executable in-place for local os.  Goes with internal operationalization demos.
+## DEMO: Build datamon executable in-place for local os.  Goes with internal operationalization demos.
+build-datamon-local: export TARGET=cmd/datamon/datamon
 build-datamon-local:
-	@go build -o cmd/datamon/datamon ./cmd/datamon/
+	$(MAKE) compile-datamon
+
+.PHONY: build-datamon-mac
+## Build datamon executable for mac os x (on mac os x)
+build-datamon-mac: export TARGET=out/datamon.mac
+build-datamon-mac:
+	$(MAKE) compile-datamon
 
 .PHONY: build-all
 ## Build all the containers
@@ -163,18 +146,12 @@ build-all: clean build-datamon build-migrate
 
 .PHONY: build-migrate
 ## Build migrate tool
+build-migrate: export BUILD_TARGET=reg.onec.co/migrate
+build-migrate: export DOCKERFILE=migrate.Dockerfile
+build-migrate: export BUILD_ARGS=--pull
+build-migrate: export TAGS=$(USER_TAG) $(BRANCH_TAG)
 build-migrate:
-	@echo 'building ${YELLOW}migrate${RESET} container'
-	@docker build --pull \
-		--build-arg github_user=$(GITHUB_USER) \
-		--build-arg github_token=$(GITHUB_TOKEN) \
-		-t reg.onec.co/migrate:${GITHUB_USER}-$$(date '+%Y%m%d') \
-		-t reg.onec.co/migrate:$(subst /,_,$(GIT_BRANCH)) \
-		-f migrate.Dockerfile .
-
-.PHONY: push-all
-## Push all the containers
-push-all: push-datamon
+	$(MAKE) build-target
 
 .PHONY: setup
 ## Setup for testing
@@ -209,6 +186,7 @@ clean:
 test: clean setup runtests clean
 
 .PHONY: mocks
+## Generate mocks for unit testing
 mocks:
 	@hack/go-generate.sh
 
@@ -231,79 +209,6 @@ goimports:
 check: gofmt goimports
 	@golangci-lint run --build-tags fuse_cli --max-same-issues 0 --verbose
 
-### k8s demos
-
-# todo: scripts to datamon-fuse-sidecar Docker img, lint to CI
-.PHONY: lint-init-scripts
-## build shell container used in fuse demo
-fuse-demo-lint-init-scripts:
-	shellcheck hack/fuse-demo/wrap_application.sh
-
-.PHONY: fuse-demo-build-shell
-## build shell container used in fuse demo
-fuse-demo-build-shell:
-	@echo 'building fuse demo application container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-fuse-demo-shell \
-		--ssh default \
-		-f ./hack/fuse-demo/shell.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-fuse-demo-shell
-
-.PHONY: fuse-demo-build-sidecar
-## build sidecar container used in fuse demo
-fuse-demo-build-sidecar: build-and-push-fuse-sidecar
-	@echo 'building fuse demo sidecar container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-fuse-demo-sidecar \
-		--ssh default \
-		-f ./hack/fuse-demo/sidecar.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-fuse-demo-sidecar
-
-## demonstrate a fuse read-only filesystem
-fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
-	@./hack/fuse-demo/create_ro_pod.sh
-	@./hack/fuse-demo/run_shell.sh
-
-.PHONY: fuse-demo-coord-build-app
-## build shell container used in fuse demo
-fuse-demo-coord-build-app:
-	@echo 'building fuse demo application container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-fuse-demo-coord-app \
-		--ssh default \
-		-f ./hack/fuse-demo/coord-app.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-fuse-demo-coord-app
-
-.PHONY: fuse-demo-coord-build-datamon
-## build shell container used in fuse demo
-fuse-demo-coord-build-datamon:
-	@echo 'building fuse demo sidecar container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-fuse-demo-coord-datamon \
-		--ssh default \
-		-f ./hack/fuse-demo/coord-datamon.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-fuse-demo-coord-datamon
-
-.PHONY: pg-demo-coord-build-app
-## build shell container used in fuse demo
-pg-demo-coord-build-app:
-	@echo 'building pg demo application container'
-	docker build \
-		--progress plain \
-		-t gcr.io/onec-co/datamon-pg-demo-coord-app \
-		--ssh default \
-		-f ./hack/fuse-demo/coord-app-pg.Dockerfile \
-		.
-	docker push gcr.io/onec-co/datamon-pg-demo-coord-app
-
 .PHONY: profile-metrics
 ## Build the metrics collection binary and write output
 profile-metrics:
@@ -320,3 +225,67 @@ profile-metrics:
 		out/metrics/cpu.prof \
 		out/metrics/mem.prof \
 		out/metrics
+
+### k8s demos
+
+# todo: scripts to datamon-fuse-sidecar Docker img, lint to CI
+.PHONY: lint-init-scripts
+## DEMO: build shell container used in fuse demo
+fuse-demo-lint-init-scripts:
+	shellcheck hack/fuse-demo/wrap_application.sh
+
+.PHONY: fuse-demo-build-shell
+## DEMO: build shell container used in fuse demo
+fuse-demo-build-shell: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-shell
+fuse-demo-build-shell: export DOCKERFILE=hack/fuse-demo/shell.Dockerfile
+fuse-demo-build-shell: export BUILD_ARGS=
+fuse-demo-build-shell: export TAGS=latest
+fuse-demo-build-shell:
+	$(MAKE) build-target
+	$(MAKE) push-target
+
+.PHONY: fuse-demo-build-sidecar
+## DEMO: build sidecar container used in fuse demo
+fuse-demo-build-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-sidecar
+fuse-demo-build-sidecar: export DOCKERFILE=hack/fuse-demo/sidecar.Dockerfile
+fuse-demo-build-sidecar: export BUILD_ARGS=
+fuse-demo-build-sidecar: export TAGS=latest
+fuse-demo-build-sidecar: build-and-push-fuse-sidecar
+	$(MAKE) build-target
+	$(MAKE) push-target
+
+.PHONY: fuse-demo-ro
+## DEMO: demonstrate a fuse read-only filesystem
+fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
+	@./hack/fuse-demo/create_ro_pod.sh
+	@./hack/fuse-demo/run_shell.sh
+
+.PHONY: fuse-demo-coord-build-app
+## DEMO: build shell container used in fuse demo
+fuse-demo-coord-build-app: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-coord-app
+fuse-demo-coord-build-app: export DOCKERFILE=hack/fuse-demo/coord-app.Dockerfile
+fuse-demo-coord-build-app: export BUILD_ARGS=
+fuse-demo-coord-build-app: export TAGS=latest
+fuse-demo-coord-build-app:
+	$(MAKE) build-target
+	$(MAKE) push-target
+
+.PHONY: fuse-demo-coord-build-datamon
+## DEMO: build shell container used in fuse demo
+fuse-demo-coord-build-datamon: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-coord-datamon
+fuse-demo-coord-build-datamon: export DOCKERFILE=hack/fuse-demo/coord-datamon.Dockerfile
+fuse-demo-coord-build-datamon: export BUILD_ARGS=
+fuse-demo-coord-build-datamon: export TAGS=latest
+fuse-demo-coord-build-datamon:
+	$(MAKE) build-target
+	$(MAKE) push-target
+
+.PHONY: pg-demo-coord-build-app
+## DEMO: build shell container used in fuse demo
+pg-demo-coord-build-app: export BUILD_TARGET=$(REPOSITORY)/datamon-pg-demo-coord-app
+pg-demo-coord-build-app: export DOCKERFILE=hack/fuse-demo/coord-app-pg.Dockerfile
+pg-demo-coord-build-app: export BUILD_ARGS=
+pg-demo-coord-build-app: export TAGS=latest
+pg-demo-coord-build-app:
+	$(MAKE) build-target
+	$(MAKE) push-target
