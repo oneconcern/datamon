@@ -25,6 +25,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// TODO: Clean up this test so that more stringent checks can be implemented in model/bundles.go#GetArchivePathComponents
+
 type bundleFixture struct {
 	name          string
 	repo          string
@@ -94,7 +96,7 @@ func bundleTestCases() []bundleFixture {
 			name:          "invalid file name",
 			repo:          "invalid/repo.yaml",
 			wantError:     true,
-			errorContains: []string{"expected label"},
+			errorContains: []string{"path is invalid"},
 		},
 		{
 			name:          "no archive path",

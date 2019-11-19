@@ -177,19 +177,37 @@ func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) 
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	cs := strings.SplitN(archivePath, "/", 4)
 	if cs[0] == "labels" {
+		if cs[3] != "label.yaml" {
+			return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be label.yaml. components: %v, path: %s", cs, archivePath)
+		}
 		return ArchivePathComponents{
 			LabelName: cs[2],
 			Repo:      cs[1],
 		}, nil
 	}
-	if cs[2] == "repo.yaml" {
+	if cs[0] == "repos" {
 		return ArchivePathComponents{Repo: cs[1]}, nil
+		// TODO: implement more stringent checks. bundle_list_test.go needs refactoring
+		//if cs[2] == "repo.yaml" {
+		//}
+		//return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be repo.yaml. components: %v, path: %s", cs, archivePath)
+	}
+	if cs[0] == "bundles" {
+		return ArchivePathComponents{
+			Repo:            cs[1],
+			BundleID:        cs[2],
+			ArchiveFileName: cs[3],
+		}, nil // placeholder in case of mor parsing
+		//if cs[3] == "bundle.yaml" {
+		//}
+		//return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be bundle.yaml. components: %v, path: %s", cs, archivePath)
 	}
 	return ArchivePathComponents{
 		Repo:            cs[1],
 		BundleID:        cs[2],
 		ArchiveFileName: cs[3],
 	}, nil // placeholder in case of mor parsing
+	//return ArchivePathComponents{}, fmt.Errorf("path is invalid: %v, path: %s", cs, archivePath)
 }
 
 func GetBundleTimeStamp() time.Time {

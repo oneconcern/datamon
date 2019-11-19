@@ -6,7 +6,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/badoux/checkmail"
+	"net/mail"
 )
 
 // LabelDescriptor describes a label
@@ -73,7 +73,7 @@ func ValidateLabel(label LabelDescriptor) error {
 			return fmt.Errorf("email for contributor cannot be blank")
 		}
 		// TODO: Is this sufficient validation?
-		err := checkmail.ValidateFormat(c.Email)
+		_, err := mail.ParseAddress(c.Email)
 		if err != nil {
 			return fmt.Errorf("email validation failed for :%s err:%w", c.Email, err)
 		}
