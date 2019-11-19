@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -91,7 +90,7 @@ func buildLabelBatchFixture(t *testing.T) func() {
 		labelBatchFixture = make([]string, maxTestKeys)
 		expectedLabelBatchFixture = make(model.LabelDescriptors, maxTestKeys)
 		for i := 0; i < maxTestKeys; i++ {
-			labelBatchFixture[i] = fmt.Sprintf("labels/myRepo/myLabel-%0.3d.yaml", i)
+			labelBatchFixture[i] = fmt.Sprintf("labels/myRepo/myLabel-%0.3d/label.yaml", i)
 			expectedLabelBatchFixture[i] = model.LabelDescriptor{
 				Name:      fmt.Sprintf("myLabel-%0.3d", i),
 				BundleID:  fmt.Sprintf("bundle-myLabel-%0.3d", i),
@@ -106,14 +105,9 @@ func buildLabelBatchFixture(t *testing.T) func() {
 	}
 }
 
-func extractID(pth string) string {
-	labelNameRe := regexp.MustCompile(`^(.*)\.yaml$`)
-	parts := strings.Split(pth, "/")
-	m := labelNameRe.FindStringSubmatch(parts[2])
-	if len(m) < 2 {
-		panic(fmt.Sprintf("invalid testcase: %s", pth))
-	}
-	return m[1]
+func extractID(path string) string {
+	cs := strings.SplitN(path, "/", 4)
+	return cs[2]
 }
 
 func mockedLabelStore(testcase string) storage.Store {
@@ -124,7 +118,7 @@ func mockedLabelStore(testcase string) storage.Store {
 				return true, nil
 			},
 			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"labels/myRepo/myLabel-test.yaml"}, "", nil
+				return []string{"labels/myRepo/myLabel-test/label.yaml"}, "", nil
 			},
 			KeysFunc: func(_ context.Context) ([]string, error) {
 				return nil, nil

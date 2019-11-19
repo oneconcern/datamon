@@ -15,7 +15,7 @@ import (
 
 func CreateRepo(repo model.RepoDescriptor, stores context2.Stores) error {
 	store := GetRepoStore(stores) // TODO: Integrate with WAL.
-	err := model.Validate(repo)
+	err := model.ValidateRepo(repo)
 	if err != nil {
 		return err
 	}

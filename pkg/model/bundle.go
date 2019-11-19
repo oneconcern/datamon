@@ -169,8 +169,6 @@ func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) 
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".yaml")
 }
 
-var labelNameRe *regexp.Regexp
-
 /* this function's design is converging on being able to return something meaningful
  * given any path in the metadata archive, not just those corresponding to bundles.
  *
@@ -179,16 +177,8 @@ var labelNameRe *regexp.Regexp
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	cs := strings.SplitN(archivePath, "/", 4)
 	if cs[0] == "labels" {
-		labelBasenameMatches := labelNameRe.FindStringSubmatch(cs[2])
-		if labelBasenameMatches == nil {
-			return ArchivePathComponents{}, fmt.Errorf(
-				"expected label basename %s to match regexp %s",
-				cs[2], labelNameRe.String())
-		}
-		labelName := labelBasenameMatches[1]
-
 		return ArchivePathComponents{
-			LabelName: labelName,
+			LabelName: cs[2],
 			Repo:      cs[1],
 		}, nil
 	}
@@ -212,8 +202,4 @@ func IsGeneratedFile(file string) bool {
 	//path, err := filepath.Abs(file)
 	match, _ := regexp.MatchString("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$", file)
 	return match
-}
-
-func init() {
-	labelNameRe = regexp.MustCompile(`^(.*)\.yaml$`)
 }

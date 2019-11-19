@@ -11,6 +11,7 @@ replace go.uber.org/goleak => go.uber.org/goleak v0.10.1-0.20190823232112-227bd7
 require (
 	cloud.google.com/go v0.37.1
 	github.com/aws/aws-sdk-go v1.18.6
+	github.com/badoux/checkmail v0.0.0-20181210160741-9661bd69e9ad
 	github.com/docker/go-units v0.3.3
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/gobuffalo/packd v0.3.0

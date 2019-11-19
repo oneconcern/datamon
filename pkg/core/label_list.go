@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	typicalLabelsNum = 1000 // default number of allocated slots for repos
+	typicalLabelsNum = 1000 // default number of allocated slots for labels
 )
 
 // ListLabels returns all labels from a repo
