@@ -137,7 +137,7 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 	}
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(stores, iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
 
 	// start repo metadata retrieval
 	wg.Add(1)
