@@ -195,7 +195,7 @@ install-minio:
 .PHONY: install-minio-k8s
 ## Install minio in local kubernetes
 install-minio-k8s:
-	kubectl --context $(LOCAL_KUBECTX) create -f ./k8s/minio.yaml
+	kubectl --context $(LOCAL_KUBECTX) create -f ./k8s/minio/minio.yaml
 
 .SILENT: clean
 ## Clean up post running tests
