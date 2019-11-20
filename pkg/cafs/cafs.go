@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	DefaultLeafSize = 2 * 1024 * 1024
-	MaxLeafSize     = 5 * 1024 * 1024
+	DefaultLeafSize    = 2 * 1024 * 1024
+	MaxLeafSize        = 5 * 1024 * 1024
+	DeduplicationBlake = "blake"
 )
 
 // LeafSize configuration for the blake2b hashes
@@ -98,6 +99,7 @@ type Fs interface {
 	Keys(context.Context) ([]Key, error)
 	RootKeys(context.Context) ([]Key, error)
 	Has(context.Context, Key, ...HasOption) (bool, []Key, error)
+	GetAddressingScheme() string
 }
 
 // New creates a new file system operations instance for a repository
@@ -108,6 +110,7 @@ func New(opts ...Option) (Fs, error) {
 		leafSize:                    uint32(5 * units.MiB),
 		concurrentFlushes:           10,
 		readerConcurrentChunkWrites: 3,
+		deduplicationScheme:         DeduplicationBlake,
 	}
 	f.leafPool = newLeafFreelist()
 	f.lru, _ = lru.NewWithEvict(10, func(lruKey interface{}, lruVal interface{}) {
@@ -139,6 +142,11 @@ type defaultFs struct {
 	leafPool                    *leafFreelist
 	concurrentFlushes           int
 	readerConcurrentChunkWrites int
+	deduplicationScheme         string
+}
+
+func (d *defaultFs) GetAddressingScheme() string {
+	return DeduplicationBlake
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
