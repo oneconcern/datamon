@@ -88,6 +88,7 @@ jobs:
 
   go_test:
     executor: docker_minio
+    parallelism: 4
     environment:
       GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
@@ -109,7 +110,7 @@ jobs:
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             hack/go-generate.sh
             go mod download
-            gotestsum --junitfile /tmp/test-results/go-test-report.xml ./... -- -race ./...
+            gotestsum --junitfile /tmp/test-results/go-test-report.xml ./... -- -race $(go list ./... | circleci tests split)
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
