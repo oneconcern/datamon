@@ -12,8 +12,7 @@ TARGET_MAX_CHAR_NUM=30
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 VERSION=$(shell git describe --tags)
 COMMIT=$(shell git rev-parse HEAD)
-RELEASE_TAG=$(shell ./hack/release_tag.sh)
-RELEASE_TAG_LATEST=$(shell ./hack/release_tag.sh -l)
+RELEASE_TAG=$(shell go run ./hack/release_tag.go)
 GITDIRTY=$(shell git diff --quiet || echo 'dirty')
 
 # Build tagging parameters
@@ -75,6 +74,7 @@ build-datamon-binaries:
 build-and-push-fuse-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-sidecar
 build-and-push-fuse-sidecar: export DOCKERFILE=sidecar.Dockerfile
 build-and-push-fuse-sidecar: export BUILD_ARGS=
+build-and-push-fuse-sidecar: export RELEASE_TAG_LATEST=$(shell ./hack/release_tag.sh -l)
 build-and-push-fuse-sidecar: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
 build-and-push-fuse-sidecar: build-datamon-binaries
 	$(MAKE) build-target
@@ -95,6 +95,7 @@ build-and-push-pg-sidecar: build-datamon-binaries
 build-and-push-datamover: export BUILD_TARGET=$(REPOSITORY)/datamon-datamover
 build-and-push-datamover: export DOCKERFILE=datamover.Dockerfile
 build-and-push-datamover: export BUILD_ARGS=
+build-and-push-datamover: export RELEASE_TAG_LATEST=$(shell go run ./hack/release_tag.go -l -i gcr.io/onec-co/datamon-datamover)
 build-and-push-datamover: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
 build-and-push-datamover: build-datamon-binaries
 	$(MAKE) build-target
