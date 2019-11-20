@@ -5,6 +5,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"hash/crc32"
 	"io"
 	"os"
@@ -313,8 +314,18 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	return nil
 }
 
-func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
+func validateBundle(bundle *Bundle) bool {
+	if bundle.BundleDescriptor.Deduplication == "" {
+		bundle.l.Error("failed to validate bundle, Deduplication scheme not set")
+		return false
+	}
+	return true
+}
 
+func uploadBundleDescriptor(ctx context.Context, bundle *Bundle) error {
+	if !validateBundle(bundle) {
+		return fmt.Errorf("failed to validate bundle")
+	}
 	buffer, err := yaml.Marshal(bundle.BundleDescriptor)
 	if err != nil {
 		return err

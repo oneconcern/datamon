@@ -15,14 +15,15 @@ const (
 
 // BundleDescriptor represents a commit which is a file tree with the changes to the repository.
 type BundleDescriptor struct {
-	LeafSize               uint32        `json:"leafSize" yaml:"leafSize"` // Each bundles blobs are independently generated
-	ID                     string        `json:"id" yaml:"id"`
-	Message                string        `json:"message" yaml:"message"`
-	Parents                []string      `json:"parents,omitempty" yaml:"parents,omitempty"`
-	Timestamp              time.Time     `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
-	Contributors           []Contributor `json:"contributors" yaml:"contributors"`
-	BundleEntriesFileCount uint64        `json:"count" yaml:"count"`                         // Number of files which have BundleDescriptor Entries
-	Version                uint64        `json:"version,omitempty" yaml:"version,omitempty"` // Version for the bundle
+	LeafSize               uint32        `json:"leafSize" yaml:"leafSize"`                               // Each bundles blobs are independently generated
+	ID                     string        `json:"id" yaml:"id"`                                           // Unique ID for the bundle.
+	Message                string        `json:"message" yaml:"message"`                                 // Message for the commit/bundle
+	Parents                []string      `json:"parents,omitempty" yaml:"parents,omitempty"`             // Bundles with parent child relation
+	Timestamp              time.Time     `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`         // Local wall clock time
+	Contributors           []Contributor `json:"contributors" yaml:"contributors"`                       // Contributor for the bundle
+	BundleEntriesFileCount uint64        `json:"count" yaml:"count"`                                     // Number of files which have BundleDescriptor Entries
+	Version                uint64        `json:"version,omitempty" yaml:"version,omitempty"`             // Version for the bundle
+	Deduplication          string        `json:"deduplication,omitempty" yaml:"deduplication,omitempty"` // Type of deduplication used
 	_                      struct{}
 }
 
