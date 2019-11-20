@@ -49,7 +49,6 @@ jobs:
           name: Lint shell scripts
           command: |
             shellcheck hack/fuse-demo/wrap_application.sh
-            shellcheck deploy/datamon.sh
       - run:
           name: Ensure metrics
           command: |
