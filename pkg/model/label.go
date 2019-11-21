@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
+
+	"net/mail"
 )
 
 // LabelDescriptor describes a label
@@ -39,12 +42,41 @@ func GetArchivePathPrefixToLabels(repo string, prefixes ...string) string {
 	return fmt.Sprint(getArchivePathToLabels(), repo+"/"+strings.Join(prefixes, "/"))
 }
 
-// GetArchivePathPrefixToLabelPrefix gets the path to the label with a label prefix.
-func GetArchivePathPrefixToLabelPrefix(repo string, prefix string) string {
-	return fmt.Sprint(getArchivePathToLabels(), repo+"/"+prefix)
-}
-
 // GetArchivePathToLabel gets the path to the label descriptor.
 func GetArchivePathToLabel(repo string, labelName string) string {
-	return fmt.Sprint(GetArchivePathPrefixToLabels(repo), labelName, ".yaml")
+	return fmt.Sprint(GetArchivePathPrefixToLabels(repo), labelName, "/label.yaml")
+}
+
+func ValidateLabel(label LabelDescriptor) error {
+	if label.Name == "" {
+		return fmt.Errorf("empty field: label name is empty")
+	}
+	if label.BundleID == "" {
+		return fmt.Errorf("empty field: label bundleID is empty")
+	}
+	for i, c := range label.Name {
+		// Note: useful reference https://www.compart.com/en/unicode/category
+		if !unicode.IsDigit(c) &&
+			!unicode.IsLetter(c) &&
+			!unicode.Is(unicode.Hyphen, c) &&
+			!unicode.Is(unicode.Pc, c) {
+			return fmt.Errorf("invalid name: label name:%s contains unsupported character \"%s\"",
+				label.Name,
+				string([]rune(label.Name)[i]))
+		}
+	}
+	for _, c := range label.Contributors {
+		if c.Name == "" {
+			return fmt.Errorf("name for contributor cannot be blank")
+		}
+		if c.Email == "" {
+			return fmt.Errorf("email for contributor cannot be blank")
+		}
+		// TODO: Is this sufficient validation?
+		_, err := mail.ParseAddress(c.Email)
+		if err != nil {
+			return fmt.Errorf("email validation failed for :%s err:%w", c.Email, err)
+		}
+	}
+	return nil
 }

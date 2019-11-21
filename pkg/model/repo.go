@@ -45,7 +45,7 @@ func GetArchivePathPrefixToRepos() string {
 	return fmt.Sprint(getArchivePathToRepos())
 }
 
-func Validate(repo RepoDescriptor) error {
+func ValidateRepo(repo RepoDescriptor) error {
 	if repo.Name == "" {
 		return fmt.Errorf("empty field: repo name is empty")
 	}

@@ -170,8 +170,6 @@ func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) 
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".yaml")
 }
 
-var labelNameRe *regexp.Regexp
-
 /* this function's design is converging on being able to return something meaningful
  * given any path in the metadata archive, not just those corresponding to bundles.
  *
@@ -180,27 +178,37 @@ var labelNameRe *regexp.Regexp
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	cs := strings.SplitN(archivePath, "/", 4)
 	if cs[0] == "labels" {
-		labelBasenameMatches := labelNameRe.FindStringSubmatch(cs[2])
-		if labelBasenameMatches == nil {
-			return ArchivePathComponents{}, fmt.Errorf(
-				"expected label basename %s to match regexp %s",
-				cs[2], labelNameRe.String())
+		if cs[3] != "label.yaml" {
+			return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be label.yaml. components: %v, path: %s", cs, archivePath)
 		}
-		labelName := labelBasenameMatches[1]
-
 		return ArchivePathComponents{
-			LabelName: labelName,
+			LabelName: cs[2],
 			Repo:      cs[1],
 		}, nil
 	}
-	if cs[2] == "repo.yaml" {
+	if cs[0] == "repos" {
 		return ArchivePathComponents{Repo: cs[1]}, nil
+		// TODO: implement more stringent checks. bundle_list_test.go needs refactoring
+		//if cs[2] == "repo.yaml" {
+		//}
+		//return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be repo.yaml. components: %v, path: %s", cs, archivePath)
+	}
+	if cs[0] == "bundles" {
+		return ArchivePathComponents{
+			Repo:            cs[1],
+			BundleID:        cs[2],
+			ArchiveFileName: cs[3],
+		}, nil // placeholder in case of mor parsing
+		//if cs[3] == "bundle.yaml" {
+		//}
+		//return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be bundle.yaml. components: %v, path: %s", cs, archivePath)
 	}
 	return ArchivePathComponents{
 		Repo:            cs[1],
 		BundleID:        cs[2],
 		ArchiveFileName: cs[3],
 	}, nil // placeholder in case of mor parsing
+	//return ArchivePathComponents{}, fmt.Errorf("path is invalid: %v, path: %s", cs, archivePath)
 }
 
 func GetBundleTimeStamp() time.Time {
@@ -213,8 +221,4 @@ func IsGeneratedFile(file string) bool {
 	//path, err := filepath.Abs(file)
 	match, _ := regexp.MatchString("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$", file)
 	return match
-}
-
-func init() {
-	labelNameRe = regexp.MustCompile(`^(.*)\.yaml$`)
 }
