@@ -29,10 +29,13 @@ jobs:
             sudo apt-get install -y shellcheck
       - run:
           name: Install go tools
+          environment:
+            GO111MODULE: 'on'
           command: |
-            go get -u gotest.tools/gotestsum
-            go get -u github.com/matryer/moq
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+            go get -u gotest.tools/gotestsum@latest
+            go get -u github.com/matryer/moq@latest
+            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+            go clean -modcache
             mkdir -p /tmp/test-results
       - checkout
       # Restore bundle cache
