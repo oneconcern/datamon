@@ -22,8 +22,8 @@ which both consumes and produces versioned data as datamon bundles.
 
 Versioned data is available either as a file system mount or as a Postgres instance running in a _sidecar container_.
 
-The main ARGO container communicates with the sidecar container via [shared volumes on the same pod] 
-(https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/).
+The main ARGO container communicates with the sidecar container via
+[shared volumes on the same pod](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/).
 
 After this program has produced its outputs, the sidecar container uploads the results to GCS as datamon bundles.
 
