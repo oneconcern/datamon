@@ -26,6 +26,15 @@ This is not a replacement for existing tools, but rather a way to manage their i
 Datamon works by providing a git like interface to manage data efficiently.
 `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if datamonFlags.root.upgrade {
+			if err := doSelfUpgrade(upgradeFlags{forceUgrade: true}); err != nil {
+				log.Printf("WARN: failed to upgrade datamon. Carrying on with command in the current version: %v", err)
+			} else {
+				if err := doExecAfterUpgrade(); err != nil {
+					wrapFatalln("cannot execute upgraded datamon", err)
+				}
+			}
+		}
 		if datamonFlags.root.cpuProf {
 			f, err := os.Create("cpu.prof")
 			if err != nil {
@@ -85,6 +94,8 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	authorizer = gauth.New()
 	addConfigFlag(rootCmd)
+	addUpgradeFlag(rootCmd)
+	addUpgradeForceFlag(rootCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.

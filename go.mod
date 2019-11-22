@@ -11,6 +11,7 @@ replace go.uber.org/goleak => go.uber.org/goleak v0.10.1-0.20190823232112-227bd7
 require (
 	cloud.google.com/go v0.37.1
 	github.com/aws/aws-sdk-go v1.18.6
+	github.com/blang/semver v3.5.1+incompatible
 	github.com/docker/go-units v0.3.3
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/gobuffalo/packd v0.3.0
@@ -30,6 +31,7 @@ require (
 	github.com/opentracing/opentracing-go v1.0.2
 	github.com/pelletier/go-toml v1.4.0 // indirect
 	github.com/pkg/errors v0.8.1 // indirect
+	github.com/rhysd/go-github-selfupdate v1.1.0
 	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/segmentio/ksuid v1.0.2
 	github.com/spf13/afero v1.2.2
@@ -48,7 +50,7 @@ require (
 	google.golang.org/api v0.2.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.2.4
-	gotest.tools v2.2.0+incompatible // indirect
+	gotest.tools v2.2.0+incompatible
 )
 
 go 1.13

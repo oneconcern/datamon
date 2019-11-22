@@ -18,6 +18,9 @@ executors:
         command:
           - server
           - data
+
+  # This provides a glibc build
+  # TODO(frederic): add builder for alpine and compare
   docker_builder:
     working_directory: ~/project
     docker:
@@ -41,6 +44,8 @@ commands:
     steps:
       - run:
           name: Install go tools for testing
+          # update tools to latest release but clear the module cache after install
+          # to avoid conflicts with the main go dependencies.
           environment:
             GO111MODULE: 'on'
           command: |
@@ -53,6 +58,7 @@ commands:
     steps:
       - run:
           name: Initialize gcloud SDK
+          # GCLOUD_SERVICE_KEY is defined as a global environment in circleci for this context
           command: |
             echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
             gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
@@ -80,7 +86,6 @@ jobs:
           name: Lint shell scripts
           command: |
             shellcheck hack/fuse-demo/wrap_application.sh
-            shellcheck deploy/datamon.sh
       - run:
           name: Ensure metrics
           command: |
@@ -188,13 +193,29 @@ jobs:
           command: |
             make pg-demo-coord-build-app
 
-#  publish_release:
-#    executor: docker_minio
-#    steps:
-#      - run:
-#          name: Dummy step
-#          command: |
-#            echo "Should reach here before publishing anything with a tagged release"
+  publish_release:
+    executor: docker_builder
+    # TODO(frederic):
+    # - acquire GITHUB_TOKEN for onecrobot to push to homebrew-datamon repo
+    #
+    # > goreleaser needs access to github API, not only the git repo.
+    # > Hence ssh key is not sufficient and GITHUB_TOKEN is required.
+    steps:
+      - run:
+          name: Prepare github release
+          command: |
+            # self-installing goreleaser
+            curl -sL https://git.io/goreleaser > goreleaser
+            chmod u+x goreleaser
+            release_notes="./notes/NOTES.${CIRCLE_TAG}.md"
+            if [[ -n ${CIRCLE_TAG} && -f ${RELEASE_NOTES} ]] ; then
+              # use custom release notes
+              echo "Adding release notes ${release_notes}"
+              opts="--release-notes ${release_notes}"
+              # otherwise, leaves standard changelog from goreleaser
+              # (picks up all commits)
+            fi
+            ./goreleaser ${opts-""}
 
 workflows:
   version: 2
@@ -218,17 +239,16 @@ workflows:
             - go_lint
             - go_test
 
-# TODO: on tagged releases, we might want a minimal number of tags only
-#      - publish_release:
-#          context: "OC Common"
-#          requires:
-#            - go_lint
-#            - go_test
-#            - build_images
-#          filters:
-#            branches:
-#              only:
-#                - master
-#                - v2.*/
-#            tags:
-#              only: /(^[^v].*)/
+      - publish_release:
+          context: "OC Common"
+          requires:
+            - go_lint
+            - go_test
+            - build_images
+          filters:
+            branches:
+              only:
+                - master
+                - v[0-9].*/
+            tags:
+              only: /(^[^v].*)/
