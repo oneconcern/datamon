@@ -11,7 +11,10 @@ Consumed inputs are dowloaded then mounted read-only. Producted outputs are uplo
 This data presentation layer is part of the "batteries" feature.
 
 The current design favors the sidecar container approach, with bespoke signaling between containers,
-over the CSI driver approach. Therefore datamon is not available as a kubernetes persistent volume plugin.
+over the CSI driver approach. Therefore,  datamon is not available as a kubernetes persistent volume plugin.
+
+This design choice stems from the current inability by Kubernetes CSI API to handle ephemeral volumes.
+Managing many short lived kubernetes volumes is at the moment not practical.
 
 Signaling is implemented with files on a shared volume.
 
@@ -28,6 +31,11 @@ The main ARGO container communicates with the sidecar container via
 After this program has produced its outputs, the sidecar container uploads the results to GCS as datamon bundles.
 
 ## Sidecar signaling
+
+We need some coordination between the different containers running in the pod.
+
+In particular, we need to keep the pod running and the sidecars to finish uploading
+results when the main ARGO workflow is done processing.
 
 Ensuring that data is ready for access (sidecar to main-container messaging)
 as well as notification that the data-science program has
