@@ -8,9 +8,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"os"
-	"path/filepath"
-	"runtime/pprof"
 
 	"go.uber.org/zap"
 
@@ -192,11 +189,16 @@ func uploadBundleFiles(
 	for i := 0; i < cap(concurrencyControl); i++ {
 		concurrencyControl <- struct{}{}
 	}
-	bundle.l.Debug("upload threads finished.  sending doneOk event.")
+	bundle.l.Debug("upload threads finished. sending doneOk event.")
 	chans.doneOk <- struct{}{}
 }
 
-func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error)) error {
+func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...ListOption) error {
+	settings := defaultSettings()
+	for _, apply := range opts {
+		apply(&settings)
+	}
+
 	// Walk the entire tree
 	// TODO: #53 handle large file count
 	if getKeys == nil {
@@ -233,19 +235,12 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		doneOk:     doneOkC,
 	})
 
-	if MemProfDir != "" {
-		var f *os.File
-		path := filepath.Join(MemProfDir, "upload_bundle.mem.prof")
-		f, err = os.Create(path)
-		if err != nil {
+	if settings.profilingEnabled {
+		if err = writeMemProfile(opts...); err != nil {
 			return err
 		}
-		err = pprof.Lookup("heap").WriteTo(f, 0)
-		if err != nil {
-			return err
-		}
-		f.Close()
 	}
+
 	var numFilePackedRes int
 	var numFileListUploads int
 	fileList := make([]model.BundleEntry, 0, bundleEntriesPerFile)

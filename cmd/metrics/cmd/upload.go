@@ -22,6 +22,7 @@ import (
 	"google.golang.org/api/option"
 )
 
+// GCSParams defines some parameters for a Google Cloud Storage context
 type GCSParams struct {
 	MetadataBucket  string
 	BlobBucket      string
@@ -189,8 +190,12 @@ var uploadCmd = &cobra.Command{
 		)
 
 		logger.Debug("beginning upload")
-
-		err = core.Upload(context.Background(), bundle)
+		var opts []core.ListOption
+		if params.root.memProfPath != "" {
+			// add some extra memory profiling on specific critical parts (i.e. bundle Upload)
+			opts = append(opts, core.WithMemProf(params.root.memProfPath))
+		}
+		err = core.Upload(context.Background(), bundle, opts...)
 		if err != nil {
 			log.Fatalln(err)
 		}

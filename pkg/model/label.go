@@ -30,6 +30,8 @@ func (b LabelDescriptors) Len() int {
 func (b LabelDescriptors) Less(i, j int) bool {
 	return b[i].BundleID < b[j].BundleID
 }
+
+// Last label in a LabelDescriptors slice
 func (b LabelDescriptors) Last() LabelDescriptor {
 	return b[len(b)-1]
 }
@@ -38,6 +40,7 @@ func getArchivePathToLabels() string {
 	return "labels/"
 }
 
+// GetArchivePathPrefixToLabels yields the path to labels in a repo, given some prefixes
 func GetArchivePathPrefixToLabels(repo string, prefixes ...string) string {
 	return fmt.Sprint(getArchivePathToLabels(), repo+"/"+strings.Join(prefixes, "/"))
 }

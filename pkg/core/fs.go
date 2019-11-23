@@ -36,14 +36,14 @@ const (
 	dirInitialSize                   = 64
 )
 
-// ReadOnlyFS is the virtual filesystem created on top of a bundle.
+// ReadOnlyFS is the virtual read-only filesystem created on top of a bundle.
 type ReadOnlyFS struct {
 	mfs        *fuse.MountedFileSystem // The mounted filesystem
 	fsInternal *readOnlyFsInternal     // The core of the filesystem
 	server     fuse.Server             // Fuse server
 }
 
-// ReadOnlyFS is the virtual filesystem created on top of a bundle.
+// MutableFS is the virtual mutable filesystem created on top of a bundle.
 type MutableFS struct {
 	mfs        *fuse.MountedFileSystem // The mounted filesystem
 	fsInternal *fsMutable              // The core of the filesystem
@@ -118,6 +118,7 @@ func prepPath(path string) error {
 	return err
 }
 
+// MountReadOnly a ReadOnlyFS
 func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
 	err := prepPath(path)
 	if err != nil {
@@ -136,6 +137,7 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
 	return err
 }
 
+// MountMutable mounts a MutableFS as mutable (read-write)
 func (dfs *MutableFS) MountMutable(path string) error {
 	err := prepPath(path)
 	if err != nil {
@@ -151,15 +153,20 @@ func (dfs *MutableFS) MountMutable(path string) error {
 	return err
 }
 
+// Unmount a ReadOnlyFS
 func (dfs *ReadOnlyFS) Unmount(path string) error {
 	// On unmount, walk the FS and create a bundle
 	return fuse.Unmount(path)
 }
 
+// JoinMount blocks until a mounted file system has been unmounted.
+// It does not return successfully until all ops read from the connection have been responded to
+// (i.e. the file system server has finished processing all in-flight ops).
 func (dfs *ReadOnlyFS) JoinMount(ctx context.Context) error {
 	return dfs.mfs.Join(ctx)
 }
 
+// Unmount a MutableFS
 func (dfs *MutableFS) Unmount(path string) error {
 	// On unmount, walk the FS and create a bundle
 	_ = dfs.fsInternal.Commit()
@@ -169,10 +176,14 @@ func (dfs *MutableFS) Unmount(path string) error {
 	return fuse.Unmount(path)
 }
 
+// JoinMount blocks until a mounted file system has been unmounted.
+// It does not return successfully until all ops read from the connection have been responded to
+// (i.e. the file system server has finished processing all in-flight ops).
 func (dfs *MutableFS) JoinMount(ctx context.Context) error {
 	return dfs.mfs.Join(ctx)
 }
 
+// Commit changes on a MutableFS
 func (dfs *MutableFS) Commit() error {
 	return dfs.fsInternal.Commit()
 }

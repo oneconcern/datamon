@@ -7,11 +7,15 @@ import (
 )
 
 const (
+	// DiffEntryTypeAdd indicates the bundle exhibits an extra entry
 	DiffEntryTypeAdd = iota
+	// DiffEntryTypeDel indicates the bundle exhibits a missing entry
 	DiffEntryTypeDel
+	// DiffEntryTypeDif indicates the bundle exhibits different entries
 	DiffEntryTypeDif
 )
 
+// DiffEntryType qualifies the type of difference between two bundles
 type DiffEntryType uint
 
 func (det DiffEntryType) String() string {
@@ -23,6 +27,7 @@ func (det DiffEntryType) String() string {
 	return diffEntryStrings[det]
 }
 
+// DiffEntry describes a single point of difference between two bundles
 type DiffEntry struct {
 	Type DiffEntryType
 	// could use a method rather than storing Name in order to curb memory use
@@ -31,6 +36,7 @@ type DiffEntry struct {
 	Additional model.BundleEntry
 }
 
+// BundleDiff describes all differences between two bundle
 type BundleDiff struct {
 	Entries []DiffEntry
 }

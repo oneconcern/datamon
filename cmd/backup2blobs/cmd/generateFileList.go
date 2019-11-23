@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/convert"
 
 	"go.uber.org/zap"
 
@@ -99,7 +99,7 @@ func walkDirConcurrently(rootDir string) {
 	go processFiles(fileChannel, &wg)
 
 	r := iradix.New()
-	r, _, update := r.Insert(model.UnsafeStringToBytes(filepath.Clean(rootDir)), nil)
+	r, _, update := r.Insert(convert.UnsafeStringToBytes(filepath.Clean(rootDir)), nil)
 	if update {
 		logger.Error("Failed to insert root")
 		return
@@ -140,7 +140,7 @@ func processFiles(fileChan chan string, wg *sync.WaitGroup) {
 		if !ok {
 			break
 		}
-		fileListTxn.Insert(model.UnsafeStringToBytes(strings.TrimPrefix(
+		fileListTxn.Insert(convert.UnsafeStringToBytes(strings.TrimPrefix(
 			fileEnt, filepath.Clean(generateParams.parentDir)+"/")+"\n"), nil)
 		count++
 		if count%10000 == 0 {
@@ -197,7 +197,7 @@ func processDir(dirChan chan *task, fileChan chan string) {
 				trees[i] = tree
 			}
 
-			directory := model.UnsafeBytesToString(key)
+			directory := convert.UnsafeBytesToString(key)
 
 			dirEnts, err := godirwalk.ReadDirents(directory, buffer)
 			dirTask.incReadDirOpCount()
@@ -226,7 +226,7 @@ func processDir(dirChan chan *task, fileChan chan string) {
 				tasks := dirCount // Min number of sub tasks
 				for _, dirEnt := range dirEnts {
 					if dirEnt.IsDir() {
-						trees[i], _, ok = trees[i].Insert(model.UnsafeStringToBytes(directory+"/"+dirEnt.Name()), nil)
+						trees[i], _, ok = trees[i].Insert(convert.UnsafeStringToBytes(directory+"/"+dirEnt.Name()), nil)
 						if ok {
 							logger.Error("Dir already exists", zap.String("dir", directory+"/"+dirEnt.Name()))
 						}
@@ -270,7 +270,7 @@ var generateFileListCmd = &cobra.Command{
 				Callback: func(osPathname string, de *godirwalk.Dirent) error {
 					if !de.IsDir() {
 						fileToLog := strings.TrimPrefix(osPathname, generateParams.trimPrefix)
-						_, err = file.Write(model.UnsafeStringToBytes(fileToLog + "\n"))
+						_, err = file.Write(convert.UnsafeStringToBytes(fileToLog + "\n"))
 						if err != nil {
 							logError.Printf("Failed to write file:%s err:%s", osPathname, err)
 						}

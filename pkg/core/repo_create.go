@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// CreateRepo persists a repository with a repo descriptor and some context's stores
 func CreateRepo(repo model.RepoDescriptor, stores context2.Stores) error {
 	store := GetRepoStore(stores) // TODO: Integrate with WAL.
 	err := model.ValidateRepo(repo)

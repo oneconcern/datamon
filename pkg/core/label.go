@@ -16,13 +16,21 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
+// Label describes a bundle label.
+//
+// A label is a name given to a bundle, analogous to tags in git.
+// Examples: Latest, production.
 type Label struct {
 	Descriptor model.LabelDescriptor
 }
 
+// LabelOption is a functor to build labels
 type LabelOption func(*Label)
+
+// LabelDescriptorOption is a functor to build label descriptors
 type LabelDescriptorOption func(descriptor *model.LabelDescriptor)
 
+// LabelContributors sets a list of contributors for the label
 func LabelContributors(c []model.Contributor) LabelDescriptorOption {
 	return func(ld *model.LabelDescriptor) {
 		ld.Contributors = c
@@ -33,10 +41,12 @@ func getLabelStore(stores context2.Stores) storage.Store {
 	return stores.VMetadata()
 }
 
+// LabelContributor sets a single contributor for the label
 func LabelContributor(c model.Contributor) LabelDescriptorOption {
 	return LabelContributors([]model.Contributor{c})
 }
 
+// NewLabelDescriptor builds a new label descriptor
 func NewLabelDescriptor(descriptorOps ...LabelDescriptorOption) *model.LabelDescriptor {
 	ld := model.LabelDescriptor{
 		Timestamp: time.Now(),
@@ -47,12 +57,14 @@ func NewLabelDescriptor(descriptorOps ...LabelDescriptorOption) *model.LabelDesc
 	return &ld
 }
 
+// LabelName sets a name for the label
 func LabelName(name string) LabelOption {
 	return func(l *Label) {
 		l.Descriptor.Name = name
 	}
 }
 
+// NewLabel builds a new label with a descriptor
 func NewLabel(ld *model.LabelDescriptor, labelOps ...LabelOption) *Label {
 	if ld == nil {
 		ld = NewLabelDescriptor()
@@ -66,6 +78,7 @@ func NewLabel(ld *model.LabelDescriptor, labelOps ...LabelOption) *Label {
 	return &label
 }
 
+// UploadDescriptor persists the label descriptor for a bundle
 func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error {
 	e := RepoExists(bundle.RepoID, bundle.contextStores)
 	if e != nil {
@@ -94,6 +107,7 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 	return nil
 }
 
+// DownloadDescriptor retrieves the label descriptor for a bundle
 func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, checkRepoExists bool) error {
 	if checkRepoExists {
 		e := RepoExists(bundle.RepoID, bundle.contextStores)
@@ -124,6 +138,7 @@ func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, chec
 	return nil
 }
 
+// GetLabelStore extracts the versioning metadata store from some context's stores
 func GetLabelStore(stores context2.Stores) storage.Store {
 	return getVMetaStore(stores)
 }

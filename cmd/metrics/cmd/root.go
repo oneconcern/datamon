@@ -8,7 +8,6 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"github.com/spf13/cobra"
@@ -35,7 +34,6 @@ this executable exists to gather performance metrics, memory and cpu usage for e
 					log.Fatal(err)
 				}
 			}
-			core.MemProfDir = params.root.memProfPath
 			f, err := os.Create(params.root.cpuProfPath)
 			if err != nil {
 				log.Fatal(err)
@@ -51,6 +49,7 @@ this executable exists to gather performance metrics, memory and cpu usage for e
 	},
 }
 
+// Execute the selected command
 func Execute() {
 	var err error
 	if err = rootCmd.Execute(); err != nil {

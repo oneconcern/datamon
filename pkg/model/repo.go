@@ -27,7 +27,7 @@ func (b RepoDescriptors) Less(i, j int) bool {
 	return b[i].Name < b[j].Name
 }
 
-// Last return the last entry in a slice of RepoDescriptors
+// Last returns the last entry in a slice of RepoDescriptors
 func (b RepoDescriptors) Last() RepoDescriptor {
 	return b[len(b)-1]
 }
@@ -41,10 +41,12 @@ func getArchivePathToRepos() string {
 	return "repos/"
 }
 
+// GetArchivePathPrefixToRepos yields the path to all repos
 func GetArchivePathPrefixToRepos() string {
 	return fmt.Sprint(getArchivePathToRepos())
 }
 
+// ValidateRepo validates a repository descriptor: name and description are required, name only contains letters, digits or '-'.
 func ValidateRepo(repo RepoDescriptor) error {
 	if repo.Name == "" {
 		return fmt.Errorf("empty field: repo name is empty")

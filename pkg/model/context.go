@@ -11,9 +11,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// ContextVersion indicates the version of the context model
 const ContextVersion = 1.0
 
-// Context defines the details for a Datamon context.
+// Context defines the details for a datamon context.
 type Context struct {
 	Name      string `json:"name" yaml:"name"`           // Name for the context
 	WAL       string `json:"wal" yaml:"wal"`             // WAL is the location for the log
@@ -30,36 +31,47 @@ func GetPathToContext(context string) string {
 	return context + "/" + "context.yaml"
 }
 
+// GetWALName yields the name of the Write Ahead Log store
 func GetWALName(context string, n string) string {
 	if n != "" {
 		return n
 	}
 	return context + "-wal"
 }
+
+// GetBlobName yields the name of the Blob store
 func GetBlobName(context string, n string) string {
 	if n != "" {
 		return n
 	}
 	return context + "-blob"
 }
+
+// GetMetadataName yields the name of the Metadata store
 func GetMetadataName(context string, n string) string {
 	if n != "" {
 		return n
 	}
 	return context + "-metadata"
 }
+
+// GetVMetadataName yields the name of the Versioning Metadata store
 func GetVMetadataName(context string, n string) string {
 	if n != "" {
 		return n
 	}
 	return context + "-v-metadata"
 }
+
+// GetReadLogName yields the name of the Read Log store
 func GetReadLogName(context string, n string) string {
 	if n != "" {
 		return n
 	}
 	return context + "-read-log"
 }
+
+// UnmarshalContext unmarshals a context from a YAML descriptor
 func UnmarshalContext(b []byte) (*Context, error) {
 	if b == nil {
 		return nil, fmt.Errorf("received nil entry to unmarshall")
@@ -69,11 +81,13 @@ func UnmarshalContext(b []byte) (*Context, error) {
 	return &c, err
 }
 
+// MarshalContext marshals a context as a YAML descriptor
 func MarshalContext(c *Context) ([]byte, error) {
 	b, err := yaml.Marshal(c)
 	return b, err
 }
 
+// ValidateContext checks the context is valid, i.e. all expected stores are well defined
 func ValidateContext(context Context) error {
 	var cause string
 	switch {
