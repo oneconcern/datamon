@@ -1,23 +1,17 @@
 FROM golang:alpine as base
 
-ARG github_user
-ARG github_token
-
-ENV GITHUB_USER ${github_user}
-ENV GITHUB_TOKEN ${github_token}
-
 ADD hack/create-netrc.sh /usr/bin/create-netrc
 
 RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
   create-netrc &&\
-  apk add --no-cache musl-dev gcc ca-certificates mailcap upx tzdata zip git &&\
+  apk add --no-cache --quiet musl-dev gcc ca-certificates mailcap upx tzdata zip git &&\
   update-ca-certificates &&\
   cp /etc/ssl/certs/ca-certificates.crt /stage/etc/ssl/certs/ca-certificates.crt &&\
   cp /etc/mime.types /stage/etc/mime.types
 
 # https://golang.org/src/time/zoneinfo.go Copy the zoneinfo installed by musl-dev
 WORKDIR /usr/share/zoneinfo
-RUN zip -r -0 /stage/zoneinfo.zip .
+RUN zip -qr -0 /stage/zoneinfo.zip .
 
 ARG version
 ARG commit
@@ -35,10 +29,10 @@ RUN LDFLAGS='-s -w -linkmode external -extldflags "-static"' && \
   LDFLAGS="$LDFLAGS -X 'github.com/oneconcern/datamon/cmd/datamon/cmd.BuildDate=$(date -u -R)'" && \
   LDFLAGS="$LDFLAGS -X 'github.com/oneconcern/datamon/cmd/datamon/cmd.GitCommit=${GIT_COMMIT}'" && \
   LDFLAGS="$LDFLAGS -X 'github.com/oneconcern/datamon/cmd/datamon/cmd.GitState=${GIT_DIRTY}'" && \
-  go build -o /stage/usr/bin/datamon --ldflags "$LDFLAGS" ./cmd/datamon
+  go build -o /stage/usr/bin/datamon --ldflags "$LDFLAGS" ./cmd/datamon && \
+  upx /stage/usr/bin/datamon && \
+  md5sum /stage/usr/bin/datamon
 
-RUN upx /stage/usr/bin/datamon
-RUN md5sum /stage/usr/bin/datamon
 #Build the dist image
 FROM scratch
 COPY --from=base /stage /
