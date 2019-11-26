@@ -148,6 +148,8 @@ Flags:
 The last line prints the commit hash.
 If the optional `--label` is omitted, the commit hash will be needed to download the bundle.
 
+> git analogy: `git commit -m {message}`
+
 **Example:**
 
 ```bash
