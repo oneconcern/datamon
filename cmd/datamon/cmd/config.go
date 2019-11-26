@@ -38,6 +38,10 @@ func (c *CLIConfig) setDatamonParams(flags *flagsT) {
 }
 
 func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
+	if flags.core.Config == "" {
+		wrapFatalln("set environment variable $DATAMON_GLOBAL_CONFIG or create config file", nil)
+		return
+	}
 	configStore, err := gcs.New(context.Background(), flags.core.Config, config.Credential)
 	if err != nil {
 		wrapFatalln("failed to get context details", err)
