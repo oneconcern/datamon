@@ -1,18 +1,41 @@
 # Kubernetes sidecar guide
 
-## Datamond as a sidecar
+## Goal
 
-Current use of Datamon at One Concern with respect to intra-Argo workflow usage relies on the
-[kubernetes sidecar](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/)
-pattern wherein a shared volume (transport layer) ramifies application layer
-communication to coordinate between the _main container_, where a data-science program
-accesses data provided by Datamon and produces data for Datamon to upload, and the
-_sidecar container_, where Datamon provides data for access (as hierarchical filesystems,
-as SQL databases, etc.).
+The objective is to expose persistent data at rest to a consuming application running in a kubernetes pod.
 
-After the main container's DAG-node-specific data-science program outputs data
-(to shared Kubernetes volume, to a PostgreSQL instance in the sidecar, and so on),
-the sidecar container uploads the results of the data-science program to GCS.
+Consumed inputs are dowloaded then mounted read-only. Producted outputs are uploaded in their archived state.
+
+## Design
+
+This data presentation layer is part of the "batteries" feature.
+
+The current design favors the sidecar container approach, with bespoke signaling between containers,
+over the CSI driver approach. Therefore,  datamon is not available as a kubernetes persistent volume plugin.
+
+This design choice stems from the current inability by Kubernetes CSI API to handle ephemeral volumes.
+Managing many short lived kubernetes volumes is at the moment not practical.
+
+Signaling is implemented with files on a shared volume.
+
+## Datamon as a sidecar
+
+We focus on the use case of some ARGO worflow running some data-science program in a pod,
+which both consumes and produces versioned data as datamon bundles.
+
+Versioned data is available either as a file system mount or as a Postgres instance running in a _sidecar container_.
+
+The main ARGO container communicates with the sidecar container via
+[shared volumes on the same pod](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/).
+
+After this program has produced its outputs, the sidecar container uploads the results to GCS as datamon bundles.
+
+## Sidecar signaling
+
+We need some coordination between the different containers running in the pod.
+
+In particular, we need to keep the pod running and the sidecars to finish uploading
+results when the main ARGO workflow is done processing.
 
 Ensuring that data is ready for access (sidecar to main-container messaging)
 as well as notification that the data-science program has
@@ -20,7 +43,29 @@ produced output data to upload (main-container to sidecar messaging),
 is the responsibility of a few shell scripts shipped as part and parcel of the
 Docker images that practicably constitute sidecars.
 
-While there's precisely one application container per Argo node,
+The coordination signaling defines the following protocol:
+
+### File system mount (`fuse`)
+
+| main(`wrap_application.sh`) | sidecar (`wrap_datamon.sh`) | what happens |
+|-----------------------------|-----------------------------|--------------|
+|                | <= mountdone  | application waits for input bundles to be mounted |
+|                |               | (do some work...)                                 |
+| initupload  => |               | datamon starts running the upload commands        |
+|                | <= uploaddone | application waits until its output is archived    |
+
+### Postgres SQL
+
+| main(`wrap_application.sh`) | sidecar (`wrap_datamon_pg.sh`) | what happens |
+|-----------------------------|-----------------------------|--------------|
+|                 | <= dbstarted    | application waits for the DB instance to be ready |
+|                 |                 | (do some work...)                                 |
+| initdbupload => |                 | datamon archives the database as a bundle         |
+|                 | <= dbuploaddone | application waits until its output is archived    |
+
+<!-- Internal notes -->
+<!--
+ While there's precisely one application container per Argo node,
 a Kubernetes container created from an arbitrary image,
 sidecars are additional containers in the same Kubernetes pod
 -- or Argo DAG node, we can say, approximately synonymously --
@@ -29,39 +74,44 @@ that concert datamon-based data-ferrying setups with the application container.
 > _Aside_: as additional kinds of data sources and sinks are added,
 > we may also refer to "sidecars" as "batteries," and so on as semantic drift
 > of the shell scripts shears away feature creep in the application binary.
+-->
 
-There are currently two batteries-included® images
+## Sidecar releases
 
-* `gcr.io/onec-co/datamon-fuse-sidecar`
-  provides hierarchical filesystem access
-* `gcr.io/onec-co/datamon-pg-sidecar`
-  provides PostgreSQL database access
+There are currently two sidecar images:
 
-Both are versioned along with
+* `gcr.io/onec-co/datamon-fuse-sidecar` provides hierarchical filesystem access
+* `gcr.io/onec-co/datamon-pg-sidecar` provides PostgreSQL database access
+
+Sidecars are versioned along with
 [github releases](https://github.com/oneconcern/datamon/releases/)
-of the
-[desktop binary](#os-x-install-guide).
-to access recent releases listed on the github releases page,
-use the git tag as the Docker image tag:
-At time of writing,
-[v0.7](https://github.com/oneconcern/datamon/releases/tag/v0.7)
-is the latest release tag, and (with some elisions)
+of the [desktop binary](install.md).
+
+Docker image tags follow the github releases.
+
+See latest release [here](https://github.com/oneconcern/datamon/releases/latest).
+
+You embed a datamon sidecar in your kuberbetes pod specification like this:
 ```yaml
 spec:
   ...
   containers:
     - name: datamon-sidecar
-    - image: gcr.io/onec-co/datamon-fuse-sidecar:v0.7
+    - image: gcr.io/onec-co/datamon-fuse-sidecar:v1.0.0
   ...
 ```
-would be the corresponding Kubernetes YAML to access the sidecar container image.
 
+<!-- Internal notes -->
+<!--
 > _Aside_: historically, and in case it's necessary to roll back to an now-ancient
 > version of the sidecar image, releases were tagged in git without the `v` prefix,
 > and Docker tags prepended `v` to the git tag.
 > For instance, `0.4` is listed on the github releases page, while
 > the tag `v0.4` as in `gcr.io/onec-co/datamon-fuse-sidecar:v0.4` was used when writing
 > Dockerfiles or Kubernetes-like YAML to accesses the sidecar container image.
+-->
+
+## Sidecar usage
 
 Users need only place the `wrap_application.sh` script located in the root directory
 of each of the sidecar containers within the main container.
