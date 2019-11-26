@@ -147,9 +147,5 @@ func initConfig() {
 	if datamonFlags.context.Descriptor.Name == "" {
 		datamonFlags.context.Descriptor.Name = "datamon-dev"
 	}
-
-	if datamonFlags.core.Config == "" {
-		wrapFatalln("set environment variable $DATAMON_GLOBAL_CONFIG or create config file", nil)
-		return
-	}
+	//  do not require config to be set for all commands
 }
