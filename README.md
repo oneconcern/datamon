@@ -29,15 +29,15 @@ Datamon supports the following cloud storage backends:
 * Google Cloud Storage 
 * AWS S3
 
-### Concepts
+### [Concepts](docs/concepts.md)
 
-- **Repo**: analogous to a git repo. A repo in datamon is a dataset that has a unified lifecycle.
-- **Bundle**: a bundle is a point in time read-only view of a rep:branch and is composed of individual files. Analogous to a commit in git.
-- **Label**: a name given to a bundle, analogous to tags in git. Examples: Latest, production.
-- **[Context](docs/context.md)**: a context provides a way to define multiple instances of datamon.
-- **[Write Ahead Log](docs/wal.md)**: a WAL track data updates and their ordering.
-- **Read Log**: this logs all read operations, with their originator.
-- **[Authentication](docss/usage.md#Authentication)**: datamon keeps track of who contributed what, when and in which order (WAL) and who accessed what (Read Log).
+- [**Repo**](docs/concepts.md#repo): analogous to a git repo. A repo in datamon is a dataset that has a unified lifecycle.
+- [**Bundle**](docs/concepts.md#bundle): a bundle is a point in time read-only view of a rep:branch and is composed of individual files. Analogous to a commit in git.
+- [**Label**](docs/concepts.md#label): a name given to a bundle, analogous to tags in git. Examples: Latest, production.
+- [**Context**](docs/concepts.md#context): a context provides a way to define multiple instances of datamon.
+- [**Write Ahead Log**](docs/concepts.md#write-ahead-log): a WAL track data updates and their ordering.
+- [**Read Log**](docs/concepts.md#read-log): logs all read operations, with their originator.
+- [**Authentication**](docss/usage.md#Authentication): datamon keeps track of who contributed what, when and in which order (WAL) and who accessed what (Read Log).
 
 ## Installation
 
