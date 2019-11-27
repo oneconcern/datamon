@@ -121,6 +121,9 @@ func init() {
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd, 100)
 	addLogLevel(uploadBundleCmd)
+
+	addContextFlag(uploadBundleCmd)
+
 	for _, flag := range requiredFlags {
 		err := uploadBundleCmd.MarkFlagRequired(flag)
 		if err != nil {

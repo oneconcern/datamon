@@ -55,6 +55,8 @@ func init() {
 	addContributorEmail(repoCreate)
 	addContributorName(repoCreate)
 
+	addContextFlag(repoCreate)
+
 	for _, flag := range requiredFlags {
 		err := repoCreate.MarkFlagRequired(flag)
 		if err != nil {

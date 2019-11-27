@@ -6,13 +6,19 @@ ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 
 # Build the dist image
 FROM ubuntu:18.10
-RUN apt-get update --quiet && apt-get install -y --quiet --no-install-recommends fuse sudo vim zsh &&\
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* &&\
-    echo "allow_root" >> /etc/fuse.conf
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fuse \
+    sudo \
+    vim \
+    zsh \
+    &&\
+  apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* &&\
+  echo "allow_root" >> /etc/fuse.conf
 
 COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip
 
+##
 ADD hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 ADD hack/fuse-demo/wrap_datamon.sh .
 ADD hack/fuse-demo/wrap_application.sh .
