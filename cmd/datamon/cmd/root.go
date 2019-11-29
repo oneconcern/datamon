@@ -19,11 +19,13 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "datamon",
 	Short: "Datamon helps building ML pipelines",
-	Long: `Datamon helps building ML pipelines by adding versioning, auditing and security to existing tools.
+	Long: `Datamon helps building ML pipelines by adding versioning, auditing and security to cloud storage tools
+(e.g. Google GCS, AWS S3).
 
-This is not a replacement for existing tools, but rather a way to manage their inputs and outputs.
+This is not a replacement for these tools, but rather a way to manage their inputs and outputs.
 
-Datamon works by providing a git like interface to manage data efficiently.
+Datamon works by providing a git like interface to manage data efficiently:
+your data buckets are organized in repositories of versioned and tagged bundles of files.
 `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if datamonFlags.root.upgrade {

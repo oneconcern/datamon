@@ -66,10 +66,10 @@ func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Commands to manage a config",
-	Long: `Commands to manage datamon cli config.
+	Long: `Commands to manage datamon CLI config.
 
-Configuration for datamon is the common set of datamonFlags that are needed for most commands and do not change.
-`,
+Configuration for datamon is the common set of flags that are needed for most commands and do not change across runs,
+analogous to "git config ...". `,
 }
 
 func init() {

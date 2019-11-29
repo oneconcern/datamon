@@ -12,7 +12,12 @@ import (
 var bundleFileList = &cobra.Command{
 	Use:   "files",
 	Short: "List files in a bundle",
-	Long:  "List all the files in a bundle",
+	Long: `List all the files in a bundle.
+
+You may use the "--label" flag as an alternate way to specify the bundle to search for.
+
+This is analogous to the git command "git show --pretty="" --name-only {commit-ish}"`,
+	Example: `% datamon bundle list files --repo ritesh-test-repo --bundle 1ISwIzeAR6m3aOVltAsj1kfQaml`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)

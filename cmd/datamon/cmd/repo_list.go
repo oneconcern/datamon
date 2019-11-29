@@ -21,9 +21,10 @@ func applyRepoTemplate(repo model.RepoDescriptor) error {
 }
 
 var repoList = &cobra.Command{
-	Use:   "list",
-	Short: "List repos",
-	Long:  "List repos that have been created",
+	Use:     "list",
+	Short:   "List repos",
+	Long:    `List repos that have been created`,
+	Example: ``, // TODO
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)

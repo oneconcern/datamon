@@ -11,6 +11,22 @@ repo.
  work following the [Issues guide below](#Issues)
 3. Start a Pull Request to bring in the work done.
 
+
+## Git hooks
+
+This repo uses git-hooks to run some automated client-side actions (e.g. doc update) before you commit.
+
+Install and configure git-hooks locally for this repository:
+```
+npm install git-hooks --global
+
+git-hooks --install
+```
+
+Now this is getting the usage doc regenerated automatically with every commit.
+
+If you find hooks are a problem, you can work around them with `git commit --no-verify ...`
+
 # Issues
 
 Issues are use for any new work coming in. Issues can be for

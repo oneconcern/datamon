@@ -20,9 +20,11 @@ var bundleCmd = &cobra.Command{
 	Short: "Commands to manage bundles for a repo",
 	Long: `Commands to manage bundles for a repo.
 
-A bundle is a group of files that are tracked and changed together.
-Every bundle is an entry in the history of a repository at a point in time.
-`,
+A bundle is a point in time read-only view of a repo,
+analogous to a git commit.
+
+A bundle is composed of individual files that are tracked and changed
+together.`,
 	PreRun: func(cmd *cobra.Command, args []string) {
 		config.populateRemoteConfig(&datamonFlags)
 	},

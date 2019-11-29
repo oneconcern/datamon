@@ -22,7 +22,13 @@ const (
 var uploadBundleCmd = &cobra.Command{
 	Use:   "upload",
 	Short: "Upload a bundle",
-	Long:  "Upload a bundle consisting of all files stored in a directory",
+	Long: `Upload a bundle consisting of all files stored in a directory,
+to the cloud backend storage.
+
+This is analogous to the "git commit" command. A message and a label may be set.
+`,
+	Example: `% datamon bundle upload --path /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo --label init
+Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 

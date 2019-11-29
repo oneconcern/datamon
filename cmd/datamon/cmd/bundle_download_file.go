@@ -10,7 +10,12 @@ import (
 var bundleDownloadFileCmd = &cobra.Command{
 	Use:   "file",
 	Short: "Download a file from bundle",
-	Long:  "Download a readonly, non-interactive view of a single file from a bundle",
+	Long: `Download a readonly, non-interactive view of a single file
+from a bundle.
+
+You may use the "--label" flag as an alternate way to specify a particular bundle.
+`,
+	Example: `% datamon bundle download file --file datamon/cmd/repo_list.go --repo ritesh-test-repo --bundle 1ISwIzeAR6m3aOVltAsj1kfQaml --destination /tmp`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		ctx := context.Background()
