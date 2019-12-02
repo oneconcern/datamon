@@ -14,9 +14,6 @@ var ContextCmd = &cobra.Command{
 	Short:      "Commands to manage contexts.",
 	Long: "Commands to manage contexts. " +
 		"A context is an instance of Datamon with set of repos, runs, labels etc.",
-	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
-	},
 }
 
 func init() {

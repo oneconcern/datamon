@@ -16,9 +16,6 @@ var repoCmd = &cobra.Command{
 
 Repos are datasets that are versioned and managed via bundles.
 `,
-	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
-	},
 }
 
 var repoDescriptorTemplate *template.Template

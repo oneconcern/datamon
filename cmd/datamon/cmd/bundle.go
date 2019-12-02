@@ -23,9 +23,6 @@ var bundleCmd = &cobra.Command{
 A bundle is a group of files that are tracked and changed together.
 Every bundle is an entry in the history of a repository at a point in time.
 `,
-	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
-	},
 }
 
 var bundleDescriptorTemplate *template.Template

@@ -41,6 +41,9 @@ var webSrv = &cobra.Command{
 			return
 		}
 	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		config.populateRemoteConfig(&datamonFlags)
+	},
 }
 
 func init() {
