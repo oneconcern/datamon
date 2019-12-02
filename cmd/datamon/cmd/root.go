@@ -110,7 +110,8 @@ func initConfig() {
 	// `viper.ConfigFileUsed()` returns path to config file if error is nil
 	var err error
 	// 2. Initialize config
-	config, err = newConfig()
+	config := new(CLIConfig)
+	err = viper.Unmarshal(config)
 	if err != nil {
 		wrapFatalln("populate config struct", err)
 		return
@@ -128,7 +129,12 @@ func initConfig() {
 		datamonFlags.core.Config = viper.GetString("DATAMON_GLOBAL_CONFIG")
 	}
 
-	config.setDatamonParams(&datamonFlags)
+	if datamonFlags.context.Descriptor.Name == "" {
+		datamonFlags.context.Descriptor.Name = config.Context
+	}
+	if datamonFlags.core.Config == "" {
+		datamonFlags.core.Config = config.Config
+	}
 
 	if datamonFlags.context.Descriptor.Name == "" {
 		datamonFlags.context.Descriptor.Name = "datamon-dev"

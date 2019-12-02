@@ -13,6 +13,8 @@ require (
 	github.com/aws/aws-sdk-go v1.18.6
 	github.com/docker/go-units v0.3.3
 	github.com/go-chi/chi v4.0.2+incompatible
+	github.com/gobuffalo/envy v1.8.1 // indirect
+	github.com/gobuffalo/logger v1.0.3 // indirect
 	github.com/gobuffalo/packd v0.3.0
 	github.com/gobuffalo/packr/v2 v2.7.1
 	github.com/golang/protobuf v1.3.2 // indirect
@@ -41,10 +43,11 @@ require (
 	github.com/stretchr/testify v1.4.0
 	go.uber.org/goleak v0.0.0-00010101000000-000000000000
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
+	golang.org/x/crypto v0.0.0-20191202143827-86a70503ff7e // indirect
 	golang.org/x/net v0.0.0-20190923162816-aa69164e4478 // indirect
-	golang.org/x/sys v0.0.0-20191023151326-f89234f9a2c2
+	golang.org/x/sys v0.0.0-20191128015809-6d18c012aee9
 	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/tools v0.0.0-20191130070609-6e064ea0cf2d // indirect
 	google.golang.org/api v0.2.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.2.4

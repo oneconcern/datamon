@@ -7,7 +7,6 @@ import (
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
 
@@ -17,24 +16,6 @@ type CLIConfig struct {
 	Credential string `json:"credential" yaml:"credential"` // Credentials to use for GCS
 	Config     string `json:"config" yaml:"config"`         // Config for datamon
 	Context    string `json:"context" yaml:"context"`       // Context for datamon
-}
-
-func newConfig() (*CLIConfig, error) {
-	var config CLIConfig
-	err := viper.Unmarshal(&config)
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
-func (c *CLIConfig) setDatamonParams(flags *flagsT) {
-	if flags.context.Descriptor.Name == "" {
-		flags.context.Descriptor.Name = c.Context
-	}
-	if flags.core.Config == "" {
-		flags.core.Config = c.Config
-	}
 }
 
 func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
