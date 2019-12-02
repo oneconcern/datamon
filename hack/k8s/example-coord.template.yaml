@@ -48,6 +48,8 @@ spec:
         imagePullPolicy: "$PULL_POLICY"
         command: ["./wrap_datamon.sh"]
         args: ["-s", "-c", "/tmp/coord",
+        "-b", "datamon-config-test-sdjfhga",
+        "-a", "datamon-sidecar-test",
         "-i", "/tmp/bundleid.txt",
         "-d", "config create",
         "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo",

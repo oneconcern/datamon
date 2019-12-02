@@ -43,22 +43,26 @@ dbg_print 'create_coord_pod.sh getopts end'
 
 CLUSTER_GAC_SECRET_NAME=google-application-credentials
 
-dbg_print '### creating secret '"${CLUSTER_GAC_SECRET_NAME}"' in cluster'
-dbg_print '### from file "'"${GOOGLE_APPLICATION_CREDENTIALS}"'"'
-if [[ -z $GOOGLE_APPLICATION_CREDENTIALS ]]; then
-	  echo 'GOOGLE_APPLICATION_CREDENTIALS env variable not set' 1>&2
-	  exit 1
-fi
 
-if kubectl get secret ${CLUSTER_GAC_SECRET_NAME} &> /dev/null; then
-    dbg_print '##### named secret exists so deleting'
-	  kubectl delete secret ${CLUSTER_GAC_SECRET_NAME}
+if [[ -z $GCLOUD_SERVICE_KEY ]]; then
+    # not in ci
+    dbg_print '### creating secret '"${CLUSTER_GAC_SECRET_NAME}"' in cluster'
+    dbg_print '### from file "'"${GOOGLE_APPLICATION_CREDENTIALS}"'"'
+    if [[ -z $GOOGLE_APPLICATION_CREDENTIALS ]]; then
+	      echo 'GOOGLE_APPLICATION_CREDENTIALS env variable not set' 1>&2
+	      exit 1
+    fi
+
+    if kubectl get secret ${CLUSTER_GAC_SECRET_NAME} &> /dev/null; then
+        dbg_print '##### named secret exists so deleting'
+	      kubectl delete secret ${CLUSTER_GAC_SECRET_NAME}
+    fi
+    dbg_print '##### creating according to'
+    dbg_print 'https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform#step_4_import_credentials_as_a_secret'
+    kubectl create secret generic \
+	          ${CLUSTER_GAC_SECRET_NAME} \
+	          --from-file=google-application-credentials.json=${GOOGLE_APPLICATION_CREDENTIALS}
 fi
-dbg_print '##### creating according to'
-dbg_print 'https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform#step_4_import_credentials_as_a_secret'
-kubectl create secret generic \
-	${CLUSTER_GAC_SECRET_NAME} \
-	--from-file=google-application-credentials.json=${GOOGLE_APPLICATION_CREDENTIALS}
 
 ##
 
