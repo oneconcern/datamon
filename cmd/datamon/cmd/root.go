@@ -122,15 +122,12 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
-	if datamonFlags.context.Descriptor.Name == "" {
-		datamonFlags.context.Descriptor.Name = viper.GetString("DATAMON_CONTEXT")
+
+	if config.Context == "" {
+		config.Context = viper.GetString("DATAMON_CONTEXT")
 	}
 	if datamonFlags.core.Config == "" {
 		datamonFlags.core.Config = viper.GetString("DATAMON_GLOBAL_CONFIG")
-	}
-
-	if datamonFlags.context.Descriptor.Name == "" {
-		datamonFlags.context.Descriptor.Name = config.Context
 	}
 	if datamonFlags.core.Config == "" {
 		datamonFlags.core.Config = config.Config

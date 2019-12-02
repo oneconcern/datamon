@@ -42,6 +42,7 @@ type flagsT struct {
 		Name   string
 	}
 	context struct {
+		Name string
 		Descriptor model.Context
 	}
 	repo struct {
@@ -155,7 +156,7 @@ func addCoreConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) st
 }
 func addContextFlag(cmd *cobra.Command) string {
 	c := "context"
-	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Name, c, "dev", "Set the context for datamon")
+	cmd.Flags().StringVar(&datamonFlags.context.Name, c, "dev", "Set the context for datamon")
 	return c
 }
 

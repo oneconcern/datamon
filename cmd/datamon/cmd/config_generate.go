@@ -30,7 +30,7 @@ var configGen = &cobra.Command{
 		}
 		config := CLIConfig{
 			Config:     datamonFlags.core.Config,
-			Context:    datamonFlags.context.Descriptor.Name,
+			Context:    datamonFlags.context.Name,
 			Credential: datamonFlags.root.credFile,
 		}
 		o, e := yaml.Marshal(config)

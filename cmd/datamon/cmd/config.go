@@ -28,7 +28,11 @@ func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 		wrapFatalln("failed to get context details", err)
 		return
 	}
-	rdr, err := configStore.Get(context.Background(), model.GetPathToContext(flags.context.Descriptor.Name))
+	contextName := datamonFlags.context.Name
+	if contextName == "" {
+		contextName = config.Context
+	}
+	rdr, err := configStore.Get(context.Background(), model.GetPathToContext(contextName))
 	if err != nil {
 		wrapFatalln("failed to get context details from config store for "+flags.context.Descriptor.Name, err)
 		return
