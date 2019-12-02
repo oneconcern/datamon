@@ -30,7 +30,7 @@ var BundleListCommand = &cobra.Command{
 	Long:  "List the bundles in a repo, ordered by their bundle ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		remoteStores, err := paramsToDatamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -44,7 +44,7 @@ var BundleListCommand = &cobra.Command{
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		populateRemoteConfig()
 	},
 }
 

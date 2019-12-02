@@ -15,7 +15,7 @@ var bundleFileList = &cobra.Command{
 	Long:  "List all the files in a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		remoteStores, err := paramsToDatamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -41,7 +41,7 @@ var bundleFileList = &cobra.Command{
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		populateRemoteConfig()
 	},
 }
 

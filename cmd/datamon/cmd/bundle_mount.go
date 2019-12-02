@@ -90,7 +90,7 @@ var mountBundleCmd = &cobra.Command{
 			runDaemonized()
 			return
 		}
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		remoteStores, err := paramsToDatamonContext(ctx)
 		if err != nil {
 			onDaemonError("create remote stores", err)
 			return
@@ -143,7 +143,7 @@ var mountBundleCmd = &cobra.Command{
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		populateRemoteConfig()
 	},
 }
 

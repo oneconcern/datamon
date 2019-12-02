@@ -28,7 +28,7 @@ var mutableMountBundleCmd = &cobra.Command{
 			runDaemonized()
 			return
 		}
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		remoteStores, err := paramsToDatamonContext(ctx)
 		if err != nil {
 			onDaemonError("create remote stores", err)
 			return
@@ -76,7 +76,7 @@ var mutableMountBundleCmd = &cobra.Command{
 		infoLogger.Printf("bundle: %v", bundle.BundleID)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		populateRemoteConfig()
 	},
 }
 

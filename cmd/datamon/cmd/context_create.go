@@ -27,12 +27,11 @@ func createContext() {
 	if err != nil {
 		wrapFatalln("failed to create config store. ", err)
 	}
-	if datamonFlags.context.Descriptor.Name == "" {
-		datamonFlags.context.Descriptor.Name = datamonFlags.context.Name
-	}
-	err = context.CreateContext(context2.Background(), configStore, datamonFlags.context.Descriptor)
+	datamonContext := datamonFlags.context.Descriptor
+	datamonContext.Name = datamonFlags.context.Name
+	err = context.CreateContext(context2.Background(), configStore, datamonContext)
 	if err != nil {
-		wrapFatalln("failed to create context: "+datamonFlags.context.Descriptor.Name, err)
+		wrapFatalln("failed to create context: "+datamonContext.Name, err)
 	}
 }
 

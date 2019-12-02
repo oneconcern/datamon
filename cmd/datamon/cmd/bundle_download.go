@@ -23,7 +23,7 @@ var BundleDownloadCmd = &cobra.Command{
 		" the latest bundle will be downloaded",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		remoteStores, err := paramsToDatamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -75,7 +75,7 @@ var BundleDownloadCmd = &cobra.Command{
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		populateRemoteConfig()
 	},
 }
 

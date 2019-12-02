@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
+	context2 "github.com/oneconcern/datamon/pkg/context"
+
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -18,7 +21,9 @@ type CLIConfig struct {
 	Context    string `json:"context" yaml:"context"`       // Context for datamon
 }
 
-func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
+func populateRemoteConfig() {
+	var flags *flagsT
+	flags = &datamonFlags
 	if flags.core.Config == "" {
 		wrapFatalln("set environment variable $DATAMON_GLOBAL_CONFIG or create config file", nil)
 		return
@@ -28,7 +33,7 @@ func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 		wrapFatalln("failed to get context details", err)
 		return
 	}
-	contextName := datamonFlags.context.Name
+	contextName := flags.context.Name
 	if contextName == "" {
 		contextName = config.Context
 	}
@@ -48,7 +53,37 @@ func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 		wrapFatalln("failed to unmarshal", err)
 		return
 	}
-	flags.context.Descriptor = contextDescriptor
+
+	paramsToDatamonContext = func(ctx context.Context) (context2.Stores, error) {
+		stores := context2.Stores{}
+		meta, err := gcs.New(ctx, contextDescriptor.Metadata, config.Credential)
+		if err != nil {
+			return context2.Stores{}, fmt.Errorf("failed to initialize metadata store, err:%s", err)
+		}
+		stores.SetMetadata(meta)
+		blob, err := gcs.New(ctx, contextDescriptor.Blob, config.Credential)
+		if err != nil {
+			return context2.Stores{}, fmt.Errorf("failed to initialize blob store, err:%s", err)
+		}
+		stores.SetBlob(blob)
+		v, err := gcs.New(ctx, contextDescriptor.VMetadata, config.Credential)
+		if err != nil {
+			return context2.Stores{}, fmt.Errorf("failed to initialize vmetadata store, err:%s", err)
+		}
+		stores.SetVMetadata(v)
+		w, err := gcs.New(ctx, contextDescriptor.WAL, config.Credential)
+		if err != nil {
+			return context2.Stores{}, fmt.Errorf("failed to initialize wal store, err:%s", err)
+		}
+		stores.SetWal(w)
+		r, err := gcs.New(ctx, contextDescriptor.ReadLog, config.Credential)
+		if err != nil {
+			return context2.Stores{}, fmt.Errorf("failed to initialize read log store, err:%s", err)
+		}
+		stores.SetReadLog(r)
+		return stores, nil
+	}
+
 }
 
 // configCmd represents the bundle related commands

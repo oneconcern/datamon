@@ -20,7 +20,7 @@ var webSrv = &cobra.Command{
 	Long:  "A webserver process to browse Datamon data",
 	Run: func(cmd *cobra.Command, args []string) {
 		infoLogger.Println("begin webserver")
-		stores, err := paramsToDatamonContext(context.Background(), datamonFlags)
+		stores, err := paramsToDatamonContext(context.Background())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -42,7 +42,7 @@ var webSrv = &cobra.Command{
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		populateRemoteConfig()
 	},
 }
 
