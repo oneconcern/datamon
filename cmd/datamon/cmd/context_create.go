@@ -6,10 +6,8 @@
 package cmd
 
 import (
-	context2 "context"
+	"fmt"
 
-	"github.com/oneconcern/datamon/pkg/context"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/spf13/cobra"
 )
 
@@ -18,21 +16,18 @@ var ContextCreateCommand = &cobra.Command{
 	Short: "Create a context",
 	Long:  "Create a context for Datamon",
 	Run: func(cmd *cobra.Command, args []string) {
+
+		fmt.Println("top ContextCreateCommand Run")
+		fmt.Println(createContext == nil)
+
 		createContext()
 	},
-}
+	PreRun: func(cmd *cobra.Command, args []string) {
 
-func createContext() {
-	configStore, err := gcs.New(context2.Background(), datamonFlags.core.Config, config.Credential)
-	if err != nil {
-		wrapFatalln("failed to create config store. ", err)
-	}
-	datamonContext := datamonFlags.context.Descriptor
-	datamonContext.Name = datamonFlags.context.Name
-	err = context.CreateContext(context2.Background(), configStore, datamonContext)
-	if err != nil {
-		wrapFatalln("failed to create context: "+datamonContext.Name, err)
-	}
+		fmt.Println("top ContextCreateCommand PreRun")
+
+		populateRemoteConfig()
+	},
 }
 
 func init() {

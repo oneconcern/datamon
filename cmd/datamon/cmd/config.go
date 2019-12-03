@@ -21,6 +21,8 @@ type CLIConfig struct {
 	Context    string `json:"context" yaml:"context"`       // Context for datamon
 }
 
+var createContext func()
+
 func populateRemoteConfig() {
 	var flags *flagsT
 	flags = &datamonFlags
@@ -39,7 +41,7 @@ func populateRemoteConfig() {
 	}
 	rdr, err := configStore.Get(context.Background(), model.GetPathToContext(contextName))
 	if err != nil {
-		wrapFatalln("failed to get context details from config store for "+flags.context.Descriptor.Name, err)
+		wrapFatalln("failed to get context details from config store for "+contextName, err)
 		return
 	}
 	b, err := ioutil.ReadAll(rdr)
@@ -83,6 +85,18 @@ func populateRemoteConfig() {
 		stores.SetReadLog(r)
 		return stores, nil
 	}
+
+	createContext = func() {
+		datamonContext := datamonFlags.context.Descriptor
+		datamonContext.Name = datamonFlags.context.Name
+		err = context2.CreateContext(context.Background(), configStore, datamonContext)
+		if err != nil {
+			wrapFatalln("failed to create context: "+datamonContext.Name, err)
+		}
+	}
+
+	fmt.Println("initialized createContext")
+	fmt.Println(createContext == nil)
 
 }
 

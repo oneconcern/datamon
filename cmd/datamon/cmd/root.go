@@ -110,7 +110,7 @@ func initConfig() {
 	// `viper.ConfigFileUsed()` returns path to config file if error is nil
 	var err error
 	// 2. Initialize config
-	config := new(CLIConfig)
+	config = new(CLIConfig)
 	err = viper.Unmarshal(config)
 	if err != nil {
 		wrapFatalln("populate config struct", err)
@@ -119,6 +119,10 @@ func initConfig() {
 
 	if config.Credential != "" {
 		_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.Credential)
+	}
+	if envVarConfigCredential := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS");
+		envVarConfigCredential != ""  && config.Credential == "" {
+		config.Credential = envVarConfigCredential
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
