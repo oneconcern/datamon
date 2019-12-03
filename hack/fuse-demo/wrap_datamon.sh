@@ -1,12 +1,19 @@
 #! /bin/zsh
 
+setopt ERR_EXIT
+setopt PIPE_FAIL
+
+dbg_print() {
+    typeset dbg=true
+    if $dbg; then
+        print -- $*
+    fi
+}
+
 ### datamon wrapper (demo)
 # half of the container coordination sketch, a script like this one
 # is meant to wrap datamon in the sidecar container of an Argo DAG node
 # and communciate with a script like wrap_application.sh.
-
-setopt ERR_EXIT
-setopt PIPE_FAIL
 
 POLL_INTERVAL=1 # sec
 
@@ -135,6 +142,11 @@ emit_event() {
     touch "${COORD_POINT}/${EVENT_NAME}"
 }
 
+dbg_print "have zsh version $ZSH_VERSION"
+# todo: review use of this env variable in golang binary
+export DATAMON_GLOBAL_CONFIG='datamon-config-test-sdjfhga'
+dbg_print "set DATAMON_GLOBAL_CONFIG to '${DATAMON_GLOBAL_CONFIG}' for datamon binary"
+
 run_datamon_cmd() {
     typeset params_param
     typeset -a params
@@ -143,18 +155,20 @@ run_datamon_cmd() {
     # split string according to shell parsing, remove quotes
     # http://zsh.sourceforge.net/Doc/Release/Expansion.html#Parameter-Expansion-Flags
     params=(${(Q)${(z)params_param}})
+    print -- 'inbound run_datamon_cmd datamon binary params'
+    print -- '===='
+    print -l -- $params
+    print -- '===='
+
+    params=($params --context 'datamon-sidecar-test')
+    print -- 'running datamon with params'
+    print -- '===='
+    print -l -- $params
+    print -- '===='
+
     datamon $params
     return $?
 }
-
-dbg_print() {
-    typeset dbg=true
-    if $dbg; then
-        print -- $*
-    fi
-}
-
-dbg_print "have zsh version $ZSH_VERSION"
 
 if [[ -n $CONFIG_CMD ]]; then
     run_datamon_cmd "$CONFIG_CMD"
@@ -164,8 +178,13 @@ fi
 echo "starting ${#MOUNT_CMDS} mounts '$MOUNT_CMDS'"
 
 # in some kubernetes distros like docker-desktop, /dev/fuse has perms 660 rather than 666
-echo "setting privs on fuse device"
-sudo chgrp developers /dev/fuse
+dbg_print "setting privs on fuse device"
+if [[ -e /dev/fuse ]]; then
+    sudo chgrp developers /dev/fuse
+else
+    1>&2 print -- "didn't find fuse device, /dev/fuse"
+    exit 1
+fi
 
 typeset -a mount_points
 typeset -i mount_idx

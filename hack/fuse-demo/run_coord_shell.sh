@@ -1,5 +1,19 @@
 #! /bin/zsh
 
+setopt ERR_EXIT
+
+dbg_print() {
+    local COL_GREEN
+    local COL_RESET
+    COL_YELLOW=$(tput -Txterm setaf 3)
+    COL_RESET=$(tput -Txterm sgr0)
+    echo ${COL_YELLOW}
+    print -- $1
+    echo ${COL_RESET}
+}
+
+
+
 container_name=demo-app
 
 while getopts s opt; do
@@ -23,6 +37,11 @@ if [[ -z $pod_name ]]; then
 	exit 1
 fi
 
+# todo: pass $RES_DEF as an optional parameter and
+#   use shell yaml query tool to get container names,
+#   and log $RES_DEF where <unspecified>
+dbg_print 'starting "'"$container_name"'" from <unspecified> yaml'
+
 kubectl exec -it "$pod_name" \
         -c "$container_name" \
-        -- "/bin/bash"
+        -- "/bin/zsh"

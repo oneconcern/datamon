@@ -60,6 +60,8 @@ func init() {
 
 	requiredFlags = append(requiredFlags, addLabelNameFlag(GetLabelCommand))
 
+	addContextFlag(GetLabelCommand)
+
 	for _, flag := range requiredFlags {
 		err := GetLabelCommand.MarkFlagRequired(flag)
 		if err != nil {

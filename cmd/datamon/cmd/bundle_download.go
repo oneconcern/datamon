@@ -96,6 +96,8 @@ func init() {
 
 	addNameFilterFlag(BundleDownloadCmd)
 
+	addContextFlag(BundleDownloadCmd)
+
 	for _, flag := range requiredFlags {
 		err := BundleDownloadCmd.MarkFlagRequired(flag)
 		if err != nil {
