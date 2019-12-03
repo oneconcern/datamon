@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -98,4 +99,26 @@ func CreateContext(ctx context.Context, configStore storage.Store, context model
 		return fmt.Errorf("failed to write context %v: %v", context, err)
 	}
 	return nil
+}
+
+// GetContext downloads and unmarshals a context
+func GetContext(ctx context.Context, configStore storage.Store, contextName string,
+) (context *model.Context, err error) {
+	rdr, err := configStore.Get(ctx, model.GetPathToContext(contextName))
+	if err != nil {
+		return context, err
+	}
+	bytes, err := ioutil.ReadAll(rdr)
+	if err != nil {
+		return
+	}
+	context, err = model.UnmarshalContext(bytes)
+	if err != nil {
+		return
+	}
+	err = model.ValidateContext(*context)
+	if err != nil {
+		return
+	}
+	return context, nil
 }

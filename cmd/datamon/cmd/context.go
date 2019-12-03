@@ -5,7 +5,11 @@
 
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"text/template"
+
+	"github.com/spf13/cobra"
+)
 
 var ContextCmd = &cobra.Command{
 	Use:        "context",
@@ -19,6 +23,13 @@ var ContextCmd = &cobra.Command{
 	},
 }
 
+var contextTemplate *template.Template
+
 func init() {
 	rootCmd.AddCommand(ContextCmd)
+
+	contextTemplate = func() *template.Template {
+		const listLineTemplateString = `{{.Version}} , {{.Name}} , {{.WAL}} , {{.ReadLog}} , {{.Blob}} , {{.Metadata}} , {{.VMetadata}}`
+		return template.Must(template.New("list line").Parse(listLineTemplateString))
+	}()
 }
