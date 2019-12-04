@@ -73,7 +73,7 @@ build-datamon-binaries:
 build-and-push-fuse-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-sidecar
 build-and-push-fuse-sidecar: export DOCKERFILE=sidecar.Dockerfile
 build-and-push-fuse-sidecar: export BUILD_ARGS=
-build-and-push-fuse-sidecar: export RELEASE_TAG_LATEST=$(shell ./hack/release_tag.sh -l)
+build-and-push-fuse-sidecar: export RELEASE_TAG_LATEST=$(shell go run ./hack/release_tag.go -l)
 build-and-push-fuse-sidecar: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
 build-and-push-fuse-sidecar: build-datamon-binaries
 	$(MAKE) build-target

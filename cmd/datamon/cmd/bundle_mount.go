@@ -159,6 +159,9 @@ func init() {
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	addDataPathFlag(mountBundleCmd)
+
+	addContextFlag(mountBundleCmd)
+
 	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
 
 	for _, flag := range requiredFlags {
