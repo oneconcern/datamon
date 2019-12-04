@@ -247,8 +247,6 @@ workflows:
             - build_images
           filters:
             branches:
-              only:
-                - master
-                - v[0-9].*/
+              ignore: /.*/
             tags:
               only: /(^[^v].*)/
