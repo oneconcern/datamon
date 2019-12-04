@@ -1,0 +1,104 @@
+project_name: datamon
+before:
+  hooks:
+    - go mod download
+
+env:
+  - IMPORT_PATH=github.com/oneconcern/datamon/cmd/datamon/cmd
+  - CGO_ENABLED=0
+
+builds:
+  - id: datamon
+    env: []
+    main: ./cmd/datamon/main.go
+    binary: datamon
+    ldflags:
+      - '-s'
+      - '-w'
+      # TODO(frederic): for alpine static builds:
+      #- '-linkmode external'
+      #- '-extldflags \"-static\"'
+      - '-X "{{.Env.IMPORT_PATH}}.Version={{.Version}}"'
+      - '-X "{{.Env.IMPORT_PATH}}.BuildDate={{.Date}}"'
+      - '-X "{{.Env.IMPORT_PATH}}.GitCommit={{.ShortCommit}}"'
+    goos: [ linux, darwin ]
+    goarch: [ amd64 ]
+    hooks:
+      post: ./hack/releaser/post-build.sh datamon
+
+  - id: migrate
+    env: []
+    main: ./cmd/backup2blobs/main.go
+    binary: migrate
+    goos: [ linux ]
+    goarch: [ amd64 ]
+    hooks:
+      post: ./hack/releaser/post-build.sh migrate
+
+  - id: datamon_metrics
+    env: []
+    main: ./cmd/metrics/main.go
+    binary: datamon_metrics
+    goos: [ linux ]
+    goarch: [ amd64 ]
+    hooks:
+      post: ./hack/releaser/post-build.sh datamon_metrics
+
+archives:
+  - id: tools-release
+    builds:
+      - migrate
+      - datamon_metrics
+    name_template: '{{ .ProjectName }}_tools_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    format: 'tar.gz'
+    # TODO(frederic): add release notes/changelog when we have one
+    files:
+      - LICENSE
+
+  - id: datamon-release
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    builds:
+      - datamon
+    format: 'tar.gz'
+    files:
+      - LICENSE
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-{{ .ShortCommit }}-snapshot"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    #- '^Merge:'
+    - '^typo'
+    - '^docs:'
+    - '^test:'
+
+release:
+  github:
+    owner: oneconcern
+    name: datamon
+
+brews:
+  - name: datamon
+    ids:
+      - datamon-release
+    github:
+      owner: oneconcern
+      name: homebrew-datamon
+    commit_author:
+      name: onecrobot
+      email: onecrobot@oneconcern.com
+    homepage: "https://github.com/oneconcern/datamon"
+    description: "A datascience tool to work with data at rest"
+    install: |
+      bin.install "datamon"
+    test: |
+      # TODO(frederic): this hack will no longer be necessary when we remove this
+      # global env requirement for command "version".
+      ENV["DATAMON_GLOBAL_CONFIG"] = "x"
+      system "#{bin}/datamon", "version"

@@ -15,40 +15,33 @@ ARG version
 ARG commit
 ARG dirty
 
-ENV VERSION_IMPORT_PATH ${version_import_path}
-ENV VERSION ${version}
+ENV IMPORT_PATH ${version_import_path:-"github.com/oneconcern/datamon/cmd/datamon/cmd."}
+ENV VERSION ${version:-"dev"}
 ENV GIT_COMMIT ${commit}
 ENV GIT_DIRTY ${dirty}
 
 ADD . /datamon
 WORKDIR /datamon
 
-RUN go mod download && \
-    go get -u github.com/gobuffalo/packr/v2/packr2 && \
-    (cd ./pkg/web && packr2)
+RUN go get -u github.com/gobuffalo/packr/v2/packr2 && \
+    go get -u github.com/mitchellh/gox && \
+    (cd ./pkg/web && packr2) && \
+    go mod download
 
 # .{os} extension binaries are those distributed via github releases
-RUN LDFLAGS='-s -w -linkmode external -extldflags "-static"' && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}Version=${VERSION}'" && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}BuildDate=$(date -u -R)'" && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}GitCommit=${GIT_COMMIT}'" && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}GitState=${GIT_DIRTY}'" && \
-  go build -o /stage/usr/bin/datamon.linux --ldflags "$LDFLAGS" ./cmd/datamon
+ENV LDFLAGS "-s -w -X '${IMPORT_PATH}Version=${VERSION}' -X '${IMPORT_PATH}GitCommit=${GIT_COMMIT}'"
+ENV TARGET "/stage/usr/bin"
+RUN LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
+    gox -os "linux darwin" -arch "amd64" -output "${TARGET}/{{.Dir}}_{{.OS}}_{{.Arch}}" -ldflags "$LDFLAGS" ./cmd/datamon
+RUN LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
+    gox -os "linux"        -arch "amd64" -output "${TARGET}/migrate_{{.OS}}_{{.Arch}}"  -ldflags "$LDFLAGS" ./cmd/backup2blobs
+RUN LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
+    gox -os "linux"        -arch "amd64" -output "${TARGET}/datamon_{{.Dir}}_{{.OS}}_{{.Arch}}" -ldflags "$LDFLAGS" ./cmd/metrics
 
-RUN LDFLAGS='-s -w -linkmode internal' && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}Version=${VERSION}'" && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}BuildDate=$(date -u -R)'" && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}GitCommit=${GIT_COMMIT}'" && \
-  LDFLAGS="$LDFLAGS -X '${VERSION_IMPORT_PATH}GitState=${GIT_DIRTY}'" && \
-  CGO_ENABLED=0 GOOS=darwin GOHOSTOS=linux go build -o /stage/usr/bin/datamon.mac --ldflags "$LDFLAGS" ./cmd/datamon
-
-# additional binaries are provided for building distributable docker images
-RUN cp /stage/usr/bin/datamon.linux /stage/usr/bin/datamon && \
-    upx /stage/usr/bin/datamon && \
-    md5sum /stage/usr/bin/datamon
-
-RUN go build -o /stage/usr/bin/migrate --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/backup2blobs && \
-    upx /stage/usr/bin/migrate && md5sum /stage/usr/bin/migrate
-
-RUN go build -o /stage/usr/bin/datamon_metrics --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/metrics &&\
-    upx /stage/usr/bin/datamon_metrics && md5sum /stage/usr/bin/datamon_metrics
+# compatibility with previous released artifacts
+RUN if [ -f ${TARGET}/datamon_darwin_amd64 ] ; then  cp ${TARGET}/datamon_darwin_amd64 ${TARGET}/datamon.mac ;fi && \
+    if [ -f ${TARGET}/datamon_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon.linux ;fi && \
+    if [ -f ${TARGET}/datamon_metrics_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon_metrics ;fi && \
+    cd ${TARGET};for bin in `ls -1` ; do upx ${bin} && md5sum ${bin} >> ${bin}.md5 && sha256sum ${bin} > ${bin}.sha256 ; done && \
+    if [ -f ${TARGET}/datamon_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon ;fi && \
+    if [ -f ${TARGET}/migrate_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/migrate ;fi

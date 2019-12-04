@@ -1,4 +1,5 @@
 [![CircleCI](https://circleci.com/gh/oneconcern/datamon/tree/master.svg?style=svg&circle-token=e827ee1509892d8ba85db2a819b692ca451a7a97)](https://circleci.com/gh/oneconcern/datamon/tree/master)
+[![GitHub release](https://img.shields.io/github/v/release/oneconcern/datamon)](https://github.com/oneconcern/datamon/releases/latest)
 [![license](https://img.shields.io/badge/license-MIT-green)](https://raw.githubusercontent.com/oneconcern/datamon/master/LICENSE)
 [![GoDoc](https://godoc.org/github.com/oneconcern/datamon?status.svg)](http://godoc.org/github.com/oneconcern/datamon)
 

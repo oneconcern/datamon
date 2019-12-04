@@ -67,7 +67,6 @@ build-datamon-binaries:
 	$(MAKE) build-target \
 		BUILD_TARGET=datamon-binaries \
 		DOCKERFILE=binaries.Dockerfile BUILD_ARGS="--pull $(VERSION_ARGS)" TAGS=""
-	@./hack/release_from_docker_build.sh
 
 .PHONY: build-and-push-fuse-sidecar
 ## build FUSE sidecar container used in Argo workflows
@@ -290,3 +289,15 @@ pg-demo-coord-build-app: export TAGS=latest
 pg-demo-coord-build-app:
 	$(MAKE) build-target
 	$(MAKE) push-target
+
+.PHONY: release
+## Cut a new release. Example: make release TAG=v1.0.6
+release:
+	@if [[ -z "$(TAG)" ]] ; then echo "Must have arg: TAG=vX.Y.Z" && exit 1 ;fi
+	@git tag -a -m "datamon release ${TAG}" ${TAG}
+	git push origin ${TAG}
+#
+# NOTES:
+# * atm git tags are not signed
+# TODO:
+# * [ ] bind this with git-chglog or similar

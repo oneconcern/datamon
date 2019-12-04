@@ -52,12 +52,14 @@ type flagsT struct {
 		credFile string
 		logLevel string
 		cpuProf  bool
+		upgrade  bool
 	}
 	core struct {
 		Config            string
 		ConcurrencyFactor int
 		BatchSize         int
 	}
+	upgrade upgradeFlags
 }
 
 var datamonFlags = flagsT{}
@@ -247,6 +249,25 @@ func addCPUProfFlag(cmd *cobra.Command) string {
 	c := "cpuprof"
 	cmd.Flags().BoolVar(&datamonFlags.root.cpuProf, c, false, "Toggle runtime profiling")
 	return c
+}
+
+func addUpgradeCheckOnlyFlag(cmd *cobra.Command) string {
+	c := "check-version"
+	cmd.Flags().BoolVar(&datamonFlags.upgrade.checkOnly, c, false, "Checks if a new version is available but does not upgrade")
+	return c
+}
+
+func addUpgradeForceFlag(cmd *cobra.Command) string {
+	c := "force"
+	cmd.Flags().BoolVar(&datamonFlags.upgrade.forceUgrade, c, false, "Forces upgrade even if the current version is not a released version")
+	return c
+}
+
+const upgradeFlag = "upgrade"
+
+func addUpgradeFlag(cmd *cobra.Command) string {
+	cmd.PersistentFlags().BoolVar(&datamonFlags.root.upgrade, upgradeFlag, false, "Upgrades the current version then carries on with the specified command")
+	return upgradeFlag
 }
 
 /** parameters struct to other formats */
