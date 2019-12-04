@@ -17,6 +17,7 @@ datamon bundle mount [flags]
 ```
       --bundle string            The hash id for the bundle, if not specified the latest bundle will be used
       --concurrency-factor int   Heuristic on the amount of concurrency used by various operations.  Turn this value down to use less memory, increase for faster operations. (default 100)
+      --context string           Set the context for datamon (default "dev")
       --cpuprof                  Toggle runtime profiling
       --daemonize                Whether to run the command as a daemonized process
       --destination string       The path to the download dir
@@ -26,6 +27,12 @@ datamon bundle mount [flags]
       --mount string             The path to the mount dir
       --repo string              The name of this repository
       --stream                   Stream in the FS view of the bundle, do not download all files. Default to true. (default true)
+```
+
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

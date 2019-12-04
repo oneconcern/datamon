@@ -30,6 +30,12 @@ Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR
       --repo string     The name of this repository
 ```
 
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
+```
+
 ### SEE ALSO
 
 * [datamon label](datamon_label.md)	 - Commands to manage labels for a repo

@@ -21,6 +21,12 @@ datamon repo get [flags]
       --repo string   The name of this repository
 ```
 
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
+```
+
 ### SEE ALSO
 
 * [datamon repo](datamon_repo.md)	 - Commands to manage repos

@@ -23,6 +23,12 @@ datamon bundle update [flags]
       --repo string              The name of this repository
 ```
 
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
+```
+
 ### SEE ALSO
 
 * [datamon bundle](datamon_bundle.md)	 - Commands to manage bundles for a repo

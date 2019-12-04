@@ -20,6 +20,12 @@ They are versioned and managed via bundles.
   -h, --help   help for repo
 ```
 
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
+```
+
 ### SEE ALSO
 
 * [datamon](datamon.md)	 - Datamon helps building ML pipelines

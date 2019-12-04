@@ -31,6 +31,12 @@ datamon bundle list files [flags]
       --repo string     The name of this repository
 ```
 
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
+```
+
 ### SEE ALSO
 
 * [datamon bundle list](datamon_bundle_list.md)	 - List bundles

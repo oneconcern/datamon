@@ -26,9 +26,16 @@ datamon repo create [flags]
 ### Options
 
 ```
+      --context string       Set the context for datamon (default "dev")
       --description string   The description for the repo
   -h, --help                 help for create
       --repo string          The name of this repository
+```
+
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

@@ -33,11 +33,18 @@ datamon bundle download [flags]
 ```
       --bundle string            The hash id for the bundle, if not specified the latest bundle will be used
       --concurrency-factor int   Heuristic on the amount of concurrency used by various operations.  Turn this value down to use less memory, increase for faster operations. (default 100)
+      --context string           Set the context for datamon (default "dev")
       --destination string       The path to the download dir
   -h, --help                     help for download
       --label string             The human-readable name of a label
       --name-filter string       A regular expression (RE2) to match names of bundle entries.
       --repo string              The name of this repository
+```
+
+### Options inherited from parent commands
+
+```
+      --upgrade   Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO
