@@ -39,12 +39,9 @@ type FUSEParams struct {
 	Globals struct {
 		SleepInsteadOfExit bool   `json:"sleepInsteadOfExit" yaml:"sleepInsteadOfExit"`
 		CoordPoint         string `json:"coordPoint" yaml:"coordPoint"`
-		Contributor        struct {
-			Name  string `json:"name" yaml:"name"`
-			Email string `json:"email" yaml:"email"`
-			_     struct{}
-		} `json:"contributor" yaml:"contributor"`
-		_ struct{}
+		ConfigBucketName   string `json:"configBucketName" yaml:"configBucketName"`
+		ContextName        string `json:"contextName" yaml:"contextName"`
+		_                  struct{}
 	} `json:"globalOpts" yaml:"globalOpts"`
 	Bundles []fuseParamsBundleParams `json:"bundles" yaml:"bundles"`
 	_       struct{}
@@ -155,10 +152,15 @@ func FUSECoordPoint(coordPoint string) FUSEParamsOption {
 	}
 }
 
-func FUSEContributor(name string, email string) FUSEParamsOption {
+func FUSEConfigBucketName(configBucketName string) FUSEParamsOption {
 	return func(fuseParams *FUSEParams) {
-		fuseParams.Globals.Contributor.Name = name
-		fuseParams.Globals.Contributor.Email = email
+		fuseParams.Globals.ConfigBucketName = configBucketName
+	}
+}
+
+func FUSEContextName(contextName string) FUSEParamsOption {
+	return func(fuseParams *FUSEParams) {
+		fuseParams.Globals.ContextName = contextName
 	}
 }
 
