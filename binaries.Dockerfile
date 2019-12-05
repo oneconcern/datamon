@@ -31,11 +31,13 @@ RUN go get -u github.com/gobuffalo/packr/v2/packr2 && \
 # .{os} extension binaries are those distributed via github releases
 ENV LDFLAGS "-s -w -X '${IMPORT_PATH}Version=${VERSION}' -X '${IMPORT_PATH}GitCommit=${GIT_COMMIT}'"
 ENV TARGET "/stage/usr/bin"
-RUN LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
+
+# Ref: https://github.com/mitchellh/gox/issues/55 for CGO_ENABLED=0
+RUN CGO_ENABLED=0 LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
     gox -os "linux darwin" -arch "amd64" -output "${TARGET}/{{.Dir}}_{{.OS}}_{{.Arch}}" -ldflags "$LDFLAGS" ./cmd/datamon
-RUN LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
+RUN CGO_ENABLED=0 LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
     gox -os "linux"        -arch "amd64" -output "${TARGET}/migrate_{{.OS}}_{{.Arch}}"  -ldflags "$LDFLAGS" ./cmd/backup2blobs
-RUN LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
+RUN CGO_ENABLED=0 LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
     gox -os "linux"        -arch "amd64" -output "${TARGET}/datamon_{{.Dir}}_{{.OS}}_{{.Arch}}" -ldflags "$LDFLAGS" ./cmd/metrics
 
 # compatibility with previous released artifacts

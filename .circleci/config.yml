@@ -40,6 +40,15 @@ commands:
             sudo apt-get update -y --quiet
             sudo apt-get install -y --quiet git build-essential google-cloud-sdk shellcheck zsh
 
+  install_kubectl:
+    steps:
+      - run:
+          name: Install prerequisites to drive kubernetes from ci job
+          command: |
+            sudo apt-get update -y --quiet
+            sudo apt-get install --quiet kubectl
+            gcloud container clusters get-credentials onec-dev
+
   install_tools:
     steps:
       - run:
@@ -124,6 +133,32 @@ jobs:
           destination: raw-test-output
       - store_test_results:
           path: /tmp/test-results
+
+  fuse_sidecar_test:
+    executor: docker_builder
+    environment:
+      GOOGLE_PROJECT_ID: "onec-co"
+      GOOGLE_COMPUTE_ZONE: us-west2-c
+    steps:
+      - setup_remote_docker:
+          version: 18.09.3
+      - install_base
+      - checkout
+      - restore_cache:
+          keys:
+            - pkg-cache-{{ checksum "go.sum" }}
+            - pkg-cache-
+      - login_to_google
+      - install_kubectl
+      - run:
+          name: Run fuse sidecar demo
+          command: |
+            make build-datamon-local
+            mkdir -p ~/extra
+            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
+            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
+            DATAMON_GLOBAL_CONFIG=datamon-config-test-sdjfhga ./cmd/datamon/datamon config create
+            hack/fuse-demo/demo_coord.sh -b
 
   build_images:
     executor: docker_builder
@@ -225,6 +260,9 @@ workflows:
          context: "OC Common"
 
       - go_test:
+          context: "OC Common"
+
+      - fuse_sidecar_test:
           context: "OC Common"
 
       - build_images:

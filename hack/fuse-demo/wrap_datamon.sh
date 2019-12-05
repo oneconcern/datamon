@@ -23,9 +23,12 @@ typeset COORD_POINT
 typeset -a DATAMON_CMDS
 typeset BUNDLE_ID_FILE
 
+typeset CONTEXT_BUCKET_NAME
+typeset CONTEXT_NAME
+
 SLEEP_INSTEAD_OF_EXIT=
 
-while getopts sc:d:i: opt; do
+while getopts b:a:sc:d:i: opt; do
     case $opt in
         (s)
             SLEEP_INSTEAD_OF_EXIT=true
@@ -40,6 +43,12 @@ while getopts sc:d:i: opt; do
             ;;
         (i)
             BUNDLE_ID_FILE="$OPTARG"
+            ;;
+        (b)
+            CONTEXT_BUCKET_NAME="$OPTARG"
+            ;;
+        (a)
+            CONTEXT_NAME="$OPTARG"
             ;;
         (\?)
             echo "Bad option, aborting."
@@ -57,6 +66,14 @@ if [[ $#DATAMON_CMDS -eq 0 ]]; then
 fi
 if [[ -z $COORD_POINT ]]; then
     echo "coordination point not set" 1>&2
+    exit 1
+fi
+if [[ -z $CONTEXT_BUCKET_NAME ]]; then
+    echo "context bucket not set" 1>&2
+    exit 1
+fi
+if [[ -z $CONTEXT_NAME ]]; then
+    echo "context bucket not set" 1>&2
     exit 1
 fi
 
@@ -144,7 +161,7 @@ emit_event() {
 
 dbg_print "have zsh version $ZSH_VERSION"
 # todo: review use of this env variable in golang binary
-export DATAMON_GLOBAL_CONFIG='datamon-config-test-sdjfhga'
+export DATAMON_GLOBAL_CONFIG=$CONTEXT_BUCKET_NAME
 dbg_print "set DATAMON_GLOBAL_CONFIG to '${DATAMON_GLOBAL_CONFIG}' for datamon binary"
 
 run_datamon_cmd() {
@@ -160,7 +177,7 @@ run_datamon_cmd() {
     print -l -- $params
     print -- '===='
 
-    params=($params --context 'datamon-sidecar-test')
+    params=($params --context $CONTEXT_NAME)
     print -- 'running datamon with params'
     print -- '===='
     print -l -- $params
@@ -169,6 +186,18 @@ run_datamon_cmd() {
     datamon $params
     return $?
 }
+
+unsetopt ERR_EXIT
+run_datamon_cmd 'context get'
+datamon_status=$?
+setopt ERR_EXIT
+if [[ $datamon_status -eq 2 ]]; then
+    1>&2 print -- "didn't find $CONTEXT_NAME in bucket $CONTEXT_BUCKET_NAME"
+    exit 1
+fi
+if [[ ! $datamon_status -eq 0 ]]; then
+    1>&2 print -- "context get failed for unknown reason"
+fi
 
 if [[ -n $CONFIG_CMD ]]; then
     run_datamon_cmd "$CONFIG_CMD"
