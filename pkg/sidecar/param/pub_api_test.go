@@ -28,7 +28,7 @@ func createFUSEParams(t *testing.T) (fuseParams FUSEParams) {
 	require.NoError(t, err, "add source bundle")
 	err = fuseParams.AddBundle(
 		BDName("dest"),
-		BDDest("ransom-datamon-test-repo", "result of container coordination demo"),
+		BDDest("ransom-datamon-test-repo", "result of container coordination demo", "/tmp/upload"),
 		BDDestLabel("coordemo"),
 		BDDestBundleIDFile("/tmp/bundleid.txt"),
 	)
@@ -62,7 +62,7 @@ bundles:
   srcRepo: ""
   srcLabel: ""
   srcBundle: ""
-  destPath: ""
+  destPath: /tmp/upload
   destRepo: ransom-datamon-test-repo
   destMessage: result of container coordination demo
   destLabel: coordemo

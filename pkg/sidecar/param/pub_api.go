@@ -200,10 +200,11 @@ func BDSrcByBundleID(path string, repo string, bundle string) FUSEParamsBDOption
 	}
 }
 
-func BDDest(repo string, msg string) FUSEParamsBDOption {
+func BDDest(repo string, msg string, path string) FUSEParamsBDOption {
 	return func(bdParams *fuseParamsBundleParams) {
 		bdParams.DestRepo = repo
 		bdParams.DestMessage = msg
+		bdParams.DestPath = path
 	}
 }
 

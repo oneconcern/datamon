@@ -49,7 +49,7 @@ require (
 	golang.org/x/crypto v0.0.0-20191205180655-e7c4368fe9dd // indirect
 	golang.org/x/sys v0.0.0-20191204072324-ce4227a45e2e
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20191205183834-61fa4dffed09 // indirect
+	golang.org/x/tools v0.0.0-20191205205310-69111344d4a5 // indirect
 	google.golang.org/api v0.2.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.2.4

@@ -197,12 +197,12 @@ runtests: mocks
 .PHONY: gofmt
 ## Run gofmt on the cmd and pkg packages
 gofmt:
-	@gofmt -s -w ./cmd ./pkg ./internal
+	@gofmt -s -w ./cmd ./pkg ./internal ./hack/fuse-demo
 
 .PHONY: goimports
 ## Run goimports on the cmd and pkg packages
 goimports:
-	@goimports -w ./cmd ./pkg
+	@goimports -w ./cmd ./pkg ./hack/fuse-demo
 
 .PHONY: check
 ## Runs static code analysis checks (golangci-lint)
@@ -276,7 +276,9 @@ fuse-demo-coord-build-datamon: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-de
 fuse-demo-coord-build-datamon: export DOCKERFILE=hack/fuse-demo/coord-datamon.Dockerfile
 fuse-demo-coord-build-datamon: export BUILD_ARGS=
 fuse-demo-coord-build-datamon: export TAGS=latest
+fuse-demo-coord-build-datamon: export SERIALIZED_INPUT_FILE=hack/fuse-demo/gen/fuse-params.yaml
 fuse-demo-coord-build-datamon:
+	@go run hack/fuse-demo/write_fuse_params.go
 	$(MAKE) build-target
 	$(MAKE) push-target
 
