@@ -5,39 +5,13 @@
 A datamon repository is analogous to a git repo. A repo is a dataset that has a unified lifecycle.
 A particular version of the files in a repo is called a [`bundle`](#bundle).
 
-```
-Usage:
-  datamon repo [command]
-
-Available Commands:
-  create      Create a named repo
-  get         Get repo info by name
-  list        List repos
-
-Flags:
-  -h, --help   help for repo
-```
+See [usage](usage/datamon_repo.md)
 
 ## Bundle 
 
 A bundle is a point in time read-only view of a repo, composed of individual files. This is analogous to a commit in git.
 
-```
-Usage:
-  datamon bundle [command]
-
-Available Commands:
-  diff        Diff a downloaded bundle with a remote bundle.
-  download    Download a bundle
-  get         Get bundle info by id
-  list        List bundles
-  mount       Mount a bundle
-  update      Update a downloaded bundle with a remote bundle.
-  upload      Upload a bundle
-
-Flags:
-  -h, --help   help for bundle
-```
+See [usage](usage/datamon_bundle.md)
 
 Bundle metadata can be _downloaded_ (e.g. contributors), bundle blob content can be _mounted_ on a host mount path.
 
@@ -54,30 +28,13 @@ A name given to a bundle, analogous to tags in git. Examples: Latest, production
 
 > NOTE: at this moment, tags a simple strings and cannot be annotated or signed like git tags.
 
-```
-Usage:
-  datamon label [command]
-
-Available Commands:
-  get         Get bundle info by label
-  list        List labels
-  set         Set labels
-
-Flags:
-  -h, --help   help for label
-```
+See [usage](usage/datamon_label.md)
 
 ## Context
 
 A [context](context.md) provides a way to define multiple instances of datamon.
 
-```
-Usage:
-  datamon context [command]
-
-Available Commands:
-  create      Create a context
-```
+See [usage](usage/datamon_context.md)
 
 ## Write Ahead Log
 

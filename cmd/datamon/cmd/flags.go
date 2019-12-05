@@ -54,6 +54,9 @@ type flagsT struct {
 		cpuProf  bool
 		upgrade  bool
 	}
+	doc struct {
+		docTarget string
+	}
 	core struct {
 		Config            string
 		ConcurrencyFactor int
@@ -163,7 +166,7 @@ func addContextFlag(cmd *cobra.Command) string {
 
 func addConfigFlag(cmd *cobra.Command) string {
 	config := "config"
-	cmd.Flags().StringVar(&datamonFlags.core.Config, config, "", "Set the config to use")
+	cmd.Flags().StringVar(&datamonFlags.core.Config, config, "", "Set the config backend store to use")
 	return config
 }
 
@@ -268,6 +271,12 @@ const upgradeFlag = "upgrade"
 func addUpgradeFlag(cmd *cobra.Command) string {
 	cmd.PersistentFlags().BoolVar(&datamonFlags.root.upgrade, upgradeFlag, false, "Upgrades the current version then carries on with the specified command")
 	return upgradeFlag
+}
+
+func addTargetFlag(cmd *cobra.Command) string {
+	c := "target-dir"
+	cmd.Flags().StringVar(&datamonFlags.doc.docTarget, c, ".", "The target directory where to generate the markdown documentation")
+	return c
 }
 
 /** parameters struct to other formats */

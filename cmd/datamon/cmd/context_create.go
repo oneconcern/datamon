@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ContextCreateCommand is a command to create a datamon context
 var ContextCreateCommand = &cobra.Command{
 	Use:   "create",
 	Short: "Create a context",

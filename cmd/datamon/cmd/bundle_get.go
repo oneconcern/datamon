@@ -12,11 +12,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// GetBundleCommand retrieves the metadata for a bundle
 var GetBundleCommand = &cobra.Command{
 	Use:   "get",
-	Short: "Get bundle info by id",
-	Long: `Performs a direct lookup of labels by id.
-Prints corresponding bundle information if the label exists,
+	Short: "Get bundle info",
+	Long: `Performs a direct lookup of a bundle.
+
+Prints corresponding bundle metadata if the bundle exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()

@@ -8,10 +8,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// SetLabelCommand is a command to set a label on a bundle
 var SetLabelCommand = &cobra.Command{
 	Use:   "set",
 	Short: "Set labels",
-	Long:  "Set the label corresponding to a bundle",
+	Long: `Set the label corresponding to a bundle.
+
+Setting a label is analogous to the git command "git tag {label}".`,
+	Example: `% datamon label set --repo ritesh-test-repo --label anotherlabel --bundle 1ISwIzeAR6m3aOVltAsj1kfQaml
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 

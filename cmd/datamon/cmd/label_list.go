@@ -25,7 +25,11 @@ func applyLabelTemplate(label model.LabelDescriptor) error {
 var LabelListCommand = &cobra.Command{
 	Use:   "list",
 	Short: "List labels",
-	Long:  "List the labels in a repo",
+	Long: `List the labels in a repo.
+
+This is analogous to the "git tag --list" command.`,
+	Example: `% datamon label list --repo ritesh-test-repo
+init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 

@@ -14,7 +14,10 @@ var repoCmd = &cobra.Command{
 	Short: "Commands to manage repos",
 	Long: `Commands to manage repos.
 
-Repos are datasets that are versioned and managed via bundles.
+A datamon repository is analogous to a git repository.
+
+Repos are datasets with a unified lifecycle.
+They are versioned and managed via bundles.
 `,
 	PreRun: func(cmd *cobra.Command, args []string) {
 		config.populateRemoteConfig(&datamonFlags)

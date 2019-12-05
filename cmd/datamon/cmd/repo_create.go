@@ -14,8 +14,13 @@ import (
 var repoCreate = &cobra.Command{
 	Use:   "create",
 	Short: "Create a named repo",
-	Long: "Create a repo. Repo names must not contain special characters. " +
-		"Allowed characters Unicode characters, digits and hyphen. Example: dm-test-repo-1",
+	Long: `Creates a new datamon repository.
+
+Repo names must not contain special characters.
+Allowed characters Unicode characters, digits and hyphen.
+
+This is analogous to the "git init ..." command.`,
+	Example: `% datamon repo create  --description "Ritesh's repo for testing" --repo ritesh-datamon-test-repo`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		contributor, err := paramsToContributor(datamonFlags)

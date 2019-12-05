@@ -16,11 +16,24 @@ const (
 	filelistDownloadsByConcurrencyFactor = 10
 )
 
+// BundleDownloadCmd is a command to download a read-only view of the bundle data
 var BundleDownloadCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Download a bundle",
-	Long: "Download a readonly, non-interactive view of the entire data that is part of a bundle. If --bundle is not specified" +
-		" the latest bundle will be downloaded",
+	Long: `Download a read-only, non-interactive view of the entire data
+that is part of a bundle.
+
+If --bundle is not specified, the latest bundle (aka "commit") will be downloaded.
+
+This is analogous to the git command "git checkout {commit-ish}".`,
+	Example: `# Download a bundle by hash
+% datamon bundle download --repo ritesh-test-repo --destination /path/to/folder/to/download --bundle 1INzQ5TV4vAAfU2PbRFgPfnzEwR
+
+# Download a bundle by label
+% datamon bundle download --repo ritesh-test-repo --destination /path/to/folder/to/download --label init
+Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
+...
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)

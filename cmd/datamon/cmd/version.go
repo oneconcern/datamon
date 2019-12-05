@@ -57,7 +57,7 @@ func (v VersionInfo) String() string {
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "prints the version of this datamon",
+	Short: "prints the version of datamon",
 	Long: `Prints the version of datamon. It includes the following components:
 	* Semver (output of git describe --tags)
 	* Build Date (date at which the binary was built)

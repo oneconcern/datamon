@@ -16,7 +16,15 @@ const datamonDir = ".datamon2"
 var configGen = &cobra.Command{
 	Use:   "create",
 	Short: "Create a config",
-	Long:  "Create a config to use for datamon. Config file will be placed in $HOME/" + datamonDir + "/datamon.yaml",
+	Long: `Create a config to use for datamon to hold flags that do not
+change.
+
+The configuration file will be placed in $HOME/` + datamonDir + `/datamon.yaml`,
+	Example: `# Replace path to gcloud credential file. Use absolute path
+% datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json,
+
+# Replace path to gcloud credential file (use absolute path here)
+% datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		_, err := paramsToContributor(datamonFlags)
 		if err != nil {

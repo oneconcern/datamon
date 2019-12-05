@@ -38,7 +38,7 @@ Datamon supports the following cloud storage backends:
 - [**Context**](docs/concepts.md#context): a context provides a way to define multiple instances of datamon.
 - [**Write Ahead Log**](docs/concepts.md#write-ahead-log): a WAL track data updates and their ordering.
 - [**Read Log**](docs/concepts.md#read-log): logs all read operations, with their originator.
-- [**Authentication**](docss/usage.md#Authentication): datamon keeps track of who contributed what, when and in which order (WAL) and who accessed what (Read Log).
+- [**Authentication**](docs/auth.md): datamon keeps track of who contributed what, when and in which order (WAL) and who accessed what (Read Log).
 
 ## Installation
 
@@ -46,7 +46,7 @@ Please follow the [installation instructions](docs/install.md).
 
 ## CLI Guide
 
-Datamon comes as a CLI tool: see [usage](docs/usage.md).
+Datamon comes as a CLI tool: see [usage](docs/usage/datamon.md).
 
 ## Use cases
 
