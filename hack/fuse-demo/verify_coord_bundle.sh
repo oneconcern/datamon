@@ -25,7 +25,16 @@ start_timestamp=$(cat /tmp/datamon_fuse_demo_coord_start_timestamp)
 verify_datamon_timestamp() {
     timestamp="$1"
     timestamp_to_parse=$(echo "$timestamp" | sed 's/\.[^ ]*//g' | sed 's/ *[^ ]*$//')
-    epoch_timestamp=$(date -jf '%Y-%m-%d %H:%M:%S %z' "$timestamp_to_parse" '+%s')
+
+    print -- "timestamp_to_parse $timestamp_to_parse"
+
+    if [[ -z $GCLOUD_SERVICE_KEY ]]; then
+        # not in ci.  use freebsd date (default on os x).
+        epoch_timestamp=$(date -jf '%Y-%m-%d %H:%M:%S %z' "$timestamp_to_parse" '+%s')
+    else
+        # in ci.  use gnu date.
+        epoch_timestamp=$(date --date="$timestamp_to_parse" '+%s')
+    fi
     sec_from_start=$((${epoch_timestamp} - ${start_timestamp}))
     #
     dbg_print "timestamp ${timestamp}"
@@ -46,6 +55,10 @@ params_label_get=(--repo "$DATAMON_REPO" \
                          --label "$EXPECTED_LABEL" \
                          --context 'datamon-sidecar-test')
 
+dbg_print 'label get params'
+dbg_print '----'
+print -l -- $params_label_get
+dbg_print '----'
 dbg_print 'label get lines'
 "$DATAMON_EXEC" label get \
                 ${params_label_get}

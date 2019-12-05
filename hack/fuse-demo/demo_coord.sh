@@ -71,7 +71,10 @@ if [[ -z $k8s_ctx ]]; then
     print 'kubernetes context not set' 1>&2
     exit 1
 fi
-kubectx $k8s_ctx
+if [[ -z $GCLOUD_SERVICE_KEY ]]; then
+    # not in ci
+    kubectx $k8s_ctx
+fi
 
 ##
 
