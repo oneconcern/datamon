@@ -29,7 +29,6 @@ var LabelListCommand = &cobra.Command{
 
 This is analogous to the "git tag --list" command.`,
 	Example: `% datamon label list --repo ritesh-test-repo
-Using config file: /Users/ritesh/.datamon/datamon.yaml
 init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()

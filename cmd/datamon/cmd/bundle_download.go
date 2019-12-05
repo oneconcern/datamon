@@ -31,6 +31,8 @@ This is analogous to the git command "git checkout {commit-ish}".`,
 
 # Download a bundle by label
 % datamon bundle download --repo ritesh-test-repo --destination /path/to/folder/to/download --label init
+Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
+...
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()

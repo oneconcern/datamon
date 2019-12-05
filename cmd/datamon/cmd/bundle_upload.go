@@ -28,7 +28,10 @@ to the cloud backend storage.
 This is analogous to the "git commit" command. A message and a label may be set.
 `,
 	Example: `% datamon bundle upload --path /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo --label init
-Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR`,
+Uploading blob:0871e8f83bdefd710a7710de14decef2254ffed94ee537d72eef671fa82d72d10015b3758b0a8960c93899af265191b0108663c95ece8377bf89e741e14f2a53, bytes:1440
+Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR
+set label 'init'
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 

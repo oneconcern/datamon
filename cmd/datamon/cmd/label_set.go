@@ -16,7 +16,7 @@ var SetLabelCommand = &cobra.Command{
 
 Setting a label is analogous to the git command "git tag {label}".`,
 	Example: `% datamon label set --repo ritesh-test-repo --label anotherlabel --bundle 1ISwIzeAR6m3aOVltAsj1kfQaml
-Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR`,
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 
