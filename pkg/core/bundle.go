@@ -165,6 +165,7 @@ func Publish(ctx context.Context, bundle *Bundle) error {
 }
 
 // PublishSelectBundleEntries publish a selected list of entries from a bundle to a ConsumableStore, based on a predicate filter
+// TODO: the predicate func is actually ignored atm
 func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) error {
 	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
 }

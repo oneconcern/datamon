@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"sort"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -20,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
-	"gopkg.in/yaml.v2"
 )
 
 type labelFixture struct {
@@ -32,23 +28,20 @@ type labelFixture struct {
 	errorContains []string
 }
 
+var (
+	initLabelBatchFixture     sync.Once
+	labelBatchFixture         []string
+	expectedLabelBatchFixture model.LabelDescriptors
+	baseTime                  time.Time
+)
+
 func labelTestCases() []labelFixture {
 	return []labelFixture{
 		{
-			name:   happyPath,
-			repo:   "myRepo",
-			prefix: "myLab",
-			expected: model.LabelDescriptors{
-				{
-					Name:      "myLabel-test",
-					BundleID:  "bundle-myLabel-test",
-					Timestamp: testTime(),
-					Contributors: []model.Contributor{
-						{Email: "test1@example.com"},
-						{Email: "test2@example.com"},
-					},
-				},
-			},
+			name:     happyPath,
+			repo:     "myRepo",
+			prefix:   "myLab",
+			expected: model.LabelDescriptors{fakeLD("myLabel-test")},
 		},
 		{
 			name:     happyWithBatches,
@@ -58,24 +51,6 @@ func labelTestCases() []labelFixture {
 		},
 	}
 }
-
-func buildLabelYaml(id string) string {
-	label := model.LabelDescriptor{
-		Name:         id,
-		BundleID:     fmt.Sprintf("bundle-%s", id),
-		Timestamp:    testTime(),
-		Contributors: []model.Contributor{{Email: "test1@example.com"}, {Email: "test2@example.com"}},
-	}
-	asYaml, _ := yaml.Marshal(label)
-	return string(asYaml)
-}
-
-var (
-	initLabelBatchFixture     sync.Once
-	labelBatchFixture         []string
-	expectedLabelBatchFixture model.LabelDescriptors
-	baseTime                  time.Time
-)
 
 func init() {
 	baseTime = time.Now().Truncate(time.Hour).UTC() // avoid loss of time resolution through yaml marshalling
@@ -90,62 +65,41 @@ func buildLabelBatchFixture(t *testing.T) func() {
 		labelBatchFixture = make([]string, maxTestKeys)
 		expectedLabelBatchFixture = make(model.LabelDescriptors, maxTestKeys)
 		for i := 0; i < maxTestKeys; i++ {
-			labelBatchFixture[i] = fmt.Sprintf("labels/myRepo/myLabel-%0.3d/label.yaml", i)
-			expectedLabelBatchFixture[i] = model.LabelDescriptor{
-				Name:      fmt.Sprintf("myLabel-%0.3d", i),
-				BundleID:  fmt.Sprintf("bundle-myLabel-%0.3d", i),
-				Timestamp: testTime(),
-				Contributors: []model.Contributor{
-					{Email: "test1@example.com"},
-					{Email: "test2@example.com"},
-				},
-			}
+			labelBatchFixture[i] = fakeLabelPath("myRepo", fmt.Sprintf("myLabel-%0.3d", i))
+			expectedLabelBatchFixture[i] = fakeLD(fmt.Sprintf("myLabel-%0.3d", i))
 		}
 		require.Truef(t, sort.IsSorted(expectedBatchFixture), "got %v", expectedBatchFixture)
 	}
-}
-
-func extractID(path string) string {
-	cs := strings.SplitN(path, "/", 4)
-	return cs[2]
 }
 
 func mockedLabelStore(testcase string) storage.Store {
 	switch testcase {
 	case happyPath:
 		return &mockstorage.StoreMock{
-			HasFunc: func(_ context.Context, _ string) (bool, error) {
-				return true, nil
+			HasFunc: goodHasFunc,
+			KeysPrefixFunc: func(_ context.Context, _ string, _ string, _ string, _ int) ([]string, string, error) {
+				return []string{fakeLabelPath("myRepo", "myLabel-test")}, "", nil
 			},
-			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
-				return []string{"labels/myRepo/myLabel-test/label.yaml"}, "", nil
-			},
-			KeysFunc: func(_ context.Context) ([]string, error) {
-				return nil, nil
-			},
-			GetFunc: func(_ context.Context, pth string) (io.ReadCloser, error) {
-				extractID(pth)
-				return ioutil.NopCloser(strings.NewReader(buildLabelYaml(extractID(pth)))), nil
-			},
+			KeysFunc: goodKeysFunc,
+			GetFunc:  goodGetLabelFunc,
 		}
 	case happyWithBatches:
 		return &mockstorage.StoreMock{
-			HasFunc: func(_ context.Context, _ string) (bool, error) {
-				return true, nil
-			},
-			KeysPrefixFunc: func(_ context.Context, _ string, prefix string, delimiter string, count int) ([]string, string, error) {
+			HasFunc: goodHasFunc,
+			KeysPrefixFunc: func(_ context.Context, _ string, _ string, _ string, _ int) ([]string, string, error) {
 				return labelBatchFixture, "", nil
 			},
-			KeysFunc: func(_ context.Context) ([]string, error) {
-				return nil, nil
-			},
-			GetFunc: func(_ context.Context, pth string) (io.ReadCloser, error) {
-				return ioutil.NopCloser(strings.NewReader(buildLabelYaml(extractID(pth)))), nil
-			},
+			KeysFunc: goodKeysFunc,
+			GetFunc:  goodGetLabelFunc,
 		}
 	default:
 		return nil
 	}
+}
+
+func mockedLabelContextStores(scenario string) context2.Stores {
+	mockStore := mockedLabelStore(scenario)
+	return context2.NewStores(nil, nil, nil, mockStore, mockStore)
 }
 
 func testListLabels(t *testing.T, concurrency int, i int) {
@@ -155,21 +109,19 @@ func testListLabels(t *testing.T, concurrency int, i int) {
 		testcase := toPin
 
 		t.Run(fmt.Sprintf("ListLabels-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
-			//t.Parallel()
-			mockStore := mockedLabelStore(testcase.name)
-			stores := context2.NewStores(nil, nil, nil, mockStore, mockStore)
-			labels, err := ListLabels(testcase.repo, stores, testcase.prefix, ConcurrentList(concurrency), BatchSize(testBatchSize))
+			t.Parallel()
+			labels, err := ListLabels(testcase.repo, mockedLabelContextStores(testcase.name),
+				testcase.prefix, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertLabels(t, testcase, labels, err)
 		})
 		t.Run(fmt.Sprintf("ListLabelsApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
-			//t.Parallel()
-			mockStore := mockedLabelStore(testcase.name)
+			t.Parallel()
 			labels := make(model.LabelDescriptors, 0, typicalReposNum)
-			stores := context2.NewStores(nil, nil, nil, mockStore, mockStore)
-			err := ListLabelsApply(testcase.repo, stores, testcase.prefix, func(label model.LabelDescriptor) error {
-				labels = append(labels, label)
-				return nil
-			}, ConcurrentList(concurrency), BatchSize(testBatchSize))
+			err := ListLabelsApply(testcase.repo, mockedLabelContextStores(testcase.name),
+				testcase.prefix, func(label model.LabelDescriptor) error {
+					labels = append(labels, label)
+					return nil
+				}, ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertLabels(t, testcase, labels, err)
 		})
 	}
