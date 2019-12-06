@@ -17,7 +17,8 @@ They are versioned and managed via bundles.
 ### Options
 
 ```
-  -h, --help   help for repo
+      --context string   Set the context for datamon (default "dev")
+  -h, --help             help for repo
 ```
 
 ### Options inherited from parent commands

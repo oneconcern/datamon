@@ -17,7 +17,6 @@ datamon context create [flags]
 ```
       --blob string       The name of the bucket hosting the datamon blobs
       --config string     Set the config backend store to use
-      --context string    Set the context for datamon (default "dev")
   -h, --help              help for create
       --meta string       The name of the bucket used by datamon metadata
       --read-log string   The name of the bucket hosting the read log
@@ -28,7 +27,8 @@ datamon context create [flags]
 ### Options inherited from parent commands
 
 ```
-      --upgrade   Upgrades the current version then carries on with the specified command
+      --context string   Set the context for datamon (default "dev")
+      --upgrade          Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

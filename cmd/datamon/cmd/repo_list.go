@@ -48,9 +48,6 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 
 func init() {
 	addCoreConcurrencyFactorFlag(repoList, 500)
-
-	addContextFlag(repoList)
-
 	addBatchSizeFlag(repoList)
 	repoCmd.AddCommand(repoList)
 }

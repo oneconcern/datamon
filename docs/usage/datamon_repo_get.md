@@ -24,7 +24,8 @@ datamon repo get [flags]
 ### Options inherited from parent commands
 
 ```
-      --upgrade   Upgrades the current version then carries on with the specified command
+      --context string   Set the context for datamon (default "dev")
+      --upgrade          Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

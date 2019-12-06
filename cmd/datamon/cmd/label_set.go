@@ -67,18 +67,11 @@ Setting a label is analogous to the git command "git tag {label}".`,
 }
 
 func init() {
-	requiredFlags := []string{addRepoNameOptionFlag(SetLabelCommand)}
-
-	requiredFlags = append(requiredFlags, addLabelNameFlag(SetLabelCommand))
-	requiredFlags = append(requiredFlags, addBundleFlag(SetLabelCommand))
-
-	for _, flag := range requiredFlags {
-		err := SetLabelCommand.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
+	requireFlags(SetLabelCommand,
+		addRepoNameOptionFlag(SetLabelCommand),
+		addLabelNameFlag(SetLabelCommand),
+		addBundleFlag(SetLabelCommand),
+	)
 
 	labelCmd.AddCommand(SetLabelCommand)
 }

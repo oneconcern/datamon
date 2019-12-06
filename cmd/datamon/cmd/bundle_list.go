@@ -53,19 +53,12 @@ This is analogous to the "git log" command. The bundle ID works like a git commi
 }
 
 func init() {
-
-	requiredFlags := []string{addRepoNameOptionFlag(BundleListCommand)}
+	requireFlags(BundleListCommand,
+		addRepoNameOptionFlag(BundleListCommand),
+	)
 
 	addCoreConcurrencyFactorFlag(BundleListCommand, 500)
 	addBatchSizeFlag(BundleListCommand)
-
-	for _, flag := range requiredFlags {
-		err := BundleListCommand.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	bundleCmd.AddCommand(BundleListCommand)
 }

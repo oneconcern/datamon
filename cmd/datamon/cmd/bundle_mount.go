@@ -148,8 +148,11 @@ var mountBundleCmd = &cobra.Command{
 }
 
 func init() {
+	requireFlags(mountBundleCmd,
+		addRepoNameOptionFlag(mountBundleCmd),
+		addMountPathFlag(mountBundleCmd),
+	)
 
-	requiredFlags := []string{addRepoNameOptionFlag(mountBundleCmd)}
 	addDaemonizeFlag(mountBundleCmd)
 	addBundleFlag(mountBundleCmd)
 	addLogLevel(mountBundleCmd)
@@ -159,18 +162,6 @@ func init() {
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	addDataPathFlag(mountBundleCmd)
-
-	addContextFlag(mountBundleCmd)
-
-	requiredFlags = append(requiredFlags, addMountPathFlag(mountBundleCmd))
-
-	for _, flag := range requiredFlags {
-		err := mountBundleCmd.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	bundleCmd.AddCommand(mountBundleCmd)
 }

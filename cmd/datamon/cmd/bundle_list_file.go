@@ -55,21 +55,15 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 }
 
 func init() {
-
-	// Source
-	requiredFlags := []string{addRepoNameOptionFlag(bundleFileList)}
+	requireFlags(bundleFileList,
+		// Source
+		addRepoNameOptionFlag(bundleFileList),
+	)
 
 	// Bundle to download
 	addBundleFlag(bundleFileList)
 
 	addLabelNameFlag(bundleFileList)
 
-	for _, flag := range requiredFlags {
-		err := BundleDownloadCmd.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 	BundleListCommand.AddCommand(bundleFileList)
 }

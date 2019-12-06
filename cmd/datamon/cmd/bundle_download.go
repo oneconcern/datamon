@@ -93,12 +93,12 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 }
 
 func init() {
-
-	// Source
-	requiredFlags := []string{addRepoNameOptionFlag(BundleDownloadCmd)}
-
-	// Destination
-	requiredFlags = append(requiredFlags, addDataPathFlag(BundleDownloadCmd))
+	requireFlags(BundleDownloadCmd,
+		// Source
+		addRepoNameOptionFlag(BundleDownloadCmd),
+		// Destination
+		addDataPathFlag(BundleDownloadCmd),
+	)
 
 	// Bundle to download
 	addBundleFlag(BundleDownloadCmd)
@@ -108,16 +108,6 @@ func init() {
 	addConcurrencyFactorFlag(BundleDownloadCmd, 100)
 
 	addNameFilterFlag(BundleDownloadCmd)
-
-	addContextFlag(BundleDownloadCmd)
-
-	for _, flag := range requiredFlags {
-		err := BundleDownloadCmd.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	bundleCmd.AddCommand(BundleDownloadCmd)
 }

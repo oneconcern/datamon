@@ -85,27 +85,17 @@ var bundleDiffCmd = &cobra.Command{
 
 func init() {
 
-	// Source
-	requiredFlags := []string{addRepoNameOptionFlag(bundleDiffCmd)}
-
-	// Destination
-	requiredFlags = append(requiredFlags, addDataPathFlag(bundleDiffCmd))
+	requireFlags(bundleDiffCmd,
+		addRepoNameOptionFlag(bundleDiffCmd),
+		// Destination
+		addDataPathFlag(bundleDiffCmd),
+	)
 
 	// Bundle to download
 	addBundleFlag(bundleDiffCmd)
-	// Blob bucket
 
 	addLabelNameFlag(bundleDiffCmd)
-
 	addConcurrencyFactorFlag(bundleDiffCmd, 100)
-
-	for _, flag := range requiredFlags {
-		err := bundleDiffCmd.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	bundleCmd.AddCommand(bundleDiffCmd)
 }

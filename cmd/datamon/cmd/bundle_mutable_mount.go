@@ -81,20 +81,14 @@ var mutableMountBundleCmd = &cobra.Command{
 }
 
 func init() {
+	requireFlags(mutableMountBundleCmd,
+		addRepoNameOptionFlag(mutableMountBundleCmd),
+		addMountPathFlag(mutableMountBundleCmd),
+		addCommitMessageFlag(mutableMountBundleCmd),
+	)
 
-	requiredFlags := []string{addRepoNameOptionFlag(mutableMountBundleCmd)}
 	addDaemonizeFlag(mutableMountBundleCmd)
 	addDataPathFlag(mutableMountBundleCmd)
-	requiredFlags = append(requiredFlags, addMountPathFlag(mutableMountBundleCmd))
-	requiredFlags = append(requiredFlags, addCommitMessageFlag(mutableMountBundleCmd))
-
-	for _, flag := range requiredFlags {
-		err := mutableMountBundleCmd.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	mountBundleCmd.AddCommand(mutableMountBundleCmd)
 }
