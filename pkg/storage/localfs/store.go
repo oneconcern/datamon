@@ -4,7 +4,6 @@ package localfs
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +12,7 @@ import (
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/storage"
-	"github.com/oneconcern/datamon/pkg/storage/status"
+	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"github.com/spf13/afero"
 )
 
@@ -63,7 +62,7 @@ func (r localReader) Read(p []byte) (n int, err error) {
 func toSentinelErrors(err error) error {
 	// return sentinel errors defined by the status package
 	if os.IsNotExist(err) {
-		return status.ErrNotExists
+		return storagestatus.ErrNotExists
 	}
 	return err
 }
@@ -157,7 +156,7 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 
 //TODO discuss the implementation with @Ivan & @Ritesh
 func (l *localFS) KeysPrefix(ctx context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
-	return nil, "", errors.New("unimplemented")
+	return nil, "", storagestatus.ErrNotImplemented
 }
 
 func (l *localFS) Clear(ctx context.Context) error {

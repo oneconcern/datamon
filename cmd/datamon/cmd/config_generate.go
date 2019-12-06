@@ -24,7 +24,11 @@ The configuration file will be placed in $HOME/` + datamonDir + `/datamon.yaml`,
 % datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json,
 
 # Replace path to gcloud credential file (use absolute path here)
-% datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json`,
+% datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
+
+# Specify a config bucket to store context details
+% datamon config create --config fred-datamon-config --context test-context
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		_, err := paramsToContributor(datamonFlags)
 		if err != nil {

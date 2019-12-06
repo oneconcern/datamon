@@ -167,7 +167,7 @@ func addContextFlag(cmd *cobra.Command) string {
 
 func addConfigFlag(cmd *cobra.Command) string {
 	config := "config"
-	cmd.Flags().StringVar(&datamonFlags.core.Config, config, "", "Set the config backend store to use")
+	cmd.Flags().StringVar(&datamonFlags.core.Config, config, "", "Set the config backend store to use (do not set the scheme, e.g. 'gs://')")
 	return config
 }
 

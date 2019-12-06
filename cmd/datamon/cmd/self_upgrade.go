@@ -107,7 +107,7 @@ func doCheckVersion() error {
 		return errors.New(fmt.Sprintf("could not fetch release from github repo (%s)", githubRepo)).Wrap(err)
 	}
 	if !found {
-		return errors.New(fmt.Sprintf("no matching release from github repo (%s)", githubRepo)).Wrap(err)
+		return errors.New(fmt.Sprintf("no matching release from github repo (%s)", githubRepo))
 	}
 
 	if isRelease && latest.Version.Equals(v) {

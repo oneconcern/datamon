@@ -10,10 +10,7 @@ import (
 
 //go:generate moq -out ./mockstorage/store.go -pkg mockstorage . Store
 
-type errString string
-
 const MaxObjectSizeInMemory = 2 * 1024 * 1024 * 1024 // 2 gigs
-func (e errString) Error() string                    { return string(e) }
 
 const (
 	// Adding these to make code more readable when looking at Put Call
@@ -22,14 +19,6 @@ const (
 )
 
 type NewKey = bool
-
-const (
-	ErrNotFound     errString = "not found"
-	ErrForbidden    errString = "forbidden"
-	ErrNotSupported errString = "not supported"
-	ErrExists       errString = "exists already"
-	ErrObjectTooBig errString = "object too big to be read into memory"
-)
 
 type Attributes struct {
 	Created time.Time

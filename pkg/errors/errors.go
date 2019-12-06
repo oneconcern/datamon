@@ -6,6 +6,7 @@ package errors
 
 import (
 	stderr "errors"
+	"fmt"
 )
 
 var _ error = New("")
@@ -26,7 +27,7 @@ type Error struct {
 
 // Error message
 func (e *Error) Error() string {
-	return e.msg
+	return e.String()
 }
 
 // Unwrap nested error
@@ -39,13 +40,44 @@ func (e *Error) Unwrap() error {
 
 // Wrap a nested error
 func (e *Error) Wrap(err error) *Error {
+	if err == nil {
+		return e
+	}
+	if e == nil {
+		return &Error{msg: err.Error()}
+	}
 	e.err = err
 	return e
 }
 
 // Is of some error type?
 func (e *Error) Is(target error) bool {
-	return e == target || e.err == target
+	if e == nil {
+		return target == nil
+	}
+	if e == target {
+		return true
+	}
+	if e.err != nil {
+		if thisErr, ok := (e.err).(*Error); ok {
+			return thisErr.Is(target)
+		}
+	}
+	return false
+}
+
+// String displays the stack of errors
+func (e *Error) String() string {
+	if e == nil {
+		return ""
+	}
+	if e.err == nil {
+		return e.msg
+	}
+	if stringer, ok := (e.err).(fmt.Stringer); ok {
+		return e.msg + ": " + stringer.String()
+	}
+	return e.msg + ": " + e.err.Error()
 }
 
 // As finds the first error in err's chain that matches target, and if so, sets target to that error value and returns true.
@@ -57,5 +89,11 @@ func As(err error, target interface{}) bool {
 // Is reports whether any error in err's chain matches target
 // (a shortcut to standard lib errors.As)
 func Is(err, target error) bool {
+	if err == nil {
+		return target == nil
+	}
+	if thisErr, ok := err.(*Error); ok {
+		return thisErr.Is(target)
+	}
 	return stderr.Is(err, target)
 }

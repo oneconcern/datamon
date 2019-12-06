@@ -18,7 +18,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 ### Options
 
 ```
-      --config string   Set the config backend store to use
+      --config string   Set the config backend store to use (do not set the scheme, e.g. 'gs://')
       --force           Forces upgrade even if the current version is not a released version
   -h, --help            help for datamon
       --upgrade         Upgrades the current version then carries on with the specified command

@@ -2,13 +2,10 @@ package sthree
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"io"
 	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
@@ -58,25 +55,10 @@ func (s *s3FS) Has(ctx context.Context, key string) (bool, error) {
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
-
 	if err != nil {
-		if rerr, ok := err.(awserr.RequestFailure); ok && rerr.StatusCode() == 404 {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to get head request: %v", err)
+		return false, filterErrNotExists(toSentinelErrors(err))
 	}
 	return true, nil
-}
-
-func toSentinelErrors(err error) error {
-	// return sentinel errors defined by the status package
-	// see: https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
-	if awse, ok := err.(awserr.Error); ok {
-		if awse.Code() == "NoSuchKey" || awse.Code() == "NoSuchBucket" {
-			return status.ErrNotExists
-		}
-	}
-	return err
 }
 
 func (s *s3FS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
@@ -97,7 +79,7 @@ func (s *s3FS) Put(ctx context.Context, key string, rdr io.Reader, _ bool) error
 		Key:    aws.String(key),
 		Body:   rdr,
 	})
-	return err
+	return toSentinelErrors(err)
 }
 
 func (s *s3FS) Delete(ctx context.Context, key string) error {
@@ -105,7 +87,7 @@ func (s *s3FS) Delete(ctx context.Context, key string) error {
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
-	return err
+	return toSentinelErrors(err)
 }
 
 func (s *s3FS) Keys(ctx context.Context) ([]string, error) {
@@ -123,7 +105,7 @@ func (s *s3FS) Keys(ctx context.Context) ([]string, error) {
 
 	err := s.s3.ListObjectsPagesWithContext(ctx, params, eachPage)
 	if err != nil {
-		return nil, err
+		return nil, toSentinelErrors(err)
 	}
 	return keys, nil
 }
@@ -154,7 +136,7 @@ func (s *s3FS) KeysPrefix(ctx context.Context, token, prefix, delimiter string, 
 
 	err := s.s3.ListObjectsPagesWithContext(ctx, params, eachPage)
 	if err != nil {
-		return nil, "", err
+		return nil, "", toSentinelErrors(err)
 	}
 
 	log.Printf("Truncated %v ", isTruncated)
@@ -167,7 +149,7 @@ func (s *s3FS) KeysPrefix(ctx context.Context, token, prefix, delimiter string, 
 func (s *s3FS) Clear(ctx context.Context) error {
 	params := &s3.ListObjectsInput{Bucket: aws.String(s.bucket)}
 	del := s3manager.NewBatchDeleteWithClient(s.s3)
-	return del.Delete(ctx, s3manager.NewDeleteListIterator(s.s3, params))
+	return toSentinelErrors(del.Delete(ctx, s3manager.NewDeleteListIterator(s.s3, params)))
 }
 
 func (s *s3FS) String() string {
@@ -175,13 +157,13 @@ func (s *s3FS) String() string {
 }
 
 func (s *s3FS) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error) {
-	return nil, errors.New("unimplemented")
+	return nil, status.ErrNotImplemented
 }
 
 func (s *s3FS) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
-	panic("implement me")
+	return storage.Attributes{}, status.ErrNotImplemented
 }
 
 func (s *s3FS) Touch(ctx context.Context, objectName string) error {
-	panic("implement me")
+	return status.ErrNotImplemented
 }
