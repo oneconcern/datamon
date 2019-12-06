@@ -138,6 +138,7 @@ build-datamon-local:
 ## Build datamon executable for mac os x (on mac os x)
 build-datamon-mac: export TARGET=out/datamon.mac
 build-datamon-mac:
+	@mkdir -p out
 	$(MAKE) compile-datamon
 
 .PHONY: build-all
@@ -212,6 +213,7 @@ check: gofmt goimports
 .PHONY: profile-metrics
 ## Build the metrics collection binary and write output
 profile-metrics:
+	@mkdir -p out/metrics
 	@go build -o out/metrics/metrics.out ./cmd/metrics
 	./hack/metrics/xtime.sh \
 		-l out/metrics/upload.log \
