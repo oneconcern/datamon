@@ -13,10 +13,8 @@ import (
 func createFUSEParams(t *testing.T) (fuseParams FUSEParams) {
 	fuseParams, err := NewFUSEParams(
 		FUSECoordPoint("/tmp/coord"),
-		FUSEContributor(
-			"contributor name",
-			"contributor@oneconcern.com",
-		),
+		FUSEConfigBucketName("datamon-config-test-sdjfhga"),
+		FUSEContextName("datamon-sidecar-test"),
 	)
 	require.NoError(t, err, "init postgres params")
 	err = fuseParams.AddBundle(
@@ -30,7 +28,7 @@ func createFUSEParams(t *testing.T) (fuseParams FUSEParams) {
 	require.NoError(t, err, "add source bundle")
 	err = fuseParams.AddBundle(
 		BDName("dest"),
-		BDDest("ransom-datamon-test-repo", "result of container coordination demo"),
+		BDDest("ransom-datamon-test-repo", "result of container coordination demo", "/tmp/upload"),
 		BDDestLabel("coordemo"),
 		BDDestBundleIDFile("/tmp/bundleid.txt"),
 	)
@@ -46,9 +44,8 @@ func TestCreateFUSEParams(t *testing.T) {
 	expectedString := `globalOpts:
   sleepInsteadOfExit: false
   coordPoint: /tmp/coord
-  contributor:
-    name: contributor name
-    email: contributor@oneconcern.com
+  configBucketName: datamon-config-test-sdjfhga
+  contextName: datamon-sidecar-test
 bundles:
 - name: src
   srcPath: /tmp/mount
@@ -65,7 +62,7 @@ bundles:
   srcRepo: ""
   srcLabel: ""
   srcBundle: ""
-  destPath: ""
+  destPath: /tmp/upload
   destRepo: ransom-datamon-test-repo
   destMessage: result of container coordination demo
   destLabel: coordemo

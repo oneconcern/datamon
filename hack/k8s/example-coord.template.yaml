@@ -16,7 +16,10 @@ spec:
       - name: init-application-wrap
         image: gcr.io/onec-co/datamon-fuse-demo-coord-datamon:latest
         imagePullPolicy: "$PULL_POLICY"
-        command: ["sh", "-c", "mkdir /tmp/coord/.scripts; cp wrap_application.sh /tmp/coord/.scripts/wrap_application.sh; chmod a+x /tmp/coord/.scripts/wrap_application.sh; echo 'placed application wrapper'"]
+
+        command: ["sh", "-c",
+        "mkdir /tmp/coord/.scripts; cp wrap_application.sh /tmp/coord/.scripts/wrap_application.sh; chmod a+x /tmp/coord/.scripts/wrap_application.sh; echo 'placed application wrapper'"]
+
         stdin: true
         tty: true
         volumeMounts:
@@ -26,9 +29,11 @@ spec:
       - name: demo-app
         image: gcr.io/onec-co/datamon-fuse-demo-coord-app:latest
         imagePullPolicy: "$PULL_POLICY"
+
+        # command: ["/bin/tini"]
+        # args: ["--", "/bin/zsh"]
+
         command: ["/tmp/coord/.scripts/wrap_application.sh"]
-        # use the wrong number of params in order to simulate error out of mock app
-        # args: ["-c", "/tmp/coord", "--", "./mock_application.sh", "/tmp/mount"]
         args: ["-s", "-c", "/tmp/coord", "-b", "fuse", "--",
         "./mock_application.sh",
         "/tmp/mount",
@@ -46,14 +51,12 @@ spec:
       - name: datamon-sidecar
         image: gcr.io/onec-co/datamon-fuse-demo-coord-datamon:latest
         imagePullPolicy: "$PULL_POLICY"
+
+        # command: ["/bin/tini"]
+        # args: ["--", "/bin/zsh"]
+
         command: ["./wrap_datamon.sh"]
-        args: ["-s", "-c", "/tmp/coord",
-        "-b", "datamon-config-test-sdjfhga",
-        "-a", "datamon-sidecar-test",
-        "-i", "/tmp/bundleid.txt",
-        "-d", "config create",
-        "-d", "bundle upload --path /tmp/upload --message \"result of container coordination demo\" --repo ransom-datamon-test-repo --label coordemo",
-        "-d", "bundle mount --repo ransom-datamon-test-repo --label testlabel --mount /tmp/mount --stream"]
+        args: []
         securityContext:
           privileged: true
         stdin: true
@@ -69,8 +72,14 @@ spec:
         - mountPath: /tmp/gac
           name: google-application-credentials
         env:
+
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /tmp/gac/google-application-credentials.json
+
+        - name: dm_fuse_params
+          value: /fuse-params.yaml
+
+
       volumes:
       - name: fuse-mountpoint
         emptyDir: {}

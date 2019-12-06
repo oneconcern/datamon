@@ -28,9 +28,13 @@ RUN chmod a+x wrap_datamon.sh &&\
     groupadd -g 2000 developers &&\
     usermod -g developers developer &&\
     chown -R developer:developers /usr/bin/datamon &&\
+    chown -R developer:developers /usr/bin/datamon_sidecar_param &&\
     mkdir -p /etc/sudoers.d && \
     echo "developer ALL = (ALL) NOPASSWD: ALL" > /etc/sudoers.d/developer &&\
     chmod 0400 /etc/sudoers.d/developer
 
 USER developer
+
+RUN touch ~/.zshrc
+
 ENTRYPOINT [ "datamon" ]

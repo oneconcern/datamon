@@ -64,6 +64,10 @@ spec:
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /tmp/gac/google-application-credentials.json
+
+        - name: dm_fuse_params
+          value: /fuse-params.yaml
+
 #
       volumes:
       - name: fuse-mountpoint
