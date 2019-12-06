@@ -168,7 +168,7 @@ func addContextFlag(cmd *cobra.Command) string {
 
 func addConfigFlag(cmd *cobra.Command) string {
 	config := "config"
-	cmd.Flags().StringVar(&datamonFlags.core.Config, config, "", "Set the config backend store to use (do not set the scheme, e.g. 'gs://')")
+	cmd.Flags().StringVar(&datamonFlags.core.Config, config, "", "Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')")
 	return config
 }
 
@@ -401,4 +401,18 @@ func paramsToDestStore(params flagsT,
 
 func paramsToContributor(_ flagsT) (model.Contributor, error) {
 	return authorizer.Principal(config.Credential)
+}
+
+// requireFlags sets a flag (local to the command or inherited) as required
+func requireFlags(cmd *cobra.Command, flags ...string) {
+	for _, flag := range flags {
+		err := cmd.MarkFlagRequired(flag)
+		if err != nil {
+			err = cmd.MarkPersistentFlagRequired(flag)
+		}
+		if err != nil {
+			wrapFatalln(fmt.Sprintf("error attempting to mark the required flag %q", flag), err)
+			return
+		}
+	}
 }

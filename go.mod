@@ -24,16 +24,14 @@ require (
 	github.com/hashicorp/go-immutable-radix v1.0.0
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/ivanilves/lstags v1.2.10
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20180417054321-cd3959611bcb
 	github.com/karrick/godirwalk v1.12.0
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/opentracing/opentracing-go v1.0.2
-	github.com/pelletier/go-toml v1.4.0 // indirect
+	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/rhysd/go-github-selfupdate v1.1.0
 	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/segmentio/ksuid v1.0.2
@@ -41,18 +39,17 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/spf13/viper v1.4.0
+	github.com/spf13/viper v1.5.0
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	go.uber.org/goleak v0.0.0-00010101000000-000000000000
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20191205180655-e7c4368fe9dd // indirect
+	golang.org/x/crypto v0.0.0-20191202143827-86a70503ff7e // indirect
 	golang.org/x/sys v0.0.0-20191204072324-ce4227a45e2e
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20191205205310-69111344d4a5 // indirect
 	google.golang.org/api v0.2.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v2 v2.2.7
 	gotest.tools v2.2.0+incompatible
 )
 

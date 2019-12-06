@@ -18,7 +18,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 ### Options
 
 ```
-      --config string   Set the config backend store to use (do not set the scheme, e.g. 'gs://')
+      --config string   Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
       --force           Forces upgrade even if the current version is not a released version
   -h, --help            help for datamon
       --upgrade         Upgrades the current version then carries on with the specified command
@@ -27,7 +27,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 ### SEE ALSO
 
 * [datamon bundle](datamon_bundle.md)	 - Commands to manage bundles for a repo
-* [datamon config](datamon_config.md)	 - Commands to manage a config
+* [datamon config](datamon_config.md)	 - Commands to manage the config file
 * [datamon context](datamon_context.md)	 - Commands to manage contexts.
 * [datamon label](datamon_label.md)	 - Commands to manage labels for a repo
 * [datamon repo](datamon_repo.md)	 - Commands to manage repos

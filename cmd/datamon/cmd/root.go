@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime/pprof"
 
 	"github.com/spf13/viper"
 
-	"github.com/oneconcern/datamon/pkg/auth"
 	gauth "github.com/oneconcern/datamon/pkg/auth/google"
 	"github.com/spf13/cobra"
 )
+
+// config file content
+var config *CLIConfig
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -54,33 +57,6 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 	},
 }
 
-var config *CLIConfig
-
-// used to patch over calls to os.Exit() during test
-var logFatalln = log.Fatalln
-var logFatalf = log.Fatalf
-var osExit = os.Exit
-
-// used to patch over calls to Authable.Principal() during test
-var authorizer auth.Authable
-
-// infoLogger wraps informative messages to os.Stdout without cluttering expected output in tests.
-// To be used instead on fmt.Printf(os.Stdout, ...)
-var infoLogger = log.New(os.Stdout, "", 0)
-
-func wrapFatalln(msg string, err error) {
-	if err == nil {
-		logFatalln(msg)
-	} else {
-		logFatalf("%v", fmt.Errorf(msg+": %w", err))
-	}
-}
-
-func wrapFatalWithCode(code int, format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	osExit(code)
-}
-
 // Execute adds all child commands to the root command and sets datamonFlags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -103,30 +79,31 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	// 1. Set defaults
-	// 2. Read in config file
-	// 3. Override via environment variable
-	// 4. Override via flags.
 
-	// 2. Config file
-	if os.Getenv("DATAMON_CONFIG") != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(os.Getenv("DATAMON_CONFIG"))
+	// 1. Defaults: none at the moment (defaults are set together with flags)
+
+	// 2. Override via environment variables
+	viper.AutomaticEnv() // read in environment variables that match
+
+	// 3. Read from config file
+	if location := os.Getenv(envConfigLocation); location != "" {
+		// use config file from env var
+		viper.SetConfigFile(location)
 	} else {
+		// let viper resolve config file location from some known paths
+		viper.SetConfigName(configFile)
 		viper.AddConfigPath(".")
-		viper.AddConfigPath("$HOME/" + datamonDir)
+		viper.AddConfigPath(filepath.Dir(configFileLocation(true)))
 		viper.AddConfigPath("/etc/datamon2")
-		viper.SetConfigName("datamon2")
 	}
 
-	// If a config file is found, read it in.
-	_ = viper.ReadInConfig() // nolint:errcheck
-	// `viper.ConfigFileUsed()` returns path to config file if error is nil
-	var err error
-	// 2. Initialize config
-	config, err = newConfig()
-	if err != nil {
-		wrapFatalln("populate config struct", err)
+	// if a config file is found, read it
+	handleConfigErrors(viper.ReadInConfig())
+
+	// 4. Initialize config and override via flags
+	config = new(CLIConfig)
+	if err := viper.Unmarshal(config); err != nil {
+		wrapFatalln("config file contains invalid values", err)
 		return
 	}
 
@@ -134,7 +111,6 @@ func initConfig() {
 		_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.Credential)
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
 	if datamonFlags.context.Descriptor.Name == "" {
 		datamonFlags.context.Descriptor.Name = viper.GetString("DATAMON_CONTEXT")
 	}
@@ -150,15 +126,23 @@ func initConfig() {
 	//  do not require config to be set for all commands
 }
 
-func requireFlags(cmd *cobra.Command, flags ...string) {
-	for _, flag := range flags {
-		err := cmd.MarkFlagRequired(flag)
-		if err != nil {
-			err = cmd.MarkPersistentFlagRequired(flag)
-		}
-		if err != nil {
-			wrapFatalln(fmt.Sprintf("error attempting to mark the required flag %q", flag), err)
-			return
-		}
+func handleConfigErrors(err error) {
+	if err == nil {
+		return
+	}
+	switch err.(type) {
+	case viper.UnsupportedConfigError:
+		infoLogger.Println("warning: the config file extension is not of a supported type." +
+			"Use a well-known config file extension (.yaml, .json, ...)")
+	case *os.PathError:
+		// config file was forced but not found: skip
+		break
+	case viper.ConfigFileNotFoundError:
+		// config file resolve attempt, not found: skip
+		break
+	default:
+		// file found but some other error occurred: stop
+		wrapFatalln("error reading the config file "+viper.ConfigFileUsed(), err)
+		return
 	}
 }
