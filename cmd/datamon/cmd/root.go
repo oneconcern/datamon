@@ -27,6 +27,7 @@ This is not a replacement for these tools, but rather a way to manage their inpu
 Datamon works by providing a git like interface to manage data efficiently:
 your data buckets are organized in repositories of versioned and tagged bundles of files.
 `,
+	DisableAutoGenTag: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if datamonFlags.root.upgrade {
 			if err := doSelfUpgrade(upgradeFlags{forceUgrade: true}); err != nil {
