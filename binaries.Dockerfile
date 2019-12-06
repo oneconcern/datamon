@@ -39,6 +39,8 @@ RUN CGO_ENABLED=0 LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" 
     gox -os "linux"        -arch "amd64" -output "${TARGET}/migrate_{{.OS}}_{{.Arch}}"  -ldflags "$LDFLAGS" ./cmd/backup2blobs
 RUN CGO_ENABLED=0 LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
     gox -os "linux"        -arch "amd64" -output "${TARGET}/datamon_{{.Dir}}_{{.OS}}_{{.Arch}}" -ldflags "$LDFLAGS" ./cmd/metrics
+RUN CGO_ENABLED=0 LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" \
+    gox -os "linux"        -arch "amd64" -output "${TARGET}/datamon_{{.Dir}}_{{.OS}}_{{.Arch}}" -ldflags "$LDFLAGS" ./cmd/sidecar_param
 
 # compatibility with previous released artifacts
 RUN if [ -f ${TARGET}/datamon_darwin_amd64 ] ; then  cp ${TARGET}/datamon_darwin_amd64 ${TARGET}/datamon.mac ;fi && \
@@ -46,4 +48,6 @@ RUN if [ -f ${TARGET}/datamon_darwin_amd64 ] ; then  cp ${TARGET}/datamon_darwin
     if [ -f ${TARGET}/datamon_metrics_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon_metrics ;fi && \
     cd ${TARGET};for bin in `ls -1` ; do upx ${bin} && md5sum ${bin} >> ${bin}.md5 && sha256sum ${bin} > ${bin}.sha256 ; done && \
     if [ -f ${TARGET}/datamon_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon ;fi && \
-    if [ -f ${TARGET}/migrate_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/migrate ;fi
+    if [ -f ${TARGET}/migrate_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/migrate ;fi && \
+    if [ -f ${TARGET}/datamon_sidecar_param_linux_amd64 ] ; then  cp ${TARGET}/datamon_sidecar_param_linux_amd64 ${TARGET}/datamon_sidecar_param ;fi
+

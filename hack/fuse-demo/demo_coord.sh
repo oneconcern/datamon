@@ -78,6 +78,11 @@ fi
 
 ##
 
+dbg_print '### using golang api to write serialized input file'
+
+
+##
+
 dbg_print '### building images'
 
 run_docker_make_cmd() {
