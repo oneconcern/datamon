@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
+	gcscontext "github.com/oneconcern/datamon/pkg/context/gcs"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -283,39 +284,8 @@ func addTargetFlag(cmd *cobra.Command) string {
 /** parameters struct to other formats */
 
 func paramsToDatamonContext(ctx context.Context, params flagsT) (context2.Stores, error) {
-	stores := context2.Stores{}
-
-	meta, err := gcs.New(ctx, params.context.Descriptor.Metadata, config.Credential)
-	if err != nil {
-		return context2.Stores{}, fmt.Errorf("failed to initialize metadata store, err:%s", err)
-	}
-	stores.SetMetadata(meta)
-
-	blob, err := gcs.New(ctx, params.context.Descriptor.Blob, config.Credential)
-	if err != nil {
-		return context2.Stores{}, fmt.Errorf("failed to initialize blob store, err:%s", err)
-	}
-	stores.SetBlob(blob)
-
-	v, err := gcs.New(ctx, params.context.Descriptor.VMetadata, config.Credential)
-	if err != nil {
-		return context2.Stores{}, fmt.Errorf("failed to initialize vmetadata store, err:%s", err)
-	}
-	stores.SetVMetadata(v)
-
-	w, err := gcs.New(ctx, params.context.Descriptor.WAL, config.Credential)
-	if err != nil {
-		return context2.Stores{}, fmt.Errorf("failed to initialize wal store, err:%s", err)
-	}
-	stores.SetWal(w)
-
-	r, err := gcs.New(ctx, params.context.Descriptor.ReadLog, config.Credential)
-	if err != nil {
-		return context2.Stores{}, fmt.Errorf("failed to initialize read log store, err:%s", err)
-	}
-	stores.SetReadLog(r)
-
-	return stores, nil
+	// here we select a 100% gcs backend strategy (more elaborate strategies could be defined by the context pkg)
+	return gcscontext.MakeContext(ctx, params.context.Descriptor, config.Credential)
 }
 
 func paramsToBundleOpts(stores context2.Stores) []core.BundleOption {

@@ -87,6 +87,9 @@ func (b *Bundle) BlobStore() storage.Store {
 }
 
 func getBlobStore(stores context2.Stores) storage.Store {
+	if stores == nil {
+		return nil
+	}
 	return stores.Blob()
 }
 
@@ -96,6 +99,9 @@ func (b *Bundle) MetaStore() storage.Store {
 }
 
 func getMetaStore(stores context2.Stores) storage.Store {
+	if stores == nil {
+		return nil
+	}
 	return stores.Metadata()
 }
 
@@ -104,6 +110,9 @@ func (b *Bundle) VMetaStore() storage.Store {
 	return getVMetaStore(b.contextStores)
 }
 func getVMetaStore(stores context2.Stores) storage.Store {
+	if stores == nil {
+		return nil
+	}
 	return stores.VMetadata()
 }
 
@@ -113,6 +122,9 @@ func (b *Bundle) WALStore() storage.Store {
 }
 
 func getWALStore(stores context2.Stores) storage.Store {
+	if stores == nil {
+		return nil
+	}
 	return stores.Wal()
 }
 
@@ -121,6 +133,9 @@ func (b *Bundle) ReadLogStore() storage.Store {
 	return getReadLogStore(b.contextStores)
 }
 func getReadLogStore(stores context2.Stores) storage.Store {
+	if stores == nil {
+		return nil
+	}
 	return stores.ReadLog()
 }
 

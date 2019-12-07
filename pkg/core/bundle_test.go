@@ -57,7 +57,7 @@ func TestBundle(t *testing.T) {
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
 	reArchiveBlob := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveBlobDir))
 	reArchive := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), reArchiveMetaDir))
-	dmc := context2.Stores{}
+	dmc := context2.New()
 	dmc.SetMetadata(metaStore)
 	require.NoError(t, CreateRepo(model.RepoDescriptor{
 		Name:        repo,
@@ -68,6 +68,8 @@ func TestBundle(t *testing.T) {
 			Email: "t@test.com",
 		},
 	}, dmc))
+
+	dmc = context2.New()
 	dmc.SetMetadata(reArchive)
 	require.NoError(t, CreateRepo(model.RepoDescriptor{
 		Name:        repo,
@@ -80,6 +82,7 @@ func TestBundle(t *testing.T) {
 	}, dmc))
 
 	bd := NewBDescriptor()
+	dmc = context2.New()
 	dmc.SetMetadata(metaStore)
 	dmc.SetBlob(blobStore)
 	bundle := NewBundle(bd,
@@ -97,6 +100,7 @@ func TestBundle(t *testing.T) {
 	validatePublish(t, consumableStore, bundleEntriesFileCount)
 
 	/* bundle id is set on upload */
+	dmc = context2.New()
 	dmc.SetBlob(reArchiveBlob)
 	dmc.SetMetadata(reArchive)
 	archiveBundle2 := NewBundle(bd,
@@ -119,7 +123,7 @@ func paramedTestPublishMetadata(t *testing.T, publish bool) {
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), destinationDir))
 	metaStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), metaDir))
 	blobStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), blobDir))
-	dmc := context2.Stores{}
+	dmc := context2.New()
 	dmc.SetMetadata(metaStore)
 	require.NoError(t, CreateRepo(model.RepoDescriptor{
 		Name:        repo,
@@ -132,6 +136,7 @@ func paramedTestPublishMetadata(t *testing.T, publish bool) {
 	}, dmc))
 
 	bd := NewBDescriptor()
+	dmc = context2.New()
 	dmc.SetMetadata(metaStore)
 	dmc.SetBlob(blobStore)
 	bundle := NewBundle(bd,
