@@ -15,15 +15,15 @@ datamon context get [flags]
 ### Options
 
 ```
-      --config string    Set the config backend store to use
-      --context string   Set the context for datamon (default "dev")
-  -h, --help             help for get
+      --config string   Set the config backend store to use
+  -h, --help            help for get
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --upgrade   Upgrades the current version then carries on with the specified command
+      --context string   Set the context for datamon (default "dev")
+      --upgrade          Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// GetLabelCommand retrieves bundle metadata by label
 var GetLabelCommand = &cobra.Command{
 	Use:   "get",
 	Short: "Get bundle info by label",
@@ -59,8 +60,6 @@ func init() {
 	requiredFlags := []string{addRepoNameOptionFlag(GetLabelCommand)}
 
 	requiredFlags = append(requiredFlags, addLabelNameFlag(GetLabelCommand))
-
-	addContextFlag(GetLabelCommand)
 
 	for _, flag := range requiredFlags {
 		err := GetLabelCommand.MarkFlagRequired(flag)

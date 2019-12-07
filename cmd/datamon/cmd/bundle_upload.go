@@ -121,25 +121,17 @@ set label 'init'
 }
 
 func init() {
+	requireFlags(uploadBundleCmd,
+		addRepoNameOptionFlag(uploadBundleCmd),
+		addPathFlag(uploadBundleCmd),
+		addCommitMessageFlag(uploadBundleCmd),
+	)
 
-	requiredFlags := []string{addRepoNameOptionFlag(uploadBundleCmd)}
-	requiredFlags = append(requiredFlags, addPathFlag(uploadBundleCmd))
-	requiredFlags = append(requiredFlags, addCommitMessageFlag(uploadBundleCmd))
 	addFileListFlag(uploadBundleCmd)
 	addLabelNameFlag(uploadBundleCmd)
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd, 100)
 	addLogLevel(uploadBundleCmd)
-
-	addContextFlag(uploadBundleCmd)
-
-	for _, flag := range requiredFlags {
-		err := uploadBundleCmd.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	bundleCmd.AddCommand(uploadBundleCmd)
 }

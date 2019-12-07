@@ -35,7 +35,6 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 ```
       --bundle string            The hash id for the bundle, if not specified the latest bundle will be used
       --concurrency-factor int   Heuristic on the amount of concurrency used by various operations.  Turn this value down to use less memory, increase for faster operations. (default 100)
-      --context string           Set the context for datamon (default "dev")
       --destination string       The path to the download dir
   -h, --help                     help for download
       --label string             The human-readable name of a label
@@ -46,7 +45,8 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 ### Options inherited from parent commands
 
 ```
-      --upgrade   Upgrades the current version then carries on with the specified command
+      --context string   Set the context for datamon (default "dev")
+      --upgrade          Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

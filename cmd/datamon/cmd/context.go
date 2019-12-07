@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ContextCmd is a command to manage datamon contexts
 var ContextCmd = &cobra.Command{
 	Use:        "context",
 	Aliases:    nil,
@@ -27,6 +28,7 @@ var contextTemplate *template.Template
 
 func init() {
 	rootCmd.AddCommand(ContextCmd)
+	addContextFlag(ContextCmd)
 
 	contextTemplate = func() *template.Template {
 		const listLineTemplateString = `{{.Version}} , {{.Name}} , {{.WAL}} , {{.ReadLog}} , {{.Blob}} , {{.Metadata}} , {{.VMetadata}}`

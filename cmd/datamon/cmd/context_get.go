@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// ContextGetCommand is a command to retrieve metadata about a context
 var ContextGetCommand = &cobra.Command{
 	Use:   "get",
 	Short: "Get a context info",
@@ -67,16 +68,11 @@ func getContext() {
 }
 
 func init() {
-	addConfigFlag(ContextGetCommand)
-	var requiredFlags []string
-	requiredFlags = append(requiredFlags, addContextFlag(ContextGetCommand))
+	requireFlags(ContextGetCommand,
+		addContextFlag(ContextGetCommand),
+	)
 
-	for _, flag := range requiredFlags {
-		err := ContextGetCommand.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
+	addConfigFlag(ContextGetCommand)
+
 	ContextCmd.AddCommand(ContextGetCommand)
 }

@@ -59,21 +59,14 @@ You may use the "--label" flag as an alternate way to specify a particular bundl
 }
 
 func init() {
-
-	requiredFlags := []string{addRepoNameOptionFlag(bundleDownloadFileCmd)}
-	requiredFlags = append(requiredFlags, addDataPathFlag(bundleDownloadFileCmd))
-	requiredFlags = append(requiredFlags, addBundleFileFlag(bundleDownloadFileCmd))
+	requireFlags(bundleDownloadFileCmd,
+		addRepoNameOptionFlag(bundleDownloadFileCmd),
+		addDataPathFlag(bundleDownloadFileCmd),
+		addBundleFileFlag(bundleDownloadFileCmd),
+	)
 
 	addLabelNameFlag(bundleDownloadFileCmd)
 	addBundleFlag(bundleDownloadFileCmd)
-
-	for _, flag := range requiredFlags {
-		err := bundleDownloadFileCmd.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	BundleDownloadCmd.AddCommand(bundleDownloadFileCmd)
 }

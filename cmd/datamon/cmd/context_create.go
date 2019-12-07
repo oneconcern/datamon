@@ -35,21 +35,16 @@ func createContext() {
 }
 
 func init() {
-	addConfigFlag(ContextCreateCommand)
-	var requiredFlags []string
-	requiredFlags = append(requiredFlags, addMetadataBucket(ContextCreateCommand))
-	requiredFlags = append(requiredFlags, addVMetadataBucket(ContextCreateCommand))
-	requiredFlags = append(requiredFlags, addBlobBucket(ContextCreateCommand))
-	requiredFlags = append(requiredFlags, addWALBucket(ContextCreateCommand))
-	requiredFlags = append(requiredFlags, addReadLogBucket(ContextCreateCommand))
-	requiredFlags = append(requiredFlags, addContextFlag(ContextCreateCommand))
+	requireFlags(ContextCreateCommand,
+		addMetadataBucket(ContextCreateCommand),
+		addVMetadataBucket(ContextCreateCommand),
+		addBlobBucket(ContextCreateCommand),
+		addWALBucket(ContextCreateCommand),
+		addReadLogBucket(ContextCreateCommand),
+		addContextFlag(ContextCreateCommand),
+	)
 
-	for _, flag := range requiredFlags {
-		err := ContextCreateCommand.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
+	addConfigFlag(ContextCreateCommand)
+
 	ContextCmd.AddCommand(ContextCreateCommand)
 }

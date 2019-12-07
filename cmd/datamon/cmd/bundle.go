@@ -34,6 +34,7 @@ var bundleDescriptorTemplate *template.Template
 
 func init() {
 	rootCmd.AddCommand(bundleCmd)
+	addContextFlag(bundleCmd)
 
 	bundleDescriptorTemplate = func() *template.Template {
 		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`

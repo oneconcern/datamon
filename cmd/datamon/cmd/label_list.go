@@ -53,17 +53,13 @@ init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT`,
 }
 
 func init() {
+	requireFlags(LabelListCommand,
+		addRepoNameOptionFlag(LabelListCommand),
+	)
 
-	requiredFlags := []string{addRepoNameOptionFlag(LabelListCommand)}
 	addLabelPrefixFlag(LabelListCommand)
 	addCoreConcurrencyFactorFlag(LabelListCommand, 500)
 	addBatchSizeFlag(LabelListCommand)
-	for _, flag := range requiredFlags {
-		err := LabelListCommand.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
+
 	labelCmd.AddCommand(LabelListCommand)
 }
