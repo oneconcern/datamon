@@ -4,16 +4,14 @@ package gcs
 
 import (
 	"context"
-	"errors"
 	"io"
-	"strings"
 
 	"google.golang.org/api/iterator"
 
 	gcsStorage "cloud.google.com/go/storage"
 
 	"github.com/oneconcern/datamon/pkg/storage"
-	"github.com/oneconcern/datamon/pkg/storage/status"
+	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"google.golang.org/api/option"
 )
 
@@ -24,30 +22,35 @@ type gcs struct {
 	ctx            context.Context
 }
 
+func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
+	opts := make([]option.ClientOption, 0, 2)
+	if readOnly {
+		opts = append(opts, option.WithScopes(gcsStorage.ScopeReadOnly))
+	} else {
+		opts = append(opts, option.WithScopes(gcsStorage.ScopeFullControl))
+	}
+	if credentialFile != "" {
+		opts = append(opts, option.WithCredentialsFile(credentialFile))
+	}
+	return opts
+}
+
+// New builds a new storage object from a bucket string
 func New(ctx context.Context, bucket string, credentialFile string) (storage.Store, error) {
 	googleStore := new(gcs)
 	googleStore.ctx = ctx
 	googleStore.bucket = bucket
+
 	var err error
-	if credentialFile != "" {
-		c := option.WithCredentialsFile(credentialFile)
-		googleStore.readOnlyClient, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeReadOnly), c)
-	} else {
-		googleStore.readOnlyClient, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeReadOnly))
-	}
+	googleStore.readOnlyClient, err = gcsStorage.NewClient(ctx, clientOpts(true, credentialFile)...)
 	if err != nil {
-		return nil, err
+		return nil, toSentinelErrors(err)
 	}
-	if credentialFile != "" {
-		c := option.WithCredentialsFile(credentialFile)
-		googleStore.client, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl), c)
-	} else {
-		googleStore.client, err = gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl))
-	}
+	googleStore.client, err = gcsStorage.NewClient(ctx, clientOpts(false, credentialFile)...)
 	if err != nil {
-		return nil, err
+		return nil, toSentinelErrors(err)
 	}
-	return googleStore, err
+	return googleStore, nil
 }
 
 func (g *gcs) String() string {
@@ -61,7 +64,7 @@ func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
 		if err == gcsStorage.ErrObjectNotExist {
 			return false, nil
 		}
-		return false, err
+		return false, toSentinelErrors(err)
 	}
 	return true, nil
 }
@@ -82,24 +85,16 @@ func (r *gcsReader) Close() error {
 
 func (r *gcsReader) Read(p []byte) (n int, err error) {
 	read, err := r.objectReader.Read(p)
-	return read, err
+	return read, toSentinelErrors(err)
 }
 
 func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.objectName).NewRangeReader(
 		r.g.ctx, offset, int64(len(p)))
 	if err != nil {
-		return 0, err
+		return 0, toSentinelErrors(err)
 	}
 	return objectReader.Read(p)
-}
-
-func toSentinelErrors(err error) error {
-	// return sentinel errors defined by the status package
-	if strings.Contains(err.Error(), "object doesn't exist") {
-		return status.ErrNotExists
-	}
-	return err
 }
 
 func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error) {
@@ -116,7 +111,7 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 func (g *gcs) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
 	attr, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).Attrs(ctx)
 	if err != nil {
-		return storage.Attributes{}, err
+		return storage.Attributes{}, toSentinelErrors(err)
 	}
 	return storage.Attributes{
 		Created: attr.Created,
@@ -134,7 +129,7 @@ func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error)
 
 func (g *gcs) Touch(ctx context.Context, objectName string) error {
 	_, err := g.client.Bucket(g.bucket).Object(objectName).Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
-	return err
+	return toSentinelErrors(err)
 }
 
 type readCloser struct {
@@ -164,9 +159,9 @@ func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newO
 	}
 	_, err := storage.PipeIO(writer, readCloser{reader: reader})
 	if err != nil {
-		return err
+		return toSentinelErrors(err)
 	}
-	return writer.Close()
+	return toSentinelErrors(writer.Close())
 }
 
 func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool, crc uint32) error {
@@ -182,13 +177,13 @@ func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, d
 	writer.CRC32C = crc
 	_, err := storage.PipeIO(writer, readCloser{reader: reader})
 	if err != nil {
-		return err
+		return toSentinelErrors(err)
 	}
-	return writer.Close()
+	return toSentinelErrors(writer.Close())
 }
 
 func (g *gcs) Delete(ctx context.Context, objectName string) error {
-	return g.client.Bucket(g.bucket).Object(objectName).Delete(ctx)
+	return toSentinelErrors(g.client.Bucket(g.bucket).Object(objectName).Delete(ctx))
 }
 
 // TODO: Sent error if more than a million keys. Use KeysPrefix API.
@@ -202,7 +197,7 @@ func (g *gcs) Keys(ctx context.Context) ([]string, error) {
 		var err error
 		keysCurr, nextPageToken, err = g.KeysPrefix(ctx, pageToken, "", "", keysPerQuery)
 		if err != nil {
-			return nil, err
+			return nil, toSentinelErrors(err)
 		}
 		keys = append(keys, keysCurr...)
 		pageToken = nextPageToken
@@ -218,7 +213,7 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 	keys := make([]string, 0, count)
 	pageToken, err := iterator.NewPager(itr, count, pageToken).NextPage(&objects)
 	if err != nil {
-		return nil, "", err
+		return nil, "", toSentinelErrors(err)
 	}
 
 	for _, objAttrs := range objects {
@@ -233,5 +228,5 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 }
 
 func (g *gcs) Clear(context.Context) error {
-	return errors.New("unimplemented")
+	return storagestatus.ErrNotImplemented
 }

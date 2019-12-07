@@ -9,7 +9,7 @@ import (
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 
-	"errors"
+	"github.com/oneconcern/datamon/pkg/errors"
 
 	"gopkg.in/yaml.v2"
 

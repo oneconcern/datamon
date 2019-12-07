@@ -2,11 +2,13 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path"
 	"time"
+
+	"github.com/oneconcern/datamon/pkg/core/status"
+	"github.com/oneconcern/datamon/pkg/errors"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"go.uber.org/zap"
@@ -685,14 +687,16 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 	_, update := txns.dirStore.Insert([]byte(dirFsEntry.fullPath), dirFsEntry)
 
 	if update {
-		return errors.New("dirStore updates are not expected: /" + dirFsEntry.fullPath)
+		return status.ErrUnexpectedUpdate.
+			Wrap(errors.New("dirStore updates are not expected: /" + dirFsEntry.fullPath))
 	}
 
 	key := formKey(dirFsEntry.iNode)
 
 	_, update = txns.fsEntryStore.Insert(key, dirFsEntry)
 	if update {
-		return errors.New("fsEntryStore updates are not expected: /")
+		return status.ErrUnexpectedUpdate.
+			Wrap(errors.New("fsEntryStore updates are not expected: /"))
 	}
 
 	if dirFsEntry.iNode != fuseops.RootInodeID {
@@ -703,7 +707,8 @@ func (fs *readOnlyFsInternal) insertDatamonFSDirEntry(
 			fs.l.Error("lookupTree updates are not expected",
 				zap.String("fullPath", dirFsEntry.fullPath),
 				zap.Uint64("parent iNode", uint64(parentInode)))
-			return errors.New("lookupTree updates are not expected: " + dirFsEntry.fullPath)
+			return status.ErrUnexpectedUpdate.
+				Wrap(errors.New("lookupTree updates are not expected: " + dirFsEntry.fullPath))
 		}
 
 		childEntries := fs.readDirMap[parentInode]
@@ -733,7 +738,8 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 
 	_, update := txns.fsEntryStore.Insert(key, fsEntry)
 	if update {
-		return errors.New("fsEntryStore updates are not expected: " + fsEntry.fullPath)
+		return status.ErrUnexpectedUpdate.
+			Wrap(errors.New("fsEntryStore updates are not expected: " + fsEntry.fullPath))
 	}
 
 	key = formLookupKey(parentInode, path.Base(fsEntry.fullPath))
@@ -743,7 +749,8 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 		fs.l.Error("lookupTree updates are not expected",
 			zap.String("fullPath", fsEntry.fullPath),
 			zap.Uint64("parent iNode", uint64(parentInode)))
-		return errors.New("lookupTree updates are not expected: " + fsEntry.fullPath)
+		return status.ErrUnexpectedUpdate.
+			Wrap(errors.New("lookupTree updates are not expected: " + fsEntry.fullPath))
 	}
 
 	childEntries := fs.readDirMap[parentInode]

@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
+	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
@@ -37,6 +39,17 @@ func (c *CLIConfig) setDatamonParams(flags *flagsT) {
 	}
 }
 
+func extraMsg(msg, about string, err error) string {
+	// provide extra explanation and guidance about the error
+	switch err {
+	case storagestatus.ErrInvalidResource:
+		return fmt.Sprintf("%s: please check that the config bucket %q is a valid gcs bucket", msg, about)
+	case storagestatus.ErrNotExists:
+		return fmt.Sprintf("%s: please check that the context has been created in your config", msg)
+	}
+	return msg
+}
+
 func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 	if flags.core.Config == "" {
 		wrapFatalln("set environment variable $DATAMON_GLOBAL_CONFIG or create config file", nil)
@@ -44,12 +57,13 @@ func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 	}
 	configStore, err := gcs.New(context.Background(), flags.core.Config, config.Credential)
 	if err != nil {
-		wrapFatalln("failed to get context details", err)
+		wrapFatalln(extraMsg("failed to get config store", flags.core.Config, err), err)
 		return
 	}
 	rdr, err := configStore.Get(context.Background(), model.GetPathToContext(flags.context.Descriptor.Name))
 	if err != nil {
-		wrapFatalln("failed to get context details from config store for "+flags.context.Descriptor.Name, err)
+		wrapFatalln(extraMsg("failed to get context details from config store for context "+
+			flags.context.Descriptor.Name, flags.core.Config, err), err)
 		return
 	}
 	b, err := ioutil.ReadAll(rdr)

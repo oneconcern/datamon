@@ -2,11 +2,12 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"sort"
 	"sync"
+
+	"github.com/oneconcern/datamon/pkg/errors"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core/status"

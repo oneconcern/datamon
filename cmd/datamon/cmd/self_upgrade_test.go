@@ -14,10 +14,12 @@ import (
 
 func TestSelfUpgrade(t *testing.T) {
 	err := doCheckVersion()
-	if strings.Contains(err.Error(), "no matching release from github repo") ||
-		strings.Contains(err.Error(), "could not fetch release from github repo") {
-		t.Logf("upgrade test disabled: repo artifacts not ready yet: %v", err)
-		t.SkipNow()
+	if err != nil {
+		if strings.Contains(err.Error(), "no matching release from github repo") ||
+			strings.Contains(err.Error(), "could not fetch release from github repo") {
+			t.Logf("upgrade test disabled: repo artifacts not ready yet: %v", err)
+			t.SkipNow()
+		}
 	}
 	require.NoError(t, err)
 
