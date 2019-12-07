@@ -17,7 +17,7 @@ const (
 )
 
 // ListLabels returns all labels from a repo
-func ListLabels(repo string, stores context2.Stores, prefix string, opts ...ListOption) ([]model.LabelDescriptor, error) {
+func ListLabels(repo string, stores context2.Stores, prefix string, opts ...Option) ([]model.LabelDescriptor, error) {
 	labels := make(model.LabelDescriptors, 0, typicalLabelsNum)
 
 	labelsChan, workers := listLabelsChan(repo, stores, prefix, opts...)
@@ -36,7 +36,7 @@ func ListLabels(repo string, stores context2.Stores, prefix string, opts ...List
 type ApplyLabelFunc func(model.LabelDescriptor) error
 
 // ListLabelsApply applies some function to the retrieved labels, in lexicographic order of keys.
-func ListLabelsApply(repo string, store context2.Stores, prefix string, apply ApplyLabelFunc, opts ...ListOption) error {
+func ListLabelsApply(repo string, store context2.Stores, prefix string, apply ApplyLabelFunc, opts ...Option) error {
 	var (
 		err, applyErr error
 		once          sync.Once
@@ -104,7 +104,7 @@ type labelsEvent struct {
 	err    error
 }
 
-func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...ListOption) (chan labelsEvent, *sync.WaitGroup) {
+func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...Option) (chan labelsEvent, *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	settings := defaultSettings()

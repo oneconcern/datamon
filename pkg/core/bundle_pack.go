@@ -193,7 +193,7 @@ func uploadBundleFiles(
 	chans.doneOk <- struct{}{}
 }
 
-func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...ListOption) error {
+func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...Option) error {
 	settings := defaultSettings()
 	for _, apply := range opts {
 		apply(&settings)

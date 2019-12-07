@@ -56,7 +56,7 @@ func getRepoDescriptorByRepoName(stores context2.Stores, repoName string) (model
 }
 
 // ListRepos returns all repos from a store
-func ListRepos(stores context2.Stores, opts ...ListOption) ([]model.RepoDescriptor, error) {
+func ListRepos(stores context2.Stores, opts ...Option) ([]model.RepoDescriptor, error) {
 	repos := make(model.RepoDescriptors, 0, typicalReposNum)
 
 	reposChan, workers := listReposChan(stores, opts...)
@@ -75,7 +75,7 @@ func ListRepos(stores context2.Stores, opts ...ListOption) ([]model.RepoDescript
 type ApplyRepoFunc func(model.RepoDescriptor) error
 
 // ListReposApply applies some function to the retrieved repos, in lexicographic order of keys.
-func ListReposApply(stores context2.Stores, apply ApplyRepoFunc, opts ...ListOption) error {
+func ListReposApply(stores context2.Stores, apply ApplyRepoFunc, opts ...Option) error {
 	var (
 		err, applyErr error
 		once          sync.Once
@@ -143,7 +143,7 @@ type reposEvent struct {
 	err   error
 }
 
-func listReposChan(stores context2.Stores, opts ...ListOption) (chan reposEvent, *sync.WaitGroup) {
+func listReposChan(stores context2.Stores, opts ...Option) (chan reposEvent, *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	settings := defaultSettings()

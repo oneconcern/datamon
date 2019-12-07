@@ -6,7 +6,7 @@ import (
 	"runtime/pprof"
 )
 
-func writeMemProfile(opts ...ListOption) error {
+func writeMemProfile(opts ...Option) error {
 	settings := defaultSettings()
 	for _, apply := range opts {
 		apply(&settings)

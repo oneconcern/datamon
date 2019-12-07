@@ -2,8 +2,8 @@ package core
 
 import "runtime"
 
-// ListOption sets options for listing core objects
-type ListOption func(*Settings)
+// Option sets options for listing core objects
+type Option func(*Settings)
 
 // Settings defines various settings for core features
 type Settings struct {
@@ -23,7 +23,7 @@ var (
 )
 
 // ConcurrentList sets the max level of concurrency to retrieve core objects. It defaults to 2 x #cpus.
-func ConcurrentList(concurrentList int) ListOption {
+func ConcurrentList(concurrentList int) Option {
 	return func(s *Settings) {
 		if concurrentList == 0 {
 			s.concurrentList = defaultListConcurrency
@@ -34,7 +34,7 @@ func ConcurrentList(concurrentList int) ListOption {
 }
 
 // BatchSize sets the batch window to fetch core objects. It defaults to defaultBatchSize
-func BatchSize(batchSize int) ListOption {
+func BatchSize(batchSize int) Option {
 	return func(s *Settings) {
 		if batchSize == 0 {
 			s.batchSize = defaultBatchSize
@@ -45,7 +45,7 @@ func BatchSize(batchSize int) ListOption {
 }
 
 // WithDoneChan sets a signaling channel controlled by the caller to interrupt ongoing goroutines
-func WithDoneChan(done chan struct{}) ListOption {
+func WithDoneChan(done chan struct{}) Option {
 	return func(s *Settings) {
 		s.doneChannel = done
 	}
@@ -53,7 +53,7 @@ func WithDoneChan(done chan struct{}) ListOption {
 
 // WithMemProf enables profiling and sets the memory profile directory (defaults to the current working directory).
 // Currently, extra
-func WithMemProf(memProfDir string) ListOption {
+func WithMemProf(memProfDir string) Option {
 	return func(s *Settings) {
 		s.profilingEnabled = true
 		if memProfDir != "" {
