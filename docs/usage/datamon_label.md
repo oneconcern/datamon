@@ -27,7 +27,8 @@ production
 ### Options
 
 ```
-  -h, --help   help for label
+      --context string   Set the context for datamon (default "dev")
+  -h, --help             help for label
 ```
 
 ### Options inherited from parent commands

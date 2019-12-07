@@ -50,15 +50,9 @@ exits with ENOENT status otherwise.`,
 }
 
 func init() {
-	requiredFlags := []string{addRepoNameOptionFlag(GetRepoCommand)}
-
-	for _, flag := range requiredFlags {
-		err := GetRepoCommand.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
+	requireFlags(GetRepoCommand,
+		addRepoNameOptionFlag(GetRepoCommand),
+	)
 
 	repoCmd.AddCommand(GetRepoCommand)
 }

@@ -30,6 +30,7 @@ var labelDescriptorTemplate *template.Template
 
 func init() {
 	rootCmd.AddCommand(labelCmd)
+	addContextFlag(labelCmd)
 
 	labelDescriptorTemplate = func() *template.Template {
 		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`

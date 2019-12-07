@@ -149,3 +149,16 @@ func initConfig() {
 	}
 	//  do not require config to be set for all commands
 }
+
+func requireFlags(cmd *cobra.Command, flags ...string) {
+	for _, flag := range flags {
+		err := cmd.MarkFlagRequired(flag)
+		if err != nil {
+			err = cmd.MarkPersistentFlagRequired(flag)
+		}
+		if err != nil {
+			wrapFatalln(fmt.Sprintf("error attempting to mark the required flag %q", flag), err)
+			return
+		}
+	}
+}

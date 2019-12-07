@@ -17,7 +17,8 @@ together.
 ### Options
 
 ```
-  -h, --help   help for bundle
+      --context string   Set the context for datamon (default "dev")
+  -h, --help             help for bundle
 ```
 
 ### Options inherited from parent commands

@@ -51,24 +51,15 @@ This is analogous to the "git init ..." command.`,
 }
 
 func init() {
-
-	// Metadata bucket
-	requiredFlags := []string{addRepoNameOptionFlag(repoCreate)}
-	// Description
-	requiredFlags = append(requiredFlags, addRepoDescription(repoCreate))
+	requireFlags(repoCreate,
+		// Metadata bucket
+		addRepoNameOptionFlag(repoCreate),
+		// Description
+		addRepoDescription(repoCreate),
+	)
 
 	addContributorEmail(repoCreate)
 	addContributorName(repoCreate)
-
-	addContextFlag(repoCreate)
-
-	for _, flag := range requiredFlags {
-		err := repoCreate.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	repoCmd.AddCommand(repoCreate)
 }

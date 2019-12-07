@@ -69,18 +69,12 @@ exits with ENOENT status otherwise.`,
 }
 
 func init() {
-	requiredFlags := []string{addRepoNameOptionFlag(GetBundleCommand)}
+	requireFlags(GetBundleCommand,
+		addRepoNameOptionFlag(GetBundleCommand),
+	)
 
 	addBundleFlag(GetBundleCommand)
 	addLabelNameFlag(GetBundleCommand)
-
-	for _, flag := range requiredFlags {
-		err := GetBundleCommand.MarkFlagRequired(flag)
-		if err != nil {
-			wrapFatalln("mark required flag", err)
-			return
-		}
-	}
 
 	bundleCmd.AddCommand(GetBundleCommand)
 }
