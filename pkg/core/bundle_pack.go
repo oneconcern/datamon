@@ -297,7 +297,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	}
 	bundle.l.Info("uploaded filelists",
 		zap.Int("actual number uploads attempted", numFileListUploads),
-		zap.Int("approx expected number of uploads", numFilePackedRes/int(bundleEntriesPerFile)),
+		zap.Int("approx expected number of uploads", maxInt(numFilePackedRes/int(bundleEntriesPerFile), 1)),
 	)
 	err = uploadBundleDescriptor(ctx, bundle)
 	if err != nil {

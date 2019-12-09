@@ -5,7 +5,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -50,14 +49,6 @@ func (b BundleDescriptors) Last() BundleDescriptor {
 type BundleEntries struct {
 	BundleEntries []BundleEntry `json:"BundleEntries" yaml:"BundleEntries"`
 	_             struct{}
-}
-
-// ArchivePathComponents defines the unique path parts to retrieve a file in a bundle
-type ArchivePathComponents struct {
-	Repo            string
-	BundleID        string
-	ArchiveFileName string
-	LabelName       string
 }
 
 // BundleEntry describes a file in the bundle. Empty directories are skipped
@@ -152,12 +143,18 @@ func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
 	return path
 }
 
-// GetArchivePathToBundle yields a path in a repo to some bundle
+// GetArchivePathToBundle yields a path in a repo to the descriptor of a bundle
+//
+// Example:
+//   bundles/{repo}/{bundleID}/bundle.yaml
 func GetArchivePathToBundle(repo string, bundleID string) string {
-	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle.yaml")
+	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/", bundleDescriptorFile)
 }
 
-// GetArchivePathPrefixToBundles yields a path to all bundles in a repo
+// GetArchivePathPrefixToBundles yields a path to all bundles in a repo.
+//
+// Example:
+//   bundles/{repo}/
 func GetArchivePathPrefixToBundles(repo string) string {
 	return fmt.Sprint(getArchivePathToBundles(), repo+"/")
 }
@@ -166,60 +163,19 @@ func getArchivePathToBundles() string {
 	return fmt.Sprint("bundles/")
 }
 
-// GetArchivePathToBundleFileList yields a path to the file list of a bundle
+// GetArchivePathToBundleFileList yields a path to the list of the files in a bundle
+//
+// Example:
+//   bundles/{repo}/{bundleID}/bundle-files-{index}.yaml
 func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
-	// <repo>-bundles/<bundle>/bundlefiles-<index>.yaml
-	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/bundle-files-", index, ".yaml")
+	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/", bundleFilesIndex, index, ".yaml")
 }
 
 var metaRe, flRe, genFileRe *regexp.Regexp
 
-// GetArchivePathComponents yields all components from an archive path.
-//
-// NOTE: this function's design is converging on being able to return something meaningful
-// given any path in the metadata archive, not just those corresponding to bundles.
-//
-// The return value might be changed to an interface type in later iterations.
-func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
-	cs := strings.SplitN(archivePath, "/", 4)
-	if cs[0] == "labels" {
-		if cs[3] != "label.yaml" {
-			return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be label.yaml. components: %v, path: %s", cs, archivePath)
-		}
-		return ArchivePathComponents{
-			LabelName: cs[2],
-			Repo:      cs[1],
-		}, nil
-	}
-	if cs[0] == "repos" {
-		return ArchivePathComponents{Repo: cs[1]}, nil
-		// TODO: implement more stringent checks. bundle_list_test.go needs refactoring
-		//if cs[2] == "repo.yaml" {
-		//}
-		//return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be repo.yaml. components: %v, path: %s", cs, archivePath)
-	}
-	if cs[0] == "bundles" {
-		return ArchivePathComponents{
-			Repo:            cs[1],
-			BundleID:        cs[2],
-			ArchiveFileName: cs[3],
-		}, nil // placeholder in case of mor parsing
-		//if cs[3] == "bundle.yaml" {
-		//}
-		//return ArchivePathComponents{}, fmt.Errorf("path is invalid, last element in the path should be bundle.yaml. components: %v, path: %s", cs, archivePath)
-	}
-	return ArchivePathComponents{
-		Repo:            cs[1],
-		BundleID:        cs[2],
-		ArchiveFileName: cs[3],
-	}, nil // placeholder in case of mor parsing
-	//return ArchivePathComponents{}, fmt.Errorf("path is invalid: %v, path: %s", cs, archivePath)
-}
-
 // GetBundleTimeStamp yields the current UTC time
 func GetBundleTimeStamp() time.Time {
-	t := time.Now()
-	return t.UTC()
+	return time.Now().UTC()
 }
 
 // IsGeneratedFile indicate if some file comes from auto-generation (e.g. .datamon files)
@@ -231,6 +187,6 @@ func IsGeneratedFile(file string) bool {
 
 func init() {
 	metaRe = regexp.MustCompile(`^\.datamon/(.*)\.yaml$`)
-	flRe = regexp.MustCompile(`^(.*)-bundle-files-(.*)$`)
+	flRe = regexp.MustCompile(`^(.*)-` + bundleFilesIndex + `(.*)$`)
 	genFileRe = regexp.MustCompile("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$")
 }

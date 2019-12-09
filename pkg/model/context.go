@@ -28,7 +28,8 @@ type Context struct {
 
 // GetPathToContext returns the path to the context descriptor.
 func GetPathToContext(context string) string {
-	return context + "/" + "context.yaml"
+	// TODO: should probably add "contexts/" to be able to efficiently list available contexts
+	return context + "/" + contextDescriptorFile
 }
 
 // GetWALName yields the name of the Write Ahead Log store
