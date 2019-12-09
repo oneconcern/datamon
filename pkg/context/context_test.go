@@ -52,7 +52,7 @@ func TestNewContext(t *testing.T) {
 				vMetadata: s4,
 				readLog:   s5,
 			},
-			want: Stores{
+			want: &defaultStores{
 				wal:       s1,
 				blob:      s2,
 				metadata:  s3,
