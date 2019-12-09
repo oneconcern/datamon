@@ -24,13 +24,6 @@ const (
 	typicalBundlesNum     = 1000 // default number of allocated slots for bundles in a repo
 )
 
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // bundleEvent catches a single bundle with possible retrieval error
 type bundleEvent struct {
 	bundle model.BundleDescriptor
