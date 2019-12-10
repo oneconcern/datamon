@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/wal/status"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"go.uber.org/zap"
@@ -37,54 +39,69 @@ type WAL struct {
 }
 
 // Options to the write-ahead log
-type Options func(w *WAL)
+type Option func(w *WAL)
 
-func MaxConcurrency(c int) Options {
+func MaxConcurrency(c int) Option {
 	return func(w *WAL) {
 		w.maxConcurrency = c
 	}
 }
 
-func TokenGeneratorPath(path string) Options {
+func TokenGeneratorPath(path string) Option {
 	return func(w *WAL) {
 		w.tokenGeneratorPath = path
 	}
 }
 
-func NewWAL(mutableStore storage.Store, walStore storage.Store, logger *zap.Logger, options ...Options) *WAL {
-	wal := WAL{
-		mutableStore:       mutableStore,
-		walStore:           walStore,
-		tokenGeneratorPath: model.TokenGeneratorPath,
+// Logger sets a logger for this WAL
+func Logger(logger *zap.Logger) Option {
+	return func(w *WAL) {
+		if logger != nil {
+			w.l = logger
+		}
+	}
+}
+
+func defaultWAL() *WAL {
+	logger, _ := dlogger.GetLogger(dlogger.LogLevelInfo)
+	return &WAL{
 		maxConcurrency:     maxConcurrency,
 		l:                  logger,
+		tokenGeneratorPath: model.TokenGeneratorPath,
 	}
+}
+
+// New builds a new write-ahead log on some mutable store, with log entries stored at the walStore
+func New(mutableStore storage.Store, walStore storage.Store, options ...Option) *WAL {
+	wal := defaultWAL()
 	for _, option := range options {
-		option(&wal)
+		option(wal)
 	}
+	wal.mutableStore = mutableStore
+	wal.walStore = walStore
 	wal.connectionControl = make(chan struct{}, maxConcurrency)
 	// Check if token generator object exists
 	_ = mutableStore.Put(context.Background(), wal.tokenGeneratorPath, strings.NewReader(""), storage.OverWrite)
-	return &wal
+	return wal
 }
 
 // Gets a token such that tokens are K-sortable.
 func (w *WAL) getToken(ctx context.Context) (string, error) {
 	err := w.updateTokenTimestamp(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to update the token generator err:%s", err.Error())
+		return "", status.ErrTokenGenUpdate.Wrap(err)
 	}
 
 	// Read the updateTime from the tokenGenerator object
 	attr, err := w.mutableStore.GetAttr(ctx, w.tokenGeneratorPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to get tokenGenerator attributes: %s, err:%s", w.tokenGeneratorPath, err)
+		return "", status.ErrTokenAttributes.WrapWithLog(w.l, err, zap.String("token generator", w.tokenGeneratorPath))
 	}
 
 	// Use the updateTime from the token generator (gain independence from local wall clock)
 	k, err := ksuid.NewRandomWithTime(attr.Updated)
 	if err != nil {
-		return "", fmt.Errorf("failed tp generate ksuid: %s", err)
+		return "", status.ErrKSUID.Wrap(err)
 	}
 
 	w.l.Debug("generated token", zap.String("token", k.String()), zap.Time("updateTime", attr.Updated))
@@ -100,15 +117,14 @@ func (w *WAL) Add(ctx context.Context, p string) (string, error) {
 	var err error
 	e.Token, err = w.getToken(ctx)
 	if err != nil {
-		w.l.Error("failed to generate token for entry", zap.Error(err), zap.String("payload", p))
-		return "", fmt.Errorf("failed to generate token: %v", err)
+		return "", status.ErrTokenGenerate.WrapWithLog(w.l, err, zap.String("payload", p))
 	}
+
 	err = w.walStore.Put(ctx, e.Token, strings.NewReader(e.Payload), storage.NoOverWrite) // Should be a new entry
 	if err != nil {
-		w.l.Error("failed to add wal entry", zap.Error(err), zap.String("token", e.Token))
-		return "", fmt.Errorf("failed to add wal token: %s, entry: %s", e.Token, err.Error())
+		return "", status.ErrAddWALEntry.WrapWithLog(w.l, err, zap.String("token", e.Token))
 	}
-	w.l.Info("Write wal entry", zap.String("token", e.Token))
+	w.l.Debug("Write wal entry", zap.String("token", e.Token))
 	return e.Token, err
 }
 
@@ -126,10 +142,7 @@ func (w *WAL) updateTokenTimestamp(ctx context.Context) error {
 // Use the last Entry of the previous call to paginate to the next set of keys.
 func (w *WAL) ListTokens(ctx context.Context, fromToken string, max int) (tokens []string, next string, err error) {
 	if max <= 0 {
-		w.l.Warn("received 0 length max",
-			zap.String("fromToken", fromToken),
-			zap.Int("max", max))
-		return nil, "", fmt.Errorf("max count needs to be greater than 0 : %d, fromToken:%s", max, fromToken)
+		return nil, "", status.ErrMaxCount.WrapWithLog(w.l, nil, zap.Int("max count", max), zap.String("token", fromToken))
 	}
 	k, err := ksuid.Parse(fromToken)
 	if err != nil {
@@ -140,15 +153,14 @@ func (w *WAL) ListTokens(ctx context.Context, fromToken string, max int) (tokens
 	}
 
 	// Go back in time to include the keys that might have been written before the token was generated.
-	b := []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
+	b := make([]byte, 16)
 	ksuidOld, err := ksuid.FromParts(k.Time().Add(-w.GetExpirationDuration()*2), b)
 	if err != nil {
-		w.l.Error("failed to calculate first token", zap.Error(err), zap.String("fromToken", fromToken))
+		return nil, "", status.ErrFirstToken.WrapWithLog(w.l, err, zap.String("fromToken", fromToken))
 	}
 	tokens, next, err = w.walStore.KeysPrefix(ctx, ksuidOld.String(), "", "", max)
 	if err != nil {
-		w.l.Error("failed to get tokens",
-			zap.Error(err),
+		return nil, "", status.ErrGetTokens.WrapWithLog(w.l, err,
 			zap.String("backDatedToken", ksuidOld.String()),
 			zap.String("token", fromToken))
 	}

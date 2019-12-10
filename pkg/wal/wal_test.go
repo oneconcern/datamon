@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -47,7 +48,6 @@ func randSleep() {
 }
 
 func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
-
 	ctx := context.Background()
 
 	bucket := "deleteme-wal-test-" + internal.RandStringBytesMaskImprSrc(15)
@@ -104,18 +104,26 @@ func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
 	return gcs, cleanup
 }
 
+func mustGetTestLogger(t *testing.T) *zap.Logger {
+	if isDebug := os.Getenv("DEBUG_TEST"); isDebug != "" {
+		l, err := zap.NewDevelopment()
+		require.NoError(t, err)
+		return l
+	}
+	return zap.NewNop()
+}
+
 func TestNewWAL1(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		mutableStore storage.Store
 		walStore     storage.Store
-		logger       *zap.Logger
-		options      []Options
+		options      []Option
 	}
-	l, err := zap.NewDevelopment()
+	l := mustGetTestLogger(t)
+
 	s1 := localfs.New(afero.NewOsFs())
 	s2 := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), "base"))
-	require.NoError(t, err)
 	tests := []struct {
 		name string
 		args args
@@ -126,8 +134,7 @@ func TestNewWAL1(t *testing.T) {
 			args: args{
 				mutableStore: s1,
 				walStore:     s2,
-				logger:       l,
-				options:      []Options{MaxConcurrency(11), TokenGeneratorPath("path")},
+				options:      []Option{MaxConcurrency(11), TokenGeneratorPath("path")},
 			},
 			want: &WAL{
 				mutableStore:       s1,
@@ -143,8 +150,7 @@ func TestNewWAL1(t *testing.T) {
 			args: args{
 				mutableStore: s1,
 				walStore:     s2,
-				logger:       l,
-				options:      []Options{TokenGeneratorPath("path")},
+				options:      []Option{TokenGeneratorPath("path")},
 			},
 			want: &WAL{
 				mutableStore:       s1,
@@ -159,8 +165,7 @@ func TestNewWAL1(t *testing.T) {
 			args: args{
 				mutableStore: s1,
 				walStore:     s2,
-				logger:       l,
-				options:      []Options{MaxConcurrency(11)},
+				options:      []Option{MaxConcurrency(11)},
 			},
 			want: &WAL{
 				mutableStore:       s1,
@@ -175,8 +180,7 @@ func TestNewWAL1(t *testing.T) {
 			args: args{
 				mutableStore: s1,
 				walStore:     s2,
-				logger:       l,
-				options:      []Options{},
+				options:      []Option{},
 			},
 			want: &WAL{
 				mutableStore:       s1,
@@ -189,12 +193,13 @@ func TestNewWAL1(t *testing.T) {
 	}
 	for _, test := range tests {
 		tt := test
+		tt.args.options = append(tt.args.options, Logger(l))
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewWAL(tt.args.mutableStore, tt.args.walStore, tt.args.logger, tt.args.options...); !(reflect.DeepEqual(got.maxConcurrency, tt.want.maxConcurrency) ||
+			if got := New(tt.args.mutableStore, tt.args.walStore, tt.args.options...); !(reflect.DeepEqual(got.maxConcurrency, tt.want.maxConcurrency) ||
 				reflect.DeepEqual(got.mutableStore, tt.want.mutableStore) ||
 				reflect.DeepEqual(got.walStore, tt.want.walStore) ||
 				reflect.DeepEqual(got.l, tt.want.l)) {
-				t.Errorf("NewWAL() = %v, want %v", got, tt.want)
+				t.Errorf("New() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -208,8 +213,7 @@ func TestWAL_GetToken(t *testing.T) {
 	walStore, cleanupWal := setup(t, 0)
 	defer cleanupWal()
 	_ = mutableStore.Put(context.Background(), model.TokenGeneratorPath, strings.NewReader(""), storage.OverWrite)
-	l, err := zap.NewDevelopment()
-	require.NoError(t, err)
+	l := mustGetTestLogger(t)
 
 	type fields struct {
 		mutableStore       storage.Store
@@ -280,6 +284,7 @@ func TestWAL_GetToken(t *testing.T) {
 	for _, test := range tests {
 		tt := test
 		t.Run(tt.name, func(t *testing.T) {
+			var err error
 			token2 = token1
 			w := &WAL{
 				mutableStore:       tt.fields.mutableStore,
@@ -428,8 +433,7 @@ func TestWAL_Add(t *testing.T) {
 		ctx context.Context
 		p   string
 	}
-	l, err := zap.NewDevelopment()
-	require.NoError(t, err)
+	l := mustGetTestLogger(t)
 
 	tests := []struct {
 		name          string
@@ -764,8 +768,7 @@ func TestWAL_ListEntries(t *testing.T) {
 			},
 		},
 	}
-	l, err := zap.NewDevelopment()
-	require.NoError(t, err)
+	l := mustGetTestLogger(t)
 	for _, test := range tests {
 		tt := test
 		t.Run(tt.name, func(t *testing.T) {
