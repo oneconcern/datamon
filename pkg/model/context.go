@@ -11,8 +11,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// ContextVersion indicates the version of the context model
-const ContextVersion = 1.0
+const (
+	// ContextVersion indicates the version of the context model
+	ContextVersion = 1.0
+)
 
 // Context defines the details for a datamon context.
 type Context struct {

@@ -26,7 +26,7 @@ type Attributes struct {
 	Owner   string
 }
 
-// Store implementations know how to write entries to a K/V model.Store.
+// Store implementations know how to fetch and write entries from a and a K/V store.
 //
 // Typically this is something file system-like. Examples are S3, local FS, NFS, ...
 // Implementations of this interface are assumed to be fairly simple.
@@ -39,15 +39,22 @@ type Store interface {
 	Touch(context.Context, string) error
 	Put(context.Context, string, io.Reader, NewKey) error
 	Delete(context.Context, string) error
-	Keys(context.Context) ([]string, error)
 	Clear(context.Context) error
+
+	// Keys returns all keys known to the store.
+	// Depending on the implementation, some limit may exist on the maximum number of such returned keys
+	Keys(context.Context) ([]string, error)
+
+	// KeyPrefix provides a paginated key iterator using "pageToken" as the next starting point
 	KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) ([]string, string, error)
 }
 
+// StoreCRC knows how to update an object with a computed CRC checksum
 type StoreCRC interface {
 	PutCRC(context.Context, string, io.Reader, bool, uint32) error
 }
 
+// PipeIO copies data from a reader to a writer using io.Pipe
 func PipeIO(writer io.Writer, reader io.Reader) (n int64, err error) {
 	pr, pw := io.Pipe()
 	errC := make(chan error, 1)
