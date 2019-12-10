@@ -589,6 +589,13 @@ func (fs *fsMutable) SetXattr(
 func (fs *fsMutable) Destroy() {
 }
 
+func (fs *fsMutable) Fallocate(
+	ctx context.Context,
+	op *fuseops.FallocateOp) (err error) {
+	err = fuse.ENOSYS
+	return
+}
+
 type commitChans struct {
 	// recv data from goroutines about uploaded files
 	bundleEntry chan<- model.BundleEntry
