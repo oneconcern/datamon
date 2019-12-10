@@ -69,7 +69,7 @@ type ApplyBundleFunc func(model.BundleDescriptor) error
 //				fmt.Fprintf(os.Stderr, "%v\n", bundle)
 //				return nil
 //			})
-func ListBundlesApply(repo string, stores context2.Stores, apply ApplyBundleFunc, opts ...ListOption) error {
+func ListBundlesApply(repo string, stores context2.Stores, apply ApplyBundleFunc, opts ...Option) error {
 	var (
 		err, applyErr error
 		once          sync.Once
@@ -128,7 +128,7 @@ func ListBundlesApply(repo string, stores context2.Stores, apply ApplyBundleFunc
 // ListBundles returns a list of bundle descriptors from a repo. It collects all bundles until completion.
 //
 // NOTE: this func could become deprecated. At this moment, however, it is used by pkg/web.
-func ListBundles(repo string, stores context2.Stores, opts ...ListOption) (model.BundleDescriptors, error) {
+func ListBundles(repo string, stores context2.Stores, opts ...Option) (model.BundleDescriptors, error) {
 	bundles := make(model.BundleDescriptors, 0, typicalBundlesNum)
 
 	bundlesChan, workers := listBundlesChan(repo, stores, opts...)
@@ -152,7 +152,7 @@ func ListBundles(repo string, stores context2.Stores, opts ...ListOption) (model
 // A signaling channel may be given as option to interrupt background processing (e.g. on error).
 //
 // The sync.WaitGroup for internal goroutines is returned if caller wants to wait and avoid any leaked goroutines.
-func listBundlesChan(repo string, stores context2.Stores, opts ...ListOption) (chan bundlesEvent, *sync.WaitGroup) {
+func listBundlesChan(repo string, stores context2.Stores, opts ...Option) (chan bundlesEvent, *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	settings := defaultSettings()

@@ -190,7 +190,7 @@ var uploadCmd = &cobra.Command{
 		)
 
 		logger.Debug("beginning upload")
-		var opts []core.ListOption
+		var opts []core.Option
 		if params.root.memProfPath != "" {
 			// add some extra memory profiling on specific critical parts (i.e. bundle Upload)
 			opts = append(opts, core.WithMemProf(params.root.memProfPath))

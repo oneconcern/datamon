@@ -236,17 +236,17 @@ func implPublishMetadata(ctx context.Context, bundle *Bundle,
 }
 
 // Upload an bundle to archive
-func Upload(ctx context.Context, bundle *Bundle, opts ...ListOption) error {
+func Upload(ctx context.Context, bundle *Bundle, opts ...Option) error {
 	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, nil, opts...)
 }
 
 // UploadSpecificKeys uploads some specified keys (files) within a bundle's consumable store
-func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error), opts ...ListOption) error {
+func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error), opts ...Option) error {
 	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, getKeys, opts...)
 }
 
 // implementation of Upload() with some additional parameters for test
-func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...ListOption) error {
+func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...Option) error {
 	if err := RepoExists(bundle.RepoID, bundle.contextStores); err != nil {
 		return err
 	}
