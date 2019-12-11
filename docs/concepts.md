@@ -13,7 +13,7 @@ A bundle is a point in time read-only view of a repo, composed of individual fil
 
 See [usage](usage/datamon_bundle.md)
 
-Bundle metadata can be _downloaded_ (e.g. contributors), bundle blob content can be _mounted_ on a host mount path.
+Bundle metadata can be _downloaded_ (e.g. to see contributors), bundle blob content can be _mounted_ on a host mount path.
 
 A simple read-only mount provide a file system view of the bundle content.
 

@@ -1,3 +1,4 @@
+// Package sthree implements datamon Store for AWS S3
 package sthree
 
 import (

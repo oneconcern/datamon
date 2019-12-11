@@ -1,3 +1,4 @@
+// Package web builds a web server to navigate through datamon repos.
 package web
 
 import (
@@ -105,11 +106,13 @@ type ServerParams struct {
 	Credential string
 }
 
+// Server describe a web server with templates
 type Server struct {
 	tmpl   appTemplates
 	params ServerParams
 }
 
+// NewServer builds a new web server with page handlers
 func NewServer(params ServerParams) (*Server, error) {
 	tmpl, err := loadTemplates()
 	if err != nil {

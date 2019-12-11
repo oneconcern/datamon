@@ -1,3 +1,4 @@
+// Package status exports errors produced by the core package.
 package status
 
 import (

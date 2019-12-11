@@ -1,5 +1,6 @@
 // Copyright © 2018 One Concern
 
+// Package localfs implements datamon Store for a local file system
 package localfs
 
 import (

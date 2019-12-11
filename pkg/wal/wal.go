@@ -1,3 +1,7 @@
+// Package wal provides a write-ahead log.
+//
+// The WAL keeps track of all changes to a repo, that is,
+// which contributor did change what and when.
 package wal
 
 import (
@@ -22,6 +26,7 @@ const (
 	maxConcurrency    = 1024
 )
 
+// WAL describes a write-ahead log
 type WAL struct {
 	mutableStore       storage.Store // Location for updating token generator object
 	tokenGeneratorPath string        // Path to the token generator object in the mutable store
@@ -31,6 +36,7 @@ type WAL struct {
 	l                  *zap.Logger   // Logging
 }
 
+// Options to the write-ahead log
 type Options func(w *WAL)
 
 func MaxConcurrency(c int) Options {
@@ -38,6 +44,7 @@ func MaxConcurrency(c int) Options {
 		w.maxConcurrency = c
 	}
 }
+
 func TokenGeneratorPath(path string) Options {
 	return func(w *WAL) {
 		w.tokenGeneratorPath = path
