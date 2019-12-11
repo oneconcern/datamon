@@ -1,5 +1,7 @@
 module github.com/oneconcern/datamon
 
+// NOTE: goleak is a test dependency based on master and not the latest release (stalled)
+
 require (
 	cloud.google.com/go v0.49.0 // indirect
 	cloud.google.com/go/storage v1.4.0
