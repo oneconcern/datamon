@@ -9,17 +9,17 @@ import (
 const (
 	// descriptor files (object metadata)
 
-	repoDescriptorFile    = "repo.yaml"
-	labelDescriptorFile   = "label.yaml"
-	bundleDescriptorFile  = "bundle.yaml"
-	contextDescriptorFile = "context.yaml"
-	bundleFilesIndex      = "bundle-files-"
+	repoDescriptorFile     = "repo.yaml"
+	labelDescriptorFile    = "label.yaml"
+	bundleDescriptorFile   = "bundle.yaml"
+	contextDescriptorFile  = "context.yaml"
+	bundleFilesIndexPrefix = "bundle-files-"
 )
 
 var isBundleFileIndexRe *regexp.Regexp
 
 func init() {
-	isBundleFileIndexRe = regexp.MustCompile(`^` + bundleFilesIndex + `(\d+)\.yaml$`)
+	isBundleFileIndexRe = regexp.MustCompile(`^` + bundleFilesIndexPrefix + `(\d+)\.yaml$`)
 }
 
 // ArchivePathComponents defines the unique path parts to retrieve a file in a bundle
@@ -93,7 +93,7 @@ func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error)
 		default:
 			return ArchivePathComponents{},
 				fmt.Errorf("path is invalid, last element in the path should be either empty, %q or \"%s[nnn].yaml\". components: %v, path: %s",
-					bundleDescriptorFile, bundleFilesIndex, cs, archivePath)
+					bundleDescriptorFile, bundleFilesIndexPrefix, cs, archivePath)
 		}
 	// TODO: contexts
 	default:

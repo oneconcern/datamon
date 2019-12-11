@@ -169,7 +169,7 @@ func getArchivePathToBundles() string {
 // Example:
 //   bundles/{repo}/{bundleID}/bundle-files-{index}.yaml
 func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
-	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/", bundleFilesIndex, index, ".yaml")
+	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/", bundleFilesIndexPrefix, index, ".yaml")
 }
 
 var metaRe, flRe, genFileRe *regexp.Regexp
@@ -188,6 +188,6 @@ func IsGeneratedFile(file string) bool {
 
 func init() {
 	metaRe = regexp.MustCompile(`^\.datamon/(.*)\.yaml$`)
-	flRe = regexp.MustCompile(`^(.*)-` + bundleFilesIndex + `(.*)$`)
+	flRe = regexp.MustCompile(`^(.*)-` + bundleFilesIndexPrefix + `(.*)$`)
 	genFileRe = regexp.MustCompile("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$")
 }
