@@ -2,14 +2,17 @@
 
 ## datamon config
 
-Commands to manage a config
+Commands to manage the config file
 
 ### Synopsis
 
-Commands to manage datamon CLI config.
+Commands to manage datamon local CLI config file.
 
-Configuration for datamon is the common set of flags that are needed for most commands and do not change across runs,
-analogous to "git config ...". 
+The local datamon configuration file contains the common set of flags that are needed for most commands and do not change across runs,
+analogous to "git config ...".
+
+You may force a specific local config file using the $DATAMON_CONFIG environment variable (must be some yaml or json file).
+
 
 ### Options
 
@@ -26,5 +29,5 @@ analogous to "git config ...".
 ### SEE ALSO
 
 * [datamon](datamon.md)	 - Datamon helps building ML pipelines
-* [datamon config create](datamon_config_create.md)	 - Create a config
+* [datamon config create](datamon_config_create.md)	 - Create a local config file
 

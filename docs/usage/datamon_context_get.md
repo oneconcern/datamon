@@ -15,7 +15,7 @@ datamon context get [flags]
 ### Options
 
 ```
-      --config string   Set the config backend store to use (do not set the scheme, e.g. 'gs://')
+      --config string   Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
   -h, --help            help for get
 ```
 

@@ -16,7 +16,7 @@ datamon context create [flags]
 
 ```
       --blob string       The name of the bucket hosting the datamon blobs
-      --config string     Set the config backend store to use (do not set the scheme, e.g. 'gs://')
+      --config string     Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
   -h, --help              help for create
       --meta string       The name of the bucket used by datamon metadata
       --read-log string   The name of the bucket hosting the read log
