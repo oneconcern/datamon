@@ -1,4 +1,4 @@
-// Package status declares error constants returned by the various
+// Package status declares error constants returned by
 // implementations of the Authable interface.
 //
 // NOTE: such constants are located in a separate package to avoid

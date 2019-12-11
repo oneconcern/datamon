@@ -1,5 +1,6 @@
 // Copyright © 2018 One Concern
 
+// Package gcs implements datamon Store for Google GCS
 package gcs
 
 import (

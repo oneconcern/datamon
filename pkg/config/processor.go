@@ -1,6 +1,7 @@
+// Package config is currently unused.
 package config
 
-// Spec for what to process
+// Processor provides a specification for what to process
 type Processor struct {
 	Name      string    `json:"name" yaml:"name"`
 	Branch    string    `json:"branch" yaml:"branch"`
@@ -16,7 +17,7 @@ type Resources struct {
 	Mem ResourceLimit `json:"mem,omitempty" yaml:"mem,omitempty"`
 }
 
-// Resource limits
+// ResourceLimit applied to a resource used by the processor (e.g. Min/Max)
 type ResourceLimit struct {
 	Min string `json:"min,omitempty" yaml:"min,omitempty"`
 	Max string `json:"max,omitempty" yaml:"max,omitempty"`

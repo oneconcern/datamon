@@ -63,6 +63,7 @@ type BundleEntry struct {
 const (
 	// ConsumableStorePathTypeDescriptor defines consumable store metadata of type "descriptor"
 	ConsumableStorePathTypeDescriptor byte = iota
+
 	// ConsumableStorePathTypeFileList defines consumable store metadata of type "file list"
 	ConsumableStorePathTypeFileList
 )
