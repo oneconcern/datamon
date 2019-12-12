@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2019 One Concern
+ *
+ */
+
 package model
 
 import (
@@ -24,6 +29,7 @@ type BundleDescriptor struct {
 	BundleEntriesFileCount uint64        `json:"count" yaml:"count"`                                     // Number of files which have BundleDescriptor Entries
 	Version                uint64        `json:"version,omitempty" yaml:"version,omitempty"`             // Version for the bundle
 	Deduplication          string        `json:"deduplication,omitempty" yaml:"deduplication,omitempty"` // Type of deduplication used
+	RunStage               string        `json:"runstage,omitempty" yaml:"runstage,omitempty"`           // Path to the run stage
 	_                      struct{}
 }
 
