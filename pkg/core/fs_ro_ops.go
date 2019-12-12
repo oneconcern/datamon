@@ -404,6 +404,15 @@ func (fs *readOnlyFsInternal) Destroy() {
 	)
 }
 
+func (fs *readOnlyFsInternal) Fallocate(
+	ctx context.Context,
+	op *fuseops.FallocateOp) (err error) {
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+	err = fuse.ENOSYS
+	return
+}
+
 func isDir(fsEntry *fsEntry) bool {
 	return fsEntry.hash != ""
 }
