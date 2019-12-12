@@ -250,6 +250,7 @@ jobs:
               # otherwise, leaves standard changelog from goreleaser
               # (picks up all commits)
             fi
+            echo "Preparing release ${CIRCLE_TAG}"
             ./goreleaser ${opts-""}
 
 workflows:
@@ -284,7 +285,7 @@ workflows:
             - go_test
             - build_images
           filters:
+            tags:
+              only: /^v.*/
             branches:
               ignore: /.*/
-            tags:
-              only: /(^[^v].*)/
