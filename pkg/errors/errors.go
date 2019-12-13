@@ -7,6 +7,9 @@ package errors
 import (
 	stderr "errors"
 	"fmt"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var _ error = New("")
@@ -48,6 +51,31 @@ func (e *Error) Wrap(err error) *Error {
 	}
 	e.err = err
 	return e
+}
+
+// WrapMessage wraps a nested message error as with fmt.Errorf()
+func (e *Error) WrapMessage(msg string, args ...interface{}) *Error {
+	wrapped := fmt.Errorf(msg, args...)
+	return e.Wrap(wrapped)
+}
+
+// WithLog logs the error with some extra fields, which are part of the log but
+// not of the returned error.
+func (e *Error) WithLog(logger *zap.Logger, args ...zapcore.Field) *Error {
+	if logger != nil {
+		logger.Error(e.String(), args...)
+	}
+	return e
+}
+
+// WrapWithLog logs with some extra fields and wraps a nested error.
+// TODO(fred): marshal extra args into wrapped err...
+func (e *Error) WrapWithLog(logger *zap.Logger, err error, args ...zapcore.Field) *Error {
+	if logger != nil {
+		extras := append([]zapcore.Field{zap.Error(err)}, args...)
+		logger.Error(e.String(), extras...)
+	}
+	return e.Wrap(err)
 }
 
 // Is of some error type?
