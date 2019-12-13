@@ -258,25 +258,50 @@ workflows:
   build_and_test:
     jobs:
       - go_lint:
-         context: "OC Common"
+          context: "OC Common"
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
 
       - go_test:
           context: "OC Common"
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
 
       - fuse_sidecar_test:
           context: "OC Common"
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
 
       - build_images:
           context: "OC Common"
           requires:
             - go_lint
             - go_test
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
 
       - build_demo_images:
           context: "OC Common"
           requires:
             - go_lint
             - go_test
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
 
       - publish_release:
           context: "OC Common"
@@ -288,4 +313,5 @@ workflows:
             tags:
               only: /^v.*/
             branches:
-              ignore: /.*/
+              only:
+                - master
