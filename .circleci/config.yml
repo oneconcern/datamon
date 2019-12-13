@@ -23,6 +23,9 @@ executors:
   # TODO(frederic): add builder for alpine and compare
   docker_builder:
     working_directory: ~/project
+    environment:
+      GOOGLE_PROJECT_ID: "onec-co"
+      GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
       - image: circleci/golang
 
@@ -33,7 +36,7 @@ commands:
           name: Install packages with gcloud SDK installed locally
           command: |
             sudo apt-get update -y --quiet
-            sudo apt-get install --quiet lsb-release
+            sudo apt-get install --quiet lsb-release upx
             export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
             echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
             curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
@@ -236,22 +239,39 @@ jobs:
     # > goreleaser needs access to github API, not only the git repo.
     # > Hence ssh key is not sufficient and GITHUB_TOKEN is required.
     steps:
+      - setup_remote_docker:
+          version: 18.09.3
+      - install_base
+      - checkout
+      - restore_cache:
+          keys:
+            - pkg-cache-{{ checksum "go.sum" }}
+            - pkg-cache-
+      - login_to_google
       - run:
           name: Prepare github release
           command: |
+            #PATH=${PATH}:/usr/local/go/bin:${GOPATH}/bin
+            PATH=${PATH}:${GOPATH}/bin
+            opts="--debug"
             # self-installing goreleaser
-            curl -sL https://git.io/goreleaser > goreleaser
-            chmod u+x goreleaser
+            curl -sL https://git.io/goreleaser > ${GOPATH}/bin/goreleaser
+            chmod u+x ${GOPATH}/bin/goreleaser
             release_notes="./notes/NOTES.${CIRCLE_TAG}.md"
-            if [[ -n ${CIRCLE_TAG} && -f ${RELEASE_NOTES} ]] ; then
+            if [[ -n "${CIRCLE_TAG}" && -f ${RELEASE_NOTES} ]] ; then
               # use custom release notes
               echo "Adding release notes ${release_notes}"
-              opts="--release-notes ${release_notes}"
+              opts="${opts} --release-notes ${release_notes}"
+            else
               # otherwise, leaves standard changelog from goreleaser
               # (picks up all commits)
+              echo "No release notes provided: standard changelog applies"
+            fi
+            if [[ -z "${CIRCLE_TAG}" ]] ; then
+              echo "No tag defined for this commit. goleaser will fail [test purpose]"
             fi
             echo "Preparing release ${CIRCLE_TAG}"
-            ./goreleaser ${opts-""}
+            goreleaser ${opts} 2>&1
 
 workflows:
   version: 2
@@ -314,4 +334,5 @@ workflows:
               only: /^v.*/
             branches:
               only:
+                - goreleaser-debug
                 - master

@@ -49,7 +49,7 @@ archives:
     builds:
       - migrate
       - datamon_metrics
-    name_template: '{{ .ProjectName }}_tools_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    name_template: '{{ .ProjectName }}-tools_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     format: 'tar.gz'
     # TODO(frederic): add release notes/changelog when we have one
     files:
@@ -98,7 +98,4 @@ brews:
     install: |
       bin.install "datamon"
     test: |
-      # TODO(frederic): this hack will no longer be necessary when we remove this
-      # global env requirement for command "version".
-      ENV["DATAMON_GLOBAL_CONFIG"] = "x"
       system "#{bin}/datamon", "version"
