@@ -15,7 +15,6 @@ import (
 	"github.com/oneconcern/datamon/pkg/errors"
 	"github.com/oneconcern/datamon/pkg/model"
 
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
 )
@@ -31,15 +30,12 @@ var ContextGetCommand = &cobra.Command{
 }
 
 func getContext() {
-	configStore, err := gcs.New(context.Background(), datamonFlags.core.Config, config.Credential)
-	if err != nil {
-		wrapFatalln("failed to create config store. ", err)
-	}
+	configStore := mustGetConfigStore()
 	contextName := datamonFlags.context.Descriptor.Name
 	has, err := configStore.Has(context.Background(),
 		model.GetPathToContext(contextName))
 	if err != nil {
-		wrapFatalln("failed to test if context exists. ", err)
+		wrapFatalln("context does not exist", err)
 		return
 	}
 	if !has {

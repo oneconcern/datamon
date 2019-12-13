@@ -7,6 +7,7 @@ package model
 
 import (
 	"fmt"
+	"path"
 
 	"gopkg.in/yaml.v2"
 )
@@ -30,8 +31,16 @@ type Context struct {
 
 // GetPathToContext returns the path to the context descriptor.
 func GetPathToContext(context string) string {
-	// TODO: should probably add "contexts/" to be able to efficiently list available contexts
-	return context + "/" + contextDescriptorFile
+	return path.Join(getArchivePathToContexts(), context, contextDescriptorFile)
+}
+
+// GetArchivePathPrefixToContexts returns the path to the list of contexts
+func GetArchivePathPrefixToContexts() string {
+	return getArchivePathToContexts()
+}
+
+func getArchivePathToContexts() string {
+	return fmt.Sprint("contexts/")
 }
 
 // GetWALName yields the name of the Write Ahead Log store
