@@ -12,6 +12,7 @@ import (
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	status "github.com/oneconcern/datamon/pkg/core/status"
+	"github.com/oneconcern/datamon/pkg/errors"
 	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -48,7 +49,7 @@ func getContext() {
 
 	var rcvdContext model.Context
 	datamonContext, err := context2.GetContext(context.Background(), configStore, contextName)
-	if err == status.ErrNotFound {
+	if errors.Is(err, status.ErrNotFound) {
 		wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
 		return
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/oneconcern/datamon/pkg/errors"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -101,10 +102,10 @@ func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 
 func handleRemoteConfigErr(store storage.Store, err error) (storage.Store, error) {
 	// provide extra explanation and guidance about the error
-	switch err {
-	case storagestatus.ErrInvalidResource:
+	switch {
+	case errors.Is(err, storagestatus.ErrInvalidResource):
 		return nil, fmt.Errorf("please check that the config bucket %v is a valid gcs bucket: %w", store, err)
-	case storagestatus.ErrNotExists:
+	case errors.Is(err, storagestatus.ErrNotExists):
 		return nil, fmt.Errorf("please check that the config bucket has been created in your remote config at %v: %w", store, err)
 	}
 	return store, err
@@ -112,10 +113,10 @@ func handleRemoteConfigErr(store storage.Store, err error) (storage.Store, error
 
 func handleContextErr(r io.ReadCloser, err error) (io.ReadCloser, error) {
 	// provide extra explanation and guidance about the error
-	switch err {
-	case storagestatus.ErrInvalidResource:
+	switch {
+	case errors.Is(err, storagestatus.ErrInvalidResource):
 		return nil, fmt.Errorf("please check that the config bucket is a valid gcs bucket: %w", err)
-	case storagestatus.ErrNotExists:
+	case errors.Is(err, storagestatus.ErrNotExists):
 		return nil, fmt.Errorf("please check that the context has been created in your remote config: %w", err)
 	}
 	return r, err

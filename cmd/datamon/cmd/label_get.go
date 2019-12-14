@@ -7,6 +7,7 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"
+	"github.com/oneconcern/datamon/pkg/errors"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
@@ -34,7 +35,7 @@ exits with ENOENT status otherwise.`,
 			core.LabelName(datamonFlags.label.Name),
 		)
 		err = label.DownloadDescriptor(ctx, bundle, true)
-		if err == status.ErrNotFound {
+		if errors.Is(err, status.ErrNotFound) {
 			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
 			return
 		}
