@@ -79,7 +79,7 @@ commands:
 
 jobs:
   go_lint:
-    executor: docker_minio
+    executor: docker_builder
     steps:
       - install_base
       - checkout
@@ -105,9 +105,7 @@ jobs:
 
   go_test:
     executor: docker_minio
-    environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
+    parallelism: 2
     steps:
       - install_base
       - checkout
@@ -126,7 +124,12 @@ jobs:
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             hack/go-generate.sh
             go mod download
-            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures ./... -- -race ./...
+            if [[ ${CIRCLE_NODE_INDEX} -eq 0 ]] ; then
+              TESTS=$(go list ./...|grep 'datamon/cmd')
+            else
+              TESTS=$(go list ./...|grep -v 'datamon/cmd')
+            fi
+            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures -- -race ${TESTS}
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
@@ -139,9 +142,6 @@ jobs:
 
   fuse_sidecar_test:
     executor: docker_builder
-    environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
     steps:
       - setup_remote_docker:
           version: 18.09.3
@@ -165,9 +165,6 @@ jobs:
 
   build_images:
     executor: docker_builder
-    environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
     steps:
       - setup_remote_docker:
           version: 18.09.3
@@ -197,9 +194,6 @@ jobs:
 
   build_demo_images:
     executor: docker_builder
-    environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
     steps:
       - setup_remote_docker:
           version: 18.09.3
@@ -233,9 +227,7 @@ jobs:
 
   publish_release:
     executor: docker_builder
-    # TODO(frederic):
-    # - acquire GITHUB_TOKEN for onecrobot to push to homebrew-datamon repo
-    #
+    # NOTE:
     # > goreleaser needs access to github API, not only the git repo.
     # > Hence ssh key is not sufficient and GITHUB_TOKEN is required.
     steps:
