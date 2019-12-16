@@ -333,6 +333,4 @@ workflows:
             tags:
               only: /^v.*/
             branches:
-              only:
-                - goreleaser-debug
-                - master
+              ignore: /.*/
