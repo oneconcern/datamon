@@ -7,11 +7,13 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"
+	"github.com/oneconcern/datamon/pkg/errors"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
 )
 
+// GetRepoCommand retrieves the description of a repo
 var GetRepoCommand = &cobra.Command{
 	Use:   "get",
 	Short: "Get repo info by name",
@@ -27,11 +29,11 @@ exits with ENOENT status otherwise.`,
 		}
 		repoDescriptor, err := core.GetRepoDescriptorByRepoName(
 			remoteStores, datamonFlags.repo.RepoName)
-		if err == status.ErrNotFound {
-			wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
-			return
-		}
 		if err != nil {
+			if errors.Is(err, status.ErrNotFound) {
+				wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
+				return
+			}
 			wrapFatalln("error downloading repo information", err)
 			return
 		}

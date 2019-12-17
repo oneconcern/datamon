@@ -49,8 +49,10 @@ func (e *Error) Wrap(err error) *Error {
 	if e == nil {
 		return &Error{msg: err.Error()}
 	}
-	e.err = err
-	return e
+	return &Error{
+		msg: e.msg,
+		err: err,
+	}
 }
 
 // WrapMessage wraps a nested message error as with fmt.Errorf()
@@ -83,7 +85,10 @@ func (e *Error) Is(target error) bool {
 	if e == nil {
 		return target == nil
 	}
-	if e == target {
+	if thisTgt, ok := target.(*Error); ok && e.msg == thisTgt.msg {
+		return true
+	}
+	if e.msg == target.Error() {
 		return true
 	}
 	if e.err != nil {
