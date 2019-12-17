@@ -1,6 +1,9 @@
 module github.com/oneconcern/datamon
 
 // NOTE: goleak is a test dependency based on master and not the latest release (stalled)
+// NOTE: rhyds/go-github.-selfupdate carries out binary self update. My fork fixes an issue with
+// multi-artifacts releases (will prompty push PR to owner)
+replace github.com/rhysd/go-github-selfupdate => github.com/fredbi/go-github-selfupdate v1.2.0
 
 require (
 	cloud.google.com/go v0.49.0 // indirect

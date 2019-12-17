@@ -16,10 +16,13 @@ import (
 )
 
 const (
-	githubRepo = "fredbi/datamon"
+	githubRepo = "oneconcern/datamon"
 )
 
-var releaseDescriptorTemplate *template.Template
+var (
+	releaseDescriptorTemplate *template.Template
+	assetFilter               selfupdate.Option
+)
 
 func init() {
 	releaseDescriptorTemplate = func() *template.Template {
@@ -34,6 +37,7 @@ Release Notes: {{ .ReleaseNotes }}
 `
 		return template.Must(template.New("release").Parse(releaseTemplateString))
 	}()
+	assetFilter = selfupdate.AssetFilter("^datamon([^-]?.?)_")
 }
 
 func applyReleaseTemplate(release *selfupdate.Release) error {
@@ -75,7 +79,7 @@ func doSelfUpgrade(opts upgradeFlags) error {
 		selfupdate.EnableLog()
 	}
 
-	latest, err := selfupdate.UpdateCommand(opts.selfBinary, v, githubRepo)
+	latest, err := selfupdate.UpdateCommand(opts.selfBinary, v, githubRepo, assetFilter)
 	if err != nil {
 		return errors.New("binary update failed").Wrap(err)
 	}
@@ -90,7 +94,6 @@ func doSelfUpgrade(opts upgradeFlags) error {
 	}
 	return nil
 }
-
 func doCheckVersion() error {
 	isRelease := false
 	version := NewVersionInfo().Version
@@ -102,7 +105,7 @@ func doCheckVersion() error {
 		isRelease = true
 	}
 
-	latest, found, err := selfupdate.DefaultUpdater().DetectLatest(githubRepo)
+	latest, found, err := selfupdate.DefaultUpdater().DetectLatest(githubRepo, assetFilter)
 	if err != nil {
 		return errors.New(fmt.Sprintf("could not fetch release from github repo (%s)", githubRepo)).Wrap(err)
 	}

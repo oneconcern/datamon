@@ -3,6 +3,7 @@ package cmd
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -30,22 +31,18 @@ func TestSelfUpgrade(t *testing.T) {
 	opts.selfBinary = "fake"
 	require.Error(t, doSelfUpgrade(opts))
 
-	dummyExec, err := ioutil.TempFile("", "dummy-exec")
+	dummyDir, err := ioutil.TempDir("", "dummy-exec")
 	require.NoError(t, err)
-	defer func() { _ = os.Remove(dummyExec.Name()) }()
+	defer func() { _ = os.RemoveAll(dummyDir) }()
 
-	_, err = dummyExec.Write([]byte(`dummy`))
+	opts.selfBinary = filepath.Join(dummyDir, "datamon")
+
+	err = ioutil.WriteFile(opts.selfBinary, []byte(`dummy`), 0700)
 	require.NoError(t, err)
-	require.NoError(t, dummyExec.Close())
 
-	opts.selfBinary = dummyExec.Name()
 	require.NoError(t, doSelfUpgrade(opts))
 
-	err = os.Chmod(dummyExec.Name(), 0700)
-	require.NoError(t, err)
-
-	_ = os.Setenv("DATAMON_GLOBAL_CONFIG", "x") // TODO: we should remove this requirement on some commands
-	res := icmd.RunCommand(dummyExec.Name(), "version")
+	res := icmd.RunCommand(opts.selfBinary, "version")
 	require.EqualValues(t, 0, res.ExitCode)
 
 	rexp := regexp.MustCompile(`(?m)Version:\s*(.*?)\nBuild date:\s*(.*?)\nCommit:\s*(.*)`)
