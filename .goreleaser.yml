@@ -23,8 +23,6 @@ builds:
       - '-X "{{.Env.IMPORT_PATH}}.GitCommit={{.ShortCommit}}"'
     goos: [ linux, darwin ]
     goarch: [ amd64 ]
-    hooks:
-      post: ./hack/releaser/post-build.sh datamon
 
   - id: migrate
     env: []
