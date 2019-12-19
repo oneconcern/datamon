@@ -19,10 +19,7 @@ const (
 	githubRepo = "oneconcern/datamon"
 )
 
-var (
-	releaseDescriptorTemplate *template.Template
-	assetFilter               selfupdate.Option
-)
+var releaseDescriptorTemplate *template.Template
 
 func init() {
 	releaseDescriptorTemplate = func() *template.Template {
@@ -37,7 +34,6 @@ Release Notes: {{ .ReleaseNotes }}
 `
 		return template.Must(template.New("release").Parse(releaseTemplateString))
 	}()
-	assetFilter = selfupdate.AssetFilter("^datamon([^-]?.?)_")
 }
 
 func applyReleaseTemplate(release *selfupdate.Release) error {
@@ -55,6 +51,18 @@ type upgradeFlags struct {
 	forceUgrade bool
 	verbose     bool
 	selfBinary  string // use to mock updated binary (we don't want the test binary to be overwritten during tests)
+}
+
+func updater() *selfupdate.Updater {
+	//assetFilter = selfupdate.AssetFilter("^datamon([^-]?.?)_")
+	u, err := selfupdate.NewUpdater(selfupdate.Config{
+		Filters: []string{"^datamon([^-]?.?)_"},
+	})
+	if err != nil {
+		wrapFatalln("error setting up self update", err)
+		return nil
+	}
+	return u
 }
 
 func doSelfUpgrade(opts upgradeFlags) error {
@@ -79,7 +87,7 @@ func doSelfUpgrade(opts upgradeFlags) error {
 		selfupdate.EnableLog()
 	}
 
-	latest, err := selfupdate.UpdateCommand(opts.selfBinary, v, githubRepo, assetFilter)
+	latest, err := updater().UpdateCommand(opts.selfBinary, v, githubRepo)
 	if err != nil {
 		return errors.New("binary update failed").Wrap(err)
 	}
@@ -94,6 +102,7 @@ func doSelfUpgrade(opts upgradeFlags) error {
 	}
 	return nil
 }
+
 func doCheckVersion() error {
 	isRelease := false
 	version := NewVersionInfo().Version
@@ -105,7 +114,7 @@ func doCheckVersion() error {
 		isRelease = true
 	}
 
-	latest, found, err := selfupdate.DefaultUpdater().DetectLatest(githubRepo, assetFilter)
+	latest, found, err := updater().DetectLatest(githubRepo)
 	if err != nil {
 		return errors.New(fmt.Sprintf("could not fetch release from github repo (%s)", githubRepo)).Wrap(err)
 	}
@@ -135,10 +144,12 @@ var selfUpgradeCmd = &cobra.Command{
 		if datamonFlags.upgrade.checkOnly {
 			if err := doCheckVersion(); err != nil {
 				wrapFatalln("error checking latest release", err)
+				return
 			}
 		}
 		if err := doSelfUpgrade(datamonFlags.upgrade); err != nil {
 			wrapFatalln("error trying to update datamon", err)
+			return
 		}
 	},
 }
