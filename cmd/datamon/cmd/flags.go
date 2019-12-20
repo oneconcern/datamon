@@ -34,6 +34,7 @@ type flagsT struct {
 		SkipOnError       bool
 		ConcurrencyFactor int
 		NameFilter        string
+		WithLabels        bool
 	}
 	web struct {
 		port      int
@@ -203,6 +204,12 @@ func addLabelPrefixFlag(cmd *cobra.Command) string {
 	prefixString := "prefix"
 	cmd.Flags().StringVar(&datamonFlags.label.Prefix, prefixString, "", "List labels starting with a prefix.")
 	return prefixString
+}
+
+func addWithLabelFlag(cmd *cobra.Command) string {
+	withLabels := "with-labels"
+	cmd.Flags().BoolVar(&datamonFlags.bundle.WithLabels, withLabels, false, "Include labels in the returned bundle metadata")
+	return withLabels
 }
 
 func addRepoNameOptionFlag(cmd *cobra.Command) string {

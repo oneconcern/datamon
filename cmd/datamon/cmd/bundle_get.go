@@ -8,6 +8,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/errors"
+	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
@@ -57,8 +58,25 @@ exits with ENOENT status otherwise.`,
 			return
 		}
 
+		var labels []model.LabelDescriptor
+		if datamonFlags.bundle.WithLabels {
+			// optionally starts by retrieving labels on this repo
+			labels = getLabels(remoteStores)
+		}
+
 		var buf bytes.Buffer
-		err = bundleDescriptorTemplate.Execute(&buf, bundle.BundleDescriptor)
+		if labels != nil {
+			data := struct {
+				model.BundleDescriptor
+				Labels string
+			}{
+				BundleDescriptor: bundle.BundleDescriptor,
+			}
+			data.Labels = displayBundleLabels(bundle.BundleDescriptor.ID, labels)
+			err = bundleDescriptorTemplate(true).Execute(&buf, data)
+		} else {
+			err = bundleDescriptorTemplate(false).Execute(&buf, bundle.BundleDescriptor)
+		}
 		if err != nil {
 			log.Println("executing template:", err)
 		}
@@ -76,6 +94,7 @@ func init() {
 
 	addBundleFlag(GetBundleCommand)
 	addLabelNameFlag(GetBundleCommand)
+	addWithLabelFlag(GetBundleCommand)
 
 	bundleCmd.AddCommand(GetBundleCommand)
 }

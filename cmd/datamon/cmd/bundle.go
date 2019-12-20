@@ -6,9 +6,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"text/template"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
+	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/spf13/cobra"
@@ -30,15 +32,22 @@ together.`,
 	},
 }
 
-var bundleDescriptorTemplate *template.Template
-
 func init() {
 	rootCmd.AddCommand(bundleCmd)
+}
 
-	bundleDescriptorTemplate = func() *template.Template {
-		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
-		return template.Must(template.New("list line").Parse(listLineTemplateString))
-	}()
+func bundleDescriptorTemplate(withLabels bool) *template.Template {
+	// bundle rendering comes in 2 flavors: one without the labels field, the other with the
+	// comma separated list of labels set on the bundle. When the label field is wanted,
+	// but empty, it takes the <no label> value.
+	var listLineTemplateString string
+	if !withLabels {
+		listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
+	} else {
+		// template with labels
+		listLineTemplateString = `{{.ID}} ,{{.Labels}}, {{.Timestamp}} , {{.Message}}`
+	}
+	return template.Must(template.New("list line").Parse(listLineTemplateString))
 }
 
 func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) error {
@@ -68,4 +77,19 @@ func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) erro
 	}
 	log.Printf("Using bundle: %s", datamonFlags.bundle.ID)
 	return nil
+}
+
+// displayBundleLabels constructs a string representation of a list of labels associated to a bundle
+func displayBundleLabels(bundleID string, labels []model.LabelDescriptor) string {
+	bundleLabels := make([]string, 0, len(labels))
+	for _, label := range labels {
+		if label.BundleID == bundleID {
+			bundleLabels = append(bundleLabels, label.Name)
+		}
+	}
+	if len(bundleLabels) > 0 {
+		// using ";" to keep simple split rule on main fields
+		return "(" + strings.Join(bundleLabels, ";") + ")"
+	}
+	return "<no label>"
 }

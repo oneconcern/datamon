@@ -28,6 +28,7 @@ datamon bundle list [flags]
       --concurrency-factor int   Heuristic on the amount of concurrency used by core operations. Concurrent retrieval of metadata is capped by the 'batch-size' parameter. Turn this value down to use less memory, increase for faster operations. (default 500)
   -h, --help                     help for list
       --repo string              The name of this repository
+      --with-labels              Include labels in the returned bundle metadata
 ```
 
 ### Options inherited from parent commands

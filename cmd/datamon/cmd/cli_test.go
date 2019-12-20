@@ -352,6 +352,7 @@ type bundleListEntry struct {
 	hash    string
 	message string
 	time    time.Time
+	labels  string
 }
 
 type bundleListEntries []bundleListEntry
@@ -369,16 +370,17 @@ func (b bundleListEntries) Last() bundleListEntry {
 	return b[len(b)-1]
 }
 
-func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
+func listBundles(t *testing.T, repoName string, flags ...string) (bundleListEntries, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		panic(err)
 	}
 	log.SetOutput(w)
-	runCmd(t, []string{"bundle",
+	runCmd(t, append([]string{"bundle",
 		"list",
 		"--repo", repoName,
-	}, "list bundles", false)
+	}, flags...),
+		"list bundles", false)
 	log.SetOutput(os.Stdout)
 	w.Close()
 	//
@@ -387,15 +389,30 @@ func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
 	bles := make(bundleListEntries, 0)
 	for _, line := range getDataLogLines(t, string(lb), []string{}) {
 		sl := strings.Split(line, ",")
-		t, err := time.Parse(timeForm, strings.TrimSpace(sl[1]))
+
+		// updates expectations about format, depending on flags
+		expectLabels := false
+		offset := 0
+		for _, flag := range flags {
+			if flag == "--with-labels" {
+				expectLabels = true
+				offset = 1
+				break
+			}
+		}
+
+		t, err := time.Parse(timeForm, strings.TrimSpace(sl[1+offset]))
 		if err != nil {
 			return nil, err
 		}
 		rle := bundleListEntry{
 			rawLine: line,
 			hash:    strings.TrimSpace(sl[0]), // bundle ID
-			message: strings.TrimSpace(sl[2]),
+			message: strings.TrimSpace(sl[2+offset]),
 			time:    t,
+		}
+		if expectLabels {
+			rle.labels = strings.TrimSpace(sl[1])
 		}
 		bles = append(bles, rle)
 	}
@@ -504,6 +521,7 @@ func TestGetLabel(t *testing.T) {
 		"--description", "testing",
 		"--repo", repo1,
 	}, "create first test repo", false)
+
 	runCmd(t, []string{"label",
 		"get",
 		"--repo", repo1,
@@ -513,6 +531,7 @@ func TestGetLabel(t *testing.T) {
 		"ENOENT on nonexistant label")
 	files := testUploadTrees[0]
 	file := files[0]
+
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, file),
@@ -521,11 +540,26 @@ func TestGetLabel(t *testing.T) {
 		"--label", label,
 		"--concurrency-factor", concurrencyFactor,
 	}, "upload bundle at "+dirPathStr(t, file), false)
+
 	runCmd(t, []string{"label",
 		"get",
 		"--repo", repo1,
 		"--label", label,
 	}, "get label", false)
+
+	// query bundles with labels
+	bundles, err := listBundles(t, repo1, "--with-labels")
+	require.NoError(t, err)
+	bundle := bundles.Last()
+	require.Equal(t, "("+label+")", bundle.labels)
+
+	runCmd(t, []string{"bundle",
+		"get",
+		"--repo", repo1,
+		"--bundle", bundle.hash,
+		"--with-labels",
+	}, "("+label+")", false)
+	require.NoError(t, err)
 }
 
 type labelListEntry struct {
@@ -643,7 +677,13 @@ func TestSetLabel(t *testing.T) {
 	ll = listLabels(t, repo1, "")
 	require.Equal(t, len(ll), 0, "no labels created yet")
 
-	bundles, err := listBundles(t, repo1)
+	// query bundles with labels when no label set
+	bundles, err := listBundles(t, repo1, "--with-labels")
+	require.NoError(t, err)
+	bundle := bundles.Last()
+	require.Equal(t, "<no label>", bundle.labels)
+
+	bundles, err = listBundles(t, repo1)
 	require.NoError(t, err, "error out of listBundles() test helper")
 	require.Equal(t, 1, bundles.Len(), "bundle count in test repo")
 

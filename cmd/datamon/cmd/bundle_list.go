@@ -12,15 +12,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func applyBundleTemplate(bundle model.BundleDescriptor) error {
-	var buf bytes.Buffer
-	if err := bundleDescriptorTemplate.Execute(&buf, bundle); err != nil {
-		// NOTE(frederic): to be discussed - PR#267 introduced a change here
-		// by stopping upon errors while it was previously non-blocking
-		return fmt.Errorf("executing template: %w", err)
+func applyBundleTemplate(labels []model.LabelDescriptor) func(model.BundleDescriptor) error {
+	return func(bundle model.BundleDescriptor) error {
+		var (
+			buf bytes.Buffer
+			err error
+		)
+
+		if labels != nil {
+			data := struct {
+				model.BundleDescriptor
+				Labels string
+			}{
+				BundleDescriptor: bundle,
+			}
+			data.Labels = displayBundleLabels(bundle.ID, labels)
+			err = bundleDescriptorTemplate(true).Execute(&buf, data)
+		} else {
+			err = bundleDescriptorTemplate(false).Execute(&buf, bundle)
+		}
+		if err != nil {
+			return fmt.Errorf("executing template: %w", err)
+		}
+		log.Println(buf.String())
+		return nil
 	}
-	log.Println(buf.String())
-	return nil
 }
 
 // BundleListCommand describes the CLI command for listing bundles
@@ -39,7 +55,15 @@ This is analogous to the "git log" command. The bundle ID works like a git commi
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		err = core.ListBundlesApply(datamonFlags.repo.RepoName, remoteStores, applyBundleTemplate,
+
+		var labels []model.LabelDescriptor
+		if datamonFlags.bundle.WithLabels {
+			// optionally starts by retrieving labels on this repo
+			labels = getLabels(remoteStores)
+		}
+
+		err = core.ListBundlesApply(datamonFlags.repo.RepoName, remoteStores,
+			applyBundleTemplate(labels),
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
 			core.BatchSize(datamonFlags.core.BatchSize))
 		if err != nil {
@@ -59,6 +83,7 @@ func init() {
 
 	addCoreConcurrencyFactorFlag(BundleListCommand, 500)
 	addBatchSizeFlag(BundleListCommand)
+	addWithLabelFlag(BundleListCommand)
 
 	bundleCmd.AddCommand(BundleListCommand)
 }

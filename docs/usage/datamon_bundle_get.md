@@ -22,6 +22,7 @@ datamon bundle get [flags]
   -h, --help            help for get
       --label string    The human-readable name of a label
       --repo string     The name of this repository
+      --with-labels     Include labels in the returned bundle metadata
 ```
 
 ### Options inherited from parent commands

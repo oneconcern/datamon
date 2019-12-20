@@ -3,6 +3,9 @@ package cmd
 import (
 	"text/template"
 
+	context2 "github.com/oneconcern/datamon/pkg/context"
+	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/spf13/cobra"
 )
 
@@ -35,4 +38,15 @@ func init() {
 		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
 	}()
+}
+
+// getLabels is a helper to synchronously retrieve labels and enrich the result from other commands
+func getLabels(remoteStores context2.Stores) []model.LabelDescriptor {
+	labels, err := core.ListLabels(datamonFlags.repo.RepoName, remoteStores, "",
+		core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
+		core.BatchSize(datamonFlags.core.BatchSize))
+	if err != nil {
+		wrapFatalln("could not download label list: %w", err)
+	}
+	return labels
 }
