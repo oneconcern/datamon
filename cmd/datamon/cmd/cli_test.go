@@ -17,15 +17,14 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
-
+	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
-	"github.com/spf13/afero"
 
 	gcsStorage "cloud.google.com/go/storage"
 	"github.com/oneconcern/datamon/internal"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
-	"google.golang.org/api/iterator"
 )
 
 const (
@@ -1279,19 +1278,14 @@ func readTextFile(t testing.TB, pth string) string {
 /* objects can be deleted recursively.  non-empty buckets cannot be deleted. */
 func deleteBucket(ctx context.Context, t *testing.T, client *gcsStorage.Client, bucketName string) {
 	mb := client.Bucket(bucketName)
-	oi := mb.Objects(ctx, &gcsStorage.Query{})
-	for {
-		objAttrs, err := oi.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			t.Errorf("error iterating: %v", err)
-		}
-		obj := mb.Object(objAttrs.Name)
-		if err := obj.Delete(ctx); err != nil {
-			t.Errorf("error deleting object: %v", err)
-		}
+	gcs, err := gcs.New(context.TODO(), bucketName, "") // Use GOOGLE_APPLICATION_CREDENTIALS env variable
+	require.NoError(t, err, "failed to create gcs client")
+	var keys []string
+	keys, err = gcs.Keys(ctx)
+	require.NoError(t, err, "get object names created during test")
+	for _, key := range keys {
+		err = gcs.Delete(ctx, key)
+		require.NoError(t, err, "failed to delete:"+key)
 	}
 	if err := mb.Delete(ctx); err != nil {
 		t.Errorf("error deleting bucket %v", err)
