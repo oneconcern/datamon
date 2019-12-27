@@ -21,6 +21,7 @@ var (
 	// infoLogger wraps informative messages to os.Stdout without cluttering expected output in tests.
 	// To be used instead on fmt.Printf(os.Stdout, ...)
 	infoLogger = log.New(os.Stdout, "", 0)
+	logStdOut  = fmt.Printf
 )
 
 func wrapFatalln(msg string, err error) {
