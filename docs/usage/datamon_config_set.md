@@ -1,12 +1,12 @@
 **Version: dev**
 
-## datamon config create
+## datamon config set
 
 Create a local config file
 
 ### Synopsis
 
-Creates a local config file to use for datamon to hold flags that do not change, like remote config bucket or current context to use.
+Creates a local config file and sets the config value to use for datamon to hold flags that do not change, like remote config bucket or current context to use.
 
 	By default, this configuration file will be placed in $HOME/.datamon2/datamon.yaml.
 
@@ -14,26 +14,26 @@ Creates a local config file to use for datamon to hold flags that do not change,
 	
 
 ```
-datamon config create [flags]
+datamon config set [flags]
 ```
 
 ### Examples
 
 ```
 # Replace path to gcloud credential file. Use absolute path
-% datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json,
+% datamon config set --credential /Users/ritesh/.config/gcloud/application_default_credentials.json,
 config file created in /Users/ritesh/.datamon2/datamon.yaml
 
 # Replace path to gcloud credentials file (use absolute path here)
-% datamon config create --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
+% datamon config set --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
 config file created in /Users/ritesh/.datamon2/datamon.yaml
 
 # Specify a config bucket to store context details
-% datamon config create --config fred-datamon-config --context test-context
+% datamon config set --config fred-datamon-config --context test-context
 config file created in /Users/ritesh/.datamon2/datamon.yaml
 
 # Generate config in some non-default location
-% DATAMON_CONFIG=~/.config/.datamon/config.yaml datamon config create --config "remote-config-bucket"
+% DATAMON_CONFIG=~/.config/.datamon/config.yaml datamon config set --config "remote-config-bucket"
 config file created in /Users/ritesh/.config/.datamon/config.yaml
 
 ```
@@ -44,7 +44,7 @@ config file created in /Users/ritesh/.config/.datamon/config.yaml
       --config string       Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
       --context string      Set the context for datamon (default "dev")
       --credential string   The path to the credential file
-  -h, --help                help for create
+  -h, --help                help for set
 ```
 
 ### Options inherited from parent commands
