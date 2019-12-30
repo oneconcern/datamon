@@ -1,9 +1,6 @@
 module github.com/oneconcern/datamon
 
 // NOTE: goleak is a test dependency based on master and not the latest release (stalled)
-// NOTE: rhyds/go-github.-selfupdate carries out binary self update. My fork fixes an issue with
-// multi-artifacts releases (will prompty push PR to owner)
-replace github.com/rhysd/go-github-selfupdate => github.com/fredbi/go-github-selfupdate v1.2.0
 
 require (
 	cloud.google.com/go v0.49.0 // indirect
@@ -28,7 +25,7 @@ require (
 	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/opentracing/opentracing-go v1.0.2
 	github.com/pelletier/go-toml v1.6.0 // indirect
-	github.com/rhysd/go-github-selfupdate v1.1.0
+	github.com/rhysd/go-github-selfupdate v1.2.1
 	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/segmentio/ksuid v1.0.2
 	github.com/spf13/afero v1.2.2
