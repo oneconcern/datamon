@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"context"
+	"log"
 
 	daemonizer "github.com/jacobsa/daemonize"
 
@@ -74,6 +75,20 @@ var mutableMountBundleCmd = &cobra.Command{
 			return
 		}
 		infoLogger.Printf("bundle: %v", bundle.BundleID)
+		if datamonFlags.label.Name != "" {
+			labelDescriptor := core.NewLabelDescriptor(
+				core.LabelContributor(contributor),
+			)
+			label := core.NewLabel(labelDescriptor,
+				core.LabelName(datamonFlags.label.Name),
+			)
+			err = label.UploadDescriptor(ctx, bundle)
+			if err != nil {
+				wrapFatalln("upload label", err)
+				return
+			}
+			log.Printf("set label '%v'", datamonFlags.label.Name)
+		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		config.populateRemoteConfig(&datamonFlags)
@@ -89,6 +104,7 @@ func init() {
 
 	addDaemonizeFlag(mutableMountBundleCmd)
 	addDataPathFlag(mutableMountBundleCmd)
+	addLabelNameFlag(mutableMountBundleCmd)
 
 	mountBundleCmd.AddCommand(mutableMountBundleCmd)
 }
