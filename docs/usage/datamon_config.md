@@ -29,5 +29,5 @@ You may force a specific local config file using the $DATAMON_CONFIG environment
 ### SEE ALSO
 
 * [datamon](datamon.md)	 - Datamon helps building ML pipelines
-* [datamon config create](datamon_config_create.md)	 - Create a local config file
+* [datamon config set](datamon_config_set.md)	 - Create a local config file
 
