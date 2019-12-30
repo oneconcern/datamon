@@ -33,6 +33,9 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 			wrapFatalln("create remote stores", err)
 			return
 		}
+
+	fmt.Printf("using remote stores:\n%v\n", remoteStores)
+
 		err = core.ListReposApply(remoteStores, applyRepoTemplate,
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
 			core.BatchSize(datamonFlags.core.BatchSize))

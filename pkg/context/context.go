@@ -116,6 +116,11 @@ func (c *defaultStores) Wal() storage.Store {
 	return c.wal
 }
 
+func (c *defaultStores) String() string {
+	return fmt.Sprintf("wal: %q, readLog: %q, blob: %q, metadata %q, vMetadata: %q",
+		c.wal, c.readLog, c.blob, c.metadata, c.vMetadata)
+}
+
 // CreateContext marshals and persists a context in the remote config
 func CreateContext(ctx context.Context, configStore storage.Store, context model.Context) error {
 	// 1. Validate

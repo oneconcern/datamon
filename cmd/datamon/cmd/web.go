@@ -25,6 +25,9 @@ var webSrv = &cobra.Command{
 			wrapFatalln("create remote stores", err)
 			return
 		}
+
+	fmt.Printf("using remote stores:\n%v\n", stores)
+
 		s, err := web.NewServer(web.ServerParams{
 			Stores:     stores,
 			Credential: config.Credential,
@@ -48,7 +51,7 @@ func init() {
 	addWebPortFlag(webSrv)
 
 	/* core datamonFlags */
-	//	addMetadataBucket(repoList)
+	addContextFlag(webSrv)
 
 	rootCmd.AddCommand(webSrv)
 }
