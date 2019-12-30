@@ -15,15 +15,15 @@ datamon context get [flags]
 ### Options
 
 ```
-      --config string   Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-  -h, --help            help for get
+      --config string    Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
+      --context string   Set the context for datamon (default "dev")
+  -h, --help             help for get
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --context string   Set the context for datamon (default "dev")
-      --upgrade          Upgrades the current version then carries on with the specified command
+      --upgrade   Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

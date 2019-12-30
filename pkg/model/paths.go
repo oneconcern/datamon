@@ -28,6 +28,7 @@ type ArchivePathComponents struct {
 	BundleID        string
 	ArchiveFileName string
 	LabelName       string
+	Context         string
 }
 
 // GetArchivePathComponents yields all components from an archive path.
@@ -38,10 +39,11 @@ type ArchivePathComponents struct {
 // The return value might be changed to an interface type in later iterations.
 func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error) {
 	const (
-		maxPos    = 4
-		labelPos  = 3 // as in: labels/{repo}/{label}/label.yaml
-		repoPos   = 2 // as in: repos/{repo}/repo.yaml
-		bundlePos = 3 // as in: bundles/{repo}/{bundleID}/bundle.yaml
+		maxPos     = 4
+		labelPos   = 3 // as in: labels/{repo}/{label}/label.yaml
+		repoPos    = 2 // as in: repos/{repo}/repo.yaml
+		bundlePos  = 3 // as in: bundles/{repo}/{bundleID}/bundle.yaml
+		contextPos = 2 // as in: contexts/{context}/context.yaml
 	)
 	cs := strings.SplitN(archivePath, "/", maxPos)
 	switch cs[0] { // we always have at least 1 element
@@ -95,7 +97,15 @@ func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error)
 				fmt.Errorf("path is invalid, last element in the path should be either empty, %q or \"%s[nnn].yaml\". components: %v, path: %s",
 					bundleDescriptorFile, bundleFilesIndexPrefix, cs, archivePath)
 		}
-	// TODO: contexts
+	case "contexts":
+		if len(cs) < contextPos+1 {
+			return ArchivePathComponents{},
+				fmt.Errorf("path is invalid: expect path to context to have %d parts: %s", contextPos+1, archivePath)
+		}
+		return ArchivePathComponents{
+			ArchiveFileName: cs[contextPos],
+			Context:         cs[contextPos-1],
+		}, nil // placeholder in case of more parsing
 	default:
 		return ArchivePathComponents{}, fmt.Errorf("path is invalid: %v, path: %s", cs, archivePath)
 	}
