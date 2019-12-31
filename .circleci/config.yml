@@ -126,7 +126,7 @@ jobs:
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             hack/go-generate.sh
             go mod download
-            gotestsum --junitfile /tmp/test-results/go-test-report.xml ./... -- -race ./...
+            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures ./... -- -race ./...
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
