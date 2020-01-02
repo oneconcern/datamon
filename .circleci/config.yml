@@ -228,6 +228,19 @@ jobs:
             echo "Preparing release ${CIRCLE_TAG}"
             goreleaser ${opts} 2>&1
 
+  push_builder:
+    executor: docker_builder
+    shell: /bin/bash
+    steps:
+      - checkout
+      - login_to_google
+      - run:
+          name: build an image to build and test datamon
+          command: |
+            cd hack/builder
+            docker build -t gcr.io/onec-co/datamon-builder:latest .
+            docker push gcr.io/onec-co/datamon-builder:latest
+
 workflows:
   version: 2
   build_and_test:
@@ -289,3 +302,15 @@ workflows:
               only: /^v.*/
             branches:
               ignore: /.*/
+
+  weekly:
+    triggers:
+      - schedule:
+          cron: "5 4 * * 6"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - push_builder:
+          context: "OC Common"

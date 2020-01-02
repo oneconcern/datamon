@@ -46,7 +46,7 @@ RUN CGO_ENABLED=0 LDFLAGS="${LDFLAGS} '-X{IMPORT_PATH}BuildDate=$(date -u -R)'" 
 RUN if [ -f ${TARGET}/datamon_darwin_amd64 ] ; then  cp ${TARGET}/datamon_darwin_amd64 ${TARGET}/datamon.mac ;fi && \
     if [ -f ${TARGET}/datamon_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon.linux ;fi && \
     if [ -f ${TARGET}/datamon_metrics_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon_metrics ;fi && \
-    cd ${TARGET};for bin in `ls -1` ; do upx ${bin} && md5sum ${bin} >> ${bin}.md5 && sha256sum ${bin} > ${bin}.sha256 ; done && \
+    cd ${TARGET};for bin in `ls -1|grep -v darwin` ; do upx ${bin} && md5sum ${bin} >> ${bin}.md5 && sha256sum ${bin} > ${bin}.sha256 ; done && \
     if [ -f ${TARGET}/datamon_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/datamon ;fi && \
     if [ -f ${TARGET}/migrate_linux_amd64 ] ; then  cp ${TARGET}/datamon_linux_amd64 ${TARGET}/migrate ;fi && \
     if [ -f ${TARGET}/datamon_sidecar_param_linux_amd64 ] ; then  cp ${TARGET}/datamon_sidecar_param_linux_amd64 ${TARGET}/datamon_sidecar_param ;fi
