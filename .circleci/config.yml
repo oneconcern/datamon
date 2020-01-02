@@ -7,7 +7,10 @@ executors:
       GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
-      - image: circleci/golang
+      - image: gcr.io/onec-co/datamon-builder:latest
+        auth:
+          username: _json_key
+          password: $GCLOUD_SERVICE_KEY
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: access-key
@@ -27,45 +30,12 @@ executors:
       GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
-      - image: circleci/golang
+      - image: gcr.io/onec-co/datamon-builder:latest
+        auth:
+          username: _json_key
+          password: $GCLOUD_SERVICE_KEY
 
 commands:
-  install_base:
-    steps:
-      - run:
-          name: Install packages with gcloud SDK installed locally
-          command: |
-            sudo apt-get update -y --quiet
-            sudo apt-get install --quiet lsb-release upx
-            export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
-            echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-            curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
-            sudo apt-get update -y --quiet
-            sudo apt-get install -y --quiet git build-essential google-cloud-sdk shellcheck zsh
-
-  install_kubectl:
-    steps:
-      - run:
-          name: Install prerequisites to drive kubernetes from ci job
-          command: |
-            sudo apt-get update -y --quiet
-            sudo apt-get install --quiet kubectl
-            gcloud container clusters get-credentials onec-dev
-
-  install_tools:
-    steps:
-      - run:
-          name: Install go tools for testing
-          # update tools to latest release but clear the module cache after install
-          # to avoid conflicts with the main go dependencies.
-          environment:
-            GO111MODULE: 'on'
-          command: |
-            go get -u gotest.tools/gotestsum@latest
-            go get -u github.com/matryer/moq@latest
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-            go clean -modcache
-
   login_to_google:
     steps:
       - run:
@@ -81,13 +51,11 @@ jobs:
   go_lint:
     executor: docker_builder
     steps:
-      - install_base
       - checkout
       - restore_cache:
           keys:
            - pkg-cache-{{ checksum "go.sum" }}
            - pkg-cache-
-      - install_tools
       - run:
           name: Run golang linter
           command: |
@@ -107,13 +75,11 @@ jobs:
     executor: docker_minio
     parallelism: 2
     steps:
-      - install_base
       - checkout
       - restore_cache:
           keys:
             - pkg-cache-{{ checksum "go.sum" }}
             - pkg-cache-
-      - install_tools
       - login_to_google
       - run:
           name: Run golang tests
@@ -145,14 +111,15 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
       - restore_cache:
           keys:
             - pkg-cache-{{ checksum "go.sum" }}
             - pkg-cache-
       - login_to_google
-      - install_kubectl
+      - run:
+          command: |
+            gcloud container clusters get-credentials onec-dev
       - run:
           name: Run fuse sidecar demo
           command: |
@@ -168,7 +135,6 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
       - restore_cache:
           keys:
@@ -197,7 +163,6 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
       - restore_cache:
           keys:
@@ -233,7 +198,6 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
       - restore_cache:
           keys:
@@ -243,7 +207,6 @@ jobs:
       - run:
           name: Prepare github release
           command: |
-            #PATH=${PATH}:/usr/local/go/bin:${GOPATH}/bin
             PATH=${PATH}:${GOPATH}/bin
             opts="--debug"
             # self-installing goreleaser
