@@ -36,7 +36,8 @@ type flagsT struct {
 		NameFilter        string
 	}
 	web struct {
-		port int
+		port      int
+		noBrowser bool
 	}
 	label struct {
 		Prefix string
@@ -180,8 +181,15 @@ func addBatchSizeFlag(cmd *cobra.Command) string {
 }
 
 func addWebPortFlag(cmd *cobra.Command) string {
-	cmd.Flags().IntVar(&datamonFlags.web.port, webPort, 3003, "Port number for the web server")
+	webPort := "port"
+	cmd.Flags().IntVar(&datamonFlags.web.port, webPort, 0, "Port number for the web server (defaults to random port)")
 	return webPort
+}
+
+func addWebNoBrowserFlag(cmd *cobra.Command) string {
+	c := "no-browser"
+	cmd.Flags().BoolVar(&datamonFlags.web.noBrowser, c, false, "Disable automatic launch of a browser")
+	return c
 }
 
 func addLabelNameFlag(cmd *cobra.Command) string {
