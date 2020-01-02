@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -82,8 +83,16 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 }
 
 // NewMutableFS creates a new instance of the datamon filesystem.
-func NewMutableFS(bundle *Bundle, pathToStaging string) (*MutableFS, error) {
+func NewMutableFS(bundle *Bundle) (*MutableFS, error) {
 	logger, _ := zap.NewProduction()
+	consumableStoreString := bundle.ConsumableStore.String()
+	consumableStoreStringSplit := strings.Split(consumableStoreString, "@")
+	if len(consumableStoreStringSplit) != 2 ||
+		consumableStoreStringSplit[0] != "localfs" {
+		return nil, errors.New("bundle doesn't have localfs consumable store " +
+			"to provide local cache for muable fs")
+	}
+	pathToStaging := consumableStoreStringSplit[1]
 	fs := &fsMutable{
 		bundle:       bundle,
 		readDirMap:   make(map[fuseops.InodeID]map[fuseops.InodeID]*fuseutil.Dirent),

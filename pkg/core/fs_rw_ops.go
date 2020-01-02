@@ -493,8 +493,12 @@ func (fs *fsMutable) ReadFile(
 func (fs *fsMutable) WriteFile(
 	ctx context.Context,
 	op *fuseops.WriteFileOp) (err error) {
-	fs.l.Info("writeFile", zap.Uint64("id", uint64(op.Inode)))
-	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
+	pathToBackingFile := getPathToBackingFile(op.Inode)
+	fs.l.Info("writeFile",
+		zap.Uint64("id", uint64(op.Inode)),
+		zap.String("pathToBackingFile", pathToBackingFile),
+	)
+	file, err := fs.localCache.OpenFile(pathToBackingFile, os.O_WRONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
 		return fuse.EIO
 	}
@@ -536,10 +540,12 @@ func (fs *fsMutable) FlushFile(
 	f := fs.backingFiles[op.Inode]
 	if f != nil {
 		file := *f
+if file != nil {
 		err := file.Sync()
 		if err != nil {
 			return fuse.EIO
 		}
+}
 	}
 	return
 }

@@ -51,7 +51,7 @@ var mutableMountBundleCmd = &cobra.Command{
 		bundle := core.NewBundle(bd,
 			bundleOpts...,
 		)
-		fs, err := core.NewMutableFS(bundle, datamonFlags.bundle.DataPath)
+		fs, err := core.NewMutableFS(bundle)
 		if err != nil {
 			onDaemonError("create mutable filesystem", err)
 			return
