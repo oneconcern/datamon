@@ -73,6 +73,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	authorizer = gauth.New()
 	addConfigFlag(rootCmd)
+	addContextFlag(rootCmd)
 	addUpgradeFlag(rootCmd)
 	addUpgradeForceFlag(rootCmd)
 }

@@ -28,7 +28,6 @@ var repoDescriptorTemplate *template.Template
 
 func init() {
 	rootCmd.AddCommand(repoCmd)
-	addContextFlag(repoCmd)
 
 	repoDescriptorTemplate = func() *template.Template {
 		const listLineTemplateString = `{{.Name}} , {{.Description}} , {{with .Contributor}}{{.Name}} , {{.Email}}{{end}} , {{.Timestamp}}`
