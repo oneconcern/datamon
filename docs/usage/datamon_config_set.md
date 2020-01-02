@@ -28,8 +28,12 @@ config file created in /Users/ritesh/.datamon2/datamon.yaml
 % datamon config set --credential /Users/ritesh/.config/gcloud/application_default_credentials.json
 config file created in /Users/ritesh/.datamon2/datamon.yaml
 
-# Specify a config bucket to store context details
+# Specify a config bucket and context
 % datamon config set --config fred-datamon-config --context test-context
+config file created in /Users/ritesh/.datamon2/datamon.yaml
+
+# Switch context
+% datamon config set --context another-context
 config file created in /Users/ritesh/.datamon2/datamon.yaml
 
 # Generate config in some non-default location
