@@ -153,7 +153,7 @@ func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp)
 }
 
 func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) (err error) {
-	fs.l.Info("getAttr", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("getAttr", zap.Uint64("id", uint64(op.Inode)))
 
 	nodeStore, _ := fs.atomicGetReferences()
 
@@ -162,7 +162,7 @@ func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInod
 	e, found := nodeStore.Get(key)
 	if !found {
 		err := fuse.ENOENT
-		fs.l.Info("getAttr", zap.Uint64("id", uint64(op.Inode)), zap.Error(err))
+		fs.l.Debug("getAttr", zap.Uint64("id", uint64(op.Inode)), zap.Error(err))
 		return err
 	}
 
@@ -175,10 +175,10 @@ func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInod
 }
 
 func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInodeAttributesOp) (err error) {
-	fs.l.Info("setAttr", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("setAttr", zap.Uint64("id", uint64(op.Inode)))
 
 	if op.Mode != nil { // File permissions not supported
-		fs.l.Info("set mode", zap.Uint32("mode", uint32(*op.Mode)))
+		fs.l.Debug("set mode", zap.Uint32("mode", uint32(*op.Mode)))
 		return fuse.ENOSYS
 	}
 
@@ -236,7 +236,7 @@ func (fs *fsMutable) ForgetInode(
 	ctx context.Context,
 	op *fuseops.ForgetInodeOp) (err error) {
 
-	fs.l.Info("forgetInode", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("forgetInode", zap.Uint64("id", uint64(op.Inode)))
 
 	// Check reference count for iNode and remove from iNodeStore
 	// Get the node.
@@ -275,7 +275,7 @@ func (fs *fsMutable) ForgetInode(
 		n := e.(*nodeEntry)
 		if shouldDelete(n) {
 			fs.iNodeStore, _, _ = fs.iNodeStore.Delete(key)
-			fs.l.Info("NodeStore", zap.Int("Size", fs.iNodeStore.Len()))
+			fs.l.Debug("NodeStore", zap.Int("Size", fs.iNodeStore.Len()))
 		}
 		fs.iNodeGenerator.freeINode(op.Inode)
 	}
@@ -419,14 +419,14 @@ func (fs *fsMutable) Unlink(
 func (fs *fsMutable) OpenDir(
 	ctx context.Context,
 	op *fuseops.OpenDirOp) (err error) {
-	fs.l.Info("openDir", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("openDir", zap.Uint64("id", uint64(op.Inode)))
 	return
 }
 
 func (fs *fsMutable) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) (err error) {
-	fs.l.Info("readDir", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("readDir", zap.Uint64("id", uint64(op.Inode)))
 
 	offset := int(op.Offset)
 	iNode := op.Inode
@@ -463,21 +463,21 @@ func (fs *fsMutable) ReadDir(
 func (fs *fsMutable) ReleaseDirHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseDirHandleOp) (err error) {
-	fs.l.Info("releaseDir", zap.Uint64("id", uint64(op.Handle)))
+	fs.l.Debug("releaseDir", zap.Uint64("id", uint64(op.Handle)))
 	return
 }
 
 func (fs *fsMutable) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
-	fs.l.Info("openFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("openFile", zap.Uint64("id", uint64(op.Inode)))
 	return
 }
 
 func (fs *fsMutable) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-	fs.l.Info("readFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("readFile", zap.Uint64("id", uint64(op.Inode)))
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_RDONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
 		return fuse.EIO
@@ -518,7 +518,7 @@ func (fs *fsMutable) WriteFile(
 func (fs *fsMutable) SyncFile(
 	ctx context.Context,
 	op *fuseops.SyncFileOp) (err error) {
-	fs.l.Info("syncFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("syncFile", zap.Uint64("id", uint64(op.Inode)))
 	file := *fs.backingFiles[op.Inode]
 	if file != nil {
 		err := file.Sync()
@@ -532,7 +532,7 @@ func (fs *fsMutable) SyncFile(
 func (fs *fsMutable) FlushFile(
 	ctx context.Context,
 	op *fuseops.FlushFileOp) (err error) {
-	fs.l.Info("syncFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.l.Debug("flushFile", zap.Uint64("id", uint64(op.Inode)))
 	f := fs.backingFiles[op.Inode]
 	if f != nil {
 		file := *f
@@ -547,7 +547,7 @@ func (fs *fsMutable) FlushFile(
 func (fs *fsMutable) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
-	fs.l.Info("releaseFileHandle", zap.Uint64("hndl", uint64(op.Handle)))
+	fs.l.Debug("releaseFileHandle", zap.Uint64("hndl", uint64(op.Handle)))
 	return
 }
 
@@ -801,7 +801,7 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 	 * and since the second parameter to reading from a channel is false when the channel is both empty and closed,
 	 * this thread can use reading from the bundle entry channel to detect whether the walk is finished.
 	 */
-	fs.l.Info("Commit: spinning off goroutines")
+	fs.l.Debug("Commit: spinning off goroutines")
 	go commitWalkReadDirMap(ctx, fs, commitChans{
 		bundleEntry: bundleEntryC,
 		error:       errorC,
@@ -822,7 +822,7 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 		}
 		fileList = append(fileList, bundleEntry)
 	}
-	fs.l.Info("Commit: goroutines ok.  uploading metadata.")
+	fs.l.Debug("Commit: goroutines ok.  uploading metadata.")
 	for i := 0; i*defaultBundleEntriesPerFile < len(fileList); i++ {
 		firstIdx := i * defaultBundleEntriesPerFile
 		nextFirstIdx := (i + 1) * defaultBundleEntriesPerFile
