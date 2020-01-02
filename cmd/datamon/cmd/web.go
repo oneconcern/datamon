@@ -2,22 +2,20 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"net"
 	"net/http"
+	"strconv"
 
 	"github.com/oneconcern/datamon/pkg/web"
 
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
-)
-
-const (
-	webPort = "port"
 )
 
 var webSrv = &cobra.Command{
 	Use:   "web",
 	Short: "Webserver",
-	Long:  "A webserver process to browse Datamon data",
+	Long:  "A webserver process to browse datamon data",
 	Run: func(cmd *cobra.Command, args []string) {
 		infoLogger.Println("begin webserver")
 		stores, err := paramsToDatamonContext(context.Background(), datamonFlags)
@@ -33,12 +31,39 @@ var webSrv = &cobra.Command{
 			wrapFatalln("server init error", err)
 			return
 		}
-		r := web.InitRouter(s)
-		infoLogger.Printf("serving on %d...", datamonFlags.web.port)
-		err = http.ListenAndServe(fmt.Sprintf(":%d", datamonFlags.web.port), r)
+
+		listener, err := net.Listen("tcp4", net.JoinHostPort("", strconv.Itoa(datamonFlags.web.port)))
 		if err != nil {
-			wrapFatalln("server listen error", err)
+			wrapFatalln("listener init error", err)
 			return
+		}
+
+		r := web.InitRouter(s)
+
+		latch := make(chan struct{})
+		errServe := make(chan error)
+		go func() {
+			webServer := new(http.Server)
+			webServer.SetKeepAlivesEnabled(true)
+			webServer.Handler = r
+			latch <- struct{}{}
+			errServe <- webServer.Serve(listener)
+		}()
+
+		<-latch
+		infoLogger.Printf("serving datamon UI at %s...", listener.Addr().String())
+
+		if !datamonFlags.web.noBrowser {
+			err = browser.OpenURL("http://" + listener.Addr().String())
+			if err != nil {
+				wrapFatalln("cannot launch browser", err)
+				return
+			}
+		}
+
+		err = <-errServe
+		if err != nil {
+			wrapFatalln("server error", err)
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
@@ -49,6 +74,7 @@ var webSrv = &cobra.Command{
 func init() {
 	/* web datamonFlags */
 	addWebPortFlag(webSrv)
+	addWebNoBrowserFlag(webSrv)
 
 	/* core datamonFlags */
 	//	addMetadataBucket(repoList)

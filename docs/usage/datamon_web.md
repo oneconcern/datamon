@@ -6,7 +6,7 @@ Webserver
 
 ### Synopsis
 
-A webserver process to browse Datamon data
+A webserver process to browse datamon data
 
 ```
 datamon web [flags]
@@ -15,8 +15,9 @@ datamon web [flags]
 ### Options
 
 ```
-  -h, --help       help for web
-      --port int   Port number for the web server (default 3003)
+  -h, --help         help for web
+      --no-browser   Disable automatic launch of a browser
+      --port int     Port number for the web server (defaults to random port)
 ```
 
 ### Options inherited from parent commands

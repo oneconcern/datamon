@@ -25,6 +25,7 @@ require (
 	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/opentracing/opentracing-go v1.0.2
 	github.com/pelletier/go-toml v1.6.0 // indirect
+	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
 	github.com/rhysd/go-github-selfupdate v1.2.1
 	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/segmentio/ksuid v1.0.2

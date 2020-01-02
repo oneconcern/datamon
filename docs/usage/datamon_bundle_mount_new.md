@@ -18,6 +18,7 @@ datamon bundle mount new [flags]
       --daemonize            Whether to run the command as a daemonized process
       --destination string   The path to the download dir
   -h, --help                 help for new
+      --label string         The human-readable name of a label
       --message string       The message describing the new bundle
       --mount string         The path to the mount dir
       --repo string          The name of this repository
