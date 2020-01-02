@@ -34,6 +34,7 @@ datamon repo create [flags]
 ### Options inherited from parent commands
 
 ```
+      --config string    Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
       --context string   Set the context for datamon (default "dev")
       --upgrade          Upgrades the current version then carries on with the specified command
 ```

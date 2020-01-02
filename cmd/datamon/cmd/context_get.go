@@ -69,7 +69,5 @@ func init() {
 		addContextFlag(ContextGetCommand),
 	)
 
-	addConfigFlag(ContextGetCommand)
-
 	ContextCmd.AddCommand(ContextGetCommand)
 }

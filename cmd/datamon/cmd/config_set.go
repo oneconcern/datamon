@@ -81,7 +81,5 @@ config file created in /Users/ritesh/.config/.datamon/config.yaml
 
 func init() {
 	addCredentialFile(configGen)
-	addContextFlag(configGen)
-	addConfigFlag(configGen)
 	configCmd.AddCommand(configGen)
 }
