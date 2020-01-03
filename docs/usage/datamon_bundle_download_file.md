@@ -26,7 +26,7 @@ datamon bundle download file [flags]
 
 ```
       --bundle string        The hash id for the bundle, if not specified the latest bundle will be used
-      --destination string   The path to the download dir
+      --destination string   The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
       --file string          The file to download from the bundle
   -h, --help                 help for file
       --label string         The human-readable name of a label
