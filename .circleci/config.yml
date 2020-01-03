@@ -6,6 +6,7 @@ executors:
     environment:
       GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
+    resource_class: large
     docker:
       - image: gcr.io/onec-co/datamon-builder:latest
         auth:
