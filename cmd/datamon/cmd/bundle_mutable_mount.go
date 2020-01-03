@@ -16,7 +16,8 @@ import (
 var mutableMountBundleCmd = &cobra.Command{
 	Use:   "new",
 	Short: "Create a bundle incrementally with filesystem operations",
-	Long:  "Write directories and files to the mountpoint.  Unmount or send SIGINT to this process to save.",
+	Long: `Write directories and files to the mountpoint.  Unmount or send SIGINT to this process to save.
+The destination path is a temporary staging area for write operations.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		contributor, err := paramsToContributor(datamonFlags)

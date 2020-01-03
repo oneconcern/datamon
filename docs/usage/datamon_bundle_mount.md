@@ -19,7 +19,7 @@ datamon bundle mount [flags]
       --concurrency-factor int   Heuristic on the amount of concurrency used by various operations.  Turn this value down to use less memory, increase for faster operations. (default 100)
       --cpuprof                  Toggle runtime profiling
       --daemonize                Whether to run the command as a daemonized process
-      --destination string       The path to the download dir
+      --destination string       The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
   -h, --help                     help for mount
       --label string             The human-readable name of a label
       --loglevel string          The logging level (default "info")
