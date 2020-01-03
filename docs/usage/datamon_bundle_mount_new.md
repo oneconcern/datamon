@@ -7,6 +7,7 @@ Create a bundle incrementally with filesystem operations
 ### Synopsis
 
 Write directories and files to the mountpoint.  Unmount or send SIGINT to this process to save.
+The destination path is a temporary staging area for write operations.
 
 ```
 datamon bundle mount new [flags]
@@ -16,7 +17,7 @@ datamon bundle mount new [flags]
 
 ```
       --daemonize            Whether to run the command as a daemonized process
-      --destination string   The path to the download dir
+      --destination string   The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
   -h, --help                 help for new
       --label string         The human-readable name of a label
       --message string       The message describing the new bundle

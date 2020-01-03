@@ -79,7 +79,8 @@ func addBundleFlag(cmd *cobra.Command) string {
 
 func addDataPathFlag(cmd *cobra.Command) string {
 	destination := "destination"
-	cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, destination, "", "The path to the download dir")
+	cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, destination, "",
+		"The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}")
 	return destination
 }
 
