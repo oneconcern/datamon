@@ -121,7 +121,7 @@ func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childNam
 		if err != nil {
 			fs.backingFiles[iNodeID] = &file
 		} else {
-			fs.l.Error("failed to create backing file",
+			fs.l.Warn("failed to create backing file: open file will retry this",
 				zap.Error(err),
 				zap.String("child", childName),
 				zap.Uint64("parent", uint64(parentINode)))
