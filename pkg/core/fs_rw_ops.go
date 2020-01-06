@@ -38,7 +38,9 @@ type fsMutable struct {
 	backingFiles map[fuseops.InodeID]*afero.File
 
 	// TODO: remove one giant lock with more fine grained locking coupled with the readdir move to radix.
-	lock           sync.Mutex
+	lock             sync.Mutex
+	lockBackingFiles sync.RWMutex
+
 	iNodeGenerator iNodeGenerator
 
 	// local fs cache that mirrors the files.
@@ -371,7 +373,8 @@ func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err erro
 func (fs *fsMutable) RmDir(
 	ctx context.Context,
 	op *fuseops.RmDirOp) (err error) {
-	fs.l.Info("rmdir", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	return fs.deleteNSEntry(op.Parent, op.Name)
 }
@@ -379,7 +382,9 @@ func (fs *fsMutable) RmDir(
 func (fs *fsMutable) Unlink(
 	ctx context.Context,
 	op *fuseops.UnlinkOp) (err error) {
-	fs.l.Info("unlink", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
 	// TODO: remove from lookup and readdir
 	return fs.deleteNSEntry(op.Parent, op.Name)
 }
@@ -404,6 +409,7 @@ func (fs *fsMutable) ReadDir(
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
+
 	children, found := fs.readDirMap[iNode]
 
 	if !found {
@@ -457,6 +463,9 @@ func (fs *fsMutable) ReadFile(
 	if err != nil {
 		return fuse.EIO
 	}
+	fs.lockBackingFiles.Lock()
+	defer fs.lockBackingFiles.Unlock()
+
 	fs.backingFiles[op.Inode] = &file
 	op.BytesRead, err = file.ReadAt(op.Dst, op.Offset)
 	if err != nil {
@@ -475,6 +484,9 @@ func (fs *fsMutable) WriteFile(
 	if err != nil {
 		return fuse.EIO
 	}
+	fs.lockBackingFiles.Lock()
+	defer fs.lockBackingFiles.Unlock()
+
 	fs.backingFiles[op.Inode] = &file
 	_, err = file.WriteAt(op.Data, op.Offset)
 	if err != nil {
@@ -498,6 +510,9 @@ func (fs *fsMutable) SyncFile(
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
 
+	fs.lockBackingFiles.RLock()
+	defer fs.lockBackingFiles.RUnlock()
+
 	file := *fs.backingFiles[op.Inode]
 	if file != nil {
 		err := file.Sync()
@@ -513,6 +528,9 @@ func (fs *fsMutable) FlushFile(
 	op *fuseops.FlushFileOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
+	fs.lockBackingFiles.RLock()
+	defer fs.lockBackingFiles.RUnlock()
 
 	f := fs.backingFiles[op.Inode]
 	if f != nil {

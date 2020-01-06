@@ -31,6 +31,8 @@ type readOnlyFsInternal struct {
 	fsEntryStore *iradix.Tree
 
 	// List of children for a given iNode. Maps inode id to list of children. This stitches the fuse FS together.
+	// NOTE: since populateFS is not parallel and competed before the FS is available,
+	// this map does not need being protected from concurrent access.
 	readDirMap map[fuseops.InodeID][]fuseutil.Dirent
 
 	// readonly
@@ -51,6 +53,7 @@ func typeAssertToFsEntry(p interface{}) *fsEntry {
 func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	lookupKey := formLookupKey(op.Parent, op.Name)
 	val, found := fs.lookupTree.Get(lookupKey)
 
@@ -68,7 +71,6 @@ func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookU
 		err = fuse.ENOENT
 		return
 	}
-	defer fs.opEnd(op, err)
 	return nil
 }
 
@@ -77,6 +79,7 @@ func (fs *readOnlyFsInternal) GetInodeAttributes(
 	op *fuseops.GetInodeAttributesOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	key := formKey(op.Inode)
 	e, found := fs.fsEntryStore.Get(key)
 	if !found {
@@ -100,6 +103,7 @@ func (fs *readOnlyFsInternal) ForgetInode(
 func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
 	if !found {
 		err = fuse.ENOENT
@@ -116,6 +120,7 @@ func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp
 func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	offset := int(op.Offset)
 	iNode := op.Inode
 
@@ -406,7 +411,6 @@ func populateFSAddBundleEntries(
 		nodesToAdd = nodesToAdd[:0]
 	} // End walking bundle entries q2
 	return nil
-
 }
 
 func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {

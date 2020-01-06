@@ -65,6 +65,10 @@ func (fs *fsCommon) opStart(op interface{}) {
 		logger.Debug("Start", zap.Uint64("id", uint64(t.Inode)))
 	case *fuseops.ReleaseFileHandleOp:
 		logger.Debug("Start", zap.Uint64("hndl", uint64(t.Handle)))
+	case *fuseops.RmDirOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name))
+	case *fuseops.UnlinkOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name))
 	}
 	logger.Debug("Start", zap.Any("op", op))
 }
@@ -102,6 +106,10 @@ func (fs *fsCommon) opEnd(op interface{}, err error) {
 		logger.Debug("End", zap.Uint64("id", uint64(t.Inode)), zap.Error(err))
 	case *fuseops.ReleaseFileHandleOp:
 		logger.Debug("End", zap.Uint64("hndl", uint64(t.Handle)), zap.Error(err))
+	case *fuseops.RmDirOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name), zap.Error(err))
+	case *fuseops.UnlinkOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name), zap.Error(err))
 	}
 	logger.Debug("End", zap.Any("op", op), zap.Error(err))
 }
