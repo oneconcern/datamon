@@ -61,12 +61,14 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 		return nil, err
 	}
 	fs := &readOnlyFsInternal{
-		bundle:       bundle,
+		fsCommon: fsCommon{
+			bundle:     bundle,
+			lookupTree: iradix.New(),
+			l:          l.With(zap.String("repo", bundle.RepoID), zap.String("bundle", bundle.BundleID)),
+		},
 		readDirMap:   make(map[fuseops.InodeID][]fuseutil.Dirent),
 		fsEntryStore: iradix.New(),
-		lookupTree:   iradix.New(),
 		fsDirStore:   iradix.New(),
-		l:            l,
 	}
 
 	// Extract the meta information needed.
@@ -82,13 +84,15 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 }
 
 // NewMutableFS creates a new instance of the datamon filesystem.
-func NewMutableFS(bundle *Bundle, pathToStaging string) (*MutableFS, error) {
-	logger, _ := zap.NewProduction()
+func NewMutableFS(bundle *Bundle, pathToStaging string, l *zap.Logger) (*MutableFS, error) {
 	fs := &fsMutable{
-		bundle:       bundle,
+		fsCommon: fsCommon{
+			bundle:     bundle,
+			lookupTree: iradix.New(),
+			l:          l.With(zap.String("repo", bundle.RepoID), zap.String("bundle", bundle.BundleID)),
+		},
 		readDirMap:   make(map[fuseops.InodeID]map[fuseops.InodeID]*fuseutil.Dirent),
 		iNodeStore:   iradix.New(),
-		lookupTree:   iradix.New(),
 		backingFiles: make(map[fuseops.InodeID]*afero.File),
 		lock:         sync.Mutex{},
 		iNodeGenerator: iNodeGenerator{
@@ -97,7 +101,6 @@ func NewMutableFS(bundle *Bundle, pathToStaging string) (*MutableFS, error) {
 			freeInodes:   make([]fuseops.InodeID, 0, 65536),
 		},
 		localCache: afero.NewBasePathFs(afero.NewOsFs(), pathToStaging),
-		l:          logger.With(zap.String("bundle", bundle.BundleID)),
 	}
 	err := fs.initRoot()
 	if err != nil {

@@ -10,12 +10,101 @@ import (
 
 	"go.uber.org/zap"
 
+	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
 	"github.com/jacobsa/fuse/fuseutil"
 
 	"github.com/oneconcern/datamon/pkg/convert"
 )
+
+type fsCommon struct {
+	fuseutil.NotImplementedFileSystem
+
+	// Backing bundle for this FS.
+	bundle *Bundle
+
+	// Fast lookup of parent iNode id + child name, returns iNode of child. This is a common operation and it's speed is
+	// important.
+	lookupTree *iradix.Tree
+
+	// logger
+	l *zap.Logger
+}
+
+func (fs *fsCommon) opStart(op interface{}) {
+	logger := fs.l.With(zap.String("Request", fmt.Sprintf("%T", op)))
+	switch t := op.(type) {
+	case *fuseops.ReadFileOp:
+		logger.Debug("Start", zap.Uint64("inode", uint64(t.Inode)), zap.Int("buffer", len(t.Dst)), zap.Int64("offset", t.Offset))
+		return
+	case *fuseops.WriteFileOp:
+		logger.Debug("Start", zap.Uint64("inode", uint64(t.Inode)))
+		return
+	case *fuseops.ReadDirOp:
+		logger.Debug("Start", zap.Uint64("inode", uint64(t.Inode)))
+		return
+	case *fuseops.LookUpInodeOp:
+		logger.Debug("Start", zap.Uint64("parent", uint64(t.Parent)), zap.String("child", t.Name))
+	case *fuseops.GetInodeAttributesOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Inode)))
+	case *fuseops.SetInodeAttributesOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Inode)))
+	case *fuseops.ForgetInodeOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Inode)))
+	case *fuseops.RenameOp:
+		logger.Debug("Start", zap.Uint64("oldP", uint64(t.OldParent)), zap.String("oldN", t.OldName),
+			zap.Uint64("nP", uint64(t.NewParent)), zap.String("nN", t.NewName))
+	case *fuseops.ReleaseDirHandleOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Handle)))
+	case *fuseops.OpenFileOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Inode)))
+	case *fuseops.SyncFileOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Inode)))
+	case *fuseops.FlushFileOp:
+		logger.Debug("Start", zap.Uint64("id", uint64(t.Inode)))
+	case *fuseops.ReleaseFileHandleOp:
+		logger.Debug("Start", zap.Uint64("hndl", uint64(t.Handle)))
+	}
+	logger.Debug("Start", zap.Any("op", op))
+}
+
+func (fs *fsCommon) opEnd(op interface{}, err error) {
+	logger := fs.l.With(zap.String("Request", fmt.Sprintf("%T", op)))
+	switch t := op.(type) {
+	case *fuseops.ReadFileOp:
+		logger.Debug("End", zap.Uint64("inode", uint64(t.Inode)), zap.Int64("offset", t.Offset), zap.Error(err))
+		return
+	case *fuseops.WriteFileOp:
+		logger.Debug("End", zap.Uint64("inode", uint64(t.Inode)), zap.Error(err))
+		return
+	case *fuseops.ReadDirOp:
+		logger.Debug("End", zap.Uint64("inode", uint64(t.Inode)), zap.Error(err))
+		return
+	case *fuseops.LookUpInodeOp:
+		logger.Debug("End", zap.Uint64("parent", uint64(t.Parent)), zap.String("child", t.Name), zap.Error(err))
+	case *fuseops.GetInodeAttributesOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Inode)), zap.Error(err))
+	case *fuseops.SetInodeAttributesOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Inode)), zap.Error(err))
+	case *fuseops.ForgetInodeOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Inode)), zap.Error(err))
+	case *fuseops.RenameOp:
+		logger.Debug("End", zap.Uint64("oldP", uint64(t.OldParent)), zap.String("oldN", t.OldName),
+			zap.Uint64("nP", uint64(t.NewParent)), zap.String("nN", t.NewName), zap.Error(err))
+	case *fuseops.ReleaseDirHandleOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Handle)), zap.Error(err))
+	case *fuseops.OpenFileOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Inode)), zap.Error(err))
+	case *fuseops.SyncFileOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Inode)), zap.Error(err))
+	case *fuseops.FlushFileOp:
+		logger.Debug("End", zap.Uint64("id", uint64(t.Inode)), zap.Error(err))
+	case *fuseops.ReleaseFileHandleOp:
+		logger.Debug("End", zap.Uint64("hndl", uint64(t.Handle)), zap.Error(err))
+	}
+	logger.Debug("End", zap.Any("op", op), zap.Error(err))
+}
 
 func statFS() (err error) {
 	// TODO: Find the free space on the device and set the attributes accordingly.

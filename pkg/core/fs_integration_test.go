@@ -41,8 +41,7 @@ func TestMount(t *testing.T) {
 		ConsumableStore(consumableStore),
 		BlobStore(blobStore),
 	)
-	l, _ := zap.NewProduction()
-	fs, err := NewReadOnlyFS(bundle, l)
+	fs, err := NewReadOnlyFS(bundle, zap.NewNop())
 	require.NoError(t, err)
 	_ = os.Mkdir(pathToMount, 0777|os.ModeDir)
 	err = fs.MountReadOnly(pathToMount)
@@ -72,7 +71,7 @@ func TestMutableMount(t *testing.T) {
 		ConsumableStore(consumableStore),
 		BlobStore(blobStore),
 	)
-	fs, _ := NewMutableFS(bundle, "/tmp/")
+	fs, _ := NewMutableFS(bundle, "/tmp/", zap.NewNop())
 	_ = os.Mkdir(pathToMount, 0777|os.ModeDir)
 	err := fs.MountMutable(pathToMount)
 	require.NoError(t, err)
