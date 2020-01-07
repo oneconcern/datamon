@@ -22,17 +22,13 @@ import (
 	"github.com/oneconcern/datamon/pkg/model"
 )
 
-type fsMutable struct {
+var _ fuseutil.FileSystem = &fsMutable{}
 
-	// Bundle to commit.
-	bundle *Bundle
+type fsMutable struct {
+	fsCommon
 
 	// Get fsEntry for an iNode. Speed up stat and other calls keyed by iNode
 	iNodeStore *iradix.Tree
-
-	// Fast lookup of parent iNode id + child name, returns iNode of child. This is a common operation and it's speed is
-	// important.
-	lookupTree *iradix.Tree
 
 	// List of children for a given iNode. Maps inode id to list of children. This stitches the fuse FS together.
 	// TODO: This can be based on radix tree as well. Test performance (with locking simplification) and make the change.
@@ -42,7 +38,9 @@ type fsMutable struct {
 	backingFiles map[fuseops.InodeID]*afero.File
 
 	// TODO: remove one giant lock with more fine grained locking coupled with the readdir move to radix.
-	lock           sync.Mutex
+	lock             sync.Mutex
+	lockBackingFiles sync.RWMutex
+
 	iNodeGenerator iNodeGenerator
 
 	// local fs cache that mirrors the files.
@@ -50,13 +48,6 @@ type fsMutable struct {
 
 	// Logger
 	l *zap.Logger
-}
-
-func (fs *fsMutable) StatFS(
-	ctx context.Context,
-	op *fuseops.StatFSOp) (err error) {
-	fs.l.Debug("statfs")
-	return statFS()
 }
 
 func (fs *fsMutable) atomicGetReferences() (nodeStore *iradix.Tree, lookupTree *iradix.Tree) {
@@ -124,9 +115,16 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 	return nil
 }
 
-func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
+func (fs *fsMutable) StatFS(ctx context.Context, op *fuseops.StatFSOp) (err error) {
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
-	fs.l.Debug("lookup", zap.Uint64("p", uint64(op.Parent)), zap.String("c", op.Name))
+	return statFS()
+}
+
+func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	nodeStore, lookupTree := fs.atomicGetReferences()
 
@@ -153,7 +151,8 @@ func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp)
 }
 
 func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) (err error) {
-	fs.l.Debug("getAttr", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	nodeStore, _ := fs.atomicGetReferences()
 
@@ -162,7 +161,6 @@ func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInod
 	e, found := nodeStore.Get(key)
 	if !found {
 		err := fuse.ENOENT
-		fs.l.Debug("getAttr", zap.Uint64("id", uint64(op.Inode)), zap.Error(err))
 		return err
 	}
 
@@ -175,10 +173,11 @@ func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInod
 }
 
 func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInodeAttributesOp) (err error) {
-	fs.l.Debug("setAttr", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	if op.Mode != nil { // File permissions not supported
-		fs.l.Debug("set mode", zap.Uint32("mode", uint32(*op.Mode)))
+		fs.l.Debug("setting permissions mode is not supported", zap.Uint32("mode", uint32(*op.Mode)))
 		return fuse.ENOSYS
 	}
 
@@ -202,7 +201,6 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 		// File size can be truncated.
 		file, err := fs.localCache.OpenFile(fmt.Sprint(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
 		if err != nil {
-			fs.l.Error("error", zap.Error(err))
 			return fuse.EIO
 		}
 		if *op.Size > math.MaxInt64 {
@@ -211,7 +209,7 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 		}
 		err = file.Truncate(int64(*op.Size))
 		if err != nil {
-			fs.l.Error("error", zap.Error(err))
+			fs.l.Error("truncate error", zap.Error(err))
 			return fuse.EIO
 		}
 		n.attr.Size = *op.Size
@@ -235,8 +233,8 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 func (fs *fsMutable) ForgetInode(
 	ctx context.Context,
 	op *fuseops.ForgetInodeOp) (err error) {
-
-	fs.l.Debug("forgetInode", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	// Check reference count for iNode and remove from iNodeStore
 	// Get the node.
@@ -302,15 +300,6 @@ func (fs *fsMutable) MkDir(
 	return
 }
 
-// TODO: Should file and dir node be supported via this call? So far no..
-func (fs *fsMutable) MkNode(
-	ctx context.Context,
-	op *fuseops.MkNodeOp) (err error) {
-	fs.l.Info("mknode", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
-	err = fuse.ENOSYS
-	return
-}
-
 func (fs *fsMutable) CreateFile(
 	ctx context.Context,
 	op *fuseops.CreateFileOp) (err error) {
@@ -336,31 +325,12 @@ func (fs *fsMutable) CreateFile(
 	return
 }
 
-// No sym link support in datamon
-func (fs *fsMutable) CreateSymlink(
-	ctx context.Context,
-	op *fuseops.CreateSymlinkOp) (err error) {
-	fs.l.Info("createSymLink", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
-	err = fuse.ENOSYS
-	return
-}
-
-// no create link support in datamon
-func (fs *fsMutable) CreateLink(
-	ctx context.Context,
-	op *fuseops.CreateLinkOp) (err error) {
-	fs.l.Info("createLink", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
-	err = fuse.ENOSYS
-	return
-}
-
 // From man 2 rename:
 // If newpath exists but the operation fails for some reason, rename() guarantees to leave an instance of newpath in place.
 // oldpath can specify a directory.  In this case, newpath must either not exist, or it must specify an empty directory.
 func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err error) {
-
-	fs.l.Info("rename", zap.Uint64("oldP", uint64(op.OldParent)), zap.String("oldN", op.OldName),
-		zap.Uint64("nP", uint64(op.NewParent)), zap.String("nN", op.NewName))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
@@ -403,7 +373,8 @@ func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err erro
 func (fs *fsMutable) RmDir(
 	ctx context.Context,
 	op *fuseops.RmDirOp) (err error) {
-	fs.l.Info("rmdir", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	return fs.deleteNSEntry(op.Parent, op.Name)
 }
@@ -411,7 +382,9 @@ func (fs *fsMutable) RmDir(
 func (fs *fsMutable) Unlink(
 	ctx context.Context,
 	op *fuseops.UnlinkOp) (err error) {
-	fs.l.Info("unlink", zap.Uint64("id", uint64(op.Parent)), zap.String("name", op.Name))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
 	// TODO: remove from lookup and readdir
 	return fs.deleteNSEntry(op.Parent, op.Name)
 }
@@ -419,20 +392,24 @@ func (fs *fsMutable) Unlink(
 func (fs *fsMutable) OpenDir(
 	ctx context.Context,
 	op *fuseops.OpenDirOp) (err error) {
-	fs.l.Debug("openDir", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
 	return
 }
 
 func (fs *fsMutable) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) (err error) {
-	fs.l.Debug("readDir", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
 	offset := int(op.Offset)
 	iNode := op.Inode
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
+
 	children, found := fs.readDirMap[iNode]
 
 	if !found {
@@ -463,25 +440,32 @@ func (fs *fsMutable) ReadDir(
 func (fs *fsMutable) ReleaseDirHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseDirHandleOp) (err error) {
-	fs.l.Debug("releaseDir", zap.Uint64("id", uint64(op.Handle)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	return
 }
 
 func (fs *fsMutable) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
-	fs.l.Debug("openFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 	return
 }
 
 func (fs *fsMutable) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-	fs.l.Debug("readFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_RDONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
 		return fuse.EIO
 	}
+	fs.lockBackingFiles.Lock()
+	defer fs.lockBackingFiles.Unlock()
+
 	fs.backingFiles[op.Inode] = &file
 	op.BytesRead, err = file.ReadAt(op.Dst, op.Offset)
 	if err != nil {
@@ -493,11 +477,16 @@ func (fs *fsMutable) ReadFile(
 func (fs *fsMutable) WriteFile(
 	ctx context.Context,
 	op *fuseops.WriteFileOp) (err error) {
-	fs.l.Info("writeFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
 		return fuse.EIO
 	}
+	fs.lockBackingFiles.Lock()
+	defer fs.lockBackingFiles.Unlock()
+
 	fs.backingFiles[op.Inode] = &file
 	_, err = file.WriteAt(op.Data, op.Offset)
 	if err != nil {
@@ -518,7 +507,12 @@ func (fs *fsMutable) WriteFile(
 func (fs *fsMutable) SyncFile(
 	ctx context.Context,
 	op *fuseops.SyncFileOp) (err error) {
-	fs.l.Debug("syncFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
+	fs.lockBackingFiles.RLock()
+	defer fs.lockBackingFiles.RUnlock()
+
 	file := *fs.backingFiles[op.Inode]
 	if file != nil {
 		err := file.Sync()
@@ -532,7 +526,12 @@ func (fs *fsMutable) SyncFile(
 func (fs *fsMutable) FlushFile(
 	ctx context.Context,
 	op *fuseops.FlushFileOp) (err error) {
-	fs.l.Debug("flushFile", zap.Uint64("id", uint64(op.Inode)))
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
+	fs.lockBackingFiles.RLock()
+	defer fs.lockBackingFiles.RUnlock()
+
 	f := fs.backingFiles[op.Inode]
 	if f != nil {
 		file := *f
@@ -547,52 +546,9 @@ func (fs *fsMutable) FlushFile(
 func (fs *fsMutable) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
-	fs.l.Debug("releaseFileHandle", zap.Uint64("hndl", uint64(op.Handle)))
-	return
-}
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
 
-func (fs *fsMutable) ReadSymlink(
-	ctx context.Context,
-	op *fuseops.ReadSymlinkOp) (err error) {
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *fsMutable) RemoveXattr(
-	ctx context.Context,
-	op *fuseops.RemoveXattrOp) (err error) {
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *fsMutable) GetXattr(
-	ctx context.Context,
-	op *fuseops.GetXattrOp) (err error) {
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *fsMutable) ListXattr(
-	ctx context.Context,
-	op *fuseops.ListXattrOp) (err error) {
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *fsMutable) SetXattr(
-	ctx context.Context,
-	op *fuseops.SetXattrOp) (err error) {
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *fsMutable) Destroy() {
-}
-
-func (fs *fsMutable) Fallocate(
-	ctx context.Context,
-	op *fuseops.FallocateOp) (err error) {
-	err = fuse.ENOSYS
 	return
 }
 

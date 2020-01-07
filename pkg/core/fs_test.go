@@ -42,9 +42,11 @@ func TestFormLookupKey(t *testing.T) {
 func TestCreate(t *testing.T) {
 	child := "child"
 	fs := fsMutable{
-		bundle:     nil,
+		fsCommon: fsCommon{
+			bundle:     nil,
+			lookupTree: iradix.New(),
+		},
 		iNodeStore: iradix.New(),
-		lookupTree: iradix.New(),
 		readDirMap: make(map[fuseops.InodeID]map[fuseops.InodeID]*fuseutil.Dirent),
 		lock:       sync.Mutex{},
 		iNodeGenerator: iNodeGenerator{

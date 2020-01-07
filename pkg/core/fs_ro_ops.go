@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path"
 	"time"
@@ -20,87 +19,32 @@ import (
 	"github.com/jacobsa/fuse/fuseutil"
 )
 
+var _ fuseutil.FileSystem = &readOnlyFsInternal{}
+
+type readOnlyFsInternal struct {
+	fsCommon
+
+	// Get iNode for path. This is needed to generate directory entries without imposing a strict order of traversal.
+	fsDirStore *iradix.Tree
+
+	// Get fsEntry for an iNode. Speed up stat and other calls keyed by iNode
+	fsEntryStore *iradix.Tree
+
+	// List of children for a given iNode. Maps inode id to list of children. This stitches the fuse FS together.
+	// NOTE: since populateFS is not parallel and competed before the FS is available,
+	// this map does not need being protected from concurrent access.
+	readDirMap map[fuseops.InodeID][]fuseutil.Dirent
+
+	// readonly
+	isReadOnly bool
+}
+
 func (fs *readOnlyFsInternal) StatFS(
 	ctx context.Context,
 	op *fuseops.StatFSOp) (err error) {
 	return statFS()
 }
 
-func (fs *readOnlyFsInternal) opStart(op interface{}) {
-	switch t := op.(type) {
-	case *fuseops.ReadFileOp:
-		fs.l.Debug("Start",
-			zap.String("Request", fmt.Sprintf("%T", op)),
-			zap.String("repo", fs.bundle.RepoID),
-			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(t.Inode)),
-			zap.Int("buffer", len(t.Dst)),
-			zap.Int64("offset", t.Offset),
-		)
-		return
-	case *fuseops.WriteFileOp:
-		fs.l.Debug("Start",
-			zap.String("Request", fmt.Sprintf("%T", op)),
-			zap.String("repo", fs.bundle.RepoID),
-			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(t.Inode)),
-		)
-		return
-	case *fuseops.ReadDirOp:
-		fs.l.Debug("Start",
-			zap.String("Request", fmt.Sprintf("%T", op)),
-			zap.String("repo", fs.bundle.RepoID),
-			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(t.Inode)),
-		)
-		return
-	}
-	fs.l.Debug("Start",
-		zap.String("Request", fmt.Sprintf("%T", op)),
-		zap.String("repo", fs.bundle.RepoID),
-		zap.String("bundle", fs.bundle.BundleID),
-		zap.Any("op", op),
-	)
-}
-func (fs *readOnlyFsInternal) opEnd(op interface{}, err error) {
-	switch t := op.(type) {
-	case *fuseops.ReadFileOp:
-		fs.l.Debug("End",
-			zap.String("Request", fmt.Sprintf("%T", op)),
-			zap.String("repo", fs.bundle.RepoID),
-			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(t.Inode)),
-			zap.Int64("offset", t.Offset),
-			zap.Error(err),
-		)
-		return
-	case *fuseops.WriteFileOp:
-		fs.l.Debug("End",
-			zap.String("Request", fmt.Sprintf("%T", op)),
-			zap.String("repo", fs.bundle.RepoID),
-			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(t.Inode)),
-			zap.Error(err),
-		)
-		return
-	case *fuseops.ReadDirOp:
-		fs.l.Debug("End",
-			zap.String("Request", fmt.Sprintf("%T", op)),
-			zap.String("repo", fs.bundle.RepoID),
-			zap.String("bundle", fs.bundle.BundleID),
-			zap.Uint64("inode", uint64(t.Inode)),
-			zap.Error(err),
-		)
-		return
-	}
-	fs.l.Debug("End",
-		zap.String("Request", fmt.Sprintf("%T", op)),
-		zap.String("repo", fs.bundle.RepoID),
-		zap.String("bundle", fs.bundle.BundleID),
-		zap.Any("op", op),
-		zap.Error(err),
-	)
-}
 func typeAssertToFsEntry(p interface{}) *fsEntry {
 	fe := p.(fsEntry)
 	return &fe
@@ -109,6 +53,7 @@ func typeAssertToFsEntry(p interface{}) *fsEntry {
 func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	lookupKey := formLookupKey(op.Parent, op.Name)
 	val, found := fs.lookupTree.Get(lookupKey)
 
@@ -126,7 +71,6 @@ func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookU
 		err = fuse.ENOENT
 		return
 	}
-	defer fs.opEnd(op, err)
 	return nil
 }
 
@@ -135,6 +79,7 @@ func (fs *readOnlyFsInternal) GetInodeAttributes(
 	op *fuseops.GetInodeAttributesOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	key := formKey(op.Inode)
 	e, found := fs.fsEntryStore.Get(key)
 	if !found {
@@ -147,15 +92,6 @@ func (fs *readOnlyFsInternal) GetInodeAttributes(
 	return nil
 }
 
-func (fs *readOnlyFsInternal) SetInodeAttributes(
-	ctx context.Context,
-	op *fuseops.SetInodeAttributesOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
 func (fs *readOnlyFsInternal) ForgetInode(
 	ctx context.Context,
 	op *fuseops.ForgetInodeOp) (err error) {
@@ -164,82 +100,10 @@ func (fs *readOnlyFsInternal) ForgetInode(
 	return
 }
 
-func (fs *readOnlyFsInternal) MkDir(
-	ctx context.Context,
-	op *fuseops.MkDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) MkNode(
-	ctx context.Context,
-	op *fuseops.MkNodeOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) CreateFile(
-	ctx context.Context,
-	op *fuseops.CreateFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) CreateSymlink(
-	ctx context.Context,
-	op *fuseops.CreateSymlinkOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-// Hard links are not supported in datamon.
-func (fs *readOnlyFsInternal) CreateLink(
-	ctx context.Context,
-	op *fuseops.CreateLinkOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) Rename(
-	ctx context.Context,
-	op *fuseops.RenameOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) RmDir(
-	ctx context.Context,
-	op *fuseops.RmDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) Unlink(
-	ctx context.Context,
-	op *fuseops.UnlinkOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
 func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
 	if !found {
 		err = fuse.ENOENT
@@ -256,6 +120,7 @@ func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp
 func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
 	offset := int(op.Offset)
 	iNode := op.Inode
 
@@ -317,99 +182,11 @@ func (fs *readOnlyFsInternal) ReadFile(
 	return err
 }
 
-func (fs *readOnlyFsInternal) WriteFile(
-	ctx context.Context,
-	op *fuseops.WriteFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) SyncFile(
-	ctx context.Context,
-	op *fuseops.SyncFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) FlushFile(
-	ctx context.Context,
-	op *fuseops.FlushFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
 func (fs *readOnlyFsInternal) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
-	return
-}
-
-func (fs *readOnlyFsInternal) ReadSymlink(
-	ctx context.Context,
-	op *fuseops.ReadSymlinkOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) RemoveXattr(
-	ctx context.Context,
-	op *fuseops.RemoveXattrOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) GetXattr(
-	ctx context.Context,
-	op *fuseops.GetXattrOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) ListXattr(
-	ctx context.Context,
-	op *fuseops.ListXattrOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) SetXattr(
-	ctx context.Context,
-	op *fuseops.SetXattrOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
-	return
-}
-
-func (fs *readOnlyFsInternal) Destroy() {
-	fs.l.Info("Destroy",
-		zap.String("repo", fs.bundle.RepoID),
-		zap.String("bundle", fs.bundle.BundleID),
-	)
-}
-
-func (fs *readOnlyFsInternal) Fallocate(
-	ctx context.Context,
-	op *fuseops.FallocateOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-	err = fuse.ENOSYS
 	return
 }
 
@@ -634,7 +411,6 @@ func populateFSAddBundleEntries(
 		nodesToAdd = nodesToAdd[:0]
 	} // End walking bundle entries q2
 	return nil
-
 }
 
 func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
@@ -772,31 +548,6 @@ func (fs *readOnlyFsInternal) insertDatamonFSEntry(
 	fs.readDirMap[parentInode] = childEntries
 
 	return nil
-}
-
-type readOnlyFsInternal struct {
-
-	// Backing bundle for this FS.
-	bundle *Bundle
-
-	// Get iNode for path. This is needed to generate directory entries without imposing a strict order of traversal.
-	fsDirStore *iradix.Tree
-
-	// Get fsEntry for an iNode. Speed up stat and other calls keyed by iNode
-	fsEntryStore *iradix.Tree
-
-	// Fast lookup of parent iNode id + child name, returns iNode of child. This is a common operation and it's speed is
-	// important.
-	lookupTree *iradix.Tree
-
-	// List of children for a given iNode. Maps inode id to list of children. This stitches the fuse FS together.
-	readDirMap map[fuseops.InodeID][]fuseutil.Dirent
-
-	// readonly
-	isReadOnly bool
-
-	// logger
-	l *zap.Logger
 }
 
 // fsEntry is a node in the filesystem.
