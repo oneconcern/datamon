@@ -27,7 +27,7 @@ require (
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
 	github.com/rhysd/go-github-selfupdate v1.2.1
-	github.com/rogpeppe/go-internal v1.5.0 // indirect
+	github.com/rogpeppe/go-internal v1.5.1 // indirect
 	github.com/segmentio/ksuid v1.0.2
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v0.0.5
@@ -39,13 +39,13 @@ require (
 	go.opencensus.io v0.22.2 // indirect
 	go.uber.org/goleak v0.10.1-0.20191111212139-7380c5a9fa84
 	go.uber.org/zap v1.13.0
-	golang.org/x/crypto v0.0.0-20191202143827-86a70503ff7e // indirect
+	golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876 // indirect
 	golang.org/x/exp v0.0.0-20191129062945-2f5052295587 // indirect
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/net v0.0.0-20191207000613-e7e4b65ae663 // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
-	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449
-	golang.org/x/tools v0.0.0-20191206204035-259af5ff87bd // indirect
+	golang.org/x/sys v0.0.0-20200107162124-548cf772de50
+	golang.org/x/tools v0.0.0-20200107184032-11e9d9cc0042 // indirect
 	google.golang.org/api v0.14.0
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/genproto v0.0.0-20191206224255-0243a4be9c8f // indirect

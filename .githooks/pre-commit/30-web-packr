@@ -1,0 +1,5 @@
+go get -u github.com/gobuffalo/packr/v2/packr2
+cd ./pkg/web
+packr2 build
+git add packrd
+git add web-packr.go
