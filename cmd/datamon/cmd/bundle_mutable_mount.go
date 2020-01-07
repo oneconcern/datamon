@@ -9,6 +9,7 @@ import (
 	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/spf13/cobra"
 )
 
@@ -52,7 +53,12 @@ The destination path is a temporary staging area for write operations.`,
 		bundle := core.NewBundle(bd,
 			bundleOpts...,
 		)
-		fs, err := core.NewMutableFS(bundle, datamonFlags.bundle.DataPath)
+		logger, err := dlogger.GetLogger(datamonFlags.root.logLevel)
+		if err != nil {
+			onDaemonError("failed to set log level", err)
+			return
+		}
+		fs, err := core.NewMutableFS(bundle, datamonFlags.bundle.DataPath, logger)
 		if err != nil {
 			onDaemonError("create mutable filesystem", err)
 			return
