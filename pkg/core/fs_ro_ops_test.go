@@ -1,3 +1,5 @@
+// +build fsintegration
+
 package core
 
 import (
@@ -109,8 +111,6 @@ func testBadRemove(action, pth string, isDir bool, e chan<- error) {
 		e <- fmt.Errorf("%s:expected RO mount but could remove file: %s", action, pth)
 	}
 }
-
-// TODO: removeAll
 
 func testBadRename(action, pth string, _ bool, e chan<- error) {
 	err := os.Rename(pth, sibling(pth, "renamed"))

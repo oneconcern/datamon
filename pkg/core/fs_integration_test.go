@@ -1,3 +1,5 @@
+// +build fsintegration
+
 package core
 
 import (
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -27,11 +30,23 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 )
 
+const (
+	testOnTempFS = true                 // for very large test cases, avoid tempFS
+	throttleIOs  = 1 * time.Millisecond // on CI, we experiment hangs on RO mount when I/O parallel workload is too high
+)
+
 func testFsIntegEnv() (testEnv, func(t testing.TB) func()) {
+	var tmp string
+	if testOnTempFS {
+		tmp = ""
+	} else {
+		tmp = "./work"
+		_ = os.MkdirAll(tmp, 0700)
+	}
 	// builds a temporary testing environment
-	mountPath := stringorDie(ioutil.TempDir("", "mount-")) // fuse mount
-	stagingPath := stringorDie(ioutil.TempDir("", "staging-"))
-	testRoot := stringorDie(ioutil.TempDir("", "core-data-"))
+	mountPath := stringorDie(ioutil.TempDir(tmp, "mount-")) // fuse mount
+	stagingPath := stringorDie(ioutil.TempDir(tmp, "staging-"))
+	testRoot := stringorDie(ioutil.TempDir(tmp, "core-data-"))
 	sourceDir := filepath.Join(testRoot, "bundle", "source")
 	destinationDir := filepath.Join(testRoot, "bundle", "destination")
 
@@ -65,13 +80,17 @@ func testFsIntegEnv() (testEnv, func(t testing.TB) func()) {
 		}, func(t testing.TB) func() {
 			return func() {
 				t.Logf("unwinding integration test environment")
-				for _, toRemove := range []string{
+				tempDirs := []string{
 					mountPath,
 					stagingPath,
 					sourceDir,
 					destinationDir,
 					testRoot,
-				} {
+				}
+				if tmp != "" {
+					tempDirs = append(tempDirs, tmp)
+				}
+				for _, toRemove := range tempDirs {
 					_ = os.RemoveAll(toRemove)
 				}
 			}
@@ -96,25 +115,29 @@ func TestRoMount(t *testing.T) {
 
 	t.Logf("preparing RO mount on %s", ev.pathToMount)
 	bundle := fakeBundle(ev)
-	fs, err := NewReadOnlyFS(bundle, zap.NewNop())
+	fs, err := NewReadOnlyFS(bundle, testLogger())
 	require.NoError(t, err)
 
 	err = fs.MountReadOnly(ev.pathToMount)
 	require.NoError(t, err)
 
 	defer func() {
+		fs.fsInternal.l.Info("unmounting RO mount")
 		t.Log("unmounting RO mount")
 		require.NoError(t, fs.Unmount(ev.pathToMount))
 	}()
 
+	fs.fsInternal.l.Info("verifying data files")
 	t.Log("verifying data files")
 	validateDataFiles(t, filepath.Join(ev.destinationDir, ev.dataDir), filepath.Join(ev.pathToMount, ev.dataDir))
 
+	fs.fsInternal.l.Info("exercising fs syscalls")
 	t.Log("exercising fs syscalls")
 	testFSOperations(t, ev, fsROActions)
 }
 
 func fsROActions(pth string, info os.FileInfo, e chan<- error, wg *sync.WaitGroup) {
+	l := testLogger()
 	defer wg.Done()
 	// randomized actions on FS
 	actions := map[string]func(string, string, bool, chan<- error){
@@ -139,6 +162,7 @@ func fsROActions(pth string, info os.FileInfo, e chan<- error, wg *sync.WaitGrou
 		"statfs":             testStatFS,
 	}
 	for action, fn := range actions {
+		l.Info("fs-action", zap.String("action", action), zap.String("file", pth))
 		fn(action, pth, info.IsDir(), e)
 	}
 }
@@ -151,7 +175,7 @@ func TestMutableMount(t *testing.T) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, zap.NewNop())
+	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -187,7 +211,7 @@ func TestMutableMountWrite(t *testing.T) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, zap.NewNop())
+	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -224,7 +248,7 @@ func TestMutableMountCommitError(t *testing.T) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, zap.NewNop())
+	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -278,7 +302,7 @@ func testMutableMountMkdirWithFile(t *testing.T, withFile bool) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, zap.NewNop())
+	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -446,7 +470,6 @@ func testAfterCommit(t testing.TB, bundle *Bundle, tree uploadTree, ev testEnv, 
 
 	t.Logf("downloading newly created bundle in: %s", ev.destinationDir)
 	bundle.ConsumableStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.destinationDir))
-	bundle.l, _ = zap.NewDevelopment()
 	require.NoError(t, Publish(context.Background(), bundle))
 
 	t.Log("verify downloaded bundle")
@@ -589,6 +612,8 @@ func testFSOperations(t testing.TB, ev testEnv, opsFunc func(string, os.FileInfo
 			}
 		}
 	}(errC, &wg1)
+	l := testLogger()
+	l.Info("start walking")
 
 	err := filepath.Walk(ev.pathToMount, func(pth string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
@@ -598,17 +623,24 @@ func testFSOperations(t testing.TB, ev testEnv, opsFunc func(string, os.FileInfo
 		if pth == ev.pathToMount {
 			return nil
 		}
+		l.Info("walking", zap.String("file", pth))
 		wg2.Add(1)
 		go opsFunc(pth, info, errC, &wg2)
+		if throttleIOs > 0 {
+			time.Sleep(throttleIOs) // throttling test (experimented hangs when run on CI)
+		}
 
 		return nil
 	})
 	require.NoError(t, err)
 
+	l.Info("waiting for ops to terminate")
 	wg2.Wait()
 	close(errC)
+	l.Info("waiting for error events")
 	wg1.Wait()
 	assert.NoError(t, errFS)
+	l.Info("done with ops")
 }
 
 func stringorDie(arg string, err error) string {
@@ -616,4 +648,10 @@ func stringorDie(arg string, err error) string {
 		panic(err)
 	}
 	return arg
+}
+
+func testLogger() *zap.Logger {
+	//return zap.NewNop() // to limit test output
+	l, _ := zap.NewDevelopment() // to get DEBUG  during test run
+	return l
 }

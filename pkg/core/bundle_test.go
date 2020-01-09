@@ -42,8 +42,10 @@ type testEnv struct {
 	reBundleEntriesPerFile int
 	original               string
 	dataDir                string
-	pathToMount            string
-	pathToStaging          string
+	// nolint: unused,structcheck
+	pathToMount string
+	// nolint: unused,structcheck
+	pathToStaging string
 }
 
 func testBundleEnv() testEnv {
