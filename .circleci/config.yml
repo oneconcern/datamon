@@ -29,6 +29,16 @@ executors:
     docker:
       - image: circleci/golang
 
+  fuse_tester:
+    working_directory: ~/project
+    environment:
+      GOOGLE_PROJECT_ID: "onec-co"
+      GOOGLE_COMPUTE_ZONE: us-west2-c
+      GOROOT: /usr/local/go
+      GOPATH: /go
+    machine:
+      image: ubuntu-1604:201903-01
+
 commands:
   install_base:
     steps:
@@ -42,6 +52,28 @@ commands:
             curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
             sudo apt-get update -y --quiet
             sudo apt-get install -y --quiet git build-essential google-cloud-sdk shellcheck zsh
+
+  install_machine:
+    steps:
+      - run:
+          name: install VM dependencies (fuse+recent golang)
+          environment:
+            GOROOT: /usr/local/go
+            GOPATH: /go
+          command: |
+            GO_VERSION=1.13.5
+            CI_USER=$(id -u)
+            sudo apt-get install --quiet fuse
+
+            cd /tmp
+            wget --no-verbose https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz
+            sudo tar -xf go${GO_VERSION}.linux-amd64.tar.gz
+            sudo mv /usr/local/go /usr/local/go.old || true
+            sudo mv go /usr/local
+            sudo mkdir -p ${GOPATH}/pkg ${GOPATH}/bin
+            sudo chown -R ${CI_USER} ${GOPATH}
+            export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+            go version
 
   install_kubectl:
     steps:
@@ -126,7 +158,7 @@ jobs:
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             hack/go-generate.sh
             go mod download
-            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures ./... -- -race ./...
+            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures -- -race ./...
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
@@ -136,6 +168,44 @@ jobs:
           destination: raw-test-output
       - store_test_results:
           path: /tmp/test-results
+
+  go_test_fuse:
+    executor: fuse_tester
+    environment:
+      GOOGLE_PROJECT_ID: "onec-co"
+      GOOGLE_COMPUTE_ZONE: us-west2-c
+    steps:
+      - install_base
+      - install_machine
+      - checkout
+      - restore_cache:
+          keys:
+            - pkg-cache-{{ checksum "go.sum" }}
+            - pkg-cache-
+      - install_tools
+      - login_to_google
+      - run:
+          name: Run golang tests in integration environment
+          command: |
+            export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+            mkdir -p ~/extra
+            mkdir -p /tmp/test-fuse-results
+            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
+            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
+            hack/go-generate.sh
+            go mod download
+            # make install-minio
+            env
+            gotestsum --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- -tags fsintegration  ./pkg/core
+      - save_cache:
+          key: pkg-cache-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg"
+      - store_artifacts:
+          path: /tmp/test-fuse-results
+          destination: raw-test-output
+      - store_test_results:
+          path: /tmp/test-fuse-results
 
   fuse_sidecar_test:
     executor: docker_builder
@@ -293,6 +363,14 @@ workflows:
             branches:
               only: /.*/
 
+      - go_test_fuse:
+          context: "OC Common"
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
       - fuse_sidecar_test:
           context: "OC Common"
           filters:
@@ -334,3 +412,4 @@ workflows:
               only: /^v.*/
             branches:
               ignore: /.*/
+
