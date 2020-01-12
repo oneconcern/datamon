@@ -11,7 +11,7 @@ builds:
   - id: datamon
     env: []
     main: ./cmd/datamon/main.go
-    binary: datamon
+    binary: datamon2
     ldflags:
       - '-s'
       - '-w'
@@ -56,7 +56,7 @@ archives:
   - id: datamon-release
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     builds:
-      - datamon
+      - datamon2
     format: 'tar.gz'
     files:
       - LICENSE
@@ -94,6 +94,6 @@ brews:
     homepage: "https://github.com/oneconcern/datamon"
     description: "A datascience tool to work with data at rest"
     install: |
-      bin.install "datamon"
+      bin.install "datamon2"
     test: |
-      system "#{bin}/datamon", "version"
+      system "#{bin}/datamon2", "version"
