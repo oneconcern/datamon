@@ -11,7 +11,7 @@ builds:
   - id: datamon
     env: []
     main: ./cmd/datamon/main.go
-    binary: datamon
+    binary: datamon2
     ldflags:
       - '-s'
       - '-w'
