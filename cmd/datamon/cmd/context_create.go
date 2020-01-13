@@ -44,7 +44,5 @@ func init() {
 		addContextFlag(ContextCreateCommand),
 	)
 
-	addConfigFlag(ContextCreateCommand)
-
 	ContextCmd.AddCommand(ContextCreateCommand)
 }

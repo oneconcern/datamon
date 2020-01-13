@@ -39,12 +39,6 @@ type readOnlyFsInternal struct {
 	isReadOnly bool
 }
 
-func (fs *readOnlyFsInternal) StatFS(
-	ctx context.Context,
-	op *fuseops.StatFSOp) (err error) {
-	return statFS()
-}
-
 func typeAssertToFsEntry(p interface{}) *fsEntry {
 	fe := p.(fsEntry)
 	return &fe

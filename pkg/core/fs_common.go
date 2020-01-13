@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -32,9 +33,26 @@ type fsCommon struct {
 	l *zap.Logger
 }
 
+func (fs *fsCommon) StatFS(
+	ctx context.Context,
+	op *fuseops.StatFSOp) (err error) {
+	fs.opStart(op)
+	defer fs.opEnd(op, err)
+
+	return statFS()
+}
+
+func statFS() (err error) {
+	// TODO: Find the free space on the device and set the attributes accordingly.
+	// TODO: Find optimal block size (Default to the one used by underlying FS)
+	return
+}
+
 func (fs *fsCommon) opStart(op interface{}) {
 	logger := fs.l.With(zap.String("Request", fmt.Sprintf("%T", op)))
 	switch t := op.(type) {
+	case *fuseops.StatFSOp:
+		logger.Debug("Start", zap.Uint64("inodes", t.Inodes), zap.Uint64("blocks", t.Blocks))
 	case *fuseops.ReadFileOp:
 		logger.Debug("Start", zap.Uint64("inode", uint64(t.Inode)), zap.Int("buffer", len(t.Dst)), zap.Int64("offset", t.Offset))
 		return
@@ -76,6 +94,8 @@ func (fs *fsCommon) opStart(op interface{}) {
 func (fs *fsCommon) opEnd(op interface{}, err error) {
 	logger := fs.l.With(zap.String("Request", fmt.Sprintf("%T", op)))
 	switch t := op.(type) {
+	case *fuseops.StatFSOp:
+		logger.Debug("End", zap.Uint64("inodes", t.Inodes), zap.Uint64("blocks", t.Blocks), zap.Error(err))
 	case *fuseops.ReadFileOp:
 		logger.Debug("End", zap.Uint64("inode", uint64(t.Inode)), zap.Int64("offset", t.Offset), zap.Error(err))
 		return
@@ -112,12 +132,6 @@ func (fs *fsCommon) opEnd(op interface{}, err error) {
 		logger.Debug("End", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name), zap.Error(err))
 	}
 	logger.Debug("End", zap.Any("op", op), zap.Error(err))
-}
-
-func statFS() (err error) {
-	// TODO: Find the free space on the device and set the attributes accordingly.
-	// TODO: Find optimal block size (Default to the one used by underlying FS)
-	return
 }
 
 func formLookupKey(id fuseops.InodeID, childName string) []byte {

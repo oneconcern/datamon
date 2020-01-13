@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -56,9 +55,7 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 		return nil, fmt.Errorf("logger is nil")
 	}
 	if bundle == nil {
-		err := fmt.Errorf("bundle is nil")
-		l.Error("bundle is nil", zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("bundle is nil")
 	}
 	fs := &readOnlyFsInternal{
 		fsCommon: fsCommon{
@@ -74,8 +71,7 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 	// Extract the meta information needed.
 	err := Publish(context.Background(), fs.bundle)
 	if err != nil {
-		l.Error("Failed to publish bundle", zap.String("id", bundle.BundleID),
-			zap.Error(err))
+		l.Error("Failed to publish bundle", zap.String("id", bundle.BundleID), zap.Error(err))
 		return nil, err
 	}
 	// TODO: Introduce streaming and caching
@@ -85,6 +81,12 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 
 // NewMutableFS creates a new instance of the datamon filesystem.
 func NewMutableFS(bundle *Bundle, pathToStaging string, l *zap.Logger) (*MutableFS, error) {
+	if l == nil {
+		return nil, fmt.Errorf("logger is nil")
+	}
+	if bundle == nil {
+		return nil, fmt.Errorf("bundle is nil")
+	}
 	fs := &fsMutable{
 		fsCommon: fsCommon{
 			bundle:     bundle,
@@ -114,11 +116,7 @@ func NewMutableFS(bundle *Bundle, pathToStaging string, l *zap.Logger) (*Mutable
 }
 
 func prepPath(path string) error {
-	err := os.MkdirAll(path, dirDefaultMode)
-	if err != nil && strings.Contains(err.Error(), "file exists") {
-		return nil
-	}
-	return err
+	return os.MkdirAll(path, dirDefaultMode)
 }
 
 // MountReadOnly a ReadOnlyFS

@@ -45,9 +45,6 @@ type fsMutable struct {
 
 	// local fs cache that mirrors the files.
 	localCache afero.Fs
-
-	// Logger
-	l *zap.Logger
 }
 
 func (fs *fsMutable) atomicGetReferences() (nodeStore *iradix.Tree, lookupTree *iradix.Tree) {
@@ -76,7 +73,7 @@ func (fs *fsMutable) lookup(p fuseops.InodeID, c string) (le lookupEntry, found 
 	return lookup(p, c, fs.lookupTree)
 }
 
-// Delete the entry from namespace only.
+// Delete the entry from namespace only. Caller must lock structures.
 func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 	pn, found := fs.iNodeStore.Get(formKey(p))
 	if !found {
@@ -113,13 +110,6 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 	// Delete from parent read dir
 	delete(children, cLE.iNode)
 	return nil
-}
-
-func (fs *fsMutable) StatFS(ctx context.Context, op *fuseops.StatFSOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
-
-	return statFS()
 }
 
 func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
@@ -376,6 +366,9 @@ func (fs *fsMutable) RmDir(
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
 
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
+
 	return fs.deleteNSEntry(op.Parent, op.Name)
 }
 
@@ -384,6 +377,9 @@ func (fs *fsMutable) Unlink(
 	op *fuseops.UnlinkOp) (err error) {
 	fs.opStart(op)
 	defer fs.opEnd(op, err)
+
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
 
 	// TODO: remove from lookup and readdir
 	return fs.deleteNSEntry(op.Parent, op.Name)
@@ -730,6 +726,8 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 	fs.l.Info("Commit")
 	/* some sync setup */
 	if fs.bundle.BundleID == "" {
+		// NOTE(fred): I find it strange that the user may decide its own
+		// commit hash from the CLI.
 		if err := fs.bundle.InitializeBundleID(); err != nil {
 			return err
 		}
@@ -758,6 +756,7 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 	 * this thread can use reading from the bundle entry channel to detect whether the walk is finished.
 	 */
 	fs.l.Debug("Commit: spinning off goroutines")
+	// TODO: internal errors do not bubble up properly when unmounting
 	go commitWalkReadDirMap(ctx, fs, commitChans{
 		bundleEntry: bundleEntryC,
 		error:       errorC,

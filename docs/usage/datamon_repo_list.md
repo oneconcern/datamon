@@ -30,6 +30,7 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 ### Options inherited from parent commands
 
 ```
+      --config string    Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
       --context string   Set the context for datamon (default "dev")
       --upgrade          Upgrades the current version then carries on with the specified command
 ```

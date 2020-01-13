@@ -40,6 +40,7 @@ func TestFormLookupKey(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
+	const testRoot = "../../testdata/core"
 	child := "child"
 	fs := fsMutable{
 		fsCommon: fsCommon{
