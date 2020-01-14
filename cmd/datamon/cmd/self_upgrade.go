@@ -54,9 +54,9 @@ type upgradeFlags struct {
 }
 
 func updater() *selfupdate.Updater {
-	//assetFilter = selfupdate.AssetFilter("^datamon([^-]?.?)_")
+	//asset filter
 	u, err := selfupdate.NewUpdater(selfupdate.Config{
-		Filters: []string{"^datamon([^-]?.?)_"},
+		Filters: []string{`^datamon\d*([^-]?.?)_`},
 	})
 	if err != nil {
 		wrapFatalln("error setting up self update", err)
