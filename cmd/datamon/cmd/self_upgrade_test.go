@@ -35,7 +35,7 @@ func TestSelfUpgrade(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = os.RemoveAll(dummyDir) }()
 
-	opts.selfBinary = filepath.Join(dummyDir, "datamon")
+	opts.selfBinary = filepath.Join(dummyDir, "datamon2")
 
 	err = ioutil.WriteFile(opts.selfBinary, []byte(`dummy`), 0700)
 	require.NoError(t, err)
