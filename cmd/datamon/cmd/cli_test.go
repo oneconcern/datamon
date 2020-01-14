@@ -36,6 +36,7 @@ const (
 	repo2             = "test-repo2"
 	timeForm          = "2006-01-02 15:04:05.999999999 -0700 MST"
 	concurrencyFactor = "100"
+	testLeafSize      = int(cafs.DefaultLeafSize)
 )
 
 type uploadTree struct {
@@ -51,19 +52,19 @@ var testUploadTrees = [][]uploadTree{{
 }, {
 	{
 		path: "/leafs/leafsize",
-		size: cafs.DefaultLeafSize,
+		size: testLeafSize,
 	},
 	{
 		path: "/leafs/over-leafsize",
-		size: cafs.DefaultLeafSize + 1,
+		size: testLeafSize + 1,
 	},
 	{
 		path: "/leafs/under-leafsize",
-		size: cafs.DefaultLeafSize - 1,
+		size: testLeafSize - 1,
 	},
 	{
 		path: "/leafs/multiple-leafsize",
-		size: cafs.DefaultLeafSize * 3,
+		size: testLeafSize * 3,
 	},
 	{
 		path: "/leafs/root",

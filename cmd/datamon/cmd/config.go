@@ -7,13 +7,16 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/errors"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 )
 
@@ -52,9 +55,11 @@ func configFileLocation(expandEnv bool) string {
 // CLIConfig describes the CLI local configuration file.
 type CLIConfig struct {
 	// bug in viper? Need to keep names of fields the same as the serialized names..
-	Credential string `json:"credential" yaml:"credential"` // Credentials to use for GCS
-	Config     string `json:"config" yaml:"config"`         // Config bucket for datamon contexts and metadata
-	Context    string `json:"context" yaml:"context"`       // Current context for datamon
+	Credential  string `json:"credential" yaml:"credential"` // Credentials to use for GCS
+	Config      string `json:"config" yaml:"config"`         // Config bucket for datamon contexts and metadata
+	Context     string `json:"context" yaml:"context"`       // Current context for datamon
+	logger      *zap.Logger
+	oneceLogger sync.Once
 }
 
 func (c *CLIConfig) setDatamonParams(flags *flagsT) {
@@ -71,12 +76,12 @@ func (c *CLIConfig) MarshalConfig() ([]byte, error) {
 	return yaml.Marshal(c)
 }
 
-func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
+func (c *CLIConfig) populateRemoteConfig(flags *flagsT) {
 	if flags.core.Config == "" {
 		wrapFatalln("set environment variable $DATAMON_GLOBAL_CONFIG or define remote config in the config file", nil)
 		return
 	}
-	configStore, err := handleRemoteConfigErr(gcs.New(context.Background(), flags.core.Config, config.Credential))
+	configStore, err := handleRemoteConfigErr(gcs.New(context.Background(), flags.core.Config, config.Credential, gcs.Logger(c.mustGetLogger(*flags))))
 	if err != nil {
 		wrapFatalln("failed to get config store", err)
 		return
@@ -98,6 +103,17 @@ func (*CLIConfig) populateRemoteConfig(flags *flagsT) {
 		return
 	}
 	flags.context.Descriptor = contextDescriptor
+}
+
+func (c *CLIConfig) mustGetLogger(flags flagsT) *zap.Logger {
+	c.oneceLogger.Do(func() {
+		var err error
+		c.logger, err = dlogger.GetLogger(flags.root.logLevel)
+		if err != nil {
+			wrapFatalln("failed to set log level", err)
+		}
+	})
+	return c.logger
 }
 
 func handleRemoteConfigErr(store storage.Store, err error) (storage.Store, error) {

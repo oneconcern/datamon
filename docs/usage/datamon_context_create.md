@@ -17,6 +17,7 @@ datamon context create [flags]
 ```
       --blob string       The name of the bucket hosting the datamon blobs
   -h, --help              help for create
+      --loglevel string   The logging level (default "info")
       --meta string       The name of the bucket used by datamon metadata
       --read-log string   The name of the bucket hosting the read log
       --vmeta string      The name of the bucket hosting the versioned metadata

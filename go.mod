@@ -7,8 +7,10 @@ require (
 	cloud.google.com/go/storage v1.4.0
 	github.com/aws/aws-sdk-go v1.18.6
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.4.0
 	github.com/go-chi/chi v4.0.2+incompatible
+	github.com/go-openapi/runtime v0.19.9
 	github.com/gobuffalo/envy v1.8.1 // indirect
 	github.com/gobuffalo/logger v1.0.3 // indirect
 	github.com/gobuffalo/packd v0.3.0
@@ -34,7 +36,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.5.0
-	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	go.opencensus.io v0.22.2 // indirect
 	go.uber.org/goleak v0.10.1-0.20191111212139-7380c5a9fa84

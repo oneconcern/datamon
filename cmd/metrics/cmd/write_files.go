@@ -68,7 +68,7 @@ yet is generally part of the datamon metrics collection and benchmarking picture
 				filenames = append(filenames, nextFileName)
 			}
 			max := int64(1024 * 1024 * params.writeFiles.fileSize)
-			s = newGenStoreZeroOneChunks(filenames, max, cafs.DefaultLeafSize)
+			s = newGenStoreZeroOneChunks(filenames, max, int64(cafs.DefaultLeafSize))
 			return s
 		}()
 

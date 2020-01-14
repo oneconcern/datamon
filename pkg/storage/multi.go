@@ -10,6 +10,7 @@ import (
 	"sync"
 )
 
+// ReadTee reads from a source and duplicates the output to another destination store
 func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, destination string) ([]byte, error) {
 	reader, err := sStore.Get(ctx, source)
 	if err != nil {
@@ -27,11 +28,18 @@ func ReadTee(ctx context.Context, sStore Store, source string, dStore Store, des
 	return object, err
 }
 
+// MultiStoreUnit is used to specify multiple operations, some of which are tolerated to fail
 type MultiStoreUnit struct {
-	Store           Store
+	// Store is the backend to be accessed
+	Store Store
+
+	// TolerateFailure to false breaks multi-store operations whenever an error is encountered.
 	TolerateFailure bool
 }
 
+// MultiPut duplicates write operations to an array of stores, under the same name
+//
+// TODO(fred): the aliased type NewKey is just confusing: fallback to bool
 func MultiPut(ctx context.Context, stores []MultiStoreUnit, name string, buffer []byte, doesNotExist NewKey) error {
 	errC := make(chan error, len(stores))
 	var wg sync.WaitGroup
@@ -40,6 +48,7 @@ func MultiPut(ctx context.Context, stores []MultiStoreUnit, name string, buffer 
 		wg.Add(1)
 		go func(w MultiStoreUnit, buffer []byte) {
 			defer wg.Done()
+			// TODO(fred): rewrite expression with type switch
 			crcStore, ok := w.Store.(StoreCRC)
 			var err error
 			if ok {

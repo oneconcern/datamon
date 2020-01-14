@@ -78,10 +78,14 @@ func (a AuthMock) Principal(_ string) (model.Contributor, error) {
 	}, nil
 }
 
+func testContext() string {
+	return "test-context"
+}
+
 func setupConfig(t *testing.T, flags flagsT) func() {
 	r := internal.RandStringBytesMaskImprSrc(15)
 	bucketConfig := "datamon-deleteme-config" + r
-	testContext := "test-context"
+	testContext := testContext()
 	client, err := gcsStorage.NewClient(context.Background(), option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err, "couldn't create bucket client")
 	err = client.Bucket(bucketConfig).Create(context.Background(), "onec-co", nil)
@@ -103,6 +107,7 @@ func setupConfig(t *testing.T, flags flagsT) func() {
 		flags.context.Descriptor.Metadata,
 		"--read-log",
 		flags.context.Descriptor.ReadLog,
+		//"--loglevel", "debug",
 	}, "test and create context", false)
 	err = os.Setenv("DATAMON_GLOBAL_CONFIG", bucketConfig)
 	require.NoError(t, err)

@@ -29,3 +29,12 @@ func GetLogger(logLevel string) (*zap.Logger, error) {
 	}
 	return logger, nil
 }
+
+// MustGetLogger returns a zap logger with the specified level or panics
+func MustGetLogger(logLevel string) *zap.Logger {
+	l, err := GetLogger(logLevel)
+	if err != nil {
+		panic(err)
+	}
+	return l
+}

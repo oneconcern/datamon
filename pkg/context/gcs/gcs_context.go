@@ -10,34 +10,34 @@ import (
 )
 
 // MakeContext initializes all gcs stores in a context described by its model, with some gcs credentials
-func MakeContext(ctx context.Context, descriptor model.Context, creds string) (context2.Stores, error) {
+func MakeContext(ctx context.Context, descriptor model.Context, creds string, opts ...gcsstore.Option) (context2.Stores, error) {
 	stores := context2.New()
 
-	meta, err := gcsstore.New(ctx, descriptor.Metadata, creds)
+	meta, err := gcsstore.New(ctx, descriptor.Metadata, creds, opts...)
 	if err != nil {
 		return nil, status.ErrInitMetadata.Wrap(err)
 	}
 	stores.SetMetadata(meta)
 
-	blob, err := gcsstore.New(ctx, descriptor.Blob, creds)
+	blob, err := gcsstore.New(ctx, descriptor.Blob, creds, opts...)
 	if err != nil {
 		return nil, status.ErrInitBlob.Wrap(err)
 	}
 	stores.SetBlob(blob)
 
-	v, err := gcsstore.New(ctx, descriptor.VMetadata, creds)
+	v, err := gcsstore.New(ctx, descriptor.VMetadata, creds, opts...)
 	if err != nil {
 		return nil, status.ErrInitVMetadata.Wrap(err)
 	}
 	stores.SetVMetadata(v)
 
-	w, err := gcsstore.New(ctx, descriptor.WAL, creds)
+	w, err := gcsstore.New(ctx, descriptor.WAL, creds, opts...)
 	if err != nil {
 		return nil, status.ErrInitWAL.Wrap(err)
 	}
 	stores.SetWal(w)
 
-	r, err := gcsstore.New(ctx, descriptor.ReadLog, creds)
+	r, err := gcsstore.New(ctx, descriptor.ReadLog, creds, opts...)
 	if err != nil {
 		return nil, status.ErrInitRLog.Wrap(err)
 	}

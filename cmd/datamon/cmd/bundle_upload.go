@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -34,6 +33,7 @@ set label 'init'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
+		logger := config.mustGetLogger(datamonFlags)
 
 		contributor, err := paramsToContributor(datamonFlags)
 		if err != nil {
@@ -50,11 +50,6 @@ set label 'init'
 			wrapFatalln("create source store", err)
 			return
 		}
-		logger, err := dlogger.GetLogger(datamonFlags.root.logLevel)
-		if err != nil {
-			wrapFatalln("failed to set log level", err)
-			return
-		}
 		bd := core.NewBDescriptor(
 			core.Message(datamonFlags.bundle.Message),
 			core.Contributor(contributor),
@@ -65,7 +60,7 @@ set label 'init'
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.SkipMissing(datamonFlags.bundle.SkipOnError))
 		bundleOpts = append(bundleOpts,
-			core.ConcurrentFileUploads(datamonFlags.bundle.ConcurrencyFactor/fileUploadsByConcurrencyFactor))
+			core.ConcurrentFileUploads(getConcurrencyFactor(fileUploadsByConcurrencyFactor)))
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 
 		bundle := core.NewBundle(bd,

@@ -36,6 +36,8 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
+		logger := config.mustGetLogger(datamonFlags)
+
 		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
@@ -60,6 +62,7 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 			datamonFlags.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor))
 		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(
 			datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
+		bundleOpts = append(bundleOpts, core.Logger(logger))
 
 		bundle := core.NewBundle(core.NewBDescriptor(),
 			bundleOpts...,

@@ -62,7 +62,7 @@ func testFsIntegEnv() (testEnv, func(t testing.TB) func()) {
 
 	return testEnv{
 			leafSize:               cafs.DefaultLeafSize,
-			repo:                   "bundle-test-repo",
+			repo:                   "bundle-mount-test-repo",
 			bundleID:               "bundle456",
 			testRoot:               testRoot,
 			sourceDir:              sourceDir,
@@ -115,7 +115,7 @@ func TestRoMount(t *testing.T) {
 
 	t.Logf("preparing RO mount on %s", ev.pathToMount)
 	bundle := fakeBundle(ev)
-	fs, err := NewReadOnlyFS(bundle, testLogger())
+	fs, err := NewReadOnlyFS(bundle)
 	require.NoError(t, err)
 
 	err = fs.MountReadOnly(ev.pathToMount)
@@ -175,7 +175,7 @@ func TestMutableMount(t *testing.T) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
+	fs, err := NewMutableFS(bundle)
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -211,7 +211,7 @@ func TestMutableMountWrite(t *testing.T) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
+	fs, err := NewMutableFS(bundle)
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -248,7 +248,7 @@ func TestMutableMountCommitError(t *testing.T) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
+	fs, err := NewMutableFS(bundle)
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -302,7 +302,7 @@ func testMutableMountMkdirWithFile(t *testing.T, withFile bool) {
 
 	bundle := emptyBundle(ev)
 
-	fs, err := NewMutableFS(bundle, ev.pathToStaging, testLogger())
+	fs, err := NewMutableFS(bundle)
 	require.NoError(t, err)
 
 	err = fs.MountMutable(ev.pathToMount)
@@ -335,6 +335,8 @@ type uploadFileTest struct {
 
 type uploadTree []*uploadFileTest
 
+const defaultLeafSize = int(cafs.DefaultLeafSize)
+
 func makeTestUploadTree() uploadTree {
 	return uploadTree{
 		{
@@ -343,19 +345,19 @@ func makeTestUploadTree() uploadTree {
 		},
 		{
 			path: "/leafs/leafsize",
-			size: cafs.DefaultLeafSize,
+			size: defaultLeafSize,
 		},
 		{
 			path: "/leafs/over-leafsize",
-			size: cafs.DefaultLeafSize + 1,
+			size: defaultLeafSize + 1,
 		},
 		{
 			path: "/leafs/under-leafsize",
-			size: cafs.DefaultLeafSize - 1,
+			size: defaultLeafSize - 1,
 		},
 		{
 			path: "/leafs/multiple-leafsize",
-			size: cafs.DefaultLeafSize * 3,
+			size: defaultLeafSize * 3,
 		},
 		{
 			path: "/leafs/root",
@@ -451,6 +453,7 @@ func emptyBundle(ev testEnv) *Bundle {
 		Repo(ev.repo),
 		ConsumableStore(localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.pathToStaging))),
 		ContextStores(fakeContext(ev.metaDir, ev.blobDir)),
+		Logger(testLogger()),
 	)
 	return bundle
 }
@@ -648,10 +651,4 @@ func stringorDie(arg string, err error) string {
 		panic(err)
 	}
 	return arg
-}
-
-func testLogger() *zap.Logger {
-	//return zap.NewNop() // to limit test output
-	l, _ := zap.NewDevelopment() // to get DEBUG  during test run
-	return l
 }

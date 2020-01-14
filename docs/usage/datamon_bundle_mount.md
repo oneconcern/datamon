@@ -16,6 +16,7 @@ datamon bundle mount [flags]
 
 ```
       --bundle string            The hash id for the bundle, if not specified the latest bundle will be used
+      --cache-size byte-size     The desired size of the memory cache used when streaming is enabled (default 50MB)
       --concurrency-factor int   Heuristic on the amount of concurrency used by various operations.  Turn this value down to use less memory, increase for faster operations. (default 100)
       --cpuprof                  Toggle runtime profiling
       --daemonize                Whether to run the command as a daemonized process
@@ -24,8 +25,10 @@ datamon bundle mount [flags]
       --label string             The human-readable name of a label
       --loglevel string          The logging level (default "info")
       --mount string             The path to the mount dir
+      --prefetch int             Enables prefetching (requires Stream enabled) (default 1)
       --repo string              The name of this repository
       --stream                   Stream in the FS view of the bundle, do not download all files. Default to true. (default true)
+      --verify-hash              Enables hash verification on read blobs (requires Stream enabled) (default true)
 ```
 
 ### Options inherited from parent commands
