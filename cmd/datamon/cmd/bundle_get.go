@@ -32,7 +32,7 @@ exits with ENOENT status otherwise.`,
 		err = setLatestOrLabelledBundle(ctx, remoteStores)
 		if err != nil {
 			if errors.Is(err, status.ErrNotFound) {
-				wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
+				wrapFatalWithCodef(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
 				return
 			}
 			wrapFatalln("determine bundle id", err)
@@ -50,7 +50,7 @@ exits with ENOENT status otherwise.`,
 		err = core.DownloadMetadata(ctx, bundle)
 		if err != nil {
 			if errors.Is(err, status.ErrNotFound) {
-				wrapFatalWithCode(int(unix.ENOENT), "didn't find bundle %q", datamonFlags.bundle.ID)
+				wrapFatalWithCodef(int(unix.ENOENT), "didn't find bundle %q", datamonFlags.bundle.ID)
 				return
 			}
 			wrapFatalln("error downloading bundle information", err)

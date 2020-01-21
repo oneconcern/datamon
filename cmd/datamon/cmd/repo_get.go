@@ -31,7 +31,7 @@ exits with ENOENT status otherwise.`,
 			remoteStores, datamonFlags.repo.RepoName)
 		if err != nil {
 			if errors.Is(err, status.ErrNotFound) {
-				wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
+				wrapFatalWithCodef(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
 				return
 			}
 			wrapFatalln("error downloading repo information", err)

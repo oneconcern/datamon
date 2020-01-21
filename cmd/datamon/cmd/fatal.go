@@ -32,7 +32,7 @@ func wrapFatalln(msg string, err error) {
 	}
 }
 
-func wrapFatalWithCode(code int, format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
+func wrapFatalWithCodef(code int, format string, args ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
 	osExit(code)
 }

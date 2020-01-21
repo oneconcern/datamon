@@ -36,7 +36,7 @@ exits with ENOENT status otherwise.`,
 		)
 		err = label.DownloadDescriptor(ctx, bundle, true)
 		if errors.Is(err, status.ErrNotFound) {
-			wrapFatalWithCode(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
+			wrapFatalWithCodef(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
 			return
 		}
 		if err != nil {
