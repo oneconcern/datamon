@@ -31,5 +31,5 @@ go get -u github.com/oneconcern/datamon
 
 ```
 brew tap oneconcern/datamon
-brew install oneconcern/datamon/datamon
+brew install datamon
 ```
