@@ -40,7 +40,7 @@ while getopts sc:b: opt; do
             fi
             ;;
         (\?)
-            echo "Bad option, aborting."
+            echo "Bad option, aborting." 1>&2
             exit 1
             ;;
     esac
@@ -50,12 +50,12 @@ if [ "$OPTIND" -gt 1 ]; then
 fi
 
 if [ -z "$COORD_POINT" ]; then
-    echo "coordination point not set" 1>&2
+    echo "coordination point not set"  1>&2
     exit 1
 fi
 
 if [ -z "$WRONG_PARAM" ]; then
-  echo "Datamon Wrap Application Script: Set type of mount (-b) to be fuse or postgres"
+  echo "Datamon Wrap Application Script: Set type of mount (-b) to be fuse or postgres" 1>&2
   exit 1
 fi
 

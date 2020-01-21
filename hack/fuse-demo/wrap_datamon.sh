@@ -384,7 +384,7 @@ for dm_v_id in $SIDECAR_VERTEX_IDS; do
 
     if [[ ! $datamon_status -eq 0 ]]; then
         print -- "error starting datamon ${mount_cmd}, try shell" 2>&1
-        cat "$log_file_mount"
+        cat "$log_file_mount" 2>&1
         sleep 3600
         exit 1
     fi
@@ -471,7 +471,7 @@ for dm_v_id in $SIDECAR_VERTEX_IDS; do
     if [[ ! $datamon_status -eq 0 ]]; then
         dbg_print "upload command failed"
         echo "error starting datamon $upload_cmd, try shell" 2>&1
-        cat "$log_file_upload"
+        cat "$log_file_upload" 2>&1
         sleep 3600
         exit 1
     fi
