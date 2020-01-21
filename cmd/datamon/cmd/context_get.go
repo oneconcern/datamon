@@ -39,14 +39,14 @@ func getContext() {
 		return
 	}
 	if !has {
-		wrapFatalWithCode(int(unix.ENOENT), "didn't find context %q", contextName)
+		wrapFatalWithCodef(int(unix.ENOENT), "didn't find context %q", contextName)
 		return
 	}
 
 	var rcvdContext model.Context
 	datamonContext, err := context2.GetContext(context.Background(), configStore, contextName)
 	if errors.Is(err, status.ErrNotFound) {
-		wrapFatalWithCode(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
+		wrapFatalWithCodef(int(unix.ENOENT), "didn't find repo %q", datamonFlags.repo.RepoName)
 		return
 	}
 	if err != nil {
