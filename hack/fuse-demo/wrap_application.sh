@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/sh
 
 ### application wrapper (demo)
 # half of the container coordination sketch, a script like this one
