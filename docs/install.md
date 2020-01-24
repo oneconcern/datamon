@@ -13,6 +13,14 @@ docker pull gcr.io/onec-co/datamon
 Download the datamon binary for mac or for linux on the
 [Releases Page](https://github.com/oneconcern/datamon/releases/)
 
+To get version 1.0:
+Unzip the tar.gz file and run the following command to move the executable to the correct destination:
+```
+mv ~/Downloads/datamon /usr/local/bin/
+```
+
+If you run ```datamon version```, you should see ```Version: v1.0.0```.
+
 Example:
 ```$bash
 download_url=$(curl -s https://api.github.com/repos/oneconcern/datamon/releases/latest | \
