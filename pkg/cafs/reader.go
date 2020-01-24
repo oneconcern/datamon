@@ -286,11 +286,12 @@ func (r *chunkReader) watchPrefetched(wg *sync.WaitGroup, fetchC <-chan fetch) {
 
 func (r *chunkReader) doPrefetch(index, initiator int, logger *zap.Logger) (LeafBuffer, bool, error) {
 	// doPrefetch is in charge of launching go routines to fetch-ahead of the current leaf whenever appropriate:
+	//
 	// * fetching ahead is throttled by some parameter (default is 1 ahead)
 	// * we request leaves ahead only once, unless they have been wiped from buffer cache (reduce wasted work)
 	// * we cannot totally rule out wasted work because the buffer cache may not be able to retain all buffers
 	//
-	// A way to assert that there is no more wasted work than allowed by memory constraint:
+	// Here is a way to assert that there is no more wasted work than allowed by memory constraints:
 	// $ DEBUG_TEST=1 go test -v -run Reader_All|grep -E '(wasted work)|(has read leaf)'|jq -c '{key: .key,msg: .msg}'|sort
 
 	r.fetchingLatch.Lock()
@@ -347,6 +348,22 @@ func calculateKeyAndOffset(off int64, leafSize uint32) (index int, offset int64)
 }
 
 func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuffer, bool, error) {
+	// readLeafFunc returns a leaf fetching functio with hash key, key index as parameters.
+	//
+	// The input signalling channel is provided for completeness only or callers willing to interrupt
+	// the read (see destroy()).
+	//
+	// It returns a buffer containing a whole blob leaf or an error.
+	// The returned bool indicates to the caller whether the buffer has been acquired from cache (e.g; from prefetchers).
+	// When this is the case, caller should not re-add this to the cache.
+	//
+	// When prefetching is enabled, this recurses through next indices thanks to the doPretech method.
+	//
+	// Unless a prefetcher goroutine turns out to have already done the job, this goes through reading the chunks
+	// from the blob on the Store.
+	//
+	// At the end of the fetch, a hash verification may be carried out to validate the blob.
+
 	leafPoolLogger := r.l.With( // TODO(fred): nice - should replace debug logging by proper metrics instrumentation
 		zap.Uint32("leaf size", r.leafSize),
 		zap.Uint32("buffer size", r.leafPool.Size()),
@@ -463,6 +480,8 @@ func addToCacheFunc(r *chunkReader) func(Key, LeafBuffer) {
 		}
 		alreadyContained, _ := r.lru.ContainsOrAdd(r.pather(key), buffer)
 		if alreadyContained {
+			// attention: we should only release buffers who where not already in the cache
+			//
 			// already in cache, relinquish freshly acquired buffer to pool
 			r.leafPool.Release(buffer)
 		}
