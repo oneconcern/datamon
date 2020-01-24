@@ -134,7 +134,7 @@ type chunkReader struct {
 	l                     *zap.Logger
 	truncation            uint32
 	withVerifyHash        bool
-	readLeaf              func(Key, int, int, <-chan struct{}) (LeafBuffer, error)
+	readLeaf              func(Key, int, int, <-chan struct{}) (LeafBuffer, bool, error)
 	seekAhead             func(int, int) bool
 	pather                func(Key) string
 
@@ -320,8 +320,7 @@ func (r *chunkReader) doPrefetch(index, initiator int, logger *zap.Logger) (Leaf
 		b, ok := r.lru.Get(r.pather(r.keys[index]))
 		if ok {
 			lb := b.(LeafBuffer)
-			logger.Debug("waiting for prefetch to complete", zap.Int("initiator", initiator))
-			lb.Pin() // wait for other readLeaf instance to have completed its job on this buffer
+			lb.Pin()
 			r.lruLatch.Unlock()
 			// happy path: prefetching work is reused
 			return lb, true, nil
@@ -347,18 +346,18 @@ func calculateKeyAndOffset(off int64, leafSize uint32) (index int, offset int64)
 	return
 }
 
-func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuffer, error) {
+func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuffer, bool, error) {
 	leafPoolLogger := r.l.With( // TODO(fred): nice - should replace debug logging by proper metrics instrumentation
 		zap.Uint32("leaf size", r.leafSize),
 		zap.Uint32("buffer size", r.leafPool.Size()),
 	)
-	return func(k Key, index, initiator int, doneC <-chan struct{}) (LeafBuffer, error) {
+	return func(k Key, index, initiator int, doneC <-chan struct{}) (LeafBuffer, bool, error) {
 		// readLeaf fetches an entire leaf from store
 		logger := r.l.With(zap.String("prefix", r.prefix), zap.Stringer("key", k), zap.Int("index", index))
 		logger.Debug("cafs reading leaf from store")
 		rdr, err := r.fs.Get(context.Background(), r.pather(k))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		var (
 			lb   LeafBuffer
@@ -368,56 +367,62 @@ func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuff
 		defer func() {
 			if !done {
 				logger.Debug("cafs has read leaf from store", zap.Error(err))
-				return
 			}
 		}()
 
 		if !r.withPrefetch {
+			// no prefetching
 			lb = r.leafPool.Get()
 			lb.Pin()
 		} else {
+			// launch background prefetchers as needed (this is a recursion).
+			// The "done" status indicates that a prefetcher has completed
+			// the retrieval of this list and extracted the buffer from the cache.
 			lb, done, err = r.doPrefetch(index, initiator, logger)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
 			if lb == nil {
-				// safeguard
+				// safeguard against nil returned to main loop
 				if index == initiator {
 					panic("programmer's error: buffer existence should be guaranteed")
 				}
 				// skip redundant fetch
-				return nil, nil
+				return nil, false, nil
 			}
 			if done {
 				// short-circuit reads: work has already been done
-				return lb, nil
+				// hint the caller that this comes from cache (via prefetchers)
+				return lb, true, nil
 			}
 		}
 
 		if len(lb.Bytes()) > 0 {
-			// safeguard
-			panic(fmt.Sprintf("programmer's error: buffer have 0 length, but has: %d", len(lb.Bytes())))
+			// safeguard against providing dirty buffers: a buffer should be either done and returned above, or clean
+			panic(fmt.Sprintf("programmer's error: buffer should have 0 length, but has: %d", len(lb.Bytes())))
 		}
 		leafPoolLogger.Debug("cafs freelist pool",
 			zap.Int("allocated buffers", r.leafPool.Buffers()),
 			zap.Int("free buffers", r.leafPool.FreeBuffers()),
 		)
 
-		for { // TODO(fred): this could be chunked and parallelized using rdr.ReadAt
+		for { // TODO(fred): nice - this could be chunked further and parallelized using rdr.ReadAt
 			select {
 			case <-doneC:
 				logger.Debug("interrupted readLeaf")
-				return nil, nil
+				return nil, false, nil
 			default:
 			}
+
 			buffer := lb.Bytes()
 			read, e := rdr.Read(buffer[len(buffer):cap(buffer)])
 			if e != nil && e != io.EOF {
 				// relinquish trashed buffer
 				lb.Unpin()
 				r.leafPool.Release(lb)
-				return nil, e
+				return nil, false, e
 			}
+
 			if read < 0 {
 				// safeguard against funny readers
 				panic(fmt.Errorf("reader returned a negative number of bytes"))
@@ -444,10 +449,10 @@ func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuff
 				i = index + 1
 			}
 			if err := r.verifyHash(k, lb.Bytes(), i, isLast); err != nil {
-				return nil, err
+				return nil, false, err
 			}
 		}
-		return lb, nil
+		return lb, false, nil
 	}
 }
 
@@ -487,7 +492,7 @@ func seekAheadFunc(r *chunkReader) func(int, int) bool {
 			default:
 			}
 			r.l.Debug("prefetch started", zap.Int("new index", i), zap.Stringer("key", r.keys[i]))
-			b, err := r.readLeaf(k, i, initiator, r.prefetchDoneC)
+			b, fromCache, err := r.readLeaf(k, i, initiator, r.prefetchDoneC)
 			if err != nil {
 				outputC <- fetch{err: err}
 				return
@@ -496,10 +501,14 @@ func seekAheadFunc(r *chunkReader) func(int, int) bool {
 				// readLeaf has been skipped
 				return
 			}
-			b.Unpin()
 			outputC <- fetch{index: i}
-			r.addToCache(k, b)
+			b.Unpin()
+			if !fromCache {
+				r.addToCache(k, b)
+			}
 		}(nextIndex, r.fetchC, r.prefetchDoneC, &r.fetcherWg)
+
+		// tells the caller prefetching is on the way
 		return true
 	}
 }
@@ -529,7 +538,10 @@ func (r *chunkReader) ReadAt(data []byte, off int64) (readBytes int, err error) 
 
 	for {
 		// fetch leaf blobs
-		var buffer LeafBuffer
+		var (
+			buffer    LeafBuffer
+			fromCache bool
+		)
 		key := r.keys[index]
 		r.lruLatch.Lock()
 		b, ok := r.lru.Get(r.pather(key))
@@ -545,9 +557,8 @@ func (r *chunkReader) ReadAt(data []byte, off int64) (readBytes int, err error) 
 			// collects some metrics
 			atomic.AddUint64(&r.cacheMisses, 1)
 			atomic.AddUint64(&r.requested, 1)
-			buffer, err = r.readLeaf(key, index, index, r.prefetchDoneC) // readLeaf returns a pinned buffer
+			buffer, fromCache, err = r.readLeaf(key, index, index, r.prefetchDoneC) // readLeaf returns a pinned buffer
 			if err != nil {
-				buffer.Unpin()
 				return
 			}
 		}
@@ -555,7 +566,7 @@ func (r *chunkReader) ReadAt(data []byte, off int64) (readBytes int, err error) 
 		readBytes += copy(data[readBytes:], buffer.Bytes()[offset:])
 		buffer.Unpin()
 
-		if !ok {
+		if !ok && !fromCache {
 			// we are done with this buffer: stash it to the cache for reuse
 			r.addToCache(key, buffer)
 		}
