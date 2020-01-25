@@ -298,13 +298,13 @@ func addTargetFlag(cmd *cobra.Command) string {
 func addCacheSizeFlag(cmd *cobra.Command) string {
 	c := "cache-size"
 	datamonFlags.bundle.CacheSize = flagext.ByteSize(50 * units.MB)
-	cmd.Flags().Var(&datamonFlags.bundle.CacheSize, c, "The desired size of the memory cache used when streaming is enabled")
+	cmd.Flags().Var(&datamonFlags.bundle.CacheSize, c, "The desired size of the memory cache used (in KB, MB, GB, ...) when streaming is enabled")
 	return c
 }
 
 func addPrefetchFlag(cmd *cobra.Command) string {
 	c := "prefetch"
-	cmd.Flags().IntVar(&datamonFlags.bundle.WithPrefetch, c, 1, "Enables prefetching (requires Stream enabled)")
+	cmd.Flags().IntVar(&datamonFlags.bundle.WithPrefetch, c, 1, "When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled)")
 	return c
 }
 

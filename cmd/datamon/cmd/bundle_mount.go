@@ -84,7 +84,6 @@ var mountBundleCmd = &cobra.Command{
 	Long:  "Mount a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		logger := config.mustGetLogger(datamonFlags)
 
 		// cf. comments on runDaemonized
 		if datamonFlags.bundle.Daemonize {
@@ -114,7 +113,7 @@ var mountBundleCmd = &cobra.Command{
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		bundleOpts = append(bundleOpts, core.Streaming(datamonFlags.bundle.Stream))
 		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(getConcurrencyFactor(filelistDownloadsByConcurrencyFactor)))
-		bundleOpts = append(bundleOpts, core.Logger(logger))
+		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
 		if datamonFlags.bundle.Stream {
 			bundleOpts = append(bundleOpts, core.CacheSize(int(datamonFlags.bundle.CacheSize)))
 			bundleOpts = append(bundleOpts, core.Prefetch(datamonFlags.bundle.WithPrefetch))

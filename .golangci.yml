@@ -20,6 +20,7 @@ linters:
   enable-all: true
   build-tags:
     - fuse_cli
+    - fsintegration
   disable:
     - maligned
     - lll

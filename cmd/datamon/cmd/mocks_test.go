@@ -79,6 +79,7 @@ func (a AuthMock) Principal(_ string) (model.Contributor, error) {
 }
 
 func testContext() string {
+	// the context used by all tests
 	return "test-context"
 }
 

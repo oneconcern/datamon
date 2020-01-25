@@ -55,11 +55,11 @@ func configFileLocation(expandEnv bool) string {
 // CLIConfig describes the CLI local configuration file.
 type CLIConfig struct {
 	// bug in viper? Need to keep names of fields the same as the serialized names..
-	Credential  string `json:"credential" yaml:"credential"` // Credentials to use for GCS
-	Config      string `json:"config" yaml:"config"`         // Config bucket for datamon contexts and metadata
-	Context     string `json:"context" yaml:"context"`       // Current context for datamon
-	logger      *zap.Logger
-	oneceLogger sync.Once
+	Credential string `json:"credential" yaml:"credential"` // Credentials to use for GCS
+	Config     string `json:"config" yaml:"config"`         // Config bucket for datamon contexts and metadata
+	Context    string `json:"context" yaml:"context"`       // Current context for datamon
+	logger     *zap.Logger
+	onceLogger sync.Once
 }
 
 func (c *CLIConfig) setDatamonParams(flags *flagsT) {
@@ -106,7 +106,7 @@ func (c *CLIConfig) populateRemoteConfig(flags *flagsT) {
 }
 
 func (c *CLIConfig) mustGetLogger(flags flagsT) *zap.Logger {
-	c.oneceLogger.Do(func() {
+	c.onceLogger.Do(func() {
 		var err error
 		c.logger, err = dlogger.GetLogger(flags.root.logLevel)
 		if err != nil {

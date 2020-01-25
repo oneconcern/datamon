@@ -20,7 +20,7 @@ var mutableMountBundleCmd = &cobra.Command{
 The destination path is a temporary staging area for write operations.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		logger := config.mustGetLogger(datamonFlags)
+
 		contributor, err := paramsToContributor(datamonFlags)
 		if err != nil {
 			wrapFatalln("populate contributor struct", err)
@@ -50,7 +50,7 @@ The destination path is a temporary staging area for write operations.`,
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
-		bundleOpts = append(bundleOpts, core.Logger(logger))
+		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
 		bundle := core.NewBundle(bd,
 			bundleOpts...,
 		)

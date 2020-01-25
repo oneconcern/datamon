@@ -94,6 +94,9 @@ func NewReadOnlyFS(bundle *Bundle) (*ReadOnlyFS, error) {
 	return fs.populateFS(bundle)
 }
 
+// localPath resolves a consumable store to a local path.
+// TODO: this should somehow be resolved by the Store API
+// and we shouldn't make assumptions here
 func localPath(consumable fmt.Stringer) (string, error) {
 	fullPath := consumable.String()
 	// assume consumable is built with storage/localfs

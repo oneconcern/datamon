@@ -125,7 +125,7 @@ jobs:
           command: |
             hack/go-generate.sh
             go mod download
-            golangci-lint run --build-tags fuse_cli,fsintegration
+            golangci-lint run
       - run:
           name: Lint shell scripts
           command: |
