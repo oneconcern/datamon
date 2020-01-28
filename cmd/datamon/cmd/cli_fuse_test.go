@@ -44,12 +44,16 @@ func testCommand(t testing.TB, target string, args ...string) (*exec.Cmd, io.Rea
 	cmd.Env = append(cmd.Env, "GOOGLE_APPLICATION_CREDENTIALS="+os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 	pipeOut, err := cmd.StdoutPipe()
 	require.NoError(t, err)
-	// For stderr capture (not used at the moment)
-	//pipeErr, err := cmd.StderrPipe()
-	//require.NoError(t, err)
 
-	// Combine stdout (not stderr), tee this output to os.Stdout and return pipe reader for output scanning.
+	pipeErr, err := cmd.StderrPipe()
+	require.NoError(t, err)
+
+	// Combine stdout and stderr, tee this output to os.Stdout and return pipe reader for output scanning.
 	// The copy is needed. Otherwise, no output is captured until the command ends.
+	//
+	// TODO(fred): output is combined	because we assert some output from stderr (CLI output using stdlib logger)
+	// and some from stdout (pkg output using zap logger).
+	// We should return both as separate pipes and assert their respective output separately.
 	pipeR, pipeW := io.Pipe()
 	c := io.MultiWriter(os.Stdout, pipeW)
 
@@ -57,10 +61,9 @@ func testCommand(t testing.TB, target string, args ...string) (*exec.Cmd, io.Rea
 		_, _ = io.Copy(c, pipeOut)
 	}()
 
-	// For stderr capture (not used at the moment)
-	//go func() {
-	//	_, _ = io.Copy(c, pipeErr)
-	//}()
+	go func() {
+		_, _ = io.Copy(c, pipeErr)
+	}()
 	return cmd, pipeR
 }
 
