@@ -10,7 +10,6 @@ import (
 	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"github.com/spf13/cobra"
 )
@@ -85,6 +84,7 @@ var mountBundleCmd = &cobra.Command{
 	Long:  "Mount a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
+
 		// cf. comments on runDaemonized
 		if datamonFlags.bundle.Daemonize {
 			runDaemonized()
@@ -112,17 +112,17 @@ var mountBundleCmd = &cobra.Command{
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		bundleOpts = append(bundleOpts, core.Streaming(datamonFlags.bundle.Stream))
-		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(
-			datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
+		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(getConcurrencyFactor(filelistDownloadsByConcurrencyFactor)))
+		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
+		if datamonFlags.bundle.Stream {
+			bundleOpts = append(bundleOpts, core.CacheSize(int(datamonFlags.bundle.CacheSize)))
+			bundleOpts = append(bundleOpts, core.Prefetch(datamonFlags.bundle.WithPrefetch))
+			bundleOpts = append(bundleOpts, core.VerifyHash(datamonFlags.bundle.WithVerifyHash))
+		}
 		bundle := core.NewBundle(bd,
 			bundleOpts...,
 		)
-		logger, err := dlogger.GetLogger(datamonFlags.root.logLevel)
-		if err != nil {
-			onDaemonError("failed to set log level", err)
-			return
-		}
-		fs, err := core.NewReadOnlyFS(bundle, logger)
+		fs, err := core.NewReadOnlyFS(bundle)
 		if err != nil {
 			onDaemonError("create read only filesystem", err)
 			return
@@ -162,6 +162,9 @@ func init() {
 	// todo: #165 add --cpuprof to all commands via root
 	addCPUProfFlag(mountBundleCmd)
 	addDataPathFlag(mountBundleCmd)
+	addCacheSizeFlag(mountBundleCmd)
+	addPrefetchFlag(mountBundleCmd)
+	addVerifyHashFlag(mountBundleCmd)
 
 	bundleCmd.AddCommand(mountBundleCmd)
 }

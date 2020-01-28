@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 
 	"go.uber.org/zap"
 
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 
@@ -17,76 +18,37 @@ import (
 )
 
 const (
-	DefaultLeafSize    = 2 * 1024 * 1024
-	MaxLeafSize        = 5 * 1024 * 1024
+	// DeduplicationBlake is the deduplication scheme using the blake hash
+	// https://en.wikipedia.org/wiki/BLAKE_(hash_function).
+	//
+	// The implementation of the Blake hash we use (https://github.com/minio/blake2b-simd)
+	// is 3 to 5 times faster than usual hashes such as MD5 or SHA's.
 	DeduplicationBlake = "blake"
+
+	// DefaultCacheSize sets the default target LRU buffer cache in bytes.
+	//
+	// This defines the number of leaf buffers allocated to the cache (rounded up)
+	DefaultCacheSize = 50 * units.MiB
+
+	// DefaultLeafSize sets the the default size of a blob leaf (2 MB). It cannot exceed MaxLeafSize.
+	// The actual leaf size used is usually specified by each bundle.
+	DefaultLeafSize uint32 = 2 * units.MiB
+
+	// MaxLeafSize is the maximum size of a buffer in the memory pool
+	MaxLeafSize = 5 * units.MiB
+
+	// DefaultKeysCacheSize is the default size of the cache for resolved keys for root hashes.
+	//
+	// Corresponds to the number of files for which a root key is checked only once
+	DefaultKeysCacheSize = 10000
 )
 
-// LeafSize configuration for the blake2b hashes
-func LeafSize(sz uint32) Option {
-	return func(w *defaultFs) {
-		w.leafSize = sz
-	}
-}
-
-type HasOption func(*hasOpts)
-
-func HasOnlyRoots() HasOption {
-	return func(opts *hasOpts) {
-		opts.OnlyRoots = true
-	}
-}
-
-func HasGatherIncomplete() HasOption {
-	return func(opts *hasOpts) {
-		opts.OnlyRoots = true
-		opts.GatherIncomplete = true
-	}
-}
-
-func LeafTruncation(a bool) Option {
-	return func(w *defaultFs) {
-		w.leafTruncation = a
-	}
-}
-
-func Prefix(prefix string) Option {
-	return func(w *defaultFs) {
-		w.prefix = prefix
-	}
-}
-
-func Backend(store storage.Store) Option {
-	return func(w *defaultFs) {
-		w.store.backend = store
-	}
-}
-
-func ConcurrentFlushes(concurrentFlushes int) Option {
-	return func(w *defaultFs) {
-		w.concurrentFlushes = concurrentFlushes
-	}
-}
-
-func ReaderConcurrentChunkWrites(readerConcurrentChunkWrites int) Option {
-	return func(w *defaultFs) {
-		w.readerConcurrentChunkWrites = readerConcurrentChunkWrites
-	}
-}
-
-type hasOpts struct {
-	OnlyRoots, GatherIncomplete bool
-	_                           struct{} // disallow unkeyed usage
-}
-
-// Option to configure content addressable FS components
-type Option func(*defaultFs)
-
+// PutRes holds the result from a Put operation
 type PutRes struct {
-	Written int64
-	Key     Key
-	Keys    []byte
-	Found   bool
+	Written int64  // bytes written
+	Key     Key    // the new root hash of the written object
+	Keys    []byte // the sequence of leaf keys of this object (NOTE(fred): don't quite get why we don't have []Key)
+	Found   bool   // the root hash was already existing
 }
 
 // Fs implementations provide content-addressable filesystem operations
@@ -102,28 +64,56 @@ type Fs interface {
 	GetAddressingScheme() string
 }
 
-// New creates a new file system operations instance for a repository
-func New(opts ...Option) (Fs, error) {
+var _ Fs = &defaultFs{}
 
-	f := &defaultFs{
+func defaultsForFs() *defaultFs {
+	return &defaultFs{
 		store:                       cafsStore{backend: localfs.New(nil)},
-		leafSize:                    uint32(5 * units.MiB),
+		leafSize:                    DefaultLeafSize,
 		concurrentFlushes:           10,
 		readerConcurrentChunkWrites: 3,
 		deduplicationScheme:         DeduplicationBlake,
+		keysCacheSize:               DefaultKeysCacheSize,
+		lruSize:                     DefaultCacheSize,
+		l:                           dlogger.MustGetLogger("info"),
+		withVerifyHash:              true,
+		withPrefetch:                0, // prefetching disabled by default
 	}
-	f.leafPool = newLeafFreelist()
-	f.lru, _ = lru.NewWithEvict(10, func(lruKey interface{}, lruVal interface{}) {
-		lbuf := lruVal.(*leafBuffer)
-		f.leafPool.put(lbuf)
-	})
-	f.lru, _ = lru.New(10)
+}
+
+// New creates a new instance of a content-addressable file system
+func New(opts ...Option) (Fs, error) {
+	f := defaultsForFs()
 	for _, apply := range opts {
 		apply(f)
 	}
+
 	if f.leafSize > MaxLeafSize {
 		return nil, fmt.Errorf("%v exceeds maximum cafs leaf size %v", f.leafSize, MaxLeafSize)
 	}
+	if f.leafSize < KeySize {
+		return nil, fmt.Errorf("%v is smaller than the key size %v", f.leafSize, KeySize)
+	}
+
+	const buffersForparallelReaders = 3
+	cacheBuffers := BytesToBuffers(f.lruSize, f.leafSize)
+	f.leafPool = newLeafFreelist(f.leafSize, cacheBuffers+buffersForparallelReaders)
+
+	var err error
+	f.lru, err = lru.NewWithEvict(cacheBuffers, func(_ interface{}, lruVal interface{}) {
+		f.leafPool.Release(lruVal.(LeafBuffer)) // relinquish buffers to the freelist
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	f.keysCache, err = lru.New(f.keysCacheSize)
+	if err != nil {
+		return nil, err
+	}
+
+	f.pather = func(lks Key) string { return lks.StringWithPrefix(f.prefix) }
+
 	return f, nil
 }
 
@@ -132,17 +122,31 @@ type cafsStore struct {
 }
 
 type defaultFs struct {
-	store                       cafsStore
-	leafSize                    uint32
-	prefix                      string
-	zl                          zap.Logger //nolint:structcheck,unused
-	l                           log.Logger //nolint:structcheck,unused
+	store    cafsStore
+	leafSize uint32
+	l        *zap.Logger
+
+	// prefix determines a namespace for keys
+	prefix string
+	pather func(Key) string // pathing logic
+
+	// buffer cache (atm only supported for ReadAt)
+	lru      *lru.Cache // this holds leaf data in cache
+	lruLatch sync.Mutex // this ensures consistent LRU buffer pinning
+	leafPool FreeList
+	lruSize  int
+
+	// root key cache of resolved leaf keys
+	keysCache     *lru.Cache // this holds leaf keys in cache to avoid resolving root keys again
+	keysCacheSize int
+
+	// options
 	leafTruncation              bool
-	lru                         *lru.Cache
-	leafPool                    *leafFreelist
 	concurrentFlushes           int
 	readerConcurrentChunkWrites int
 	deduplicationScheme         string
+	withPrefetch                int
+	withVerifyHash              bool
 }
 
 func (d *defaultFs) GetAddressingScheme() string {
@@ -150,36 +154,53 @@ func (d *defaultFs) GetAddressingScheme() string {
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
-	w := d.writer(d.prefix)
-	defer w.Close()
+	d.l.Debug("Start cafs Put")
+	defer d.l.Debug("End cafs Put")
+
+	w := d.writer()
+
+	// write leaf blobs
 	written, err := io.Copy(w, src)
 	if err != nil {
+		w.Close()
 		return PutRes{}, err
 	}
-	key, keys, err := w.Flush()
+	root, keys, err := w.Flush()
 	if err != nil {
+		w.Close()
 		return PutRes{}, err
 	}
+
 	if err = w.Close(); err != nil {
 		return PutRes{}, err
 	}
-	destinations := make([]storage.MultiStoreUnit, 0)
 
-	found, _ := d.store.backend.Has(ctx, d.prefix+key.String())
+	// write the root key as a blob containing all leaf keys, if it does not exist already
+	found, _ := d.store.backend.Has(ctx, d.pather(root))
 	if !found {
-		destinations = append(destinations, storage.MultiStoreUnit{
-			Store:           d.store.backend,
-			TolerateFailure: false,
-		})
+		// MultiPut exposes backend.PutCRC with a []byte input
+		d.l.Debug("cafs writing the root hash blob",
+			zap.String("prefix", d.prefix),
+			zap.Stringer("root hash", root),
+		)
+		destinations := []storage.MultiStoreUnit{
+			{
+				Store:           d.store.backend,
+				TolerateFailure: false,
+			},
+		}
+		buffer := append(keys, root[:]...) // the root key trails the sequence
+		err = storage.MultiPut(ctx, destinations, d.pather(root), buffer, storage.OverWrite)
+		if err != nil {
+			return PutRes{Found: found}, err
+		}
 	}
-	buffer := append(keys, key[:]...)
-	err = storage.MultiPut(ctx, destinations, key.String(), buffer, storage.OverWrite)
-	if err != nil {
-		return PutRes{Found: found}, err
+	if d.keysCache != nil {
+		_, _ = d.keysCache.ContainsOrAdd(root, UnverifiedLeafKeys(keys, d.leafSize))
 	}
 	return PutRes{
 		Written: written,
-		Key:     key,
+		Key:     root,
 		Keys:    keys,
 		Found:   found,
 	}, nil
@@ -194,38 +215,54 @@ func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
 }
 
 func (d *defaultFs) reader(hash Key) (Reader, error) {
-	return newReader(d.store.backend, hash, d.leafSize, d.prefix,
+	var (
+		keys []Key
+		err  error
+	)
+
+	if d.keysCache != nil {
+		if b, ok := d.keysCache.Get(hash); ok {
+			keys = b.([]Key)
+		}
+	}
+	if keys == nil {
+		d.l.Debug("cafs retrieving blob keys", zap.String("prefix", d.prefix))
+		keys, err = LeavesForHash(d.store.backend, hash, d.leafSize, d.prefix)
+		if err != nil {
+			return nil, err
+		}
+		_, _ = d.keysCache.ContainsOrAdd(hash, keys)
+	}
+
+	rdr, err := newReader(d.store.backend, hash, d.leafSize,
+		Keys(keys),
 		TruncateLeaf(d.leafTruncation),
-		VerifyHash(true),
+		ReaderVerifyHash(d.withVerifyHash),
 		ConcurrentChunkWrites(d.readerConcurrentChunkWrites),
-		SetCache(d.lru),
+		SetCache(d.lru, &d.lruLatch),
 		SetLeafPool(d.leafPool),
+		ReaderPrefix(d.prefix),
+		ReaderLogger(d.l),
+		ReaderPrefetch(d.withPrefetch),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return rdr, nil
+}
+
+func (d *defaultFs) writer() Writer {
+	return newWriter(d.store.backend, d.leafSize,
+		WriterPrefix(d.prefix),
+		WriterConcurrentFlushes(d.concurrentFlushes),
+		WriterLogger(d.l),
+		WriterPather(d.pather),
 	)
 }
 
-func (d *defaultFs) writer(prefix string) Writer {
-	maxGoRoutines := d.concurrentFlushes
-	if maxGoRoutines < 1 {
-		maxGoRoutines = 1
-	}
-	w := &fsWriter{
-		store:               d.store.backend,
-		leafSize:            d.leafSize,
-		buf:                 make([]byte, d.leafSize),
-		prefix:              prefix,
-		flushChan:           make(chan blobFlush),
-		errC:                make(chan error),
-		flushThreadDoneChan: make(chan struct{}),
-		maxGoRoutines:       make(chan struct{}, maxGoRoutines),
-		blobFlushes:         make([]blobFlush, 0),
-		errors:              make([]error, 0),
-	}
-	go w.flushThread()
-	return w
-}
-
 func (d *defaultFs) Delete(ctx context.Context, hash Key) error {
-	keys, err := LeafsForHash(d.store.backend, hash, d.leafSize, d.prefix)
+	keys, err := LeavesForHash(d.store.backend, hash, d.leafSize, d.prefix)
 	if err != nil {
 		return err
 	}
@@ -242,6 +279,10 @@ func (d *defaultFs) Clear(ctx context.Context) error {
 	return d.store.backend.Clear(ctx)
 }
 
+// Keys returns all the keys from the backend store, with some optional matching filter.
+//
+// TODO(fred): nice - since the FS is configured with some prefix, one should only
+// return prefixed keys.
 func (d *defaultFs) Keys(ctx context.Context) ([]Key, error) {
 	return d.keys(ctx, matchAnyKey)
 }
@@ -293,7 +334,7 @@ func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, 
 		return has, nil, nil
 	}
 
-	ks, err := LeafsForHash(d.store.backend, key, d.leafSize, d.prefix)
+	ks, err := LeavesForHash(d.store.backend, key, d.leafSize, d.prefix)
 	if err != nil {
 		return false, nil, nil
 	}
@@ -313,11 +354,3 @@ func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, 
 }
 
 func matchAnyKey(_ Key) bool { return true }
-
-func IsRootKey(fs storage.Store, key Key, leafSize uint32) bool {
-	keys, err := LeafsForHash(fs, key, leafSize, "")
-	if err != nil {
-		return false
-	}
-	return len(keys) > 0
-}

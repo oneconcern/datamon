@@ -13,6 +13,8 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/core"
 
+	"github.com/docker/go-units"
+	"github.com/go-openapi/runtime/flagext"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -34,6 +36,9 @@ type flagsT struct {
 		SkipOnError       bool
 		ConcurrencyFactor int
 		NameFilter        string
+		CacheSize         flagext.ByteSize
+		WithPrefetch      int
+		WithVerifyHash    bool
 	}
 	web struct {
 		port      int
@@ -290,11 +295,30 @@ func addTargetFlag(cmd *cobra.Command) string {
 	return c
 }
 
+func addCacheSizeFlag(cmd *cobra.Command) string {
+	c := "cache-size"
+	datamonFlags.bundle.CacheSize = flagext.ByteSize(50 * units.MB)
+	cmd.Flags().Var(&datamonFlags.bundle.CacheSize, c, "The desired size of the memory cache used (in KB, MB, GB, ...) when streaming is enabled")
+	return c
+}
+
+func addPrefetchFlag(cmd *cobra.Command) string {
+	c := "prefetch"
+	cmd.Flags().IntVar(&datamonFlags.bundle.WithPrefetch, c, 1, "When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled)")
+	return c
+}
+
+func addVerifyHashFlag(cmd *cobra.Command) string {
+	c := "verify-hash"
+	cmd.Flags().BoolVar(&datamonFlags.bundle.WithVerifyHash, c, true, "Enables hash verification on read blobs (requires Stream enabled)")
+	return c
+}
+
 /** parameters struct to other formats */
 
 func paramsToDatamonContext(ctx context.Context, params flagsT) (context2.Stores, error) {
 	// here we select a 100% gcs backend strategy (more elaborate strategies could be defined by the context pkg)
-	return gcscontext.MakeContext(ctx, params.context.Descriptor, config.Credential)
+	return gcscontext.MakeContext(ctx, params.context.Descriptor, config.Credential, gcs.Logger(config.mustGetLogger(params)))
 }
 
 func paramsToBundleOpts(stores context2.Stores) []core.BundleOption {
@@ -331,7 +355,7 @@ func paramsToSrcStore(ctx context.Context, params flagsT, create bool) (storage.
 	var sourceStore storage.Store
 	if strings.HasPrefix(consumableStorePath, "gs://") {
 		fmt.Println(consumableStorePath[4:])
-		sourceStore, err = gcs.New(ctx, consumableStorePath[5:], config.Credential)
+		sourceStore, err = gcs.New(ctx, consumableStorePath[5:], config.Credential, gcs.Logger(config.mustGetLogger(params)))
 		if err != nil {
 			return sourceStore, err
 		}

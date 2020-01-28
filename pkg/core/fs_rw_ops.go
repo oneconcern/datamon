@@ -27,7 +27,7 @@ var _ fuseutil.FileSystem = &fsMutable{}
 type fsMutable struct {
 	fsCommon
 
-	// Get fsEntry for an iNode. Speed up stat and other calls keyed by iNode
+	// Get FsEntry for an iNode. Speed up stat and other calls keyed by iNode
 	iNodeStore *iradix.Tree
 
 	// List of children for a given iNode. Maps inode id to list of children. This stitches the fuse FS together.
@@ -306,7 +306,6 @@ func (fs *fsMutable) CreateFile(
 	lk := formLookupKey(op.Parent, op.Name)
 
 	err = fs.preCreateCheck(op.Parent, lk)
-
 	if err != nil {
 		return
 	}
@@ -548,6 +547,170 @@ func (fs *fsMutable) ReleaseFileHandle(
 	return
 }
 
+// Commit changes on a MutableFS
+func (dfs *MutableFS) Commit() error {
+	return dfs.fsInternal.Commit()
+}
+
+// Add the root of the FS into the FS.
+func (fs *fsMutable) initRoot() (err error) {
+	_, found := fs.lookupTree.Get(formKey(fuseops.RootInodeID))
+	if found {
+		return
+	}
+	err = fs.createNode(
+		formLookupKey(fuseops.RootInodeID, rootPath),
+		fuseops.RootInodeID,
+		rootPath,
+		nil,
+		fuseutil.DT_Directory,
+		true)
+	return
+}
+
+// Run validations before creating a node. Need to take locks before calling.
+func (fs *fsMutable) preCreateCheck(parentInode fuseops.InodeID, lk []byte) error {
+	// check parent exists
+	key := formKey(parentInode)
+	e, found := fs.iNodeStore.Get(key)
+	if !found {
+		return fuse.ENOENT
+	}
+
+	// parent is a directory
+	n := e.(*nodeEntry)
+	if !n.attr.Mode.IsDir() {
+		return fuse.ENOTDIR
+	}
+
+	// check child name not taken
+	_, found = fs.lookupTree.Get(lk)
+	if found {
+		return fuse.EEXIST
+	}
+	return nil
+}
+
+func (fs *fsMutable) insertReadDirEntry(id fuseops.InodeID, dirEnt *fuseutil.Dirent) {
+
+	if fs.readDirMap[id] == nil {
+		fs.readDirMap[id] = make(map[fuseops.InodeID]*fuseutil.Dirent)
+	}
+	fs.readDirMap[id][dirEnt.Inode] = dirEnt
+}
+
+func (fs *fsMutable) insertLookupEntry(id fuseops.InodeID, child string, entry lookupEntry) {
+	fs.lookupTree, _, _ = fs.lookupTree.Insert(formLookupKey(id, child), entry)
+}
+
+// Create a node. Need to hold the locks before calling.
+func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childName string,
+	entry *fuseops.ChildInodeEntry, nodeType fuseutil.DirentType, isRoot bool) error {
+
+	// Create lookup key if not already created.
+	if lk == nil {
+		lk = formLookupKey(parentINode, childName)
+	}
+
+	var iNodeID fuseops.InodeID
+	if !isRoot {
+		iNodeID = fs.iNodeGenerator.allocINode()
+	} else {
+		iNodeID = parentINode
+	}
+
+	// lookup
+	fs.lookupTree, _, _ = fs.lookupTree.Insert(lk, lookupEntry{iNode: iNodeID})
+
+	// Default to common case of create file
+	var linkCount = fileLinkCount
+	var defaultMode os.FileMode = fileDefaultMode
+	var defaultSize uint64
+
+	if nodeType == fuseutil.DT_Directory {
+		linkCount = dirLinkCount
+		defaultMode = dirDefaultMode
+		defaultSize = dirInitialSize
+		fs.readDirMap[iNodeID] = make(map[fuseops.InodeID]*fuseutil.Dirent)
+	} else {
+		// dont return error as open file will retry this.
+		file, err := fs.localCache.Create(fmt.Sprint(iNodeID))
+		if err == nil {
+			fs.backingFiles[iNodeID] = &file
+		} else {
+			fs.l.Warn("failed to create backing file: open file will retry this",
+				zap.Error(err),
+				zap.String("child", childName),
+				zap.String("localfs", fs.localCache.Name()),
+				zap.Uint64("parent", uint64(parentINode)))
+		}
+	}
+
+	d := &fuseutil.Dirent{
+		Inode: iNodeID,
+		Name:  childName,
+		Type:  nodeType,
+	}
+	if !isRoot {
+		fs.insertReadDirEntry(parentINode, d)
+	}
+
+	ts := time.Now()
+	attr := fuseops.InodeAttributes{
+		Size:   defaultSize,
+		Nlink:  linkCount,
+		Mode:   defaultMode,
+		Atime:  ts,
+		Mtime:  ts,
+		Ctime:  ts,
+		Crtime: ts,
+		Uid:    defaultGID,
+		Gid:    defaultUID,
+	}
+
+	//iNode Store
+	fs.iNodeStore, _, _ = fs.iNodeStore.Insert(formKey(iNodeID), &nodeEntry{
+		lock:              sync.Mutex{},
+		refCount:          1, // As per spec CreateFileOp
+		pathToBackingFile: getPathToBackingFile(iNodeID),
+		attr:              attr,
+	})
+
+	if nodeType == fuseutil.DT_Directory {
+		// Increment parent ref count.
+		p, _ := fs.iNodeStore.Get(formKey(parentINode))
+		parentNodeEntry := p.(*nodeEntry)
+		parentNodeEntry.attr.Nlink++
+	}
+
+	// If return is expected
+	if entry != nil {
+		entry.Attributes = attr
+		entry.EntryExpiration = time.Now().Add(cacheYearLong)
+		entry.AttributesExpiration = time.Now().Add(cacheYearLong)
+		entry.Child = iNodeID
+	}
+	return nil
+}
+
+func getPathToBackingFile(iNode fuseops.InodeID) string {
+	return fmt.Sprint(uint64(iNode))
+}
+
+func shouldDelete(n *nodeEntry) bool {
+	// LookupCount should be zero.
+	if n.attr.Mode.IsDir() {
+		if n.refCount == 0 {
+			return true
+		}
+	} else {
+		if n.refCount == 0 && n.attr.Nlink == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 type commitChans struct {
 	// recv data from goroutines about uploaded files
 	bundleEntry chan<- model.BundleEntry
@@ -723,7 +886,6 @@ func commitWalkReadDirMap(
 
 // starting from root, find each file and upload using go routines.
 func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
-	fs.l.Info("Commit")
 	/* some sync setup */
 	if fs.bundle.BundleID == "" {
 		// NOTE(fred): I find it strange that the user may decide its own
@@ -731,7 +893,9 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 		if err := fs.bundle.InitializeBundleID(); err != nil {
 			return err
 		}
+		fs.l = fs.l.With(zap.String("bundle", fs.bundle.BundleID))
 	}
+	fs.l.Info("Committing changes")
 	ctx := context.Background() // ??? is this the correct context?
 	/* `commitChans` includes rules about directionality that apply to threads only,
 	 * so we keep channels without directionality restriction separately.
@@ -777,7 +941,7 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 		}
 		fileList = append(fileList, bundleEntry)
 	}
-	fs.l.Debug("Commit: goroutines ok.  uploading metadata.")
+	fs.l.Debug("Commit: goroutines ok. uploading metadata.")
 	for i := 0; i*defaultBundleEntriesPerFile < len(fileList); i++ {
 		firstIdx := i * defaultBundleEntriesPerFile
 		nextFirstIdx := (i + 1) * defaultBundleEntriesPerFile
@@ -802,6 +966,8 @@ func (fs *fsMutable) Commit() error {
 	caFs, err := cafs.New(
 		cafs.LeafSize(fs.bundle.BundleDescriptor.LeafSize),
 		cafs.Backend(fs.bundle.BlobStore()),
+		cafs.LeafTruncation(fs.bundle.BundleDescriptor.Version < 1),
+		cafs.Logger(fs.l),
 	)
 	if err != nil {
 		return err

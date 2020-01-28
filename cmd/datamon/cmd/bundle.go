@@ -69,3 +69,12 @@ func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) erro
 	log.Printf("Using bundle: %s", datamonFlags.bundle.ID)
 	return nil
 }
+
+func getConcurrencyFactor(batchSize int) int {
+	// concurrency factor calculation for download, upload & mount
+	concurrency := datamonFlags.bundle.ConcurrencyFactor / batchSize
+	if concurrency == 0 {
+		return 1
+	}
+	return concurrency
+}

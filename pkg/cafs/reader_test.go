@@ -2,21 +2,27 @@ package cafs
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
-	lru2 "github.com/hashicorp/golang-lru"
+	"github.com/davecgh/go-spew/spew"
+	lru "github.com/hashicorp/golang-lru"
+	"go.uber.org/zap"
 
 	"github.com/oneconcern/datamon/internal"
 
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,9 +35,7 @@ func keyFromFile(t testing.TB, pth string) Key {
 
 func readTextFile(t testing.TB, pth string) string {
 	v, err := ioutil.ReadFile(pth)
-	if err != nil {
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 	return string(v)
 }
 
@@ -48,7 +52,9 @@ func TestChunkReader_SmallOnly(t *testing.T) {
 
 func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	rkey := keyFromFile(t, tf.RootHash)
-	rdr, err := newReader(blobs, rkey, leafSize, "")
+	rdr, err := newReader(blobs, rkey, leafSize,
+		ReaderPrefix(""),
+	)
 	require.NoError(t, err)
 	defer rdr.Close()
 
@@ -61,35 +67,199 @@ func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	require.Equal(t, expected, actual)
 }
 
-func verifyChunkReaderAt(t testing.TB, blobs storage.Store, tf testFile) {
+func verifyChunkReaderAt(t testing.TB, blobs storage.Store, tf testFile, opts ...ReaderOption) {
 	rkey := keyFromFile(t, tf.RootHash)
-	offset := 11
-	lru, e := lru2.New(10)
-	require.NoError(t, e)
-	r, err := newReader(blobs, rkey, leafSize, "", SetCache(lru))
-	require.NoError(t, err)
-	rdr := r.(io.ReaderAt)
+	offset := int64(11)
+	size := 2 * int(leafSize)
 
-	b := make([]byte, 2*leafSize)
-	n, err := rdr.ReadAt(b, int64(offset))
-	if err != nil && !strings.Contains(err.Error(), "EOF") {
-		require.NoError(t, err)
-	}
+	r, err := newReader(blobs, rkey, leafSize, opts...)
+	require.NoErrorf(t, err, "did not expect newReader to fail, but got: %v", err)
+
+	// assert that the reader is actually destroyable, when the gc will eventually reclaim it
+	// (terminates prefetching routines)
+	defer r.(*chunkReader).destroy()
+
+	rdr, ok := r.(io.ReaderAt)
+	require.True(t, ok)
+
 	expected := readTextFile(t, tf.Original)
-	count := len(expected) - offset
-	if int(2*leafSize) < len(expected) {
-		count = int(2 * leafSize)
+
+	// single ReadAt
+	b := make([]byte, size)
+	n, err := rdr.ReadAt(b, offset)
+	require.NoErrorf(t, filterEOF(err), "did not expect error but got: %v", err)
+	assertReadAtContent(t, size, tf.Original, expected, b, n, offset)
+
+	// parallel ReadAt on same reader, with different offsets
+	type result struct {
+		err    error
+		buffer []byte
+		count  int
+		offset int64
 	}
-	actual := string(b)
-	require.Equal(t, count, n)
-	require.Equal(t, expected[offset:count], actual[:count-offset])
+	resC := make(chan result, 10) // do not block on results
+	go func(resC chan<- result) {
+		var wg sync.WaitGroup
+		for _, off := range []int64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9} {
+			wg.Add(1)
+			go func(offset int64, res chan<- result, wg *sync.WaitGroup) {
+				defer wg.Done()
+				buffer := make([]byte, size)
+				n, err := rdr.ReadAt(buffer, offset)
+				res <- result{
+					err:    err,
+					buffer: buffer,
+					count:  n,
+					offset: offset,
+				}
+			}(off, resC, &wg)
+		}
+		wg.Wait()
+		close(resC)
+	}(resC)
+
+	// collect results and assert read data again reference
+	for res := range resC {
+		if !assert.NoErrorf(t, filterEOF(res.err),
+			"ReadAt on %s (offset: %d): did not expect error but got: %v", tf.Original, res.offset, res.err) {
+			continue
+		}
+		assertReadAtContent(t, size, tf.Original, expected, res.buffer, res.count, res.offset)
+	}
+}
+
+func filterEOF(err error) error {
+	if err == nil || strings.Contains(err.Error(), "EOF") {
+		return nil
+	}
+	return err
+}
+
+func assertReadAtContent(t testing.TB, size int, name, expected string, received []byte, n int, offset int64) {
+	var count int
+	// truncate tested data to the first 2*leafSize bytes
+	if len(expected) > size {
+		count = size
+	} else {
+		count = len(expected) - int(offset)
+	}
+	if !assert.Equalf(t, count, n, "expected to ReadAt %d bytes, got: %d", count, n) {
+		return
+	}
+	expectedBytes := expected[int(offset) : int(offset)+count]
+	if !assert.EqualValuesf(t, expectedBytes, received[:n],
+		"expected ReadAt to match expectation on %s, with offset %d", name, offset) {
+		if os.Getenv("DEBUG_TEST") == "" {
+			return
+		}
+		// dump buffers for debug
+		var diff int
+		for i := range expectedBytes {
+			if expected[i] != received[i] {
+				diff = i
+				break
+			}
+		}
+		_ = ioutil.WriteFile("test-dump.out", []byte(fmt.Sprintf(`file: %s
+			size=%d
+			offset=%d
+			received bytes=%d
+			differ at: %d
+			full: %s
+			expected=%s
+			actual=%s`, name, len(expected), offset, n, diff,
+			expected,
+			spew.Sdump(expectedBytes), spew.Sdump(received[:n]))), 0644)
+	}
+}
+
+func testLru(t *testing.T, size int, evict func(interface{}, interface{})) (*lru.Cache, *sync.Mutex) {
+	var (
+		lr  *lru.Cache
+		err error
+	)
+	if evict != nil {
+		lr, err = lru.NewWithEvict(size, evict)
+	} else {
+		lr, err = lru.New(size)
+	}
+	require.NoError(t, err)
+	return lr, &sync.Mutex{}
 }
 
 func TestChunkReader_All(t *testing.T) {
+	var l *zap.Logger
+	if os.Getenv("DEBUG_TEST") != "" {
+		l = dlogger.MustGetLogger("debug")
+	} else {
+		l = dlogger.MustGetLogger("info")
+	}
+	sl := newLeafFreelist(leafSize, 50)
+	fl := newLeafFreelist(MaxLeafSize, 50)
+
+	// a set of options to exercise chunkReaders under various conditions
+	optSets := [][]ReaderOption{
+		{
+			ReaderLogger(l),
+			SetCache(testLru(t, DefaultCacheSize, nil)),
+			ReaderPrefix(""),
+			ReaderPrefetch(0),
+		},
+		{
+			ReaderLogger(l),
+			ReaderPrefetch(1),
+			ReaderVerifyHash(true),
+		},
+		{
+			ReaderLogger(l),
+			SetCache(testLru(t, DefaultCacheSize, nil)),
+			SetLeafPool(fl),
+			ReaderPrefetch(0),
+		},
+		{
+			ReaderLogger(l),
+			SetCache(testLru(t, 20, func(_ interface{}, lruVal interface{}) {
+				fl.Release(lruVal.(LeafBuffer))
+			})),
+			SetLeafPool(fl),
+			ReaderPrefetch(3),
+		},
+		{
+			ReaderLogger(l),
+			SetCache(testLru(t, 20, func(_ interface{}, lruVal interface{}) {
+				sl.Release(lruVal.(LeafBuffer))
+			})),
+			SetLeafPool(sl),
+			ReaderPrefetch(1),
+		},
+		{
+			ReaderLogger(l),
+			SetCache(testLru(t, 50, nil)),
+			SetLeafPool(sl),
+			ReaderPrefetch(4),
+		},
+		{
+			ReaderLogger(l),
+			SetCache(testLru(t, 2, func(_ interface{}, lruVal interface{}) {
+				fl.Release(lruVal.(LeafBuffer))
+			})),
+			SetLeafPool(fl),
+			ReaderPrefetch(1),
+			ReaderVerifyHash(true),
+		},
+	}
+
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(destDir, "cafs")))
-	for _, tf := range testFiles(destDir) {
-		verifyChunkReader(t, blobs, tf)
-		verifyChunkReaderAt(t, blobs, tf)
+	for _, toPin := range testFiles(destDir) {
+		tf := toPin
+		for i, optsToPin := range optSets {
+			opts := optsToPin
+			t.Run(tf.Original+"-"+strconv.Itoa(i), func(t *testing.T) {
+				t.Parallel()
+				verifyChunkReader(t, blobs, tf)
+				verifyChunkReaderAt(t, blobs, tf, opts...)
+			})
+		}
 	}
 }
 
@@ -170,7 +340,8 @@ func TestWriteTo(t *testing.T) {
 	key2, err := KeyFromString(keyStr2)
 	require.NoError(t, err)
 	keys := []Key{key1, key2}
-	reader, err := newReader(&testFakeStore, key, 64*1024, "",
+	reader, err := newReader(&testFakeStore, key, 64*1024,
+		ReaderPrefix(""),
 		TruncateLeaf(false),
 		Keys(keys),
 	)
@@ -194,7 +365,7 @@ func TestWriteTo(t *testing.T) {
 	require.Equal(t, written, int64(2*64*1024))
 	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriter.data[:64*1024])
 	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriter.data[64*1024:])
-	// Set truncation on and verify.
+	// TODO: Set truncation on and verify.
 }
 
 type oiCalculatorTests struct {
@@ -257,7 +428,7 @@ func TestOffsetIndexCalculator(t *testing.T) {
 	}
 	for i, test := range tests {
 		index, offset := calculateKeyAndOffset(test.inOffset, test.leafSize)
-		require.Equal(t, test.outIndex, index, "Test number: "+strconv.Itoa(i))
+		require.Equal(t, test.outIndex, int64(index), "Test number: "+strconv.Itoa(i))
 		require.Equal(t, test.outOffset, offset, "Test number "+strconv.Itoa(i))
 	}
 }

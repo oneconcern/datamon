@@ -158,7 +158,11 @@ jobs:
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             hack/go-generate.sh
             go mod download
-            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures -- -race ./...
+            # cafs tests are memory intensive: best to run them separately
+            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures -- \
+              -race $(go list ./...|grep -v cafs)
+              # cafs testing: trade parallelism for memory on limited CI config + race turned off
+            gotestsum --junitfile /tmp/test-results/go-test-report-cafs.xml --format short-with-failures -- -parallel 4  ./pkg/cafs/...
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
@@ -196,7 +200,8 @@ jobs:
             go mod download
             # make install-minio
             env
-            gotestsum --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- -tags fsintegration  ./pkg/core
+            gotestsum --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- \
+            -tags fuse_cli,fsintegration -run Mount  ./pkg/core ./cmd/datamon/cmd -timeout 20m
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:

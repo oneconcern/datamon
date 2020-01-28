@@ -9,7 +9,6 @@ import (
 	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/core"
-	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +20,7 @@ var mutableMountBundleCmd = &cobra.Command{
 The destination path is a temporary staging area for write operations.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
+
 		contributor, err := paramsToContributor(datamonFlags)
 		if err != nil {
 			wrapFatalln("populate contributor struct", err)
@@ -50,15 +50,11 @@ The destination path is a temporary staging area for write operations.`,
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
 		bundle := core.NewBundle(bd,
 			bundleOpts...,
 		)
-		logger, err := dlogger.GetLogger(datamonFlags.root.logLevel)
-		if err != nil {
-			onDaemonError("failed to set log level", err)
-			return
-		}
-		fs, err := core.NewMutableFS(bundle, datamonFlags.bundle.DataPath, logger)
+		fs, err := core.NewMutableFS(bundle)
 		if err != nil {
 			onDaemonError("create mutable filesystem", err)
 			return
@@ -112,6 +108,7 @@ func init() {
 	addDaemonizeFlag(mutableMountBundleCmd)
 	addDataPathFlag(mutableMountBundleCmd)
 	addLabelNameFlag(mutableMountBundleCmd)
+	addLogLevel(mutableMountBundleCmd)
 
 	mountBundleCmd.AddCommand(mutableMountBundleCmd)
 }
