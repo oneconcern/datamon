@@ -86,7 +86,7 @@ func (rc readCloser) Close() error {
 	return nil
 }
 
-func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive storage.NewKey) error {
+func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
 	// TODO: Change this implementation to use rename to put file into place.
 	dir := filepath.Dir(key)
 	if dir != "" {
