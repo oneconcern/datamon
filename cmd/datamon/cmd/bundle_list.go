@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
 
@@ -19,7 +17,7 @@ func applyBundleTemplate(bundle model.BundleDescriptor) error {
 		// by stopping upon errors while it was previously non-blocking
 		return fmt.Errorf("executing template: %w", err)
 	}
-	log.Println(buf.String())
+	logStdOut(buf.String())
 	return nil
 }
 

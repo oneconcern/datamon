@@ -33,7 +33,7 @@ func init() {
 	rootCmd.AddCommand(ContextCmd)
 
 	contextTemplate = func() *template.Template {
-		const listLineTemplateString = `Model Version: {{.Version}}, Name: {{.Name}}, WAL: {{.WAL}}, ReadLog: {{.ReadLog}}, Blob: {{.Blob}}, Metadata: {{.Metadata}}, Version Metadata: {{.VMetadata}}`
+		const listLineTemplateString = `Model Version: {{.Version}}, Name: {{.Name}}, WAL: {{.WAL}}, ReadLog: {{.ReadLog}}, Blob: {{.Blob}}, Metadata: {{.Metadata}}, Version Metadata: {{.VMetadata}} {{printf "\n"}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
 	}()
 }

@@ -3,8 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"log"
-
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/errors"
@@ -44,7 +42,7 @@ exits with ENOENT status otherwise.`,
 			wrapFatalln("executing template", err)
 			return
 		}
-		log.Println(buf.String())
+		logStdOut(buf.String())
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		config.populateRemoteConfig(&datamonFlags)

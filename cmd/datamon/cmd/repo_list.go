@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/spf13/cobra"
@@ -16,7 +14,7 @@ func applyRepoTemplate(repo model.RepoDescriptor) error {
 	if err := repoDescriptorTemplate.Execute(&buf, repo); err != nil {
 		return fmt.Errorf("executing template: %w", err)
 	}
-	log.Println(buf.String())
+	logStdOut(buf.String())
 	return nil
 }
 

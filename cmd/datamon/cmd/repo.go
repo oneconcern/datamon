@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddCommand(repoCmd)
 
 	repoDescriptorTemplate = func() *template.Template {
-		const listLineTemplateString = `{{.Name}} , {{.Description}} , {{with .Contributor}}{{.Name}} , {{.Email}}{{end}} , {{.Timestamp}}`
+		const listLineTemplateString = `{{.Name}} , {{.Description}} , {{with .Contributor}}{{.Name}} , {{.Email}}{{end}} , {{.Timestamp}} {{printf "\n"}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
 	}()
 }

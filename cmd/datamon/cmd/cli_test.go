@@ -156,13 +156,14 @@ func listRepos(t *testing.T) ([]repoListEntry, error) {
 	if err != nil {
 		panic(err)
 	}
-	log.SetOutput(w)
+	logStdOut = func(format string, a ...interface{}) (int, error) {
+		return fmt.Fprintf(w, format, a...)
+	}
 	//
 	runCmd(t, []string{"repo",
 		"list",
 	}, "create second test repo", false)
 	//
-	log.SetOutput(os.Stdout)
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
@@ -375,12 +376,13 @@ func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
 	if err != nil {
 		panic(err)
 	}
-	log.SetOutput(w)
+	logStdOut = func(format string, a ...interface{}) (int, error) {
+		return fmt.Fprintf(w, format, a...)
+	}
 	runCmd(t, []string{"bundle",
 		"list",
 		"--repo", repoName,
 	}, "list bundles", false)
-	log.SetOutput(os.Stdout)
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)
@@ -432,7 +434,7 @@ func testListBundle(t *testing.T, file uploadTree, bcnt int) {
 			break
 		}
 	}
-	require.Truef(t, found, "bundle log message %q not found in returned bundles")
+	require.Truef(t, found, "bundle log message %s not found in returned bundles", msg)
 	require.True(t, testNow.Sub(bundles.Last().time).Seconds() < 3, "timestamp bounds after bundle create")
 }
 
@@ -443,7 +445,7 @@ func TestListBundles(t *testing.T) {
 		"create",
 		"--description", "testing",
 		"--repo", repo1,
-	}, "create second test repo", false)
+	}, "create first test repo", false)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
@@ -541,13 +543,14 @@ func listLabels(t *testing.T, repoName string, prefix string) []labelListEntry {
 	if err != nil {
 		panic(err)
 	}
-	log.SetOutput(w)
+	logStdOut = func(format string, a ...interface{}) (int, error) {
+		return fmt.Fprintf(w, format, a...)
+	}
 	runCmd(t, []string{"label",
 		"list",
 		"--repo", repoName,
 		"--prefix", prefix,
 	}, "list labels", false)
-	log.SetOutput(os.Stdout)
 	w.Close()
 	//
 	lb, err := ioutil.ReadAll(r)

@@ -8,8 +8,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"log"
-
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	status "github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/errors"
@@ -61,7 +59,7 @@ func getContext() {
 		wrapFatalln("executing template", err)
 		return
 	}
-	log.Println(buf.String())
+	logStdOut(buf.String())
 }
 
 func init() {

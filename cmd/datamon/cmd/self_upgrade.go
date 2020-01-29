@@ -31,6 +31,7 @@ Repository: github.com/{{ .RepoOwner }}/{{ .RepoName }}
 URL: {{ .URL }}
 Release Notes: {{ .ReleaseNotes }}
 ************************************************************
+{{printf "\n"}}
 `
 		return template.Must(template.New("release").Parse(releaseTemplateString))
 	}()

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
 
@@ -17,7 +15,7 @@ func applyLabelTemplate(label model.LabelDescriptor) error {
 	if err := labelDescriptorTemplate.Execute(&buf, label); err != nil {
 		return fmt.Errorf("executing template: %w", err)
 	}
-	log.Println(buf.String())
+	logStdOut(buf.String())
 	return nil
 }
 

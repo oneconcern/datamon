@@ -49,7 +49,7 @@ exits with ENOENT status otherwise.`,
 		if err != nil {
 			log.Println("executing template:", err)
 		}
-		log.Println(buf.String())
+		logStdOut(buf.String())
 
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {

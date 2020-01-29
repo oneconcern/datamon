@@ -6,8 +6,6 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +27,7 @@ func listContexts() {
 		wrapFatalln("list contexts error", err)
 		return
 	}
-	log.Printf("%v", contexts)
+	logStdOut("%v", contexts)
 }
 
 func init() {

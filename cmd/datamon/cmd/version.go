@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -65,7 +63,7 @@ var versionCmd = &cobra.Command{
 	* Git State (when dirty there were uncommitted changes during the build)
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print(NewVersionInfo().String())
+		logStdOut(NewVersionInfo().String())
 	},
 }
 
