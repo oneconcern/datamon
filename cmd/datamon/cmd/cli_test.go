@@ -377,7 +377,7 @@ func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
 		panic(err)
 	}
 	logStdOut = func(format string, a ...interface{}) (int, error) {
-		return fmt.Fprintf(w, format, a...)
+		return fmt.Fprintf(w, format+"\n", a...)
 	}
 	runCmd(t, []string{"bundle",
 		"list",
