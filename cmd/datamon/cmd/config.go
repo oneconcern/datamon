@@ -26,8 +26,9 @@ const (
 	configFile = "datamon"
 )
 
+/* ??? how to override with viper and/or what does overriding a function with viper mean? */
 // resolve default absolute directory where to find the config file (may be overridden by viper)
-func configFileLocation(expandEnv bool) string {
+func configFileLocationDefault(expandEnv bool) string {
 	var home string
 	if expandEnv {
 		if location := os.Getenv(envConfigLocation); location != "" {
@@ -46,6 +47,9 @@ func configFileLocation(expandEnv bool) string {
 	// default config file with YAML serialization used when generating a config file
 	return filepath.Join(home, datamonDir, configFile+".yaml")
 }
+
+// attachment point for tests
+var configFileLocation = configFileLocationDefault
 
 // CLIConfig describes the CLI local configuration file.
 type CLIConfig struct {
