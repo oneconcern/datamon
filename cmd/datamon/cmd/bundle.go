@@ -36,7 +36,7 @@ func init() {
 	rootCmd.AddCommand(bundleCmd)
 
 	bundleDescriptorTemplate = func() *template.Template {
-		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}} {{printf "\n"}}`
+		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
 	}()
 }
