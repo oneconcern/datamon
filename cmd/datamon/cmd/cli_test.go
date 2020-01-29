@@ -157,7 +157,7 @@ func listRepos(t *testing.T) ([]repoListEntry, error) {
 		panic(err)
 	}
 	logStdOut = func(format string, a ...interface{}) (int, error) {
-		return fmt.Fprintf(w, format, a...)
+		return fmt.Fprintf(w, format + "\n", a...)
 	}
 	//
 	runCmd(t, []string{"repo",
