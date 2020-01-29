@@ -32,7 +32,7 @@ func init() {
 	rootCmd.AddCommand(labelCmd)
 
 	labelDescriptorTemplate = func() *template.Template {
-		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}} {{printf "\n"}}`
+		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
 	}()
 }
