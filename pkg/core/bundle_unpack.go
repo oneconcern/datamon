@@ -441,7 +441,6 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 	fs cafs.Fs,
 	chans downloadBundleChans) {
 	var diff BundleDiff
-	var selectionPredicateOk bool
 	var err error
 	reportError := func(err error) {
 		chans.error <- errorHit{
@@ -466,6 +465,7 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 		bundle.l.Info("downloading bundle entries",
 			zap.Int("num", len(bundle.BundleEntries)))
 		for _, b := range bundle.BundleEntries {
+			var selectionPredicateOk bool
 			if selectionPredicate != nil {
 				selectionPredicateOk, err = selectionPredicate(b.NameWithPath)
 				if err != nil {
