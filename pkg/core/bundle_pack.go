@@ -223,9 +223,11 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	}
 
 	// Upload the files and the bundle list
-	err = bundle.InitializeBundleID()
-	if err != nil {
-		return err
+	if bundle.BundleID == "" {
+		err = bundle.InitializeBundleID()
+		if err != nil {
+			return err
+		}
 	}
 
 	filePackedC := make(chan filePacked)

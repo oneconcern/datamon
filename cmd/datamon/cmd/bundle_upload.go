@@ -61,6 +61,10 @@ set label 'init'
 		bundleOpts = append(bundleOpts,
 			core.ConcurrentFileUploads(getConcurrencyFactor(fileUploadsByConcurrencyFactor)))
 		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
+		// feature guard
+		if enableBundlePreserve {
+			bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		}
 
 		bundle := core.NewBundle(bd,
 			bundleOpts...,
@@ -126,6 +130,11 @@ func init() {
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd, 100)
 	addLogLevel(uploadBundleCmd)
+
+	// feature guard
+	if enableBundlePreserve {
+		addBundleFlag(uploadBundleCmd)
+	}
 
 	bundleCmd.AddCommand(uploadBundleCmd)
 }

@@ -264,6 +264,21 @@ func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, 
 	if err := RepoExists(bundle.RepoID, bundle.contextStores); err != nil {
 		return err
 	}
+	if bundle.BundleID != "" {
+		// case of bundleID preservation
+		id, err := ksuid.Parse(bundle.BundleID)
+		if err != nil {
+			return fmt.Errorf("invalid bundleID (ksuid) specified: %w", err)
+		}
+		bundle.setBundleID(id.String())
+		exists, err := bundle.Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("bundleID %s already exists on this store", id.String())
+		}
+	}
 	return uploadBundle(ctx, bundle, bundleEntriesPerFile, getKeys, opts...)
 }
 
