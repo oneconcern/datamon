@@ -39,13 +39,14 @@ config file created in /Users/ritesh/.datamon2/datamon.yaml
 config file created in /Users/ritesh/.config/.datamon/config.yaml
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, err := paramsToContributor(datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		_, err := optionInputs.contributor()
 		if err != nil {
 			wrapFatalln("failed to resolve contributor", err)
 			return
 		}
 
-		config := CLIConfig{
+		localConfig := CLIConfig{
 			Config:     datamonFlags.core.Config,
 			Context:    datamonFlags.context.Descriptor.Name,
 			Credential: datamonFlags.root.credFile,
@@ -56,7 +57,7 @@ config file created in /Users/ritesh/.config/.datamon/config.yaml
 		if ext := filepath.Ext(file); ext != ".yaml" {
 			infoLogger.Printf("warning: the generated config file will contain a yaml document, but the file extension is %q", ext)
 		}
-		o, err := config.MarshalConfig()
+		o, err := localConfig.MarshalConfig()
 		if err != nil {
 			wrapFatalln("could not serialize config to yaml", err)
 			return

@@ -76,8 +76,8 @@ func init() {
 	addLogLevel(rootCmd)
 }
 
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
+// readConfig reads in config file and ENV variables if set.
+func readConfig(location string) (*CLIConfig, error) {
 
 	// 1. Defaults: none at the moment (defaults are set together with flags)
 
@@ -85,7 +85,7 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// 3. Read from config file
-	if location := os.Getenv(envConfigLocation); location != "" {
+	if location != "" {
 		// use config file from env var
 		viper.SetConfigFile(location)
 	} else {
@@ -100,12 +100,25 @@ func initConfig() {
 	handleConfigErrors(viper.ReadInConfig())
 
 	// 4. Initialize config and override via flags
-	config = new(CLIConfig)
-	if err := viper.Unmarshal(config); err != nil {
+	localConfig := new(CLIConfig)
+	if err := viper.Unmarshal(localConfig); err != nil {
 		wrapFatalln("config file contains invalid values", err)
-		return
+		return nil, err
 	}
 
+	return localConfig, nil
+}
+
+// initConfig reads in config file and ENV variables if set,
+// and sets config values based on file, env, cli flags.
+func initConfig() {
+	var err error
+	config, err = readConfig(os.Getenv(envConfigLocation))
+	if err != nil {
+		wrapFatalln("read config from file and env vars", err)
+	}
+
+	// ??? what errors follow if this block is removed?
 	if config.Credential != "" {
 		// TODO(fred): now handled in paramsToContributor. May be removed
 		_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.Credential)
@@ -118,7 +131,10 @@ func initConfig() {
 		datamonFlags.core.Config = viper.GetString("DATAMON_GLOBAL_CONFIG")
 	}
 
-	config.setDatamonParams(&datamonFlags)
+	datamonFlagsPtr := &datamonFlags
+	datamonFlagsPtr.setDefaultsFromConfig(config)
+
+	//	config.setDatamonParams(&datamonFlags)
 
 	if datamonFlags.context.Descriptor.Name == "" {
 		datamonFlags.context.Descriptor.Name = "datamon-dev"

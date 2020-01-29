@@ -18,7 +18,9 @@ var webSrv = &cobra.Command{
 	Long:  "A webserver process to browse datamon data",
 	Run: func(cmd *cobra.Command, args []string) {
 		infoLogger.Println("begin webserver")
-		stores, err := paramsToDatamonContext(context.Background(), datamonFlags)
+		datamonFlagsPtr := &datamonFlags
+		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
+		stores, err := optionInputs.datamonContext(context.Background())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -67,7 +69,9 @@ var webSrv = &cobra.Command{
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	}, // https://github.com/spf13/cobra/issues/458
 }
 

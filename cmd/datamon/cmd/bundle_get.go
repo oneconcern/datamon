@@ -22,7 +22,9 @@ Prints corresponding bundle metadata if the bundle exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		datamonFlagsPtr := &datamonFlags
+		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
+		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -38,7 +40,10 @@ exits with ENOENT status otherwise.`,
 			return
 		}
 
-		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		if err != nil {
+			wrapFatalln("failed to initialize bundle options", err)
+		}
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 
@@ -64,7 +69,9 @@ exits with ENOENT status otherwise.`,
 		log.Println(buf.String())
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 

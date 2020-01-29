@@ -20,13 +20,13 @@ Setting a label is analogous to the git command "git tag {label}".`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 
-		contributor, err := paramsToContributor(datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		contributor, err := optionInputs.contributor()
 		if err != nil {
 			wrapFatalln("populate contributor struct", err)
 			return
 		}
-
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -62,7 +62,9 @@ Setting a label is analogous to the git command "git tag {label}".`,
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 

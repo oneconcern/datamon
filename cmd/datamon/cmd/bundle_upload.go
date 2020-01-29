@@ -37,17 +37,13 @@ set label 'init'
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 
-		contributor, err := paramsToContributor(datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		contributor, err := optionInputs.contributor()
 		if err != nil {
 			wrapFatalln("populate contributor struct", err)
 			return
 		}
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
-		if err != nil {
-			wrapFatalln("create remote stores", err)
-			return
-		}
-		sourceStore, err := paramsToSrcStore(ctx, datamonFlags, false)
+		sourceStore, err := optionInputs.srcStore(ctx, false)
 		if err != nil {
 			wrapFatalln("create source store", err)
 			return
@@ -57,18 +53,27 @@ set label 'init'
 			core.Contributor(contributor),
 		)
 
-		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		if err != nil {
+			wrapFatalln("failed to initialize bundle options", err)
+			return
+		}
 		bundleOpts = append(bundleOpts, core.ConsumableStore(sourceStore))
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.SkipMissing(datamonFlags.bundle.SkipOnError))
 		bundleOpts = append(bundleOpts,
 			core.ConcurrentFileUploads(getConcurrencyFactor(fileUploadsByConcurrencyFactor)))
-		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
+		logger, err := optionInputs.getLogger()
+		if err != nil {
+			wrapFatalln("get logger", err)
+			return
+		}
+		bundleOpts = append(bundleOpts, core.Logger(logger))
+
 		// feature guard
 		if enableBundlePreserve {
 			bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		}
-
 		bundle := core.NewBundle(bd,
 			bundleOpts...,
 		)
@@ -128,7 +133,9 @@ set label 'init'
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 

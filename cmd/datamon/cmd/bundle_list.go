@@ -33,7 +33,9 @@ This is analogous to the "git log" command. The bundle ID works like a git commi
 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT , Updating test bundle`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		datamonFlagsPtr := &datamonFlags
+		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
+		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -47,7 +49,9 @@ This is analogous to the "git log" command. The bundle ID works like a git commi
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 
