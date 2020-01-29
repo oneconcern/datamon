@@ -203,7 +203,7 @@ func testBadOpenOverwrite(action, pth string, isDir bool, e chan<- error) {
 	*/
 	// TODO: what it is now:
 	if err != nil {
-		e <- fmt.Errorf("%s:this is expected but not currently implementated: should not be able to open CREATE: %s", action, pth)
+		e <- fmt.Errorf("%s:this is expected but not currently implemented: should not be able to open CREATE: %s", action, pth)
 		return
 	}
 

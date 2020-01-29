@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
+	"go.uber.org/zap"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -99,6 +100,7 @@ func fakeBundle(ev testEnv) *Bundle {
 		BundleID(ev.bundleID),
 		ContextStores(fakeContext(ev.metaDir, ev.blobDir)),
 		ConsumableStore(localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.destinationDir))),
+		Logger(testLogger()),
 	)
 }
 
@@ -361,6 +363,7 @@ func generateDataFile(test *testing.T, store storage.Store, ev testEnv) model.Bu
 	fs, err := cafs.New(
 		cafs.LeafSize(ev.leafSize),
 		cafs.Backend(store),
+		cafs.Logger(testLogger()),
 	)
 	require.NoError(test, err)
 	keys, err := cafs.GenerateCAFSChunks(file, fs)
@@ -491,4 +494,12 @@ func TestBundle_StoreGet(t *testing.T) {
 	require.Equal(t, blobStore, b.BlobStore())
 	require.Equal(t, walStore, b.WALStore())
 	require.Equal(t, readLog, b.ReadLogStore())
+}
+
+func testLogger() *zap.Logger {
+	if os.Getenv("DEBUG_TEST") != "" {
+		l, _ := zap.NewDevelopment() // to get DEBUG  during test run
+		return l
+	}
+	return zap.NewNop() // to limit test output
 }

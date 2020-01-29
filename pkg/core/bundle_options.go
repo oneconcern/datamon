@@ -115,3 +115,24 @@ func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
 		b.concurrentFilelistDownloads = concurrentFilelistDownloads
 	}
 }
+
+// CacheSize tunes the buffer cache size in bytes of streamed FS operations (enabled when Streamed is true).
+func CacheSize(size int) BundleOption {
+	return func(b *Bundle) {
+		b.lruSize = size
+	}
+}
+
+// Prefetch enables prefetching on streamed FS operations (enabled when Streamed is true).
+func Prefetch(ahead int) BundleOption {
+	return func(b *Bundle) {
+		b.withPrefetch = ahead
+	}
+}
+
+// VerifyHash enables hash verification on streamed FS read perations (enabled when Streamed is true).
+func VerifyHash(enabled bool) BundleOption {
+	return func(b *Bundle) {
+		b.withVerifyHash = enabled
+	}
+}

@@ -36,6 +36,7 @@ const (
 	repo2             = "test-repo2"
 	timeForm          = "2006-01-02 15:04:05.999999999 -0700 MST"
 	concurrencyFactor = "100"
+	testLeafSize      = int(cafs.DefaultLeafSize)
 )
 
 type uploadTree struct {
@@ -51,19 +52,19 @@ var testUploadTrees = [][]uploadTree{{
 }, {
 	{
 		path: "/leafs/leafsize",
-		size: cafs.DefaultLeafSize,
+		size: testLeafSize,
 	},
 	{
 		path: "/leafs/over-leafsize",
-		size: cafs.DefaultLeafSize + 1,
+		size: testLeafSize + 1,
 	},
 	{
 		path: "/leafs/under-leafsize",
-		size: cafs.DefaultLeafSize - 1,
+		size: testLeafSize - 1,
 	},
 	{
 		path: "/leafs/multiple-leafsize",
-		size: cafs.DefaultLeafSize * 3,
+		size: testLeafSize * 3,
 	},
 	{
 		path: "/leafs/root",
@@ -304,6 +305,104 @@ func TestUploadBundle_filePath(t *testing.T) {
 		"--repo", repo1,
 		"--concurrency-factor", concurrencyFactor,
 	}, "observe error on bundle upload path as file rather than directory", true)
+}
+
+func getTempFile(t *testing.T, filename string) (*os.File, func()) {
+	if filename == "" {
+		filename = "datamon_test_temp_file"
+	}
+	tempDirPath, err := ioutil.TempDir("", "datamon-TestUploadBundleFilelist")
+	require.NoError(t, err, "create temp dir")
+	tempPath := filepath.Join(tempDirPath, filename)
+	tempFile, err := os.Create(tempPath)
+	require.NoError(t, err, "create temp file")
+	cleanup := func() {
+		err := os.RemoveAll(tempDirPath)
+		require.NoError(t, err, "rm temp dir")
+	}
+	return tempFile, cleanup
+}
+
+func TestUploadBundleFilelist(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+	}, "create test repo", false)
+	tree := testUploadTrees[1]
+	require.Greater(t, len(tree), 1)
+	var filelistPath string
+	fileNamesToUpload := make([]string, 0)
+	{
+		filelist, filelistCleanup := getTempFile(t, "to_upload.txt")
+		defer filelistCleanup()
+		filelistPath = filelist.Name()
+		for idx, file := range tree {
+			if idx > len(tree)/2 {
+				break
+			}
+			fileNamesToUpload = append(fileNamesToUpload, pathInBundle(file))
+		}
+		_, err := filelist.WriteString(strings.Join(fileNamesToUpload, "\n"))
+		require.NoError(t, err, "write names to filelist")
+		require.NoError(t, filelist.Close(), "close filelist file")
+	}
+	bundles, err := listBundles(t, repo1)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 0, bundles.Len(), "no bundles before upload")
+	{
+		file := tree[0]
+		var (
+			r, w *os.File
+			lb   []byte
+			m    bool
+		)
+		r, w, err = os.Pipe()
+		if err != nil {
+			panic(err)
+		}
+		log.SetOutput(w)
+		//
+		runCmd(t, []string{"bundle",
+			"upload",
+			"--path", dirPathStr(t, file),
+			"--message", "The initial commit for the repo",
+			"--repo", repo1,
+			"--concurrency-factor", concurrencyFactor,
+			"--files", filelistPath,
+		}, "upload bundle at "+dirPathStr(t, file), false)
+		//
+		log.SetOutput(os.Stdout)
+		w.Close()
+		//
+		lb, err = ioutil.ReadAll(r)
+		require.NoError(t, err, "i/o error reading patched log from pipe")
+		ls := string(lb)
+		//
+		m, err = regexp.MatchString(`Uploaded bundle`, ls)
+		require.NoError(t, err, "regexp match error.  likely a programming mistake in tests.")
+		require.True(t, m, "expect confirmation message on upload")
+	}
+	bundles, err = listBundles(t, repo1)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 1, bundles.Len(), "found bundle after upload")
+	bundle := bundles.Last()
+	bundleFilelistEntries := listBundleFiles(t, repo1, bundle.hash)
+	require.Equalf(t, len(fileNamesToUpload), len(bundleFilelistEntries),
+		"file count in bundle files list log [bundle: %v]", bundle)
+
+	expectedFileNames := make(map[string]bool)
+	for _, name := range fileNamesToUpload {
+		expectedFileNames[name] = true
+	}
+	actualFileNames := make(map[string]bool)
+	for _, bundleFilelistEntry := range bundleFilelistEntries {
+		actualFileNames[bundleFilelistEntry.name] = true
+	}
+	require.Equalf(t, expectedFileNames, actualFileNames,
+		"file names in bundle files list log [bundle: %v]", bundle)
 }
 
 func testUploadBundleLabel(t *testing.T, file uploadTree, label string) {
@@ -718,6 +817,75 @@ func TestDownloadBundles(t *testing.T) {
 	for i, tree := range testUploadTrees {
 		testDownloadBundle(t, tree, i+1)
 	}
+}
+
+func TestDownloadBundleNameFilter(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo1,
+	}, "create test repo", false)
+
+	files := testUploadTrees[1]
+	msg := internal.RandStringBytesMaskImprSrc(15)
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", dirPathStr(t, files[0]),
+		"--message", msg,
+		"--repo", repo1,
+		"--concurrency-factor", concurrencyFactor,
+	}, "upload bundle at "+dirPathStr(t, files[0]), false)
+	bundles, err := listBundles(t, repo1)
+	require.NoError(t, err, "error out of listBundles() test helper")
+	require.Equal(t, 1, bundles.Len(), "bundle count in test repo")
+	//
+	destFS := afero.NewBasePathFs(afero.NewOsFs(), consumedData)
+	bundle := bundles.Last()
+	dpc := "bundle-dl-" + bundle.hash
+	dp, err := filepath.Abs(filepath.Join(consumedData, dpc))
+	require.NoError(t, err, "couldn't build file path")
+	exists, err := afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.False(t, exists, "no filesystem entry at destination path '"+dpc+"' before bundle upload")
+	runCmd(t, []string{"bundle",
+		"download",
+		"--repo", repo1,
+		"--destination", dp,
+		"--bundle", bundle.hash,
+		"--name-filter", "zer",
+		"--concurrency-factor", concurrencyFactor,
+	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
+	exists, err = afero.Exists(destFS, dpc)
+	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
+	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	//
+	fileInfos := make(map[string]os.FileInfo)
+	err = afero.Walk(destFS, dpc, func(path string, info os.FileInfo, err error) error {
+		splitPath := strings.Split(path, string(os.PathSeparator))
+		var isMetaFile bool
+		for _, pathComponent := range splitPath {
+			if pathComponent == ".datamon" {
+				isMetaFile = true
+				break
+			}
+		}
+		t.Logf("file name %q has %d path components (%v) meta", path, len(splitPath), isMetaFile)
+		if len(splitPath) > 1 && !isMetaFile {
+			fileInfos[strings.Join(splitPath[1:], string(os.PathSeparator))] = info
+		}
+		return nil
+	})
+	require.NoError(t, err, "walk destination fs for download files list")
+
+	t.Logf("after download, dest has file infos %v", fileInfos)
+
+	require.Equal(t, len(fileInfos), 1,
+		"name filter regexp removed entries")
+	_, hasName := fileInfos["zero"]
+	require.True(t, hasName, "found expected entry given regexp")
+
 }
 
 type diffEntrySide struct {

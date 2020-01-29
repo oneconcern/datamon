@@ -441,7 +441,6 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 	fs cafs.Fs,
 	chans downloadBundleChans) {
 	var diff BundleDiff
-	var selectionPredicateOk bool
 	var err error
 	reportError := func(err error) {
 		chans.error <- errorHit{
@@ -466,6 +465,7 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 		bundle.l.Info("downloading bundle entries",
 			zap.Int("num", len(bundle.BundleEntries)))
 		for _, b := range bundle.BundleEntries {
+			var selectionPredicateOk bool
 			if selectionPredicate != nil {
 				selectionPredicateOk, err = selectionPredicate(b.NameWithPath)
 				if err != nil {
@@ -522,6 +522,8 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle,
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Backend(bundle.BlobStore()),
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
+		cafs.VerifyHash(bundle.withVerifyHash),
+		cafs.Logger(bundle.l),
 	)
 	if err != nil {
 		return err
@@ -580,6 +582,7 @@ func unpackDataFile(ctx context.Context, bundle *Bundle, file string) error {
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Backend(bundle.BlobStore()),
+		cafs.Logger(bundle.l),
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
 	)
 	if err != nil {

@@ -3,15 +3,17 @@ package core
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/jacobsa/fuse/fuseops"
+	"github.com/oneconcern/datamon/pkg/errors"
 
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 
@@ -49,19 +51,26 @@ type MutableFS struct {
 	server     fuse.Server             // Fuse server
 }
 
-// NewReadOnlyFS creates a new instance of the datamon filesystem.
-func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
-	if l == nil {
-		return nil, fmt.Errorf("logger is nil")
-	}
+func checkBundle(bundle *Bundle) error {
 	if bundle == nil {
-		return nil, fmt.Errorf("bundle is nil")
+		return fmt.Errorf("bundle is nil")
+	}
+	if bundle.l == nil {
+		return fmt.Errorf("logger is nil")
+	}
+	return nil
+}
+
+// NewReadOnlyFS creates a new instance of the datamon filesystem.
+func NewReadOnlyFS(bundle *Bundle) (*ReadOnlyFS, error) {
+	if err := checkBundle(bundle); err != nil {
+		return nil, err
 	}
 	fs := &readOnlyFsInternal{
 		fsCommon: fsCommon{
 			bundle:     bundle,
 			lookupTree: iradix.New(),
-			l:          l.With(zap.String("repo", bundle.RepoID), zap.String("bundle", bundle.BundleID)),
+			l:          bundle.l.With(zap.String("repo", bundle.RepoID), zap.String("bundle", bundle.BundleID)),
 		},
 		readDirMap:   make(map[fuseops.InodeID][]fuseutil.Dirent),
 		fsEntryStore: iradix.New(),
@@ -71,27 +80,53 @@ func NewReadOnlyFS(bundle *Bundle, l *zap.Logger) (*ReadOnlyFS, error) {
 	// Extract the meta information needed.
 	err := Publish(context.Background(), fs.bundle)
 	if err != nil {
-		l.Error("Failed to publish bundle", zap.String("id", bundle.BundleID), zap.Error(err))
+		fs.l.Error("Failed to publish bundle", zap.String("id", bundle.BundleID), zap.Error(err))
 		return nil, err
 	}
-	// TODO: Introduce streaming and caching
-	// Populate the filesystem.
+	// Populate the filesystem with medatata
+	//
+	// NOTE: this fetches the bundle metadata only and builds
+	// an in-memory view of the file system structure.
+	// This may lead to a large memory footprint for bundles
+	// with many files (e.g. thousands)
+	//
+	// TODO: reduce memory footprint
 	return fs.populateFS(bundle)
 }
 
-// NewMutableFS creates a new instance of the datamon filesystem.
-func NewMutableFS(bundle *Bundle, pathToStaging string, l *zap.Logger) (*MutableFS, error) {
-	if l == nil {
-		return nil, fmt.Errorf("logger is nil")
+// localPath resolves a consumable store to a local path.
+// TODO: this should somehow be resolved by the Store API
+// and we shouldn't make assumptions here
+func localPath(consumable fmt.Stringer) (string, error) {
+	fullPath := consumable.String()
+	// assume consumable is built with storage/localfs
+	parts := strings.Split(fullPath, "@")
+	if len(parts) < 2 || parts[0] != "localfs" {
+		return "", errors.New("bundle doesn't have localfs consumable store to provide local cache for mutable fs")
 	}
-	if bundle == nil {
-		return nil, fmt.Errorf("bundle is nil")
+	return parts[1], nil
+}
+
+// NewMutableFS creates a new instance of the datamon filesystem.
+func NewMutableFS(bundle *Bundle) (*MutableFS, error) {
+	if err := checkBundle(bundle); err != nil {
+		return nil, err
+	}
+	pathToStaging, err := localPath(bundle.ConsumableStore)
+	if err != nil {
+		return nil, err
+	}
+	bundle.l.Info("mutable mount staging storage", zap.String("path", pathToStaging))
+
+	l := bundle.l.With(zap.String("repo", bundle.RepoID))
+	if bundle.BundleID != "" {
+		l = l.With(zap.String("bundle", bundle.BundleID))
 	}
 	fs := &fsMutable{
 		fsCommon: fsCommon{
 			bundle:     bundle,
 			lookupTree: iradix.New(),
-			l:          l.With(zap.String("repo", bundle.RepoID), zap.String("bundle", bundle.BundleID)),
+			l:          l,
 		},
 		readDirMap:   make(map[fuseops.InodeID]map[fuseops.InodeID]*fuseutil.Dirent),
 		iNodeStore:   iradix.New(),
@@ -104,7 +139,7 @@ func NewMutableFS(bundle *Bundle, pathToStaging string, l *zap.Logger) (*Mutable
 		},
 		localCache: afero.NewBasePathFs(afero.NewOsFs(), pathToStaging),
 	}
-	err := fs.initRoot()
+	err = fs.initRoot()
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +147,7 @@ func NewMutableFS(bundle *Bundle, pathToStaging string, l *zap.Logger) (*Mutable
 		mfs:        nil,
 		fsInternal: fs,
 		server:     fuseutil.NewFileSystemServer(fs),
-	}, err
+	}, nil
 }
 
 func prepPath(path string) error {
@@ -128,13 +163,23 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string) error {
 	// Reminder: Options are OS specific
 	// options := make(map[string]string)
 	// options["allow_other"] = ""
+	el, _ := zap.NewStdLogAt(dfs.fsInternal.l.
+		With(zap.String("fuse", "read-only mount"), zap.String("mountpoint", path)), zapcore.ErrorLevel)
+	dl, _ := zap.NewStdLogAt(dfs.fsInternal.l.
+		With(zap.String("fuse-debug", "read-only mount"), zap.String("mountpoint", path)), zapcore.DebugLevel)
 	mountCfg := &fuse.MountConfig{
+		Subtype:     "datamon", // mount appears as "fuse.datamon"
+		ReadOnly:    true,
 		FSName:      dfs.fsInternal.bundle.RepoID,
-		VolumeName:  dfs.fsInternal.bundle.BundleID,
-		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
+		VolumeName:  dfs.fsInternal.bundle.BundleID, // NOTE: OSX only option
+		ErrorLogger: el,
+		DebugLogger: dl,
 		// Options:     options,
 	}
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
+	if err == nil {
+		dfs.fsInternal.l.Info("mounting", zap.String("mountpoint", path))
+	}
 	return err
 }
 
@@ -144,19 +189,28 @@ func (dfs *MutableFS) MountMutable(path string) error {
 	if err != nil {
 		return err
 	}
+	el, _ := zap.NewStdLogAt(dfs.fsInternal.l.
+		With(zap.String("fuse", "mutable mount"), zap.String("mountpoint", path)), zapcore.ErrorLevel)
+	dl, _ := zap.NewStdLogAt(dfs.fsInternal.l.
+		With(zap.String("fuse-debug", "mutable mount"), zap.String("mountpoint", path)), zapcore.DebugLevel)
 	// TODO plumb additional mount options
 	mountCfg := &fuse.MountConfig{
+		Subtype:     "datamon-mutable",
 		FSName:      dfs.fsInternal.bundle.RepoID,
 		VolumeName:  dfs.fsInternal.bundle.BundleID,
-		ErrorLogger: log.New(os.Stderr, "fuse: ", log.Flags()),
+		ErrorLogger: el,
+		DebugLogger: dl,
 	}
 	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
+	if err == nil {
+		dfs.fsInternal.l.Info("mounting", zap.String("mountpoint", path))
+	}
 	return err
 }
 
 // Unmount a ReadOnlyFS
 func (dfs *ReadOnlyFS) Unmount(path string) error {
-	// On unmount, walk the FS and create a bundle
+	dfs.fsInternal.l.Info("unmounting", zap.String("mountpoint", path))
 	return fuse.Unmount(path)
 }
 
@@ -174,6 +228,7 @@ func (dfs *MutableFS) Unmount(path string) error {
 	//if err != nil {
 	// dump the metadata to the local FS to manually recover.
 	//}
+	dfs.fsInternal.l.Info("unmounting", zap.String("mountpoint", path))
 	return fuse.Unmount(path)
 }
 
@@ -182,9 +237,4 @@ func (dfs *MutableFS) Unmount(path string) error {
 // (i.e. the file system server has finished processing all in-flight ops).
 func (dfs *MutableFS) JoinMount(ctx context.Context) error {
 	return dfs.mfs.Join(ctx)
-}
-
-// Commit changes on a MutableFS
-func (dfs *MutableFS) Commit() error {
-	return dfs.fsInternal.Commit()
 }

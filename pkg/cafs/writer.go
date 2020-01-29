@@ -8,33 +8,70 @@ import (
 	"io"
 	"sync/atomic"
 
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
-
-	"github.com/minio/blake2b-simd"
+	"go.uber.org/zap"
 )
 
-// Writer interface for a content addressable FS
+// Writer interface for a content addressable FS with WriterCloser and Flush capabilities.
+//
+// Flushing returns the final root hash and leaf keys computed on the written data.
 type Writer interface {
 	io.WriteCloser
 	Flush() (Key, []byte, error)
 }
 
+var _ Writer = &fsWriter{}
+
 type fsWriter struct {
-	store               storage.Store       // CAFS backing store
-	prefix              string              // Prefix for store paths
-	leafSize            uint32              // Size of chunks
-	leafs               []Key               // List of keys backing a file
-	buf                 []byte              // Buffer stage a chunk == leafsize
-	offset              int                 // till where buffer is used
-	flushed             uint32              // writer has been flushed to store
-	pather              func(string) string // pathing logic
-	count               uint64              // total number of parallel writes
-	flushChan           chan blobFlush      // channel for parallel writes
-	errC                chan error          // channel for errors during parallel writes
+	store               storage.Store    // CAFS backing store
+	prefix              string           // Prefix for store paths
+	leafSize            uint32           // Size of chunks
+	leaves              []Key            // List of keys backing a file
+	buf                 []byte           // Buffer stage a chunk == leafSize
+	offset              int              // till where buffer is used
+	flushed             uint32           // writer has been flushed to store
+	pather              func(Key) string // pathing logic
+	count               uint64           // total number of blob writes
+	flushChan           chan blobFlush   // channel for parallel writes
+	errC                chan error       // channel for errors during parallel writes
 	flushThreadDoneChan chan struct{}
 	maxGoRoutines       chan struct{} // Max number of concurrent writes
 	blobFlushes         []blobFlush
 	errors              []error
+	l                   *zap.Logger
+}
+
+func defaultFsWriter(blobs storage.Store, leafSize uint32) *fsWriter {
+	return &fsWriter{
+		store:               blobs,
+		leafSize:            leafSize,
+		buf:                 make([]byte, leafSize),
+		flushChan:           make(chan blobFlush),
+		errC:                make(chan error),
+		flushThreadDoneChan: make(chan struct{}),
+		blobFlushes:         make([]blobFlush, 0),
+		errors:              make([]error, 0),
+		l:                   dlogger.MustGetLogger("info"),
+	}
+}
+
+func newWriter(blobs storage.Store, leafSize uint32, opts ...WriterOption) Writer {
+	w := defaultFsWriter(blobs, leafSize)
+	for _, apply := range opts {
+		apply(w)
+	}
+	if w.maxGoRoutines == nil {
+		// default flush concurrency
+		w.maxGoRoutines = make(chan struct{}, 1)
+	}
+	if w.pather == nil {
+		// default prefix path logic
+		w.pather = func(lks Key) string { return lks.StringWithPrefix(w.prefix) }
+	}
+
+	go w.flushThread()
+	return w
 }
 
 func (w *fsWriter) Write(p []byte) (n int, err error) {
@@ -57,14 +94,13 @@ func (w *fsWriter) Write(p []byte) (n int, err error) {
 			go pFlush(
 				false,
 				w.buf,
-				w.prefix,
 				w.leafSize,
 				w.count,
 				w.flushChan,
 				w.errC,
 				w.maxGoRoutines,
-				w.pather,
-				w.store,
+				w.writeBlob,
+				w.l,
 			)
 			w.buf = make([]byte, w.leafSize) // new buffer
 			w.offset = 0                     // new offset for new buffer
@@ -81,68 +117,28 @@ type blobFlush struct {
 func pFlush(
 	isLastNode bool,
 	buffer []byte,
-	prefix string,
 	leafSize uint32,
 	count uint64,
 	flushChan chan blobFlush,
-	errC chan error,
+	errC chan<- error,
 	maxGoRoutines chan struct{},
-	pather func(string) string,
-	destination storage.Store,
+	blobWriter func([]byte, Key, uint64) error,
+	l *zap.Logger,
 ) {
 	defer func() {
 		<-maxGoRoutines
 	}()
-	// Calculate hash value
-	hasher, err := blake2b.New(&blake2b.Config{
-		Size: blake2b.Size,
-		Tree: &blake2b.Tree{
-			Fanout:        0,
-			MaxDepth:      2,
-			LeafSize:      leafSize,
-			NodeOffset:    count,
-			NodeDepth:     0,
-			InnerHashSize: blake2b.Size,
-			IsLastNode:    isLastNode,
-		},
-	})
+
+	l.Debug("cafs writer computing leaf hash (partial flush)", zap.Uint64("leaf key index", count), zap.Bool("isLastNode", isLastNode))
+	leafKey, err := KeyFromBytes(buffer, leafSize, count, isLastNode)
 	if err != nil {
 		errC <- err
 		return
 	}
-	_, err = hasher.Write(buffer)
-	if err != nil {
-		errC <- fmt.Errorf("flush segment hash: %v", err)
-		return
-	}
 
-	leafKey, err := NewKey(hasher.Sum(nil))
-	if err != nil {
-		errC <- fmt.Errorf("flush key segment: %v", err)
+	if err = blobWriter(buffer, leafKey, count); err != nil {
+		errC <- err
 		return
-	}
-
-	// Write the blob
-	if pather == nil {
-		// w.pather = func(lks string) string { return filepath.Join(lks[:3], lks[3:6], lks[6:]) }
-		pather = func(lks string) string { return prefix + lks }
-	}
-	found, _ := destination.Has(context.TODO(), pather(leafKey.String()))
-	if !found {
-		d, ok := destination.(storage.StoreCRC)
-		if ok {
-			crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
-			err = d.PutCRC(context.TODO(), pather(leafKey.String()), bytes.NewReader(buffer), storage.OverWrite, crc)
-		} else {
-			err = destination.Put(context.TODO(), pather(leafKey.String()), bytes.NewReader(buffer), storage.OverWrite)
-		}
-		if err != nil {
-			errC <- fmt.Errorf("write segment file: %s, err: %w", pather(leafKey.String()), err)
-			return
-		}
-		fmt.Printf("Uploading blob:%s\n", leafKey.String())
-	} else {
-		fmt.Printf("Duplicate blob:%s\n", leafKey.String())
 	}
 	flushChan <- blobFlush{
 		count: count,
@@ -154,57 +150,41 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 	if w.offset == 0 {
 		return 0, nil
 	}
-	hasher, err := blake2b.New(&blake2b.Config{
-		Size: blake2b.Size,
-		Tree: &blake2b.Tree{
-			Fanout:        0,
-			MaxDepth:      2,
-			LeafSize:      w.leafSize,
-			NodeOffset:    uint64(len(w.leafs)),
-			NodeDepth:     0,
-			InnerHashSize: blake2b.Size,
-			IsLastNode:    isLastNode,
-		},
-	})
+
+	w.l.Debug("cafs writer computing leaf hash", zap.Int("leaf key index", len(w.leaves)), zap.Bool("isLastNode", isLastNode))
+	leafKey, err := KeyFromBytes(w.buf[:w.offset], w.leafSize, uint64(len(w.leaves)), isLastNode)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = hasher.Write(w.buf[:w.offset])
-	if err != nil {
-		return 0, fmt.Errorf("flush segment hash: %v", err)
-	}
-
-	leafKey, err := NewKey(hasher.Sum(nil))
-	if err != nil {
-		return 0, fmt.Errorf("flush key segment: %v", err)
-	}
-
-	if w.pather == nil {
-		// w.pather = func(lks string) string { return filepath.Join(lks[:3], lks[3:6], lks[6:]) }
-		w.pather = func(lks string) string { return w.prefix + lks }
-	}
-	found, _ := w.store.Has(context.TODO(), w.pather(leafKey.String()))
-	if !found {
-		d, ok := w.store.(storage.StoreCRC)
-		if ok {
-			crc := crc32.Checksum(w.buf[:w.offset], crc32.MakeTable(crc32.Castagnoli))
-			err = d.PutCRC(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite, crc)
-		} else {
-			err = w.store.Put(context.TODO(), w.pather(leafKey.String()), bytes.NewReader(w.buf[:w.offset]), storage.OverWrite)
-		}
-		if err != nil {
-			return 0, fmt.Errorf("write segment file: %s err:%w", w.pather(leafKey.String()), err)
-		}
-		fmt.Printf("Uploading blob:%s, bytes:%d\n", leafKey.String(), w.offset)
-	} else {
-		fmt.Printf("Duplicate blob:%s, bytes:%d\n", leafKey.String(), w.offset)
+	if err = w.writeBlob(w.buf[:w.offset], leafKey, uint64(w.offset)); err != nil {
+		return 0, err
 	}
 
 	n := w.offset
 	w.offset = 0
-	w.leafs = append(w.leafs, leafKey)
+	w.leaves = append(w.leaves, leafKey)
 	return n, nil
+}
+
+func (w *fsWriter) writeBlob(data []byte, key Key, n uint64) (err error) {
+	found, _ := w.store.Has(context.TODO(), w.pather(key))
+	if found {
+		w.l.Info("Duplicate blob", zap.Stringer("key", key), zap.Uint64("offset", n))
+		return nil
+	}
+	switch d := w.store.(type) {
+	case storage.StoreCRC:
+		crc := crc32.Checksum(data, crc32.MakeTable(crc32.Castagnoli))
+		err = d.PutCRC(context.TODO(), w.pather(key), bytes.NewReader(data), storage.OverWrite, crc)
+	default:
+		err = w.store.Put(context.TODO(), w.pather(key), bytes.NewReader(data), storage.OverWrite)
+	}
+	if err != nil {
+		return fmt.Errorf("write segment file: %s err:%w", w.pather(key), err)
+	}
+	w.l.Info("Uploading blob", zap.Stringer("key", key), zap.Int("chunk size", len(data)), zap.Uint64("offset", n))
+	return
 }
 
 func (w *fsWriter) flushThread() {
@@ -234,9 +214,9 @@ func (w *fsWriter) Flush() (Key, []byte, error) {
 	if len(w.errors) != 0 {
 		return Key{}, nil, w.errors[0]
 	}
-	w.leafs = make([]Key, len(w.blobFlushes))
+	w.leaves = make([]Key, len(w.blobFlushes))
 	for _, bf := range w.blobFlushes {
-		w.leafs[bf.count-1] = bf.key
+		w.leaves[bf.count-1] = bf.key
 	}
 	atomic.StoreUint32(&w.flushed, 1)
 
@@ -245,13 +225,14 @@ func (w *fsWriter) Flush() (Key, []byte, error) {
 		return Key{}, nil, err
 	}
 
-	rhash, err := RootHash(w.leafs, w.leafSize)
+	w.l.Debug("cafs writer computing root hash", zap.Int("leaf keys", len(w.leaves)))
+	rhash, err := RootHash(w.leaves, w.leafSize)
 	if err != nil {
 		return Key{}, nil, fmt.Errorf("flush make root hash: %v", err)
 	}
 
-	leafHashes := make([]byte, len(w.leafs)*KeySize)
-	for i, leaf := range w.leafs {
+	leafHashes := make([]byte, len(w.leaves)*KeySize)
+	for i, leaf := range w.leaves {
 		offset := KeySize * i
 		copy(leafHashes[offset:offset+KeySize], leaf[:])
 	}

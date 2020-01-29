@@ -39,6 +39,9 @@ type Bundle struct {
 	concurrentFileUploads       int
 	concurrentFileDownloads     int
 	concurrentFilelistDownloads int
+	lruSize                     int // when Streamed = true
+	withPrefetch                int // when Streamed = true
+	withVerifyHash              bool
 }
 
 // SetBundleID for the bundle
@@ -62,9 +65,8 @@ func (b *Bundle) GetBundleEntries() []model.BundleEntry {
 	return b.BundleEntries
 }
 
-// NewBDescriptor builds a new default bundle descriptor
-func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescriptor {
-	bd := model.BundleDescriptor{
+func defaultBundleDescriptor() *model.BundleDescriptor {
+	return &model.BundleDescriptor{
 		LeafSize:               cafs.DefaultLeafSize, // For now, fixed leaf size
 		ID:                     "",
 		Message:                "",
@@ -75,10 +77,15 @@ func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescri
 		Version:                model.CurrentBundleVersion,
 		Deduplication:          cafs.DeduplicationBlake,
 	}
+}
+
+// NewBDescriptor builds a new default bundle descriptor
+func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescriptor {
+	bd := defaultBundleDescriptor()
 	for _, apply := range descriptorOps {
-		apply(&bd)
+		apply(bd)
 	}
-	return &bd
+	return bd
 }
 
 // BlobStore defines the blob storage (part of the context) for a bundle
@@ -140,6 +147,7 @@ func getReadLogStore(stores context2.Stores) storage.Store {
 }
 
 func defaultBundle() Bundle {
+	l, _ := dlogger.GetLogger("info")
 	return Bundle{
 		RepoID:                      "",
 		BundleID:                    "",
@@ -149,6 +157,11 @@ func defaultBundle() Bundle {
 		concurrentFileUploads:       20,
 		concurrentFileDownloads:     10,
 		concurrentFilelistDownloads: 10,
+		l:                           l,
+
+		// default cafs options
+		withPrefetch:   1,
+		withVerifyHash: true,
 	}
 }
 
@@ -157,17 +170,19 @@ func NewBundle(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b := defaultBundle()
 	b.BundleDescriptor = *bd
 
-	b.l, _ = dlogger.GetLogger("info")
-
 	for _, bApply := range bundleOps {
 		bApply(&b)
 	}
 	if b.Streamed {
-		ls := b.BundleDescriptor.LeafSize
+		// prepare the content-addressable backend for this bundle
 		fs, _ := cafs.New(
-			cafs.LeafSize(ls),
+			cafs.LeafSize(b.BundleDescriptor.LeafSize),
 			cafs.LeafTruncation(b.BundleDescriptor.Version < 1),
 			cafs.Backend(b.BlobStore()),
+			cafs.Logger(b.l),
+			cafs.CacheSize(b.lruSize),
+			cafs.Prefetch(b.withPrefetch),
+			cafs.VerifyHash(b.withVerifyHash),
 		)
 		b.cafs = fs
 	}

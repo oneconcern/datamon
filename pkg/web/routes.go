@@ -121,20 +121,60 @@ func NewServer(params ServerParams) (*Server, error) {
 	return &Server{tmpl: tmpl, params: params}, nil
 }
 
+/* proxyable functions allow test of routing functionality independently */
+
+func listReposDefault(stores context2.Stores) []model.RepoDescriptor {
+	res, err := core.ListRepos(stores)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+func listBundlesDefault(repoName string, stores context2.Stores) []model.BundleDescriptor {
+	res, err := core.ListBundles(repoName, stores)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+func listBundleFilesDefault(repoName string, bundleID string, stores context2.Stores) []model.BundleEntry {
+	bundle := core.NewBundle(core.NewBDescriptor(),
+		core.Repo(repoName),
+		core.ContextStores(stores),
+		core.BundleID(bundleID),
+	)
+	err := core.PopulateFiles(context.Background(), bundle)
+	if err != nil {
+		panic(err)
+	}
+
+	return bundle.BundleEntries
+}
+
+var (
+	listRepos       func(context2.Stores) []model.RepoDescriptor
+	listBundles     func(string, context2.Stores) []model.BundleDescriptor
+	listBundleFiles func(string, string, context2.Stores) []model.BundleEntry
+)
+
+func init() {
+	listRepos = listReposDefault
+	listBundles = listBundlesDefault
+	listBundleFiles = listBundleFilesDefault
+}
+
 /* handlers */
 
 func (s *Server) HandleHome() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repos, err := core.ListRepos(s.params.Stores)
-		if err != nil {
-			panic(err)
-		}
-		err = s.tmpl.Exec(s, r, "home.html", w, struct {
+		err := s.tmpl.Exec(s, r, "home.html", w, struct {
 			Greeting string
 			Repos    []model.RepoDescriptor
 		}{
 			Greeting: "Hello, world",
-			Repos:    repos,
+			Repos:    listRepos(s.params.Stores),
 		})
 		if err != nil {
 			panic(err)
@@ -145,15 +185,11 @@ func (s *Server) HandleHome() http.HandlerFunc {
 func (s *Server) HandleRepoListBundles() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoName := chi.URLParam(r, "repoName")
-		bundles, err := core.ListBundles(repoName, s.params.Stores)
-		if err != nil {
-			panic(err)
-		}
-		err = s.tmpl.Exec(s, r, "repo__list_bundles.html", w, struct {
+		err := s.tmpl.Exec(s, r, "repo__list_bundles.html", w, struct {
 			Bundles  []model.BundleDescriptor
 			RepoName string
 		}{
-			Bundles:  bundles,
+			Bundles:  listBundles(repoName, s.params.Stores),
 			RepoName: repoName,
 		})
 		if err != nil {
@@ -166,23 +202,14 @@ func (s *Server) HandleBundleListFiles() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoName := chi.URLParam(r, "repoName")
 		bundleID := chi.URLParam(r, "bundleID")
-		bundle := core.NewBundle(core.NewBDescriptor(),
-			core.Repo(repoName),
-			core.ContextStores(s.params.Stores),
-			core.BundleID(bundleID),
-		)
-		err := core.PopulateFiles(context.Background(), bundle)
-		if err != nil {
-			panic(err)
-		}
-		err = s.tmpl.Exec(s, r, "bundle__list_files.html", w, struct {
+		err := s.tmpl.Exec(s, r, "bundle__list_files.html", w, struct {
 			RepoName      string
 			BundleID      string
 			BundleEntries []model.BundleEntry
 		}{
 			RepoName:      repoName,
 			BundleID:      bundleID,
-			BundleEntries: bundle.BundleEntries,
+			BundleEntries: listBundleFiles(repoName, bundleID, s.params.Stores),
 		})
 		if err != nil {
 			panic(err)
@@ -194,6 +221,8 @@ func InitRouter(srv *Server) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	reverse.Clear()
 
 	r.Get(reverse.Add("home", "/"), srv.HandleHome())
 

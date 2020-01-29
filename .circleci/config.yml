@@ -158,7 +158,18 @@ jobs:
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             hack/go-generate.sh
             go mod download
-            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures -- -race ./...
+            # cafs tests are memory intensive: best to run them separately
+            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures -- \
+              -race -coverprofile=c_non_cafs.out $(go list ./...|grep -v cafs)
+              # cafs testing: trade parallelism for memory on limited CI config + race turned off
+            gotestsum --junitfile /tmp/test-results/go-test-report-cafs.xml --format short-with-failures -- \
+              -parallel 4 -coverprofile=c_cafs_only.out ./pkg/cafs/...
+            # collect coverage metrics
+            mkdir -p /tmp/test-coverage
+            go tool cover -html=c_non_cafs.out -o coverage_non_cafs.html
+            go tool cover -html=c_cafs_only.out -o coverage_cafs_only.html
+            mv coverage_non_cafs.html coverage_cafs_only.html \
+              /tmp/test-coverage
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
@@ -166,6 +177,9 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
           destination: raw-test-output
+      - store_artifacts:
+          path: /tmp/test-coverage
+          destination: coverage-report
       - store_test_results:
           path: /tmp/test-results
 
@@ -196,7 +210,8 @@ jobs:
             go mod download
             # make install-minio
             env
-            gotestsum --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- -tags fsintegration  ./pkg/core
+            gotestsum --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- \
+            -tags fuse_cli,fsintegration -run Mount  ./pkg/core ./cmd/datamon/cmd -timeout 20m
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:

@@ -412,7 +412,7 @@ while [[ -z $MOUNT_COORD_DONE ]]; do
             # mount point already found
             continue
         fi
-        if echo "$mount_data" | grep -q "^$mount_point fuse$"; then
+        if echo "$mount_data" | grep -q "^$mount_point fuse.datamon$"; then
             found_mount_points=($mount_point $found_mount_points)
         fi
     done

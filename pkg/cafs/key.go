@@ -3,16 +3,16 @@ package cafs
 import (
 	"encoding/hex"
 	"fmt"
+
+	blake2b "github.com/minio/blake2b-simd"
 )
 
 const (
 	// KeySize for blake2b algo
-	KeySize = 64
-
-	// KeySizeHex for hex representation of a key
-	KeySizeHex = 66
+	KeySize = blake2b.Size
 )
 
+// KeyFromString constructs a key from an hex-encoded string
 func KeyFromString(kv string) (Key, error) {
 	vb, err := hex.DecodeString(kv)
 	if err != nil {
@@ -40,16 +40,20 @@ func MustNewKey(data []byte) Key {
 	return k
 }
 
-// Key type for CAFS keys
+// Key represents the address of an object stored in the CAFS
 type Key [KeySize]byte
 
+// String representation of a key, hex-encoded
 func (k Key) String() string {
 	return hex.EncodeToString(k[:])
 }
 
+// StringWithPrefix prepends a prefix to the string representation of a key
 func (k Key) StringWithPrefix(prefix string) string {
 	return prefix + k.String()
 }
+
+//TODO(fred): nice - refactor key collections as []byte with this new type
 
 // BadKeySize is an error that's returned when the key to create has an invalid size.
 type BadKeySize struct {
