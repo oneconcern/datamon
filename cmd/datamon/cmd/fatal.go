@@ -11,10 +11,10 @@ import (
 var (
 	// control over stdout/stderr
 	log    = stdlog.New(os.Stdout, "", 0)
-	errlog = stdlog.New(os.Stderr, "ERROR:", 0)
+	errlog = stdlog.New(os.Stderr, "ERROR: ", 0)
 
 	// infoLogger wraps informative messages to os.Stderr without cluttering expected output in tests.
-	infoLogger = stdlog.New(os.Stderr, "INFO:", 0)
+	infoLogger = stdlog.New(os.Stderr, "INFO: ", 0)
 
 	// global used to patch over calls to os.Exit() during tests
 	osExit = os.Exit
@@ -25,10 +25,11 @@ var (
 
 func wrapFatalln(msg string, err error) {
 	if err == nil {
-		errlog.Fatalln(msg)
+		errlog.Println(msg)
 	} else {
-		errlog.Fatalf("%v", fmt.Errorf(msg+": %w", err))
+		errlog.Printf("%v", fmt.Errorf(msg+": %w", err))
 	}
+	osExit(1)
 }
 
 // wrapFatalWithCodef is equivalent to log.Fatalf but controls the exit code returned to the command

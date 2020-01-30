@@ -76,7 +76,7 @@ The destination path is a temporary staging area for write operations.`,
 			wrapFatalln("upload bundle from mutable fs", err)
 			return
 		}
-		infoLogger.Printf("bundle: %v", bundle.BundleID)
+		log.Printf("bundle: %v", bundle.BundleID)
 		if datamonFlags.label.Name != "" {
 			labelDescriptor := core.NewLabelDescriptor(
 				core.LabelContributor(contributor),
