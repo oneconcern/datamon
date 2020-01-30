@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"log"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"

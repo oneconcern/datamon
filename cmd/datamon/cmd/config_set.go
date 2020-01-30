@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 

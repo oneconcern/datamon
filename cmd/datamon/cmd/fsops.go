@@ -21,7 +21,7 @@ func createPath(path string) {
 	// todo: determine proper permission bits.  previously 0700.
 	err := os.MkdirAll(path, 0777)
 	if err != nil {
-		fmt.Println(err)
+		errlog.Println(err)
 	}
 }
 

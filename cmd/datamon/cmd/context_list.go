@@ -6,8 +6,6 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/spf13/cobra"
 )

@@ -5,7 +5,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"log"
 	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"

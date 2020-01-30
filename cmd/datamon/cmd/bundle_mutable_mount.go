@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"context"
-	"log"
 
 	daemonizer "github.com/jacobsa/daemonize"
 

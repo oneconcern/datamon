@@ -124,8 +124,6 @@ func setupTests(t *testing.T) func() {
 	_ = os.RemoveAll(destinationDir)
 	ctx := context.Background()
 	exitMocks = NewExitMocks()
-	logFatalf = MakeFatalfMock(exitMocks)
-	logFatalln = MakeFatallnMock(exitMocks)
 	osExit = MakeExitMock(exitMocks)
 
 	btag := internal.RandStringBytesMaskImprSrc(15)
