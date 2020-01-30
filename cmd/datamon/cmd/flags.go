@@ -28,17 +28,19 @@ type flagsT struct {
 		ID                string
 		DataPath          string
 		Message           string
-		MountPath         string
 		File              string
 		Daemonize         bool
-		Stream            bool
 		FileList          string
 		SkipOnError       bool
 		ConcurrencyFactor int
 		NameFilter        string
-		CacheSize         flagext.ByteSize
-		WithPrefetch      int
-		WithVerifyHash    bool
+	}
+	fs struct {
+		MountPath      string
+		Stream         bool
+		CacheSize      flagext.ByteSize
+		WithPrefetch   int
+		WithVerifyHash bool
 	}
 	web struct {
 		port      int
@@ -98,7 +100,7 @@ func addNameFilterFlag(cmd *cobra.Command) string {
 
 func addMountPathFlag(cmd *cobra.Command) string {
 	mount := "mount"
-	cmd.Flags().StringVar(&datamonFlags.bundle.MountPath, mount, "", "The path to the mount dir")
+	cmd.Flags().StringVar(&datamonFlags.fs.MountPath, mount, "", "The path to the mount dir")
 	return mount
 }
 
@@ -136,7 +138,7 @@ func addDaemonizeFlag(cmd *cobra.Command) string {
 
 func addStreamFlag(cmd *cobra.Command) string {
 	stream := "stream"
-	cmd.Flags().BoolVar(&datamonFlags.bundle.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
+	cmd.Flags().BoolVar(&datamonFlags.fs.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
 	return stream
 }
 
@@ -297,20 +299,20 @@ func addTargetFlag(cmd *cobra.Command) string {
 
 func addCacheSizeFlag(cmd *cobra.Command) string {
 	c := "cache-size"
-	datamonFlags.bundle.CacheSize = flagext.ByteSize(50 * units.MB)
-	cmd.Flags().Var(&datamonFlags.bundle.CacheSize, c, "The desired size of the memory cache used (in KB, MB, GB, ...) when streaming is enabled")
+	datamonFlags.fs.CacheSize = flagext.ByteSize(50 * units.MB)
+	cmd.Flags().Var(&datamonFlags.fs.CacheSize, c, "The desired size of the memory cache used (in KB, MB, GB, ...) when streaming is enabled")
 	return c
 }
 
 func addPrefetchFlag(cmd *cobra.Command) string {
 	c := "prefetch"
-	cmd.Flags().IntVar(&datamonFlags.bundle.WithPrefetch, c, 1, "When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled)")
+	cmd.Flags().IntVar(&datamonFlags.fs.WithPrefetch, c, 1, "When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled)")
 	return c
 }
 
 func addVerifyHashFlag(cmd *cobra.Command) string {
 	c := "verify-hash"
-	cmd.Flags().BoolVar(&datamonFlags.bundle.WithVerifyHash, c, true, "Enables hash verification on read blobs (requires Stream enabled)")
+	cmd.Flags().BoolVar(&datamonFlags.fs.WithVerifyHash, c, true, "Enables hash verification on read blobs (requires Stream enabled)")
 	return c
 }
 

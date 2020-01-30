@@ -10,6 +10,7 @@ import (
 	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/fuse"
 
 	"github.com/spf13/cobra"
 )
@@ -111,28 +112,31 @@ var mountBundleCmd = &cobra.Command{
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
-		bundleOpts = append(bundleOpts, core.Streaming(datamonFlags.bundle.Stream))
 		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(getConcurrencyFactor(filelistDownloadsByConcurrencyFactor)))
 		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
-		if datamonFlags.bundle.Stream {
-			bundleOpts = append(bundleOpts, core.CacheSize(int(datamonFlags.bundle.CacheSize)))
-			bundleOpts = append(bundleOpts, core.Prefetch(datamonFlags.bundle.WithPrefetch))
-			bundleOpts = append(bundleOpts, core.VerifyHash(datamonFlags.bundle.WithVerifyHash))
+
+		bundle := core.NewBundle(bd, bundleOpts...)
+
+		var fsOpts []fuse.Option
+		fsOpts = append(fsOpts, fuse.Streaming(datamonFlags.fs.Stream))
+		fsOpts = append(fsOpts, fuse.Logger(config.mustGetLogger(datamonFlags)))
+		if datamonFlags.fs.Stream {
+			fsOpts = append(fsOpts, fuse.CacheSize(int(datamonFlags.fs.CacheSize)))
+			fsOpts = append(fsOpts, fuse.Prefetch(datamonFlags.fs.WithPrefetch))
+			fsOpts = append(fsOpts, fuse.VerifyHash(datamonFlags.fs.WithVerifyHash))
 		}
-		bundle := core.NewBundle(bd,
-			bundleOpts...,
-		)
-		fs, err := core.NewReadOnlyFS(bundle)
+
+		fs, err := fuse.NewReadOnlyFS(bundle, fsOpts...)
 		if err != nil {
 			onDaemonError("create read only filesystem", err)
 			return
 		}
-		if err = fs.MountReadOnly(datamonFlags.bundle.MountPath); err != nil {
+		if err = fs.MountReadOnly(datamonFlags.fs.MountPath); err != nil {
 			onDaemonError("mount read only filesystem", err)
 			return
 		}
 
-		registerSIGINTHandlerMount(datamonFlags.bundle.MountPath)
+		registerSIGINTHandlerMount(datamonFlags.fs.MountPath)
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			wrapFatalln("send event from possibly daemonized process", err)
 			return

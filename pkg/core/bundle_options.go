@@ -74,13 +74,6 @@ func BundleID(bID string) BundleOption {
 	}
 }
 
-// Streaming sets the streaming option flag for a bundle
-func Streaming(s bool) BundleOption {
-	return func(b *Bundle) {
-		b.Streamed = s
-	}
-}
-
 // SkipMissing indicates that bundle retrieval errors should be ignored. Currently not implementated.
 func SkipMissing(s bool) BundleOption {
 	return func(b *Bundle) {
@@ -113,26 +106,5 @@ func ConcurrentFileDownloads(concurrentFileDownloads int) BundleOption {
 func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
 	return func(b *Bundle) {
 		b.concurrentFilelistDownloads = concurrentFilelistDownloads
-	}
-}
-
-// CacheSize tunes the buffer cache size in bytes of streamed FS operations (enabled when Streamed is true).
-func CacheSize(size int) BundleOption {
-	return func(b *Bundle) {
-		b.lruSize = size
-	}
-}
-
-// Prefetch enables prefetching on streamed FS operations (enabled when Streamed is true).
-func Prefetch(ahead int) BundleOption {
-	return func(b *Bundle) {
-		b.withPrefetch = ahead
-	}
-}
-
-// VerifyHash enables hash verification on streamed FS read perations (enabled when Streamed is true).
-func VerifyHash(enabled bool) BundleOption {
-	return func(b *Bundle) {
-		b.withVerifyHash = enabled
 	}
 }
