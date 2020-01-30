@@ -45,19 +45,6 @@ func NewExitMocks() *ExitMocks {
 	return &exitMocks
 }
 
-// https://github.com/stretchr/testify/issues/610
-func MakeFatalfMock(m *ExitMocks) func(string, ...interface{}) {
-	return func(format string, v ...interface{}) {
-		m.Fatalf(format, v...)
-	}
-}
-
-func MakeFatallnMock(m *ExitMocks) func(...interface{}) {
-	return func(v ...interface{}) {
-		m.Fatalln(v...)
-	}
-}
-
 func MakeExitMock(m *ExitMocks) func(int) {
 	return func(code int) {
 		m.Exit(code)
