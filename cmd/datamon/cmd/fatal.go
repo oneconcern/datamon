@@ -2,37 +2,38 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+	stdlog "log"
 	"os"
 
 	"github.com/oneconcern/datamon/pkg/auth"
 )
 
 var (
-	// globals used to patch over calls to os.Exit() during test
+	// control over stdout/stderr
+	log    = stdlog.New(os.Stdout, "", 0)
+	errlog = stdlog.New(os.Stderr, "ERROR: ", 0)
 
-	logFatalln = log.Fatalln
-	logFatalf  = log.Fatalf
-	osExit     = os.Exit
+	// infoLogger wraps informative messages to os.Stderr without cluttering expected output in tests.
+	infoLogger = stdlog.New(os.Stderr, "INFO: ", 0)
 
-	// used to patch over calls to Authable.Principal() during test
+	// global used to patch over calls to os.Exit() during tests
+	osExit = os.Exit
+
+	// global used to patch over calls to Authable.Principal() during tests
 	authorizer auth.Authable
-
-	// infoLogger wraps informative messages to os.Stdout without cluttering expected output in tests.
-	// To be used instead on fmt.Printf(os.Stdout, ...)
-	infoLogger = log.New(os.Stdout, "", 0)
-	logStdOut  = fmt.Printf
 )
 
 func wrapFatalln(msg string, err error) {
 	if err == nil {
-		logFatalln(msg)
+		errlog.Println(msg)
 	} else {
-		logFatalf("%v", fmt.Errorf(msg+": %w", err))
+		errlog.Printf("%v", fmt.Errorf(msg+": %w", err))
 	}
+	osExit(1)
 }
 
+// wrapFatalWithCodef is equivalent to log.Fatalf but controls the exit code returned to the command
 func wrapFatalWithCodef(code int, format string, args ...interface{}) {
-	_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
+	errlog.Printf(format, args...)
 	osExit(code)
 }

@@ -3,9 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1215,9 +1213,7 @@ func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileList
 	if err != nil {
 		panic(err)
 	}
-	logStdOut = func(format string, a ...interface{}) (int, error) {
-		return fmt.Fprintf(w, format, a...)
-	}
+	log.SetOutput(w)
 	runCmd(t, []string{"bundle",
 		"list",
 		"files",
