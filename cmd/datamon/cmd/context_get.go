@@ -8,7 +8,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"log"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	status "github.com/oneconcern/datamon/pkg/core/status"

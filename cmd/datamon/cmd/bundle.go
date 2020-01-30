@@ -5,7 +5,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"text/template"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"

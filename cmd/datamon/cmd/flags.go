@@ -354,7 +354,7 @@ func paramsToSrcStore(ctx context.Context, params flagsT, create bool) (storage.
 
 	var sourceStore storage.Store
 	if strings.HasPrefix(consumableStorePath, "gs://") {
-		fmt.Println(consumableStorePath[4:])
+		infoLogger.Println(consumableStorePath[4:])
 		sourceStore, err = gcs.New(ctx, consumableStorePath[5:], config.Credential, gcs.Logger(config.mustGetLogger(params)))
 		if err != nil {
 			return sourceStore, err

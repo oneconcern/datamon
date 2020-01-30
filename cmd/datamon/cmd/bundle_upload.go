@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/oneconcern/datamon/pkg/core"
