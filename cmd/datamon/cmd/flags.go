@@ -200,7 +200,9 @@ func addWebNoBrowserFlag(cmd *cobra.Command) string {
 
 func addLabelNameFlag(cmd *cobra.Command) string {
 	labelName := "label"
-	cmd.Flags().StringVar(&datamonFlags.label.Name, labelName, "", "The human-readable name of a label")
+	if cmd != nil { // TODO(fred): quickfix - the actual remedy should be to avoid calling this with nil input
+		cmd.Flags().StringVar(&datamonFlags.label.Name, labelName, "", "The human-readable name of a label")
+	}
 	return labelName
 }
 
