@@ -13,7 +13,7 @@ import (
 
 func applyLabelTemplate(label model.LabelDescriptor) error {
 	var buf bytes.Buffer
-	if err := labelDescriptorTemplate.Execute(&buf, label); err != nil {
+	if err := labelDescriptorTemplate(datamonFlags).Execute(&buf, label); err != nil {
 		return fmt.Errorf("executing template: %w", err)
 	}
 	log.Println(buf.String())

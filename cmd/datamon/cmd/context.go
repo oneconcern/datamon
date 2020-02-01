@@ -27,15 +27,23 @@ var ContextCmd = &cobra.Command{
 	},
 }
 
-var contextTemplate *template.Template
+var contextTemplate func(flagsT) *template.Template
 
 func init() {
+	addTemplateFlag(ContextCmd)
 	rootCmd.AddCommand(ContextCmd)
 
-	contextTemplate = func() *template.Template {
+	contextTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("list line").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
 		const listLineTemplateString = `Model Version: {{.Version}}, Name: {{.Name}}, WAL: {{.WAL}}, ReadLog: {{.ReadLog}}, Blob: {{.Blob}}, Metadata: {{.Metadata}}, Version Metadata: {{.VMetadata}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
-	}()
+	}
 }
 
 func mustGetConfigStore() storage.Store {

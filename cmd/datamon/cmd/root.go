@@ -32,7 +32,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if datamonFlags.root.upgrade {
 			if err := doSelfUpgrade(upgradeFlags{forceUgrade: true}); err != nil {
-				log.Printf("WARN: failed to upgrade datamon. Carrying on with command in the current version: %v", err)
+				infoLogger.Printf("WARN: failed to upgrade datamon. Carrying on with command in the current version: %v", err)
 			} else {
 				if err := doExecAfterUpgrade(); err != nil {
 					wrapFatalln("cannot execute upgraded datamon", err)

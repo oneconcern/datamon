@@ -68,6 +68,7 @@ type flagsT struct {
 		Config            string
 		ConcurrencyFactor int
 		BatchSize         int
+		Template          string
 	}
 	upgrade upgradeFlags
 }
@@ -311,6 +312,12 @@ func addPrefetchFlag(cmd *cobra.Command) string {
 func addVerifyHashFlag(cmd *cobra.Command) string {
 	c := "verify-hash"
 	cmd.Flags().BoolVar(&datamonFlags.bundle.WithVerifyHash, c, true, "Enables hash verification on read blobs (requires Stream enabled)")
+	return c
+}
+
+func addTemplateFlag(cmd *cobra.Command) string {
+	c := "format"
+	cmd.PersistentFlags().StringVar(&datamonFlags.core.Template, c, "", `Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields`)
 	return c
 }
 
