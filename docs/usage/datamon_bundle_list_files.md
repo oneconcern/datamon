@@ -38,9 +38,10 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 ### Options inherited from parent commands
 
 ```
-      --config string    Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context string   Set the context for datamon (default "dev")
-      --upgrade          Upgrades the current version then carries on with the specified command
+      --config string     Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
+      --context string    Set the context for datamon (default "dev")
+      --loglevel string   The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
+      --upgrade           Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

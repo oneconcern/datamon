@@ -73,6 +73,7 @@ func init() {
 	addContextFlag(rootCmd)
 	addUpgradeFlag(rootCmd)
 	addUpgradeForceFlag(rootCmd)
+	addLogLevel(rootCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.

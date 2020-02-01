@@ -128,7 +128,6 @@ func init() {
 	addLabelNameFlag(uploadBundleCmd)
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd, 100)
-	addLogLevel(uploadBundleCmd)
 
 	// feature guard
 	if enableBundlePreserve {
