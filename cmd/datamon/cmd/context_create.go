@@ -45,7 +45,6 @@ func init() {
 		addReadLogBucket(ContextCreateCommand),
 		addContextFlag(ContextCreateCommand),
 	)
-	addLogLevel(ContextCreateCommand)
 
 	ContextCmd.AddCommand(ContextCreateCommand)
 }

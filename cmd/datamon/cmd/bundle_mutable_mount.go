@@ -107,7 +107,6 @@ func init() {
 	addDaemonizeFlag(mutableMountBundleCmd)
 	addDataPathFlag(mutableMountBundleCmd)
 	addLabelNameFlag(mutableMountBundleCmd)
-	addLogLevel(mutableMountBundleCmd)
 
 	mountBundleCmd.AddCommand(mutableMountBundleCmd)
 }

@@ -12,10 +12,16 @@ const (
 
 	// LogLevelDebug sets the log level to debug
 	LogLevelDebug = "debug"
+
+	// LogLevelNone sets logger to no logging
+	LogLevelNone = "none"
 )
 
 // GetLogger returns a zap logger with the specified level
 func GetLogger(logLevel string) (*zap.Logger, error) {
+	if logLevel == LogLevelNone {
+		return zap.NewNop(), nil
+	}
 	zapConfig := zap.NewProductionConfig()
 	var lvl zapcore.Level
 	err := lvl.UnmarshalText([]byte(logLevel))

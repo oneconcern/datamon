@@ -155,7 +155,6 @@ func init() {
 
 	addDaemonizeFlag(mountBundleCmd)
 	addBundleFlag(mountBundleCmd)
-	addLogLevel(mountBundleCmd)
 	addStreamFlag(mountBundleCmd)
 	addLabelNameFlag(mountBundleCmd)
 	addConcurrencyFactorFlag(mountBundleCmd, 100)

@@ -260,7 +260,7 @@ func addCredentialFile(cmd *cobra.Command) string {
 
 func addLogLevel(cmd *cobra.Command) string {
 	loglevel := "loglevel"
-	cmd.Flags().StringVar(&datamonFlags.root.logLevel, loglevel, "info", "The logging level")
+	cmd.PersistentFlags().StringVar(&datamonFlags.root.logLevel, loglevel, "info", "The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug")
 	return loglevel
 }
 
