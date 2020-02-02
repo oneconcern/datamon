@@ -10,16 +10,17 @@ import (
 
 //go:generate moq -out ./mockstorage/store.go -pkg mockstorage . Store
 
-const MaxObjectSizeInMemory = 2 * 1024 * 1024 * 1024 // 2 gigs
-
 const (
 	// Adding these to make code more readable when looking at Put Call
+
+	// NoOverWrite does not accept clobbering of objects in store
 	NoOverWrite = true
-	OverWrite   = false
+
+	// OverWrite accepts clobbering of objects in store
+	OverWrite = false
 )
 
-type NewKey = bool
-
+// Attributes supported by object on this store
 type Attributes struct {
 	Created time.Time
 	Updated time.Time
@@ -37,7 +38,7 @@ type Store interface {
 	GetAttr(context.Context, string) (Attributes, error)
 	GetAt(context.Context, string) (io.ReaderAt, error)
 	Touch(context.Context, string) error
-	Put(context.Context, string, io.Reader, NewKey) error
+	Put(context.Context, string, io.Reader, bool) error
 	Delete(context.Context, string) error
 	Clear(context.Context) error
 

@@ -38,9 +38,7 @@ type MultiStoreUnit struct {
 }
 
 // MultiPut duplicates write operations to an array of stores, under the same name
-//
-// TODO(fred): the aliased type NewKey is just confusing: fallback to bool
-func MultiPut(ctx context.Context, stores []MultiStoreUnit, name string, buffer []byte, doesNotExist NewKey) error {
+func MultiPut(ctx context.Context, stores []MultiStoreUnit, name string, buffer []byte, doesNotExist bool) error {
 	errC := make(chan error, len(stores))
 	var wg sync.WaitGroup
 
@@ -48,13 +46,13 @@ func MultiPut(ctx context.Context, stores []MultiStoreUnit, name string, buffer 
 		wg.Add(1)
 		go func(w MultiStoreUnit, buffer []byte) {
 			defer wg.Done()
-			// TODO(fred): rewrite expression with type switch
-			crcStore, ok := w.Store.(StoreCRC)
+
 			var err error
-			if ok {
+			switch crcStore := w.Store.(type) {
+			case StoreCRC:
 				crc := crc32.Checksum(buffer, crc32.MakeTable(crc32.Castagnoli))
 				err = crcStore.PutCRC(context.TODO(), name, bytes.NewReader(buffer), doesNotExist, crc)
-			} else {
+			default:
 				err = w.Store.Put(ctx, name, bytes.NewReader(buffer), doesNotExist)
 			}
 			if w.TolerateFailure {
