@@ -64,7 +64,7 @@ dbg_print 'label get lines'
                 ${params_label_get}
 dbg_print '==============='
 
-label_get_line=$(2>&1 "$DATAMON_EXEC" label get \
+label_get_line=$("$DATAMON_EXEC" label get \
                       $params_label_get | \
                       tail -1)
 HASH_FROM_LABEL=$(echo "$label_get_line" |cut -d"," -f 2 |tr -d ' ')

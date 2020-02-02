@@ -379,7 +379,7 @@ func (m *mockMutableStoreTestAdd) Touch(_ context.Context, path string) error {
 	return nil
 }
 
-func (m *mockMutableStoreTestAdd) Put(_ context.Context, key string, reader io.Reader, overwrite storage.NewKey) error {
+func (m *mockMutableStoreTestAdd) Put(_ context.Context, key string, reader io.Reader, overwrite bool) error {
 	if m.failPut {
 		return fmt.Errorf(putError)
 	}
@@ -652,7 +652,7 @@ func (m *mockMutableStoreTestListEntries) Touch(_ context.Context, path string) 
 	panic("implement me")
 }
 
-func (m *mockMutableStoreTestListEntries) Put(_ context.Context, _ string, _ io.Reader, _ storage.NewKey) error {
+func (m *mockMutableStoreTestListEntries) Put(_ context.Context, _ string, _ io.Reader, _ bool) error {
 	panic("implement me")
 }
 

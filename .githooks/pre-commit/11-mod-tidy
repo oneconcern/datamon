@@ -1,0 +1,4 @@
+#! /bin/bash
+set -e -o pipefail
+cd $(git rev-parse --show-toplevel)
+go mod tidy

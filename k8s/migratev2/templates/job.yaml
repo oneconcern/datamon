@@ -1,0 +1,100 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{.Release.Name}}"
+  labels:
+    app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+    app.kubernetes.io/instance: {{.Release.Name | quote }}
+    helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app.kubernetes.io/name: {{ include "datamon.name" . }}
+spec:
+  backoffLimit: {{ .Values.backoffs }}
+  ttlSecondsAfterFinished: {{ .Values.ttl }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "datamon.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config1.yaml") . | sha256sum }}
+        checksum/config2: {{ include (print $.Template.BasePath "/config2.yaml") . | sha256sum }}
+        checksum/config3: {{ include (print $.Template.BasePath "/scripts.yaml") . | sha256sum }}
+        checksum/config4: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: {{ .Values.restartPolicy }}
+      volumes:
+        - name: config1
+          configMap:
+            name: {{.Release.Name}}-config1
+        - name: config2
+          configMap:
+            name: {{.Release.Name}}-config2
+        - name: scripts
+          configMap:
+            name: {{.Release.Name}}-scripts
+        - name: creds-secret
+          secret:
+            secretName: {{ if .Values.secretName }}{{ .Values.secretName }}{{ else }}{{.Release.Name}}-credentials{{ end }}
+        - name: staging-volume
+          persistentVolumeClaim:
+            claimName: "{{.Release.Name}}-staging-claim"
+      {{- if .Values.extraVolumes }}
+{{ toYaml .Values.extraVolumes | indent 8 }}
+      {{- end }}
+      containers:
+      - name: datamon-migration-job
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: [ "/bin/bash", "{{ if .Values.history }}/scripts/migrate-history.sh{{ else }}/scripts/migrate.sh{{ end }}" ]
+        env:
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: {{ .Values.credentials }}
+          # location of datamon local config files
+          - name: HOME
+            value: {{ .Values.home }}
+          # repo to migrate
+          - name: REPO
+            value: {{ .Values.repo | quote }}
+            # bundle to migrate (default: latest)
+          - name: SOURCEBUNDLE
+            value: '{{ if and (not .Values.label) .Values.bundle }}{{ .Values.bundle }}{{ end }}'
+          - name: SOURCELABEL
+            value: '{{ if .Values.label }}{{ .Values.label }}{{ end }}'
+            # new label to create (default: original label)
+          - name: DESTLABEL
+            value: '{{ if .Values.newLabel }}{{ .Values.newLabel }}{{ else if .Values.label }}{{ .Values.label }}{{ end }}'
+          - name: DESTCONTEXT
+            value: '{{ if .Values.context }}{{ .Values.context }}{{ end }}'
+            # staging volume where to download the bundle
+          - name: STAGING
+            value: {{ .Values.staging }}
+        volumeMounts:
+          - mountPath: /scripts
+            name: scripts
+          - mountPath: {{ .Values.home }}/.datamon
+            name: config1
+          - mountPath: {{ .Values.home }}/.datamon2
+            name: config2
+          - mountPath: {{ dir .Values.credentials }}
+            name: creds-secret
+            key: {{ base .Values.credentials }}
+          - mountPath: {{ .Values.staging }}
+            name: staging-volume
+{{- if .Values.extraVolumeMounts }}
+{{ toYaml .Values.extraVolumeMounts | indent 10 }}
+{{- end }}
+        resources:
+{{ toYaml .Values.resources | indent 12 }}
+{{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+{{- end }}

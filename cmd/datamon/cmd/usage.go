@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
@@ -23,7 +22,7 @@ var docCmd = &cobra.Command{
 			func(s string) string { return s },
 		)
 		if err != nil {
-			log.Fatal(err)
+			wrapFatalln("failed to generate doc", err)
 		}
 	},
 }

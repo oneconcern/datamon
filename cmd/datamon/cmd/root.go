@@ -3,8 +3,6 @@
 package cmd
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -63,13 +61,12 @@ func Execute() {
 	var err error
 	// Check OAuth
 	if err = rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		errlog.Println(err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	log.SetFlags(0)
 	cobra.OnInitialize(initConfig)
 	authorizer = gauth.New()
 	addConfigFlag(rootCmd)
