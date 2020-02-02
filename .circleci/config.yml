@@ -203,7 +203,10 @@ jobs:
       - run:
           name: Lint shell scripts
           command: |
-            shellcheck hack/fuse-demo/wrap_application.sh
+            # scans all shells in repo, excluding zsh which is not linted
+            find . -name \*.sh|\
+            while read -r arg ;do shell=$(head -1q "${arg}");if [[ ! $shell =~ "zsh" ]] ; then echo "${arg}"; fi;done|\
+            xargs shellcheck
       - run:
           name: Ensure metrics
           command: |
@@ -292,7 +295,7 @@ jobs:
             #mkdir -p coverage-results/debug
             #cp ${collected} merged_coverprofile.out coverage-results/debug
 
-            # Fully detailed report with gocov
+            # Fully detailed report with go tool cover
             go tool cover -html=merged_coverprofile.out -o coverage-results/coverage_datamon_ci.html
 
             # Alternative report with gocov

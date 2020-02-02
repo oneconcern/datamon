@@ -1,4 +1,5 @@
 #! /bin/bash
+
 sanity () {
   echo "Running datamon migration: v1 => v2"
   echo "==================================="
@@ -6,15 +7,15 @@ sanity () {
   echo "datamon source bundle option: ${SOURCEBUNDLE}"
   echo "datamon source label option: ${SOURCELABEL}"
   echo "staging data mounted on: ${STAGING}"
-  df -h ${STAGING}
+  df -h "${STAGING}"
 
   echo "datamon destination bundle label: ${DESTLABEL}"
   echo "datamon destination context used: ${DESTCONTEXT}"
   echo "Configuration V1:"
-  cat ${HOME}/.datamon/datamon.yaml
+  cat "${HOME}"/.datamon/datamon.yaml
 
   echo "Configuration V2:"
-  cat ${HOME}/.datamon2/datamon.yaml
+  cat "${HOME}"/.datamon2/datamon.yaml
 
   type datamon1
   type datamon2
@@ -41,4 +42,13 @@ sanity () {
     echo "INFO: Migrating latest bundle"
   fi
   echo "==================================="
+}
+
+trim () {
+  local var="$*"
+  # remove leading whitespace characters
+  var="${var#"${var%%[![:space:]]*}"}"
+  # remove trailing whitespace characters
+  var="${var%"${var##*[![:space:]]}"}"
+  echo -n "$var"
 }
