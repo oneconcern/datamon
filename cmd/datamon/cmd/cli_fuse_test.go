@@ -32,6 +32,7 @@ func testLogger(t testing.TB) *zap.Logger {
 	// a logger for the test sequence itself
 	return dlogger.MustGetLogger("debug").With(zap.String("test", t.Name()))
 }
+
 func testCommand(t testing.TB, withPipe, withEnv bool, target string, args ...string) (*exec.Cmd, io.ReadCloser) {
 	// NOTE: this starts a process, not a goroutine like for other tests
 	// That is primarily because we want to send a signal to the process
