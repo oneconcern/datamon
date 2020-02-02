@@ -173,7 +173,7 @@ func (rc readCloser) Close() error {
 	return nil
 }
 
-func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newObject storage.NewKey) (err error) {
+func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newObject bool) (err error) {
 	g.l.Debug("Start Put", zap.String("objectName", objectName))
 	defer func() {
 		g.l.Debug("End Put", zap.String("objectName", objectName), zap.Error(err))
