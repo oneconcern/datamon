@@ -61,11 +61,22 @@ commands:
             GOROOT: /usr/local/go
             GOPATH: /go
           command: |
-            GO_VERSION=1.13.5
+            GO_VERSION=1.13.7
             CI_USER=$(id -u)
-            sudo apt-get install --quiet fuse
+            PATH=/home/circleci/.linuxbrew/bin:$PATH
+            sudo apt-get install -qq --yes build-essential curl file git fuse linuxbrew-wrapper
 
             cd /tmp
+            echo
+            echo "Installing standalone linuxbrew..."
+            echo
+            # do it twice: a hack to work around https://stackoverflow.com/questions/38410020/homebrew-error-update-report-should-not-be-called-directly
+            (brew update < /dev/null)||(brew update < /dev/null)
+
+            # TODO(fred): get latest from github.api/google...
+            echo
+            echo "Installing golang ${GO_VERSION}..."
+            echo
             wget --no-verbose https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz
             sudo tar -xf go${GO_VERSION}.linux-amd64.tar.gz
             sudo mv /usr/local/go /usr/local/go.old || true
@@ -199,19 +210,22 @@ jobs:
       - install_tools
       - login_to_google
       - run:
-          name: Run golang tests in integration environment
+          name: Prepare golang tests in integration environment
           command: |
             export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-            mkdir -p ~/extra
             mkdir -p /tmp/test-fuse-results
-            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
-            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             hack/go-generate.sh
             go mod download
-            # make install-minio
-            env
-            gotestsum --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- \
-            -tags fuse_cli,fsintegration -run Mount  ./pkg/core ./cmd/datamon/cmd -timeout 20m
+      - run:
+          name: Run golang tests in integration environment
+          command: |
+            mkdir -p ~/extra
+            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
+            export PATH=$GOPATH/bin:$GOROOT/bin:/home/circleci/.linuxbrew/bin:$PATH
+            export GOOGLE_APPLICATION_CREDENTIALS=~/extra/appcredentials.json
+            gotestsum \
+              --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- \
+              -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)'  ./pkg/core ./cmd/datamon/cmd -timeout 20m
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
@@ -318,7 +332,7 @@ jobs:
 
   publish_release:
     executor: docker_builder
-    # TODO(frederic):
+    # NOTE:
     # - acquire GITHUB_TOKEN for onecrobot to push to homebrew-datamon repo
     #
     # > goreleaser needs access to github API, not only the git repo.

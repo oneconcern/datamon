@@ -1418,6 +1418,8 @@ func dirPathStr(t *testing.T, file uploadTree) (path string) {
 	/* the strings.Split gets the root directory name.
 	 * would be cleaner to iterate on filepath.Split,
 	 * although even in this case `os.PathSeparator` appears necessary.
+	 *
+	 * TODO(fred): filepath.Abs(filepath.FromSlash(path.Join(sourceData strings.Split(file.path)[1])))
 	 */
 	path, err := filepath.Abs(filepath.Join(sourceData, strings.Split(file.path, string(os.PathSeparator))[1]))
 	if err != nil {
