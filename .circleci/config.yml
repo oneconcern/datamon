@@ -36,6 +36,7 @@ executors:
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOROOT: /usr/local/go
       GOPATH: /go
+      PATH: /go/bin:/usr/local/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
     machine:
       image: ubuntu-1604:201903-01
 
@@ -50,41 +51,71 @@ commands:
             export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
             echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
             curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
-            sudo apt-get update -y --quiet
-            sudo apt-get install -y --quiet git build-essential google-cloud-sdk shellcheck zsh
+            sudo apt-get update -y -qq
+            sudo apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh
 
-  install_machine:
+  install_golang:
     steps:
       - run:
-          name: install VM dependencies (fuse+recent golang)
-          environment:
-            GOROOT: /usr/local/go
-            GOPATH: /go
+          name: install latest golang
           command: |
-            GO_VERSION=1.13.7
+            export GOPATH=${GOPATH:-/usr/local/go}
+            export GOROOT=${GOROOT:-/go}
+            pushd /tmp
+
+            git init empty-go && cd empty-go && git remote add upstream	https://go.googlesource.com/go
+            GO_VERSION=$(git ls-remote --tags upstream|cut -f2|grep -vE '(weekly)|(rc)|(beta)|(release\.r)'|sed 's/refs\/tags\/go//'|sort -rV|head -1)
+            if [[ -z ${GO_VERSION} ]] ; then
+              echo "Unable to fetch latest tag from golang repo"
+              exit 1
+            fi
+
             CI_USER=$(id -u)
-            PATH=/home/circleci/.linuxbrew/bin:$PATH
-            sudo apt-get install -qq --yes build-essential curl file git fuse linuxbrew-wrapper
-
-            cd /tmp
-            echo
-            echo "Installing standalone linuxbrew..."
-            echo
-            # do it twice: a hack to work around https://stackoverflow.com/questions/38410020/homebrew-error-update-report-should-not-be-called-directly
-            (brew update < /dev/null)||(brew update < /dev/null)
-
-            # TODO(fred): get latest from github.api/google...
-            echo
-            echo "Installing golang ${GO_VERSION}..."
-            echo
             wget --no-verbose https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz
-            sudo tar -xf go${GO_VERSION}.linux-amd64.tar.gz
+            if [[ $? -ne 0 ]] ; then
+              echo "Unable to fetch latest golang binary release from https://dl.google.com"
+              exit 1
+            fi
+
+            CI_USER=$(id -u)
+            ARTIFACT="go${GO_VERSION}.linux-amd64.tar.gz"
+            sudo tar -xf ${ARTIFACT}
+
+            # clean up preinstalled golang on circleci image
             sudo mv /usr/local/go /usr/local/go.old || true
             sudo mv go /usr/local
             sudo mkdir -p ${GOPATH}/pkg ${GOPATH}/bin
             sudo chown -R ${CI_USER} ${GOPATH}
+            rm -f ${ARTIFACT}
+
             export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
             go version
+
+            popd
+
+  install_brew:
+    steps:
+      - run:
+          name: install linuxbrew
+          command: |
+            sudo apt-get install -qq -y build-essential curl file git linuxbrew-wrapper
+            # do it twice: a hack to work around https://stackoverflow.com/questions/38410020/homebrew-error-update-report-should-not-be-called-directly
+            (brew update < /dev/null)||(brew update < /dev/null)
+
+  install_fuse:
+    steps:
+      - run:
+          name: install fuse
+          command: |
+            sudo apt-get install -qq -y fuse
+
+  install_machine:
+    description: install VM dependencies
+    steps:
+      - install_base
+      - install_fuse
+      - install_brew
+      - install_golang
 
   install_kubectl:
     steps:
@@ -95,7 +126,7 @@ commands:
             sudo apt-get install --quiet kubectl
             gcloud container clusters get-credentials onec-dev
 
-  install_tools:
+  install_test_tools:
     steps:
       - run:
           name: Install go tools for testing
@@ -120,17 +151,49 @@ commands:
             gcloud --quiet config set compute/zone ${GOOGLE_COMPUTE_ZONE}
             echo $GCLOUD_SERVICE_KEY | docker login -u _json_key --password-stdin https://gcr.io
 
+  get_cache:
+    description: retrieve golang modules cache
+    steps:
+      - restore_cache:
+          keys:
+           - pkg-cache-{{ checksum "go.sum" }}
+           - pkg-cache-
+
+  put_cache:
+    description: save golang modules cache
+    steps:
+      - save_cache:
+          key: pkg-cache-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg"
+
+  google_app_credentials:
+    steps:
+      - run:
+          name: Prepare google app credentials
+          command: |
+            mkdir -p ~/extra
+            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
+
+  prepare_tests:
+    steps:
+      - google_app_credentials
+      - run:
+          name: Prepare golang tests
+          command: |
+            mkdir -p /tmp/test-results/cafs /tmp/test-results/noncafs /tmp/test-results/fuse \
+                     /tmp/test-coverage/cafs /tmp/test-coverage/noncafs /tmp/test-coverage/fuse
+            hack/go-generate.sh
+            go mod download
+
 jobs:
   go_lint:
     executor: docker_minio
     steps:
       - install_base
       - checkout
-      - restore_cache:
-          keys:
-           - pkg-cache-{{ checksum "go.sum" }}
-           - pkg-cache-
-      - install_tools
+      - get_cache
+      - install_test_tools
       - run:
           name: Run golang linter
           command: |
@@ -149,133 +212,124 @@ jobs:
   go_test:
     executor: docker_minio
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
+      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
+      GO111MODULE: 'on'
     steps:
       - install_base
       - checkout
-      - restore_cache:
-          keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
-      - install_tools
+      - get_cache
+      - install_test_tools
       - login_to_google
+      - prepare_tests
       - run:
-          name: Run golang tests
+          name: Run golang tests (1)
           command: |
-            mkdir -p ~/extra
-            mkdir -p /tmp/test-results
-            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
-            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
-            hack/go-generate.sh
-            go mod download
+            gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures -- \
+              -race -cover -covermode atomic -coverprofile /tmp/test-coverage/noncafs/c_non_cafs.out \
+              $(go list ./...|grep -v cafs)
+      - run:
+          name: 'Run golang tests (2): cafs'
+          command: |
             # cafs tests are memory intensive: best to run them separately
-            gotestsum --junitfile /tmp/test-results/go-test-report.xml --format short-with-failures -- \
-              -race -coverprofile=c_non_cafs.out $(go list ./...|grep -v cafs)
-              # cafs testing: trade parallelism for memory on limited CI config + race turned off
-            gotestsum --junitfile /tmp/test-results/go-test-report-cafs.xml --format short-with-failures -- \
-              -parallel 4 -coverprofile=c_cafs_only.out ./pkg/cafs/...
-            # collect coverage metrics
-            mkdir -p /tmp/test-coverage
-            go tool cover -html=c_non_cafs.out -o coverage_non_cafs.html
-            go tool cover -html=c_cafs_only.out -o coverage_cafs_only.html
-            mv coverage_non_cafs.html coverage_cafs_only.html \
-              /tmp/test-coverage
-      - save_cache:
-          key: pkg-cache-{{ checksum "go.sum" }}
+            # cafs tests have a lot of parallel testcases, using -race here would hog CI ressources
+            gotestsum --junitfile /tmp/test-results/cafs/go-test-report-cafs.xml --format short-with-failures -- \
+              -parallel 4 -covermode atomic -coverprofile /tmp/test-coverage/cafs/c_cafs_only.out \
+              ./pkg/cafs/...
+      - put_cache
+      - persist_to_workspace:
+          root: /tmp/test-coverage
           paths:
-            - "/go/pkg"
-      - store_artifacts:
-          path: /tmp/test-results
-          destination: raw-test-output
-      - store_artifacts:
-          path: /tmp/test-coverage
-          destination: coverage-report
+            - noncafs
+            - cafs
       - store_test_results:
           path: /tmp/test-results
 
   go_test_fuse:
     executor: fuse_tester
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
+      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
+      GO111MODULE: 'on'
     steps:
-      - install_base
       - install_machine
       - checkout
-      - restore_cache:
-          keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
-      - install_tools
+      - get_cache
+      - install_test_tools
       - login_to_google
-      - run:
-          name: Prepare golang tests in integration environment
-          command: |
-            export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-            mkdir -p /tmp/test-fuse-results
-            hack/go-generate.sh
-            go mod download
+      - prepare_tests
       - run:
           name: Run golang tests in integration environment
           command: |
-            mkdir -p ~/extra
-            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
-            export PATH=$GOPATH/bin:$GOROOT/bin:/home/circleci/.linuxbrew/bin:$PATH
-            export GOOGLE_APPLICATION_CREDENTIALS=~/extra/appcredentials.json
             gotestsum \
-              --junitfile /tmp/test-fuse-results/go-test-report.xml --format standard-verbose -- \
-              -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)'  ./pkg/core ./cmd/datamon/cmd -timeout 20m
-      - save_cache:
-          key: pkg-cache-{{ checksum "go.sum" }}
+              --junitfile /tmp/test-results/fuse/go-test-report-fuse.xml --format standard-verbose -- \
+              -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)' \
+              -timeout 20m -covermode atomic -coverprofile /tmp/test-coverage/fuse/c_fuse_integration.out \
+              ./pkg/core ./cmd/datamon/cmd
+      - put_cache
+      - persist_to_workspace:
+          root: /tmp/test-coverage
           paths:
-            - "/go/pkg"
-      - store_artifacts:
-          path: /tmp/test-fuse-results
-          destination: raw-test-output
+            - fuse
       - store_test_results:
-          path: /tmp/test-fuse-results
+          path: /tmp/test-results
+
+  test_coverage:
+    executor: docker_builder
+    steps:
+      - attach_workspace:
+          at: /tmp/test-coverage
+      - checkout
+      - run:
+          name: Merge raw coverage results and produce coverage reports
+          command: |
+            mkdir -p coverage-results
+            # Merge results from multiple test jobs
+            go get -u github.com/wadey/gocovmerge
+
+            collected="$(find /tmp/test-coverage -type f -name \*.out)"
+            echo "INFO: collected profiles: ${collected}"
+            gocovmerge $collected > merged_coverprofile.out
+
+            #mkdir -p coverage-results/debug
+            #cp ${collected} merged_coverprofile.out coverage-results/debug
+
+            # Fully detailed report with gocov
+            go tool cover -html=merged_coverprofile.out -o coverage-results/coverage_datamon_ci.html
+
+            # Alternative report with gocov
+            go get -u github.com/axw/gocov/gocov
+            go get -u github.com/matm/gocov-html
+            gocov convert merged_coverprofile.out | gocov-html > coverage-results/coverage_summary_datamon_ci.html
+      - store_artifacts:
+          path: coverage-results
 
   fuse_sidecar_test:
     executor: docker_builder
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
+      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
     steps:
       - setup_remote_docker:
           version: 18.09.3
       - install_base
       - checkout
-      - restore_cache:
-          keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
+      - get_cache
       - login_to_google
       - install_kubectl
+      - google_app_credentials
       - run:
           name: Run fuse sidecar demo
           command: |
             make build-datamon-local
-            mkdir -p ~/extra
-            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
-            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/extra/appcredentials.json
             DATAMON_GLOBAL_CONFIG=datamon-config-test-sdjfhga ./cmd/datamon/datamon config create
             hack/fuse-demo/demo_coord.sh -b
 
   build_images:
     executor: docker_builder
-    environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
     steps:
       - setup_remote_docker:
           version: 18.09.3
       - install_base
       - checkout
-      - restore_cache:
-          keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
+      - get_cache
       - login_to_google
       - run:
           name: Build datamon image (local registry)
@@ -296,18 +350,12 @@ jobs:
 
   build_demo_images:
     executor: docker_builder
-    environment:
-      GOOGLE_PROJECT_ID: "onec-co"
-      GOOGLE_COMPUTE_ZONE: us-west2-c
     steps:
       - setup_remote_docker:
           version: 18.09.3
       - install_base
       - checkout
-      - restore_cache:
-          keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
+      - get_cache
       - login_to_google
       - run:
           name: DEMO - Build datamon fuse demo image
@@ -342,15 +390,11 @@ jobs:
           version: 18.09.3
       - install_base
       - checkout
-      - restore_cache:
-          keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
+      - get_cache
       - login_to_google
       - run:
           name: Prepare github release
           command: |
-            #PATH=${PATH}:/usr/local/go/bin:${GOPATH}/bin
             PATH=${PATH}:${GOPATH}/bin
             opts="--debug"
             # self-installing goreleaser
@@ -362,7 +406,7 @@ jobs:
               echo "Adding release notes ${release_notes}"
               opts="${opts} --release-notes ${release_notes}"
             else
-              # otherwise, leaves standard changelog from goreleaser
+              # otherwise, keep the standard changelog from goreleaser
               # (picks up all commits)
               echo "No release notes provided: standard changelog applies"
             fi
@@ -394,6 +438,18 @@ workflows:
 
       - go_test_fuse:
           context: "OC Common"
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
+      - test_coverage:
+          context: "OC Common"
+          requires:
+            - go_lint
+            - go_test
+            - go_test_fuse
           filters:
             tags:
               only: /.*/
@@ -435,10 +491,10 @@ workflows:
           requires:
             - go_lint
             - go_test
+            - go_test_fuse
             - build_images
           filters:
             tags:
               only: /^v.*/
             branches:
               ignore: /.*/
-
