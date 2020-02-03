@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
@@ -201,7 +202,9 @@ func addWebNoBrowserFlag(cmd *cobra.Command) string {
 
 func addLabelNameFlag(cmd *cobra.Command) string {
 	labelName := "label"
-	cmd.Flags().StringVar(&datamonFlags.label.Name, labelName, "", "The human-readable name of a label")
+	if cmd != nil { // TODO(fred): quickfix - the actual remedy should be to avoid calling this with nil input
+		cmd.Flags().StringVar(&datamonFlags.label.Name, labelName, "", "The human-readable name of a label")
+	}
 	return labelName
 }
 
@@ -439,8 +442,21 @@ func paramsToDestStore(params flagsT,
 	return destStore, nil
 }
 
-func paramsToContributor(_ flagsT) (model.Contributor, error) {
-	return authorizer.Principal(config.Credential)
+func paramsToContributor(flags flagsT) (model.Contributor, error) {
+	var credentials string
+	switch {
+	case flags.root.credFile != "":
+		credentials = flags.root.credFile
+	case config.Credential != "":
+		credentials = config.Credential
+	default:
+		credentials = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	}
+	if credentials == "" {
+		return model.Contributor{},
+			fmt.Errorf("could not resolve credentials: must be present as --credential flag, or in local config or as GOOGLE_APPLICATION_CREDENTIALS environment")
+	}
+	return authorizer.Principal(credentials)
 }
 
 // requireFlags sets a flag (local to the command or inherited) as required

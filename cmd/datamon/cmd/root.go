@@ -107,6 +107,7 @@ func initConfig() {
 	}
 
 	if config.Credential != "" {
+		// TODO(fred): now handled in paramsToContributor. May be removed
 		_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.Credential)
 	}
 
