@@ -20,7 +20,8 @@ datamon version [flags]
 ### Options
 
 ```
-  -h, --help   help for version
+      --format string   Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
+  -h, --help            help for version
 ```
 
 ### Options inherited from parent commands

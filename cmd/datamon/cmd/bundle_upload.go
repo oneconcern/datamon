@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -15,6 +17,8 @@ import (
 const (
 	fileUploadsByConcurrencyFactor = 5
 )
+
+var uploadTemplate func(flagsT) *template.Template
 
 // uploadBundleCmd is the command to upload a bundle from Datamon and model it locally.
 var uploadBundleCmd = &cobra.Command{
@@ -95,7 +99,18 @@ set label 'init'
 				return
 			}
 		}
-		log.Printf("Uploaded bundle id:%s ", bundle.BundleID)
+
+		var labelSet string
+		defer func() {
+			var buf bytes.Buffer
+			if ert := uploadTemplate(datamonFlags).Execute(&buf, struct {
+				core.Bundle
+				Label string
+			}{Bundle: *bundle, Label: labelSet}); ert != nil {
+				wrapFatalln("executing template", ert)
+			}
+			log.Println(buf.String())
+		}()
 
 		if datamonFlags.label.Name != "" {
 			labelDescriptor := core.NewLabelDescriptor(
@@ -109,7 +124,7 @@ set label 'init'
 				wrapFatalln("upload label", err)
 				return
 			}
-			log.Printf("set label '%v'", datamonFlags.label.Name)
+			labelSet = datamonFlags.label.Name
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
@@ -135,4 +150,19 @@ func init() {
 	}
 
 	bundleCmd.AddCommand(uploadBundleCmd)
+
+	uploadTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("uploaded").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
+		const uploadTemplateString = `Uploaded bundle id:{{.BundleID}}
+{{- if .Label }}
+set label '{{.Label}}'
+{{- end }}`
+		return template.Must(template.New("uploaded").Parse(uploadTemplateString))
+	}
 }

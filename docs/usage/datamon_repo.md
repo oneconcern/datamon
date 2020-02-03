@@ -17,7 +17,8 @@ They are versioned and managed via bundles.
 ### Options
 
 ```
-  -h, --help   help for repo
+      --format string   Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
+  -h, --help            help for repo
 ```
 
 ### Options inherited from parent commands

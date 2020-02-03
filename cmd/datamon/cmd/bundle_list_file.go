@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
 	"github.com/spf13/cobra"
 )
+
+var fileLineTemplate func(flagsT) *template.Template
 
 var bundleFileList = &cobra.Command{
 	Use:   "files",
@@ -45,7 +49,11 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 			return
 		}
 		for _, e := range bundle.BundleEntries {
-			log.Printf("name:%s, size:%d, hash:%s", e.NameWithPath, e.Size, e.Hash)
+			var buf bytes.Buffer
+			if err := fileLineTemplate(datamonFlags).Execute(&buf, e); err != nil {
+				wrapFatalln("executing template", err)
+			}
+			log.Println(buf.String())
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
@@ -63,6 +71,19 @@ func init() {
 	addBundleFlag(bundleFileList)
 
 	addLabelNameFlag(bundleFileList)
+	addTemplateFlag(bundleFileList)
 
 	BundleListCommand.AddCommand(bundleFileList)
+
+	fileLineTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("file line").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
+		const fileLineTemplateString = `name:{{.NameWithPath}}, size:{{.Size}}, hash:{{.Hash}}`
+		return template.Must(template.New("file line").Parse(fileLineTemplateString))
+	}
 }
