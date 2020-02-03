@@ -38,7 +38,7 @@ See [usage](usage/datamon_context.md)
 
 ## Write Ahead Log
 
-The [WAL](wal.md) tracks data updates and their ordering.
+The [WAL](proposals/wal.md) tracks data updates and their ordering.
 
 ## Read Log
 
