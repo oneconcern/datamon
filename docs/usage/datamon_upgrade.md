@@ -17,6 +17,7 @@ datamon upgrade [flags]
 ```
       --check-version   Checks if a new version is available but does not upgrade
       --force           Forces upgrade even if the current version is not a released version
+      --format string   Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
   -h, --help            help for upgrade
 ```
 

@@ -36,6 +36,7 @@ init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT
 ```
       --config string     Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
       --context string    Set the context for datamon (default "dev")
+      --format string     Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
       --loglevel string   The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
       --upgrade           Upgrades the current version then carries on with the specified command
 ```

@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"text/template"
@@ -29,15 +30,31 @@ together.`,
 	},
 }
 
-var bundleDescriptorTemplate *template.Template
+var (
+	useBundleTemplate        func(flagsT) *template.Template
+	bundleDescriptorTemplate func(flagsT) *template.Template
+)
 
 func init() {
+	addTemplateFlag(bundleCmd)
 	rootCmd.AddCommand(bundleCmd)
 
-	bundleDescriptorTemplate = func() *template.Template {
+	bundleDescriptorTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("list line").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
 		const listLineTemplateString = `{{.ID}} , {{.Timestamp}} , {{.Message}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
-	}()
+	}
+
+	useBundleTemplate = func(_ flagsT) *template.Template {
+		const useBundleTemplateString = `Using bundle: {{.ID}}`
+		return template.Must(template.New("use bundle").Parse(useBundleTemplateString))
+	}
 }
 
 func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) error {
@@ -65,7 +82,15 @@ func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) erro
 		}
 		datamonFlags.bundle.ID = label.Descriptor.BundleID
 	}
-	log.Printf("Using bundle: %s", datamonFlags.bundle.ID)
+
+	// when descriptor template is overridden, skip this heading: means that the user is expecting some specific fields
+	if datamonFlags.core.Template == "" {
+		var buf bytes.Buffer
+		if err := useBundleTemplate(datamonFlags).Execute(&buf, struct{ ID string }{ID: datamonFlags.bundle.ID}); err != nil {
+			wrapFatalln("executing template", err)
+		}
+		log.Println(buf.String())
+	}
 	return nil
 }
 

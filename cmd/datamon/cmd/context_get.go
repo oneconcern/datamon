@@ -55,7 +55,7 @@ func getContext() {
 	rcvdContext = *datamonContext
 
 	var buf bytes.Buffer
-	err = contextTemplate.Execute(&buf, rcvdContext)
+	err = contextTemplate(datamonFlags).Execute(&buf, rcvdContext)
 	if err != nil {
 		wrapFatalln("executing template", err)
 		return

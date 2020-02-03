@@ -57,9 +57,9 @@ exits with ENOENT status otherwise.`,
 		}
 
 		var buf bytes.Buffer
-		err = bundleDescriptorTemplate.Execute(&buf, bundle.BundleDescriptor)
+		err = bundleDescriptorTemplate(datamonFlags).Execute(&buf, bundle.BundleDescriptor)
 		if err != nil {
-			log.Println("executing template:", err)
+			wrapFatalln("executing template", err)
 		}
 		log.Println(buf.String())
 	},

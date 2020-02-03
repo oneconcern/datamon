@@ -2,17 +2,23 @@ package cmd
 
 import (
 	"bytes"
+	"text/template"
 
 	"github.com/spf13/cobra"
 )
 
 var (
+	// statically linked variables when building releases
+
 	Version   string
 	BuildDate string
 	GitCommit string
 	GitState  string
 )
 
+var versionTemplate func(flagsT) *template.Template
+
+// VersionInfo describe versioning information about a build
 type VersionInfo struct {
 	Version   string `json:"version,omitempty"`
 	BuildDate string `json:"buildDate,omitempty"`
@@ -20,6 +26,7 @@ type VersionInfo struct {
 	GitState  string `json:"gitState,omitempty"`
 }
 
+// NewVersionInfo yields version information about this build
 func NewVersionInfo() VersionInfo {
 	ver := VersionInfo{
 		Version:   "dev",
@@ -37,23 +44,6 @@ func NewVersionInfo() VersionInfo {
 	return ver
 }
 
-func (v VersionInfo) String() string {
-	var buf bytes.Buffer
-	buf.WriteString("Version: ")
-	buf.WriteString(v.Version)
-	buf.WriteString("\n")
-	buf.WriteString("Build date: ")
-	buf.WriteString(v.BuildDate)
-	buf.WriteString("\n")
-	buf.WriteString("Commit: ")
-	buf.WriteString(v.GitCommit)
-	buf.WriteString("\n")
-	buf.WriteString("Working tree: ")
-	buf.WriteString(v.GitState)
-	buf.WriteString("\n")
-	return buf.String()
-}
-
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "prints the version of datamon",
@@ -64,10 +54,30 @@ var versionCmd = &cobra.Command{
 	* Git State (when dirty there were uncommitted changes during the build)
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Print(NewVersionInfo().String())
+		var buf bytes.Buffer
+		if err := versionTemplate(datamonFlags).Execute(&buf, NewVersionInfo()); err != nil {
+			wrapFatalln("executing template", err)
+		}
+		log.Println(buf.String())
 	},
 }
 
 func init() {
+	addTemplateFlag(versionCmd)
 	rootCmd.AddCommand(versionCmd)
+
+	versionTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("version").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
+		const versionTemplateString = `Version: {{.Version}}
+BuildDate: {{.BuildDate}}
+Commit: {{.GitCommit}}
+Working tree: {{.GitState}}`
+		return template.Must(template.New("version").Parse(versionTemplateString))
+	}
 }
