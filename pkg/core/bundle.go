@@ -208,7 +208,7 @@ func Publish(ctx context.Context, bundle *Bundle) error {
 }
 
 func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) error {
-	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
+	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, selectionPredicate)
 }
 
 // implementation of Publish() with some additional parameters for test
