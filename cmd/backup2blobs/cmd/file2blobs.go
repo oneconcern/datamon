@@ -181,7 +181,7 @@ var upload = &cobra.Command{
 var rootCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Commands to help migrate data to datamon",
-	Long:  "This tools helps generate a list of files and upload it to CAFS based FS",
+	Long:  "This tools helps generate a list of files then uploads it to CAFS based FS",
 }
 
 var logger *zap.Logger

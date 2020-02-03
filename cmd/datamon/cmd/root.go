@@ -19,8 +19,8 @@ var config *CLIConfig
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "datamon",
-	Short: "Datamon helps building ML pipelines",
-	Long: `Datamon helps building ML pipelines by adding versioning, auditing and security to cloud storage tools
+	Short: "Datamon helps build ML pipelines",
+	Long: `Datamon helps build ML pipelines by adding versioning, auditing and lineage tracking to cloud storage tools
 (e.g. Google GCS, AWS S3).
 
 This is not a replacement for these tools, but rather a way to manage their inputs and outputs.

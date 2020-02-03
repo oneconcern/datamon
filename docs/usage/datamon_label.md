@@ -41,7 +41,7 @@ production
 
 ### SEE ALSO
 
-* [datamon](datamon.md)	 - Datamon helps building ML pipelines
+* [datamon](datamon.md)	 - Datamon helps build ML pipelines
 * [datamon label get](datamon_label_get.md)	 - Get bundle info by label
 * [datamon label list](datamon_label_list.md)	 - List labels
 * [datamon label set](datamon_label_set.md)	 - Set labels
