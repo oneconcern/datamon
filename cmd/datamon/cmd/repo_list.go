@@ -12,7 +12,7 @@ import (
 
 func applyRepoTemplate(repo model.RepoDescriptor) error {
 	var buf bytes.Buffer
-	if err := repoDescriptorTemplate.Execute(&buf, repo); err != nil {
+	if err := repoDescriptorTemplate(datamonFlags).Execute(&buf, repo); err != nil {
 		return fmt.Errorf("executing template: %w", err)
 	}
 	log.Println(buf.String())

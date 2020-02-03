@@ -18,10 +18,17 @@ const (
 	githubRepo = "oneconcern/datamon"
 )
 
-var releaseDescriptorTemplate *template.Template
+var releaseDescriptorTemplate func(flagsT) *template.Template
 
 func init() {
-	releaseDescriptorTemplate = func() *template.Template {
+	releaseDescriptorTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("release").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
 		const releaseTemplateString = `
 ************************************************************
 Version: {{ printf "%v" .Version}}
@@ -32,13 +39,13 @@ Release Notes: {{ .ReleaseNotes }}
 ************************************************************
 `
 		return template.Must(template.New("release").Parse(releaseTemplateString))
-	}()
+	}
 }
 
 func applyReleaseTemplate(release *selfupdate.Release) error {
 	// formats and outputs info about release
 	var buf bytes.Buffer
-	if err := releaseDescriptorTemplate.Execute(&buf, release); err != nil {
+	if err := releaseDescriptorTemplate(datamonFlags).Execute(&buf, release); err != nil {
 		return errors.New("executing template").Wrap(err)
 	}
 	log.Println(buf.String())
@@ -80,7 +87,7 @@ func doSelfUpgrade(opts upgradeFlags) error {
 		if !opts.forceUgrade {
 			return errors.New("you are not running a released version of datamon. Skipping upgrade")
 		}
-		log.Printf("you are not running a released version of datamon (%v). Forcing upgrade", version)
+		infoLogger.Printf("you are not running a released version of datamon (%v). Forcing upgrade", version)
 	}
 	if opts.verbose {
 		selfupdate.EnableLog()
@@ -91,9 +98,9 @@ func doSelfUpgrade(opts upgradeFlags) error {
 		return errors.New("binary update failed").Wrap(err)
 	}
 	if latest.Version.Equals(v) {
-		log.Println("you are running the latest version of datamon", version)
+		infoLogger.Println("you are running the latest version of datamon", version)
 	} else {
-		log.Println("successfully updated to version", latest.Version)
+		infoLogger.Printf("successfully updated to version %s", version)
 		err = applyReleaseTemplate(latest)
 		if err != nil {
 			return errors.New("cannot render release infos").Wrap(err)
@@ -107,9 +114,9 @@ func doCheckVersion() error {
 	version := NewVersionInfo().Version
 	v, err := semver.ParseTolerant(version)
 	if err != nil {
-		log.Printf("you are not running a released version of datamon (%v). Checking latest release.", version)
+		infoLogger.Printf("you are not running a released version of datamon (%v). Checking latest release.", version)
 	} else {
-		log.Printf("you are running released version %v. Checking latest release.", v)
+		infoLogger.Printf("you are running released version %v. Checking latest release.", v)
 		isRelease = true
 	}
 
@@ -122,12 +129,12 @@ func doCheckVersion() error {
 	}
 
 	if isRelease && latest.Version.Equals(v) {
-		log.Println("you are running the latest version of datamon", version)
+		infoLogger.Println("you are running the latest version of datamon", version)
 		return nil
 	}
 
-	log.Printf("currently running release: %v", version)
-	log.Printf("latest available release: %v", latest.Version)
+	infoLogger.Printf("currently running release: %v", version)
+	infoLogger.Printf("latest available release: %v", latest.Version)
 	if err := applyReleaseTemplate(latest); err != nil {
 		return errors.New("cannot render release infos").Wrap(err)
 	}
@@ -154,6 +161,7 @@ var selfUpgradeCmd = &cobra.Command{
 }
 
 func init() {
+	addTemplateFlag(selfUpgradeCmd)
 	rootCmd.AddCommand(selfUpgradeCmd)
 
 	addUpgradeCheckOnlyFlag(selfUpgradeCmd)
@@ -161,7 +169,7 @@ func init() {
 }
 
 func doExecAfterUpgrade() error {
-	log.Printf("running upgraded version...")
+	infoLogger.Printf("running upgraded version...")
 	argsWithoutUpgrade := make([]string, 0, len(os.Args))
 	for _, arg := range os.Args {
 		if arg != "--"+upgradeFlag {

@@ -27,7 +27,8 @@ production
 ### Options
 
 ```
-  -h, --help   help for label
+      --format string   Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
+  -h, --help            help for label
 ```
 
 ### Options inherited from parent commands

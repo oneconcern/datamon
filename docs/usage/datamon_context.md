@@ -11,7 +11,8 @@ Commands to manage contexts. A context is an instance of Datamon with set of rep
 ### Options
 
 ```
-  -h, --help   help for context
+      --format string   Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
+  -h, --help            help for context
 ```
 
 ### Options inherited from parent commands

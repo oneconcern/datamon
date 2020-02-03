@@ -44,9 +44,9 @@ exits with ENOENT status otherwise.`,
 		}
 
 		var buf bytes.Buffer
-		err = labelDescriptorTemplate.Execute(&buf, label.Descriptor)
+		err = labelDescriptorTemplate(datamonFlags).Execute(&buf, label.Descriptor)
 		if err != nil {
-			log.Println("executing template:", err)
+			wrapFatalln("executing template", err)
 		}
 		log.Println(buf.String())
 

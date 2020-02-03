@@ -4,19 +4,19 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,16 +32,25 @@ func testLogger(t testing.TB) *zap.Logger {
 	// a logger for the test sequence itself
 	return dlogger.MustGetLogger("debug").With(zap.String("test", t.Name()))
 }
-func testCommand(t testing.TB, target string, args ...string) (*exec.Cmd, io.ReadCloser) {
+
+func testCommand(t testing.TB, withPipe, withEnv bool, target string, args ...string) (*exec.Cmd, io.ReadCloser) {
 	// NOTE: this starts a process, not a goroutine like for other tests
 	// That is primarily because we want to send a signal to the process
 	// in order to unmount.
 	cmd := exec.Command(target, args...)
-	cmd.Env = append(cmd.Env, "DATAMON_CONTEXT="+os.Getenv("DATAMON_CONTEXT")) // TODO(fred): not sure this is used
-	cmd.Env = append(cmd.Env, "DATAMON_GLOBAL_CONFIG="+os.Getenv("DATAMON_GLOBAL_CONFIG"))
+	cmd.Env = []string{}
+	if withEnv {
+		cmd.Env = append(cmd.Env, "GOOGLE_APPLICATION_CREDENTIALS="+os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+		cmd.Env = append(cmd.Env, "DATAMON_CONTEXT="+os.Getenv("DATAMON_CONTEXT")) // TODO(fred): not sure this is used
+		cmd.Env = append(cmd.Env, "DATAMON_GLOBAL_CONFIG="+os.Getenv("DATAMON_GLOBAL_CONFIG"))
+	}
 	cmd.Env = append(cmd.Env, "HOME="+os.Getenv("HOME"))
 	cmd.Env = append(cmd.Env, "PATH="+os.Getenv("PATH"))
-	cmd.Env = append(cmd.Env, "GOOGLE_APPLICATION_CREDENTIALS="+os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+
+	if !withPipe {
+		return cmd, nil
+	}
+
 	pipeOut, err := cmd.StdoutPipe()
 	require.NoError(t, err)
 
@@ -67,16 +76,15 @@ func testCommand(t testing.TB, target string, args ...string) (*exec.Cmd, io.Rea
 	return cmd, pipeR
 }
 
-func generateRepoName() string {
-	//#nosec
-	return "test-fuse-repo-" + strconv.Itoa(rand.Int())
+func generateRepoName(in string) string {
+	return "test-" + in + "-repo-" + internal.RandStringBytesMaskImprSrc(10)
 }
 
 func testBundleMount(t *testing.T, testType string, waiter func(*zap.Logger, io.Reader)) {
 	logger := testLogger(t)
 
 	logger.Info("test initialization")
-	repo := generateRepoName()
+	repo := generateRepoName("fuse")
 	cleanup := setupTests(t)
 	defer cleanup()
 	const testConcurrencyForUpload = "10"
@@ -119,9 +127,15 @@ func testBundleMount(t *testing.T, testType string, waiter func(*zap.Logger, io.
 	cmdParams = append(cmdParams, "--context", testContext())
 	logger.Info("datamon exec", zap.Strings("params", cmdParams))
 
-	cmd, pipe := testCommand(t, targetBinary, cmdParams...)
+	cmd, pipe := testCommand(t, true, true, targetBinary, cmdParams...)
 
 	require.NoError(t, cmd.Start())
+	var killed bool
+	defer func() {
+		if !killed {
+			_ = cmd.Process.Kill()
+		}
+	}()
 
 	logger.Info("waiting for mount to be ready")
 	waiter(logger, pipe)
@@ -137,6 +151,7 @@ func testBundleMount(t *testing.T, testType string, waiter func(*zap.Logger, io.
 	logger.Info("unmounting")
 	require.NoError(t, cmd.Process.Kill())
 	err = cmd.Wait()
+	killed = true
 	require.Equal(t, "signal: killed", err.Error(), "cmd exit with killed error")
 }
 
@@ -241,9 +256,25 @@ func TestBundleMountNoStreamNoDest(t *testing.T) {
 	testBundleMount(t, "nostream-nodest", testMountReady(t, `"mounting"`, 5*time.Second))
 }
 
+func captureOutputProgress(p io.Reader) (*bytes.Buffer, *sync.WaitGroup) {
+	var (
+		wg sync.WaitGroup
+		b  bytes.Buffer
+	)
+	wg.Add(1)
+	latch := make(chan struct{})
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		latch <- struct{}{}
+		_, _ = b.ReadFrom(p)
+	}(&wg)
+	<-latch
+	return &b, &wg
+}
+
 func TestBundleMutableMount(t *testing.T) {
 	logger := testLogger(t)
-	repo := generateRepoName()
+	repo := generateRepoName("fuse-mutable")
 	extraTestArgs := []string{"--loglevel", "info"} // set this to debug to get more tracing
 
 	logger.Info("test initialization")
@@ -280,9 +311,15 @@ func TestBundleMutableMount(t *testing.T) {
 	cmdParams = append(cmdParams, "--context", testContext())
 	logger.Info("datamon exec", zap.Strings("params", cmdParams))
 
-	cmd, pipe := testCommand(t, targetBinary, cmdParams...)
+	cmd, pipe := testCommand(t, true, true, targetBinary, cmdParams...)
 
 	require.NoError(t, cmd.Start())
+	var killed bool
+	defer func() {
+		if !killed {
+			_ = cmd.Process.Kill()
+		}
+	}()
 
 	testMountReady(t, `"mounting"`, 5*time.Second)(logger, pipe)
 
@@ -300,26 +337,19 @@ func TestBundleMutableMount(t *testing.T) {
 	require.NoError(t, cmd.Process.Signal(os.Interrupt))
 
 	logger.Info("capturing commit output")
-	var (
-		wg sync.WaitGroup
-		b  []byte
-	)
-	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-		b, _ = ioutil.ReadAll(pipe)
-	}(&wg)
+	b, wg := captureOutputProgress(pipe)
 
 	logger.Debug("waiting for cmd to terminate")
 	require.NoError(t, cmd.Wait())
+	killed = true
 	_ = pipe.Close()
 	logger.Debug("waiting for pipe to end")
 	wg.Wait()
 
 	logger.Info("asserting created bundle")
-	rex := regexp.MustCompile(`(?m)^bundle:\s+([^\s]+)$`)
-	match := rex.FindSubmatch(b)
-	require.Truef(t, len(match) > 1, "couldn't find bundle ID in output, got this instead: %s", string(b))
+	rex := regexp.MustCompile(`(?m)^bundle:\s*([^\s]+)$`)
+	match := rex.FindSubmatch(b.Bytes())
+	require.Truef(t, len(match) > 1, "couldn't find bundle ID in output, got this instead: %s", b.String())
 	bundleID := string(match[1])
 
 	bundles, err = listBundles(t, repo)

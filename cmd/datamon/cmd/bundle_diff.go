@@ -14,15 +14,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var bundleDiffTemplate func(flagsT) *template.Template
+
+func init() {
+	bundleDiffTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("list line").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
+		const listLineTemplateString = `{{.Type}} , {{.Name}} , {{with .Additional}}{{.Size}} , {{.Hash}}{{end}} , {{with .Existing}}{{.Size}} , {{.Hash}}{{end}}`
+		return template.Must(template.New("list line").Parse(listLineTemplateString))
+	}
+}
+
 var bundleDiffCmd = &cobra.Command{
 	Use:   "diff",
 	Short: "Diff a downloaded bundle with a remote bundle.",
 	Long: "Diff a downloaded bundle with a remote bundle.  " +
 		"--destination is a location previously passed to the `bundle download` command.",
 	Run: func(cmd *cobra.Command, args []string) {
-
-		const listLineTemplateString = `{{.Type}} , {{.Name}} , {{with .Additional}}{{.Size}} , {{.Hash}}{{end}} , {{with .Existing}}{{.Size}} , {{.Hash}}{{end}}`
-		listLineTemplate := template.Must(template.New("list line").Parse(listLineTemplateString))
 
 		ctx := context.Background()
 
@@ -65,16 +78,19 @@ var bundleDiffCmd = &cobra.Command{
 		}
 
 		if len(diff.Entries) == 0 {
-			log.Println("empty diff")
+			// sending this out to stderr (<= no result)
+			infoLogger.Println("empty diff")
 		} else {
 			for _, de := range diff.Entries {
 				var buf bytes.Buffer
-				err := listLineTemplate.Execute(&buf, de)
+				err := bundleDiffTemplate(datamonFlags).Execute(&buf, de)
 				if err != nil {
-					log.Println("executing template:", err)
+					wrapFatalln("executing template:", err)
+					return
 				}
 				log.Println(buf.String())
 			}
+			// TODO(fred): should probably return some non-zero exit code, like the ordinary diff command
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
