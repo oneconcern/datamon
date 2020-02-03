@@ -38,7 +38,7 @@ exits with ENOENT status otherwise.`,
 		}
 
 		var buf bytes.Buffer
-		err = repoDescriptorTemplate.Execute(&buf, repoDescriptor)
+		err = repoDescriptorTemplate(datamonFlags).Execute(&buf, repoDescriptor)
 		if err != nil {
 			wrapFatalln("executing template", err)
 			return

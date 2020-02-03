@@ -26,13 +26,21 @@ production`,
 	},
 }
 
-var labelDescriptorTemplate *template.Template
+var labelDescriptorTemplate func(flagsT) *template.Template
 
 func init() {
+	addTemplateFlag(labelCmd)
 	rootCmd.AddCommand(labelCmd)
 
-	labelDescriptorTemplate = func() *template.Template {
+	labelDescriptorTemplate = func(opts flagsT) *template.Template {
+		if opts.core.Template != "" {
+			t, err := template.New("list line").Parse(datamonFlags.core.Template)
+			if err != nil {
+				wrapFatalln("invalid template", err)
+			}
+			return t
+		}
 		const listLineTemplateString = `{{.Name}} , {{.BundleID}} , {{.Timestamp}}`
 		return template.Must(template.New("list line").Parse(listLineTemplateString))
-	}()
+	}
 }
