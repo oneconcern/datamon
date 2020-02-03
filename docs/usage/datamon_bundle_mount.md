@@ -23,7 +23,6 @@ datamon bundle mount [flags]
       --destination string       The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
   -h, --help                     help for mount
       --label string             The human-readable name of a label
-      --loglevel string          The logging level (default "info")
       --mount string             The path to the mount dir
       --prefetch int             When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled) (default 1)
       --repo string              The name of this repository
@@ -34,9 +33,10 @@ datamon bundle mount [flags]
 ### Options inherited from parent commands
 
 ```
-      --config string    Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context string   Set the context for datamon (default "dev")
-      --upgrade          Upgrades the current version then carries on with the specified command
+      --config string     Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
+      --context string    Set the context for datamon (default "dev")
+      --loglevel string   The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
+      --upgrade           Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

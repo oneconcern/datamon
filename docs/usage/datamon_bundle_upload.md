@@ -33,7 +33,6 @@ set label 'init'
       --files string             Text file containing list of files separated by newline.
   -h, --help                     help for upload
       --label string             The human-readable name of a label
-      --loglevel string          The logging level (default "info")
       --message string           The message describing the new bundle
       --path string              The path to the folder or bucket (gs://<bucket>) for the data
       --repo string              The name of this repository
@@ -43,9 +42,10 @@ set label 'init'
 ### Options inherited from parent commands
 
 ```
-      --config string    Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context string   Set the context for datamon (default "dev")
-      --upgrade          Upgrades the current version then carries on with the specified command
+      --config string     Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
+      --context string    Set the context for datamon (default "dev")
+      --loglevel string   The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
+      --upgrade           Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO
