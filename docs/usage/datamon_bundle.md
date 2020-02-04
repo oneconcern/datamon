@@ -32,7 +32,7 @@ together.
 
 ### SEE ALSO
 
-* [datamon](datamon.md)	 - Datamon helps building ML pipelines
+* [datamon](datamon.md)	 - Datamon helps build ML pipelines
 * [datamon bundle diff](datamon_bundle_diff.md)	 - Diff a downloaded bundle with a remote bundle.
 * [datamon bundle download](datamon_bundle_download.md)	 - Download a bundle
 * [datamon bundle get](datamon_bundle_get.md)	 - Get bundle info
