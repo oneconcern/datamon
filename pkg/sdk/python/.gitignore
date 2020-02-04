@@ -1,0 +1,4 @@
+*.so
+datamon.h
+datamon_wrapper.go
+_obj/*
