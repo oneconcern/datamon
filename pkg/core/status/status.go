@@ -18,9 +18,30 @@ var (
 	// ErrConfigContext indicates an error while attempting to retrieve contexts from a remote config store
 	ErrConfigContext = errors.New("error retrieving contexts from config store")
 
-	// ErrCafsKey indicates an invalid hash string which couldn't be transformed in a valid hash key for the content-addressable FS (i;e. the value is too short)
-	ErrCafsKey = errors.New("failed to create cafs key")
+	// ErrPublish indicates an error while publishing (downloading) the set of files in the bundle
+	ErrPublish = errors.New("failed to unpack data files")
 
-	// ErrReadAt is an error while performing a ReadAt operation on a bundle
-	ErrReadAt = errors.New("error in bundle ReadAt")
+	// ErrPublishMetadata indicates an error while publishing (downloading) the metadate for the bundle
+	ErrPublishMetadata = errors.New("failed to publish metadata")
+
+	// ErrNoBundleIDWithConsumable indicates some inconsistent bundle settings with both no bundleID and some ConsumableStore defined
+	ErrNoBundleIDWithConsumable = errors.New("no bundle id set and consumable store not present")
+
+	// ErrInvalidKsuid indicates that the bundleID used is not vallid and should parse as a ksuid.
+	//
+	// This may only appear when the feature to force (preserve) ksuid on bundle uploads is enabled.
+	ErrInvalidKsuid = errors.New("invalid bundleID (ksuid) specified")
+
+	// ErrAmbiguousBundle reports about some inconsistent settings with both consumable and metata store exist
+	// when populating metadata.
+	ErrAmbiguousBundle = errors.New("ambiguous bundle to populate files: consumable store and meta store both exist")
+
+	// ErrInvalidBundle reports about some inconsistent settings with neither consumable nor metata store exist
+	// when populating metadata.
+	ErrInvalidBundle = errors.New("invalid bundle to populate files: neither consumable store nor meta store exists")
+
+	// ErrBundleIDExists reports about a prohibited action to override an already existing bundleID on a given store.
+	//
+	// This may only appear when the feature to force (preserve) ksuid on bundle uploads is enabled.
+	ErrBundleIDExists = errors.New("bundleID already exists on this store")
 )

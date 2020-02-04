@@ -8,6 +8,7 @@ import (
 	daemonizer "github.com/jacobsa/daemonize"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/fuse"
 	"github.com/spf13/cobra"
 )
 
@@ -50,20 +51,23 @@ The destination path is a temporary staging area for write operations.`,
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
-		bundle := core.NewBundle(bd,
-			bundleOpts...,
-		)
-		fs, err := core.NewMutableFS(bundle)
+
+		bundle := core.NewBundle(bd, bundleOpts...)
+
+		var fsOpts []fuse.Option
+		fsOpts = append(fsOpts, fuse.Logger(config.mustGetLogger(datamonFlags)))
+
+		fs, err := fuse.NewMutableFS(bundle, fsOpts...)
 		if err != nil {
 			onDaemonError("create mutable filesystem", err)
 			return
 		}
-		err = fs.MountMutable(datamonFlags.bundle.MountPath)
+		err = fs.MountMutable(datamonFlags.fs.MountPath)
 		if err != nil {
 			onDaemonError("mount mutable filesystem", err)
 			return
 		}
-		registerSIGINTHandlerMount(datamonFlags.bundle.MountPath)
+		registerSIGINTHandlerMount(datamonFlags.fs.MountPath)
 		if err = daemonizer.SignalOutcome(nil); err != nil {
 			wrapFatalln("send event from possibly daemonized process", err)
 			return

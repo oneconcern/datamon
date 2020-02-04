@@ -17,6 +17,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 
+	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
@@ -30,18 +31,13 @@ type Bundle struct {
 	BundleID                    string
 	ConsumableStore             storage.Store
 	contextStores               context2.Stores
-	cafs                        cafs.Fs
 	BundleDescriptor            model.BundleDescriptor
 	BundleEntries               []model.BundleEntry
-	Streamed                    bool
 	l                           *zap.Logger
 	SkipOnError                 bool // When uploading files
 	concurrentFileUploads       int
 	concurrentFileDownloads     int
 	concurrentFilelistDownloads int
-	lruSize                     int // when Streamed = true
-	withPrefetch                int // when Streamed = true
-	withVerifyHash              bool
 }
 
 // SetBundleID for the bundle
@@ -146,22 +142,16 @@ func getReadLogStore(stores context2.Stores) storage.Store {
 	return stores.ReadLog()
 }
 
-func defaultBundle() Bundle {
-	l, _ := dlogger.GetLogger("info")
-	return Bundle{
+func defaultBundle() *Bundle {
+	return &Bundle{
 		RepoID:                      "",
 		BundleID:                    "",
 		ConsumableStore:             nil,
 		BundleEntries:               make([]model.BundleEntry, 0, 1024),
-		Streamed:                    false,
 		concurrentFileUploads:       20,
 		concurrentFileDownloads:     10,
 		concurrentFilelistDownloads: 10,
-		l:                           l,
-
-		// default cafs options
-		withPrefetch:   1,
-		withVerifyHash: true,
+		l:                           dlogger.MustGetLogger("info"),
 	}
 }
 
@@ -171,22 +161,9 @@ func NewBundle(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
 	b.BundleDescriptor = *bd
 
 	for _, bApply := range bundleOps {
-		bApply(&b)
+		bApply(b)
 	}
-	if b.Streamed {
-		// prepare the content-addressable backend for this bundle
-		fs, _ := cafs.New(
-			cafs.LeafSize(b.BundleDescriptor.LeafSize),
-			cafs.LeafTruncation(b.BundleDescriptor.Version < 1),
-			cafs.Backend(b.BlobStore()),
-			cafs.Logger(b.l),
-			cafs.CacheSize(b.lruSize),
-			cafs.Prefetch(b.withPrefetch),
-			cafs.VerifyHash(b.withVerifyHash),
-		)
-		b.cafs = fs
-	}
-	return &b
+	return b
 }
 
 // Publish a bundle to a consumable store
@@ -200,17 +177,15 @@ func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPr
 }
 
 // implementation of Publish() with some additional parameters for test
-func implPublish(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint,
+func implPublish(ctx context.Context, bundle *Bundle, entriesPerFile uint,
 	selectionPredicate func(string) (bool, error)) error {
-	err := implPublishMetadata(ctx, bundle, true, bundleEntriesPerFile)
+	err := implPublishMetadata(ctx, bundle, true, entriesPerFile)
 	if err != nil {
-		return fmt.Errorf("failed to publish, err:%s", err)
+		return status.ErrPublishMetadata.Wrap(err)
 	}
-	if !bundle.Streamed {
-		err = unpackDataFiles(ctx, bundle, nil, selectionPredicate)
-		if err != nil {
-			return fmt.Errorf("failed to unpack data files, err:%s", err)
-		}
+	err = unpackDataFiles(ctx, bundle, nil, selectionPredicate)
+	if err != nil {
+		return status.ErrPublishMetadata.Wrap(err)
 	}
 	return nil
 }
@@ -226,24 +201,21 @@ func DownloadMetadata(ctx context.Context, bundle *Bundle) error {
 }
 
 // implementation of PublishMetadata() with some additional parameters for test
-func implPublishMetadata(ctx context.Context, bundle *Bundle,
-	publish bool,
-	bundleEntriesPerFile uint,
-) error {
+func implPublishMetadata(ctx context.Context, bundle *Bundle, publish bool, entriesPerFile uint) error {
 	if bundle.BundleID == "" {
 		if bundle.ConsumableStore != nil {
 			if err := setBundleIDFromConsumableStore(ctx, bundle); err != nil {
 				return err
 			}
 		} else {
-			return fmt.Errorf("no bundle id set and consumable store not present")
+			return status.ErrNoBundleIDWithConsumable
 		}
 	}
 	if err := unpackBundleDescriptor(ctx, bundle, publish); err != nil {
 		return err
 	}
 	// async needs bundleEntriesPerFile
-	if err := unpackBundleFileList(ctx, bundle, publish, bundleEntriesPerFile); err != nil {
+	if err := unpackBundleFileList(ctx, bundle, publish, entriesPerFile); err != nil {
 		return err
 	}
 	return nil
@@ -260,7 +232,7 @@ func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]s
 }
 
 // implementation of Upload() with some additional parameters for test
-func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...Option) error {
+func implUpload(ctx context.Context, bundle *Bundle, entriesPerFile uint, getKeys func() ([]string, error), opts ...Option) error {
 	if err := RepoExists(bundle.RepoID, bundle.contextStores); err != nil {
 		return err
 	}
@@ -268,7 +240,7 @@ func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, 
 		// case of bundleID preservation
 		id, err := ksuid.Parse(bundle.BundleID)
 		if err != nil {
-			return fmt.Errorf("invalid bundleID (ksuid) specified: %w", err)
+			return status.ErrInvalidKsuid.Wrap(err)
 		}
 		bundle.setBundleID(id.String())
 		exists, err := bundle.Exists(ctx)
@@ -276,17 +248,17 @@ func implUpload(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, 
 			return err
 		}
 		if exists {
-			return fmt.Errorf("bundleID %s already exists on this store", id.String())
+			return status.ErrBundleIDExists.Wrap(fmt.Errorf("bundleID: %v", id))
 		}
 	}
-	return uploadBundle(ctx, bundle, bundleEntriesPerFile, getKeys, opts...)
+	return uploadBundle(ctx, bundle, entriesPerFile, getKeys, opts...)
 }
 
-// PopulateFiles populates a ConsumableStore with a bundle's files
+// PopulateFiles populates a ConsumableStore with the metadata for this bundle
 func PopulateFiles(ctx context.Context, bundle *Bundle) error {
 	switch {
 	case bundle.ConsumableStore != nil && bundle.MetaStore() != nil:
-		return fmt.Errorf("ambiguous bundle to populate files:  consumable store and meta store both exist")
+		return status.ErrAmbiguousBundle
 	case bundle.ConsumableStore != nil:
 		if bundle.BundleID == "" {
 			if err := setBundleIDFromConsumableStore(ctx, bundle); err != nil {
@@ -298,7 +270,7 @@ func PopulateFiles(ctx context.Context, bundle *Bundle) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("invalid bundle to populate files:  neither consumable store nor meta store exists")
+		return status.ErrInvalidBundle
 	}
 	if err := implPublishMetadata(ctx, bundle, false, defaultBundleEntriesPerFile); err != nil {
 		return err
@@ -326,14 +298,14 @@ func (b *Bundle) Exists(ctx context.Context) (bool, error) {
 }
 
 // Diff shows the differences between two bundles
-func Diff(ctx context.Context, bundleExisting, bundleAdditional *Bundle) (BundleDiff, error) {
-	if err := PopulateFiles(ctx, bundleExisting); err != nil {
+func Diff(ctx context.Context, existing, additional *Bundle) (BundleDiff, error) {
+	if err := PopulateFiles(ctx, existing); err != nil {
 		return BundleDiff{}, err
 	}
-	if err := PopulateFiles(ctx, bundleAdditional); err != nil {
+	if err := PopulateFiles(ctx, additional); err != nil {
 		return BundleDiff{}, err
 	}
-	return diffBundles(bundleExisting, bundleAdditional)
+	return diffBundles(existing, additional)
 }
 
 // Update a destination bundle from a source bundle
@@ -353,4 +325,23 @@ func Update(ctx context.Context, bundleSrc, bundleDest *Bundle) error {
 // GetBundleStore extracts the metadata store for bundles from some context's stores
 func GetBundleStore(stores context2.Stores) storage.Store {
 	return getMetaStore(stores)
+}
+
+// UploadBundleEntries uploads the current list of entries for that bundle
+func (b *Bundle) UploadBundleEntries(ctx context.Context) error {
+	fileList := b.BundleEntries
+	for i := 0; i*defaultBundleEntriesPerFile < len(fileList); i++ {
+		firstIdx := i * defaultBundleEntriesPerFile
+		nextFirstIdx := (i + 1) * defaultBundleEntriesPerFile
+		if nextFirstIdx < len(fileList) {
+			if err := uploadBundleEntriesFileList(ctx, b, fileList[firstIdx:nextFirstIdx]); err != nil {
+				return err
+			}
+		} else {
+			if err := uploadBundleEntriesFileList(ctx, b, fileList[firstIdx:]); err != nil {
+				return err
+			}
+		}
+	}
+	return uploadBundleDescriptor(ctx, b)
 }

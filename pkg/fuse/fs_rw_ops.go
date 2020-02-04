@@ -1,4 +1,4 @@
-package core
+package fuse
 
 import (
 	"context"
@@ -15,10 +15,12 @@ import (
 
 	"github.com/jacobsa/fuse/fuseutil"
 
-	"github.com/jacobsa/fuse"
+	jfuse "github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/model"
 )
 
@@ -45,6 +47,26 @@ type fsMutable struct {
 
 	// local fs cache that mirrors the files.
 	localCache afero.Fs
+}
+
+func defaultMutableFS(bundle *core.Bundle, pathToStaging string) *fsMutable {
+	return &fsMutable{
+		fsCommon: fsCommon{
+			bundle:     bundle,
+			lookupTree: iradix.New(),
+			l:          dlogger.MustGetLogger("info"),
+		},
+		readDirMap:   make(map[fuseops.InodeID]map[fuseops.InodeID]*fuseutil.Dirent),
+		iNodeStore:   iradix.New(),
+		backingFiles: make(map[fuseops.InodeID]*afero.File),
+		lock:         sync.Mutex{},
+		iNodeGenerator: iNodeGenerator{
+			lock:         sync.Mutex{},
+			highestInode: firstINode,
+			freeInodes:   make([]fuseops.InodeID, 0, 65536),
+		},
+		localCache: afero.NewBasePathFs(afero.NewOsFs(), pathToStaging),
+	}
 }
 
 func (fs *fsMutable) atomicGetReferences() (nodeStore *iradix.Tree, lookupTree *iradix.Tree) {
@@ -77,14 +99,14 @@ func (fs *fsMutable) lookup(p fuseops.InodeID, c string) (le lookupEntry, found 
 func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 	pn, found := fs.iNodeStore.Get(formKey(p))
 	if !found {
-		return fuse.ENOENT
+		return jfuse.ENOENT
 	}
 
 	pNode := pn.(*nodeEntry)
 
 	cLE, found, lk := fs.lookup(p, c)
 	if !found {
-		return fuse.ENOENT
+		return jfuse.ENOENT
 	}
 
 	cn, found := fs.iNodeStore.Get(formKey(cLE.iNode))
@@ -98,7 +120,7 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 	if cNode.attr.Mode.IsDir() {
 		children := fs.readDirMap[cLE.iNode]
 		if len(children) > 0 {
-			return fuse.ENOTEMPTY
+			return jfuse.ENOTEMPTY
 		}
 		// Delete the child dir
 		delete(fs.readDirMap, cLE.iNode)
@@ -135,7 +157,7 @@ func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp)
 		op.Entry.AttributesExpiration = time.Now().Add(cacheYearLong)
 		op.Entry.EntryExpiration = op.Entry.AttributesExpiration
 	} else {
-		return fuse.ENOENT
+		return jfuse.ENOENT
 	}
 	return nil
 }
@@ -150,7 +172,7 @@ func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInod
 
 	e, found := nodeStore.Get(key)
 	if !found {
-		err := fuse.ENOENT
+		err := jfuse.ENOENT
 		return err
 	}
 
@@ -168,7 +190,7 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 
 	if op.Mode != nil { // File permissions not supported
 		fs.l.Debug("setting permissions mode is not supported", zap.Uint32("mode", uint32(*op.Mode)))
-		return fuse.ENOSYS
+		return jfuse.ENOSYS
 	}
 
 	nodeStore, _ := fs.atomicGetReferences()
@@ -177,7 +199,7 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 	key := formKey(op.Inode)
 	e, found := nodeStore.Get(key)
 	if !found {
-		return fuse.ENOENT
+		return jfuse.ENOENT
 	}
 
 	n := e.(*nodeEntry)
@@ -191,16 +213,16 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 		// File size can be truncated.
 		file, err := fs.localCache.OpenFile(fmt.Sprint(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
 		if err != nil {
-			return fuse.EIO
+			return jfuse.EIO
 		}
 		if *op.Size > math.MaxInt64 {
 			fs.l.Error("Received size greater than MaxInt64", zap.Uint64("size", *op.Size), zap.Uint64("inode", uint64(op.Inode)))
-			return fuse.EINVAL
+			return jfuse.EINVAL
 		}
 		err = file.Truncate(int64(*op.Size))
 		if err != nil {
 			fs.l.Error("truncate error", zap.Error(err))
-			return fuse.EIO
+			return jfuse.EIO
 		}
 		n.attr.Size = *op.Size
 	}
@@ -327,12 +349,12 @@ func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err erro
 	// Find the old child
 	oldChild, found, _ := fs.lookup(op.OldParent, op.OldName)
 	if !found {
-		return fuse.ENOENT
+		return jfuse.ENOENT
 	}
 	newChild, found, _ := fs.lookup(op.NewParent, op.NewName)
 	if found {
 		if newChild.mode.IsDir() {
-			return fuse.ENOSYS
+			return jfuse.ENOSYS
 		}
 		// Delete new child, ignore if not present
 		_ = fs.deleteNSEntry(op.NewParent, op.NewName)
@@ -408,7 +430,7 @@ func (fs *fsMutable) ReadDir(
 	children, found := fs.readDirMap[iNode]
 
 	if !found {
-		return fuse.ENOENT
+		return jfuse.ENOENT
 	}
 
 	if offset > len(children) {
@@ -456,7 +478,7 @@ func (fs *fsMutable) ReadFile(
 
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_RDONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
-		return fuse.EIO
+		return jfuse.EIO
 	}
 	fs.lockBackingFiles.Lock()
 	defer fs.lockBackingFiles.Unlock()
@@ -464,7 +486,7 @@ func (fs *fsMutable) ReadFile(
 	fs.backingFiles[op.Inode] = &file
 	op.BytesRead, err = file.ReadAt(op.Dst, op.Offset)
 	if err != nil {
-		return fuse.EIO
+		return jfuse.EIO
 	}
 	return
 }
@@ -477,7 +499,7 @@ func (fs *fsMutable) WriteFile(
 
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
-		return fuse.EIO
+		return jfuse.EIO
 	}
 	fs.lockBackingFiles.Lock()
 	defer fs.lockBackingFiles.Unlock()
@@ -485,7 +507,7 @@ func (fs *fsMutable) WriteFile(
 	fs.backingFiles[op.Inode] = &file
 	_, err = file.WriteAt(op.Data, op.Offset)
 	if err != nil {
-		return fuse.EIO
+		return jfuse.EIO
 	}
 	ne, found := fs.iNodeStore.Get(formKey(op.Inode))
 	if !found {
@@ -512,7 +534,7 @@ func (fs *fsMutable) SyncFile(
 	if file != nil {
 		err := file.Sync()
 		if err != nil {
-			return fuse.EIO
+			return jfuse.EIO
 		}
 	}
 	return
@@ -532,7 +554,7 @@ func (fs *fsMutable) FlushFile(
 		file := *f
 		err := file.Sync()
 		if err != nil {
-			return fuse.EIO
+			return jfuse.EIO
 		}
 	}
 	return
@@ -574,19 +596,19 @@ func (fs *fsMutable) preCreateCheck(parentInode fuseops.InodeID, lk []byte) erro
 	key := formKey(parentInode)
 	e, found := fs.iNodeStore.Get(key)
 	if !found {
-		return fuse.ENOENT
+		return jfuse.ENOENT
 	}
 
 	// parent is a directory
 	n := e.(*nodeEntry)
 	if !n.attr.Mode.IsDir() {
-		return fuse.ENOTDIR
+		return jfuse.ENOTDIR
 	}
 
 	// check child name not taken
 	_, found = fs.lookupTree.Get(lk)
 	if found {
-		return fuse.EEXIST
+		return jfuse.EEXIST
 	}
 	return nil
 }
@@ -888,8 +910,6 @@ func commitWalkReadDirMap(
 func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 	/* some sync setup */
 	if fs.bundle.BundleID == "" {
-		// NOTE(fred): I find it strange that the user may decide its own
-		// commit hash from the CLI.
 		if err := fs.bundle.InitializeBundleID(); err != nil {
 			return err
 		}
@@ -942,20 +962,8 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 		fileList = append(fileList, bundleEntry)
 	}
 	fs.l.Debug("Commit: goroutines ok. uploading metadata.")
-	for i := 0; i*defaultBundleEntriesPerFile < len(fileList); i++ {
-		firstIdx := i * defaultBundleEntriesPerFile
-		nextFirstIdx := (i + 1) * defaultBundleEntriesPerFile
-		if nextFirstIdx < len(fileList) {
-			if err := uploadBundleEntriesFileList(ctx, fs.bundle, fileList[firstIdx:nextFirstIdx]); err != nil {
-				return err
-			}
-		} else {
-			if err := uploadBundleEntriesFileList(ctx, fs.bundle, fileList[firstIdx:]); err != nil {
-				return err
-			}
-		}
-	}
-	if err := uploadBundleDescriptor(ctx, fs.bundle); err != nil {
+	fs.bundle.BundleEntries = fileList
+	if err := fs.bundle.UploadBundleEntries(ctx); err != nil {
 		return err
 	}
 	fs.l.Info("Commit: ok.")

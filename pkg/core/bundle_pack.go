@@ -215,7 +215,6 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		cafs.Backend(bundle.BlobStore()),
 		cafs.ConcurrentFlushes(bundle.concurrentFileUploads/fileUploadsPerFlush),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
-		cafs.VerifyHash(bundle.withVerifyHash),
 		cafs.Logger(bundle.l),
 	)
 	if err != nil {

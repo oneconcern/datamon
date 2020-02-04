@@ -1,34 +1,33 @@
-package core
+package fuse
 
 import (
 	"context"
 
-	"go.uber.org/zap"
-
-	"github.com/oneconcern/datamon/pkg/cafs"
-	"github.com/oneconcern/datamon/pkg/core/status"
-
 	"github.com/jacobsa/fuse"
+	"github.com/oneconcern/datamon/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/fuse/status"
+	"go.uber.org/zap"
 )
 
 func errNotEOF(err error) bool {
 	return err != nil && err.Error() != "EOF"
 }
 
-// ReadAt reads some bundle data with an optional offset
-func (b *Bundle) ReadAt(file *FsEntry, destination []byte, offset int64) (int, error) {
-	logger := b.l.With(
+// readAtBundle reads some bundle data with an optional offset
+func (fs *readOnlyFsInternal) readAtBundle(file *FsEntry, destination []byte, offset int64) (int, error) {
+	logger := fs.l.With(
 		zap.String("key", file.hash),
-		zap.String("bundleID", b.BundleID),
-		zap.String("repo", b.RepoID),
+		zap.String("bundleID", fs.bundle.BundleID),
+		zap.String("repo", fs.bundle.RepoID),
 		zap.String("file", file.fullPath),
 	)
 
-	if !b.Streamed {
+	if !fs.streamed {
 		// just consumes the file from staging ("consumable store")
 		logger.Debug("unstreamed ReadAt", zap.Int("asked bytes", len(destination)))
-		reader, err := b.ConsumableStore.GetAt(context.Background(), file.fullPath)
+		reader, err := fs.bundle.ConsumableStore.GetAt(context.Background(), file.fullPath)
 		if err != nil {
+			logger.Error("error in unstreamed GetAt", zap.String("hash", file.hash), zap.Error(err))
 			return 0, fuse.EIO
 		}
 
@@ -50,7 +49,7 @@ func (b *Bundle) ReadAt(file *FsEntry, destination []byte, offset int64) (int, e
 			WrapWithLog(logger, err, zap.String("hash", file.hash))
 	}
 
-	reader, err := b.cafs.GetAt(context.Background(), key)
+	reader, err := fs.cafs.GetAt(context.Background(), key)
 	if err != nil {
 		return 0, status.ErrReadAt.
 			WrapWithLog(logger, err, zap.String("hash", file.hash))

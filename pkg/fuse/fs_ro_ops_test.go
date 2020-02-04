@@ -1,6 +1,6 @@
 // +build fsintegration
 
-package core
+package fuse
 
 import (
 	"fmt"
@@ -8,8 +8,45 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
+
+	"github.com/oneconcern/datamon/pkg/core/mocks"
+	"go.uber.org/zap"
 )
+
+func fsROActions(pth string, info os.FileInfo, e chan<- error, wg *sync.WaitGroup) {
+	// randomized execution of fs actions (test scenarios below) given a walked file on the mount
+	//
+	// The scenarios defined here are for a read-only mount (writes are exepcted to fail)
+	l := mocks.TestLogger()
+	defer wg.Done()
+	actions := map[string]func(string, string, bool, chan<- error){
+		"stat":               testStat,
+		"bad-stat":           testBadStat,
+		"readFile":           testReadFile,
+		"bad-readFile":       testBadReadFile,
+		"bad-overwriteFile":  testBadOverwriteFile,
+		"bad-createFile":     testBadCreateFile,
+		"bad-createFile2":    testBadCreateFile2,
+		"bad-mkdir":          testBadMkdir,
+		"bad-truncate":       testBadTruncate,
+		"bad-chown":          testBadChown,
+		"bad-chmod":          testBadChmod,
+		"bad-remove":         testBadRemove,
+		"bad-rename":         testBadRename,
+		"bad-symlink":        testBadSymlink,
+		"open-read-seek":     testOpenReadSeek,
+		"bad-open-write":     testBadOpenWrite,
+		"bad-open-overwrite": testBadOpenOverwrite,
+		"bad-open-create":    testBadOpenCreate,
+		"statfs":             testStatFS,
+	}
+	for action, fn := range actions {
+		l.Info("fs-action", zap.String("action", action), zap.String("file", pth))
+		fn(action, pth, info.IsDir(), e)
+	}
+}
 
 func sibling(pth, target string) string {
 	return filepath.Join(filepath.Dir(pth), target)

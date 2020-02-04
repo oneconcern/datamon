@@ -1,4 +1,4 @@
-package core
+package fuse
 
 import (
 	"context"
@@ -6,7 +6,10 @@ import (
 	"path"
 	"time"
 
+	"github.com/oneconcern/datamon/pkg/cafs"
+	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/core/status"
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/errors"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
@@ -14,7 +17,7 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/model"
 
-	"github.com/jacobsa/fuse"
+	jfuse "github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
 	"github.com/jacobsa/fuse/fuseutil"
 )
@@ -38,6 +41,27 @@ type readOnlyFsInternal struct {
 
 	// readonly
 	isReadOnly bool
+
+	cafs     cafs.Fs
+	streamed bool
+
+	// Streamed mode options
+	withVerifyHash bool
+	lruSize        int
+	prefetch       int
+}
+
+func defaultReadOnlyFS(bundle *core.Bundle) *readOnlyFsInternal {
+	return &readOnlyFsInternal{
+		fsCommon: fsCommon{
+			bundle:     bundle,
+			lookupTree: iradix.New(),
+			l:          dlogger.MustGetLogger("info"),
+		},
+		readDirMap:   make(map[fuseops.InodeID][]fuseutil.Dirent),
+		fsEntryStore: iradix.New(),
+		fsDirStore:   iradix.New(),
+	}
 }
 
 func asFsEntry(p interface{}) *FsEntry {
@@ -63,7 +87,7 @@ func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookU
 		op.Entry.Generation = 1
 
 	} else {
-		err = fuse.ENOENT
+		err = jfuse.ENOENT
 		return
 	}
 	return nil
@@ -78,7 +102,7 @@ func (fs *readOnlyFsInternal) GetInodeAttributes(
 	key := formKey(op.Inode)
 	e, found := fs.fsEntryStore.Get(key)
 	if !found {
-		err = fuse.ENOENT
+		err = jfuse.ENOENT
 		return
 	}
 	fe := asFsEntry(e)
@@ -101,12 +125,12 @@ func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp
 
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
 	if !found {
-		err = fuse.ENOENT
+		err = jfuse.ENOENT
 		return
 	}
 	fe := asFsEntry(p)
 	if !fe.isDir() {
-		err = fuse.ENOENT
+		err = jfuse.ENOENT
 		return
 	}
 	return nil
@@ -122,12 +146,12 @@ func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, op *fuseops.ReadDirOp
 	children, found := fs.readDirMap[iNode]
 
 	if !found {
-		err = fuse.ENOENT
+		err = jfuse.ENOENT
 		return
 	}
 
 	if offset > len(children) {
-		err = fuse.ENOENT
+		err = jfuse.ENOENT
 		return
 	}
 
@@ -166,14 +190,14 @@ func (fs *readOnlyFsInternal) ReadFile(
 	// If file has not been mutated.
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
 	if !found {
-		err = fuse.ENOENT
+		err = jfuse.ENOENT
 		return
 	}
 	fe := asFsEntry(p)
 	fs.l.Debug("reading file", zap.String("file", fe.fullPath), zap.Uint64("inode", uint64(fe.iNode)))
 
 	// now consumes the file from the bundle
-	n, err := fs.bundle.ReadAt(fe, op.Dst, op.Offset)
+	n, err := fs.readAtBundle(fe, op.Dst, op.Offset)
 	op.BytesRead = n
 	return err
 }
@@ -270,7 +294,7 @@ func newFSTxns(fs *readOnlyFsInternal) *populateFSTxns {
 
 type populate struct {
 	fs          *readOnlyFsInternal
-	bundle      *Bundle
+	bundle      *core.Bundle
 	txns        *populateFSTxns
 	nodesToAdd  []fsNodeToAdd
 	iNode       *fuseops.InodeID
@@ -412,7 +436,7 @@ func populateFSAddBundleEntries(p *populate) error {
 // It populates the file system with inodes constructed from the bundle contents.
 //
 // Note that only bundle metadata is used at this stage.
-func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
+func (fs *readOnlyFsInternal) populateFS(bundle *core.Bundle) (*ReadOnlyFS, error) {
 	txns := newFSTxns(fs)
 
 	// Add root

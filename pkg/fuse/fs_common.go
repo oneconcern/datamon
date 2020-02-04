@@ -1,4 +1,4 @@
-package core
+package fuse
 
 import (
 	"context"
@@ -13,13 +13,14 @@ import (
 	"github.com/jacobsa/fuse/fuseutil"
 
 	"github.com/oneconcern/datamon/pkg/convert"
+	"github.com/oneconcern/datamon/pkg/core"
 )
 
 type fsCommon struct {
 	fuseutil.NotImplementedFileSystem
 
 	// Backing bundle for this FS.
-	bundle *Bundle
+	bundle *core.Bundle
 
 	// Fast lookup of parent iNode id + child name, returns iNode of child. This is a common operation and it's speed is
 	// important.
