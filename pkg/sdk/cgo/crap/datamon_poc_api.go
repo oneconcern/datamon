@@ -25,7 +25,7 @@ type Config = cmd.CLIConfig
 
 func ParseConfigAndFlagsEtc(data []byte) (*Config, error) {
 	var config Config
-	err := json.Unmarshal([]byte(data), &config)
+	err := json.Unmarshal(data, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config from json: %s", err)
 	}

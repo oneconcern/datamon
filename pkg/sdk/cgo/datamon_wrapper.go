@@ -14,7 +14,7 @@ import (
 
 // errToHost returns some errno to the host program.
 //
-// NOTE: freeing the allocated memory is the responsiblity of the caller.
+// NOTE: freeing the allocated memory is the responsibility of the caller.
 func errToHost(err error, errno **C.char) int {
 	if errno != nil {
 		// malloc: let the caller handle free
@@ -56,6 +56,9 @@ func listRepos(jsonConfig *C.char, jsonOutput **C.char, errno **C.char) int {
 	}
 
 	out, err := json.Marshal(repos)
+	if err != nil {
+		return wrapErrToHost("marshal repo list", err, errno)
+	}
 
 	// malloc: let the caller handle free
 	*jsonOutput = C.CString(string(out))
@@ -91,6 +94,9 @@ func listBundles(jsonConfig *C.char, repo *C.char, jsonOutput **C.char, errno **
 	}
 
 	out, err := json.Marshal(bundles)
+	if err != nil {
+		return wrapErrToHost("marshal bundle list", err, errno)
+	}
 
 	// malloc: let the caller handle free
 	*jsonOutput = C.CString(string(out))
