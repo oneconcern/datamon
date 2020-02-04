@@ -26,7 +26,7 @@ Commands to manage contexts. A context is an instance of Datamon with set of rep
 
 ### SEE ALSO
 
-* [datamon](datamon.md)	 - Datamon helps building ML pipelines
+* [datamon](datamon.md)	 - Datamon helps build ML pipelines
 * [datamon context create](datamon_context_create.md)	 - Create a context
 * [datamon context get](datamon_context_get.md)	 - Get a context info
 * [datamon context list](datamon_context_list.md)	 - List available contexts

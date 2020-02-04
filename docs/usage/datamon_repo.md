@@ -32,7 +32,7 @@ They are versioned and managed via bundles.
 
 ### SEE ALSO
 
-* [datamon](datamon.md)	 - Datamon helps building ML pipelines
+* [datamon](datamon.md)	 - Datamon helps build ML pipelines
 * [datamon repo create](datamon_repo_create.md)	 - Create a named repo
 * [datamon repo get](datamon_repo_get.md)	 - Get repo info by name
 * [datamon repo list](datamon_repo_list.md)	 - List repos

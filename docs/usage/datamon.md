@@ -2,11 +2,11 @@
 
 ## datamon
 
-Datamon helps building ML pipelines
+Datamon helps build ML pipelines
 
 ### Synopsis
 
-Datamon helps building ML pipelines by adding versioning, auditing and security to cloud storage tools
+Datamon helps build ML pipelines by adding versioning, auditing and lineage tracking to cloud storage tools
 (e.g. Google GCS, AWS S3).
 
 This is not a replacement for these tools, but rather a way to manage their inputs and outputs.

@@ -31,5 +31,5 @@ datamon web [flags]
 
 ### SEE ALSO
 
-* [datamon](datamon.md)	 - Datamon helps building ML pipelines
+* [datamon](datamon.md)	 - Datamon helps build ML pipelines
 

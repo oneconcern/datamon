@@ -5,7 +5,7 @@
 
 # Datamon
 
-Datamon is a data science tool sponsored by [OneConcern](https://www.oneconcern.com) that helps managing data at scale.
+Datamon is a data science tool sponsored by [OneConcern](https://www.oneconcern.com) that helps manage data at scale.
 
 ## Primer
 
@@ -19,11 +19,30 @@ output/new data that is generated from the existing data.
 
 [More on design and architecture](docs/design.md).
 
-### Migrating from v1 to v2
+### Features
 
-v2 comes with breaking changes. The migration process replaces older repos by new ones.
+* Manage data sets as versioned repositories stored on a cloud storage backend
+* Manage metadata for these data sets (versions, labels, file sets...)
+* Multi-tenancy using contexts
+* Lineage tracking backed by cloud authentication
+* Store data sets as fixed size deduplicated blobs, using blake hashing
+* Versions ("bundles") may be uploaded then downloaded on local storage
+* Versions may be accessed directly on a mounted file system (fuse)
+* CLI management tool
 
-See the [migration guide](k8s/migatev2/README.md).
+#### Extra tools
+
+* scripted interface to use in a sidecar container (e.g. for ARGO workflows)
+
+#### Experimental
+
+* Mutable fuse mount, to commit versioned data sets directly from a mounted file system
+
+#### Coming soon...
+
+* [ ] Diamond workflow: several collaborating nodes produce a versioned dataset in parallel
+* [ ] Python bindings
+* [ ] Write Ahead / Read Ahead logs
 
 ### Environment
 
@@ -42,7 +61,7 @@ Datamon supports the following cloud storage backends:
 - [**Bundle**](docs/concepts.md#bundle): a bundle is a point in time read-only view of a rep:branch and is composed of individual files. Analogous to a commit in git.
 - [**Label**](docs/concepts.md#label): a name given to a bundle, analogous to tags in git. Examples: Latest, production.
 - [**Context**](docs/concepts.md#context): a context provides a way to define multiple instances of datamon.
-- [**Write Ahead Log**](docs/concepts.md#write-ahead-log): a WAL track data updates and their ordering.
+- [**Write Ahead Log**](docs/concepts.md#write-ahead-log): a WAL tracks data updates and their ordering.
 - [**Read Log**](docs/concepts.md#read-log): logs all read operations, with their originator.
 - [**Authentication**](docs/auth.md): datamon keeps track of who contributed what, when and in which order (WAL) and who accessed what (Read Log).
 
@@ -50,7 +69,13 @@ Datamon supports the following cloud storage backends:
 
 Please follow the [installation instructions](docs/install.md).
 
-## CLI Guide
+## Migrating from v1 to v2
+
+v2 comes with breaking changes. The migration process replaces older repos by new ones.
+
+See the [migration guide](k8s/migatev2/README.md).
+
+## CLI guide
 
 Datamon comes as a CLI tool: see [usage](docs/usage/datamon.md).
 
