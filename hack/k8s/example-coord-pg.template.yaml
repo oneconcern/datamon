@@ -33,7 +33,7 @@ spec:
         # args: ["--", "/bin/zsh"]
 
         command: ["/tmp/coord/.scripts/wrap_application.sh"]
-        args: ["-s", "-c", "/tmp/coord", "-b", "postgres", "--",
+        args: ["-c", "/tmp/coord", "-b", "postgres", "--",
         "./mock_application_pg.sh",
         "5430", "5429",
         "$SOME_CONST", "$IS_INIT"]

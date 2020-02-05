@@ -34,7 +34,7 @@ spec:
         # args: ["--", "/bin/zsh"]
 
         command: ["/tmp/coord/.scripts/wrap_application.sh"]
-        args: ["-s", "-c", "/tmp/coord", "-b", "fuse", "--",
+        args: ["-c", "/tmp/coord", "-b", "fuse", "--",
         "./mock_application.sh",
         "/tmp/mount",
         "/tmp/upload"]
