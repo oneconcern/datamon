@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +21,7 @@ import (
 	"time"
 
 	gcsStorage "cloud.google.com/go/storage"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/oneconcern/datamon/internal"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/stretchr/testify/assert"
@@ -248,7 +251,7 @@ func TestWorkshop(t *testing.T) {
 	}()
 
 	logger.Info("waiting for mount to be ready")
-	testMountReady(t, `"mounting"`, 5*time.Second)(logger, pipe)
+	testWaitForReader(t, `"mounting"`, 5*time.Second)(logger, pipe)
 
 	err = filepath.Walk(pathToMount, func(pth string, info os.FileInfo, _ error) error {
 		if info.IsDir() {
@@ -343,8 +346,51 @@ func TestWorkshop(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// no test here for web (see pkg/web)
 	// no test here for upgrade (see self_upgrade_test.go)
+
+	logger.Info("test web")
+	freePort, err := testGetFreePort()
+	require.NoError(t, err, "find free port")
+	port := strconv.Itoa(freePort)
+
+	cmd, pipe = testCommand(t, true, false, targetBinary,
+		"web",
+		"--port", port,
+		"--no-browser",
+	)
+
+	require.NoError(t, cmd.Start())
+	var killedWeb bool
+	defer func() {
+		if !killedWeb {
+			_ = cmd.Process.Kill()
+		}
+	}()
+
+	waiter := testWaitForReader(
+		t, "serving datamon UI", 5*time.Second,
+	)
+
+	logger.Info("waiting for web process to be ready")
+	waiter(logger, pipe)
+	logger.Info("web process ready")
+
+	resp, err := http.Get("http://localhost:" + port + "/")
+	require.NoError(t, err, "curl web service")
+	// notdo: replete test of entire http api
+	//   (contained in `pkg/web` tests)
+
+	require.NotNil(t, resp)
+
+	defer resp.Body.Close()
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	require.NoError(t, err, "parse body html")
+
+	require.NotNil(t, doc)
+
+	logger.Info(fmt.Sprintf("home page:\n%v", doc.Text()))
+
+	// smoke test only: no content validation
 }
 
 func makeTestWorkshopBundle(t testing.TB, pathToData string) map[string]*testFile {
@@ -458,6 +504,23 @@ func deleteMeta(t testing.TB, bucket, repo string) (err error) {
 		}
 	}
 	return err
+}
+
+// lifted from `github.com/phayes/freeport`
+// testGetFreePort asks the kernel for a free open port that is ready to use.
+func testGetFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+	// this is the stdlib function that chooses a port,
+	// where port 0 has semantic meaning.
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
 func deleteVMeta(t testing.TB, bucket, repo string) (err error) {
