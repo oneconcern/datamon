@@ -44,7 +44,7 @@ Setting a label is analogous to the git command "git tag {label}".`,
 			return
 		}
 		if !bundleExists {
-			wrapFatalln(fmt.Sprintf("bundle %v not found", bundle), nil)
+			wrapFatalln(fmt.Sprintf("bundle:%s not found in repo:%s %s ", bundle.BundleID, bundle.RepoID, optionInputs.dumpContext()), nil)
 			return
 		}
 
