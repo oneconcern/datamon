@@ -113,42 +113,6 @@ type repoListEntry struct {
 	time        time.Time
 }
 
-/* for tests that need to read stdout into data structures, this function converts
- * a string to a slice of lines, each of which can be parsed into a struct.
- */
-func getDataLogLines(t *testing.T, ls string, ignorePatterns []string) []string {
-	ll := strings.Split(strings.TrimSpace(ls), "\n")
-	if len(ll) == 0 {
-		return ll
-	}
-	var repoLinesStart int
-	for repoLinesStart < len(ll) && ll[repoLinesStart] == "" {
-		repoLinesStart++
-	}
-	for {
-		if !(repoLinesStart < len(ll)) {
-			break
-		}
-		var sawPattern bool
-		for _, ip := range ignorePatterns {
-			m, err := regexp.MatchString(ip, ll[repoLinesStart])
-			require.NoError(t, err, "regexp match error.  likely a programming mistake in tests.")
-			if m {
-				repoLinesStart++
-				sawPattern = true
-				break
-			}
-		}
-		if !sawPattern {
-			break
-		}
-	}
-	if repoLinesStart == len(ll) {
-		return make([]string, 0)
-	}
-	return ll[repoLinesStart:]
-}
-
 func listRepos(t *testing.T) ([]repoListEntry, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -1458,4 +1422,41 @@ func deleteBucket(ctx context.Context, t *testing.T, client *gcsStorage.Client, 
 	if err := mb.Delete(ctx); err != nil {
 		t.Errorf("error deleting bucket %v", err)
 	}
+}
+
+/* for tests that need to read stdout into data structures, this function converts
+ * a string to a slice of lines, each of which can be parsed into a struct.
+ * TODO: Refactor using bufio and bufio.Scanner. See examples in cli_fuse_test.go
+ */
+func getDataLogLines(t *testing.T, ls string, ignorePatterns []string) []string {
+	ll := strings.Split(strings.TrimSpace(ls), "\n")
+	if len(ll) == 0 {
+		return ll
+	}
+	var repoLinesStart int
+	for repoLinesStart < len(ll) && ll[repoLinesStart] == "" {
+		repoLinesStart++
+	}
+	for {
+		if !(repoLinesStart < len(ll)) {
+			break
+		}
+		var sawPattern bool
+		for _, ip := range ignorePatterns {
+			m, err := regexp.MatchString(ip, ll[repoLinesStart])
+			require.NoError(t, err, "regexp match error.  likely a programming mistake in tests.")
+			if m {
+				repoLinesStart++
+				sawPattern = true
+				break
+			}
+		}
+		if !sawPattern {
+			break
+		}
+	}
+	if repoLinesStart == len(ll) {
+		return make([]string, 0)
+	}
+	return ll[repoLinesStart:]
 }

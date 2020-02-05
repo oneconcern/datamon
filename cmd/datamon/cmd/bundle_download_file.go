@@ -20,13 +20,14 @@ You may use the "--label" flag as an alternate way to specify a particular bundl
 
 		ctx := context.Background()
 
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
 
-		destinationStore, err := paramsToDestStore(datamonFlags, destTMaybeNonEmpty, "")
+		destinationStore, err := optionInputs.destStore(destTMaybeNonEmpty, "")
 		if err != nil {
 			wrapFatalln("create destination store", err)
 			return
@@ -38,7 +39,10 @@ You may use the "--label" flag as an alternate way to specify a particular bundl
 			return
 		}
 
-		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		if err != nil {
+			wrapFatalln("failed to initialize bundle options", err)
+		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(destinationStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
@@ -54,7 +58,9 @@ You may use the "--label" flag as an alternate way to specify a particular bundl
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 

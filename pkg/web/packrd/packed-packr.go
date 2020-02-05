@@ -30,19 +30,17 @@ var _ = func() error {
 		b.SetResolver("bundle__list_files.html", packr.Pointer{ForwardBox: gk, ForwardPath: "3c6b203d09507d2f1c0b2aaed35018ca"})
 		b.SetResolver("home.html", packr.Pointer{ForwardBox: gk, ForwardPath: "d7602d28968a8d3e13daf46afa4c4dcf"})
 		b.SetResolver("repo__list_bundles.html", packr.Pointer{ForwardBox: gk, ForwardPath: "7f531d365b99ec22d6ea50c595c10767"})
-		}()
-
+	}()
 
 	func() {
 		b := packr.New("helperTmpls", "./tmpl/helpers")
 		b.SetResolver("base.html", packr.Pointer{ForwardBox: gk, ForwardPath: "f4f6932cbb872550b8c891eacfeaa15f"})
-		}()
-
+	}()
 
 	func() {
 		b := packr.New("static", "./public/assets")
 		b.SetResolver("css/vendor/normalize_8.0.1.css", packr.Pointer{ForwardBox: gk, ForwardPath: "496015eb8ecde2c26dc57cb316074843"})
-		}()
+	}()
 
 	return nil
 }()

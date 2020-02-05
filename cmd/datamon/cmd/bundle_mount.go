@@ -91,12 +91,13 @@ var mountBundleCmd = &cobra.Command{
 			runDaemonized()
 			return
 		}
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			onDaemonError("create remote stores", err)
 			return
 		}
-		consumableStore, err := paramsToDestStore(datamonFlags, destTEmpty, "datamon-mount-destination")
+		consumableStore, err := optionInputs.destStore(destTEmpty, "datamon-mount-destination")
 		if err != nil {
 			onDaemonError("create destination store", err)
 			return
@@ -108,24 +109,29 @@ var mountBundleCmd = &cobra.Command{
 			return
 		}
 		bd := core.NewBDescriptor()
-		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		if err != nil {
+			wrapFatalln("failed to initialize bundle options", err)
+		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(getConcurrencyFactor(filelistDownloadsByConcurrencyFactor)))
-		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
-
+		logger, err := optionInputs.getLogger()
+		if err != nil {
+			onDaemonError("get logger", err)
+			return
+		}
+		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundle := core.NewBundle(bd, bundleOpts...)
-
 		var fsOpts []fuse.Option
 		fsOpts = append(fsOpts, fuse.Streaming(datamonFlags.fs.Stream))
-		fsOpts = append(fsOpts, fuse.Logger(config.mustGetLogger(datamonFlags)))
+		fsOpts = append(fsOpts, fuse.Logger(logger))
 		if datamonFlags.fs.Stream {
 			fsOpts = append(fsOpts, fuse.CacheSize(int(datamonFlags.fs.CacheSize)))
 			fsOpts = append(fsOpts, fuse.Prefetch(datamonFlags.fs.WithPrefetch))
 			fsOpts = append(fsOpts, fuse.VerifyHash(datamonFlags.fs.WithVerifyHash))
 		}
-
 		fs, err := fuse.NewReadOnlyFS(bundle, fsOpts...)
 		if err != nil {
 			onDaemonError("create read only filesystem", err)
@@ -147,7 +153,9 @@ var mountBundleCmd = &cobra.Command{
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 

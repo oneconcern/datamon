@@ -21,22 +21,18 @@ The destination path is a temporary staging area for write operations.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 
-		contributor, err := paramsToContributor(datamonFlags)
-		if err != nil {
-			wrapFatalln("populate contributor struct", err)
-			return
-		}
 		// cf. comments on runDaemonized in bundle_mount.go
 		if datamonFlags.bundle.Daemonize {
 			runDaemonized()
 			return
 		}
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		contributor, err := optionInputs.contributor()
 		if err != nil {
-			onDaemonError("create remote stores", err)
+			onDaemonError("populate contributor struct", err)
 			return
 		}
-		consumableStore, err := paramsToSrcStore(ctx, datamonFlags, true)
+		consumableStore, err := optionInputs.srcStore(ctx, true)
 		if err != nil {
 			onDaemonError("create source store", err)
 			return
@@ -46,16 +42,25 @@ The destination path is a temporary staging area for write operations.`,
 			core.Message(datamonFlags.bundle.Message),
 			core.Contributor(contributor),
 		)
-		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		if err != nil {
+			onDaemonError("failed to initialize bundle options", err)
+			return
+		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
-		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
+		logger, err := optionInputs.getLogger()
+		if err != nil {
+			onDaemonError("get logger", err)
+			return
+		}
+		bundleOpts = append(bundleOpts, core.Logger(logger))
 
 		bundle := core.NewBundle(bd, bundleOpts...)
 
 		var fsOpts []fuse.Option
-		fsOpts = append(fsOpts, fuse.Logger(config.mustGetLogger(datamonFlags)))
+		fsOpts = append(fsOpts, fuse.Logger(logger))
 
 		fs, err := fuse.NewMutableFS(bundle, fsOpts...)
 		if err != nil {
@@ -97,7 +102,9 @@ The destination path is a temporary staging area for write operations.`,
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 
