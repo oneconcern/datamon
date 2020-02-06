@@ -19,12 +19,13 @@ var bundleUpdateCmd = &cobra.Command{
 		"--destination is a location previously passed to the `bundle download` command.",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		destinationStore, err := paramsToDestStore(datamonFlags, destTNonEmpty, "")
+		destinationStore, err := optionInputs.destStore(destTNonEmpty, "")
 		if err != nil {
 			wrapFatalln("create destination store", err)
 			return
@@ -72,7 +73,10 @@ var bundleUpdateCmd = &cobra.Command{
 			core.ConsumableStore(destinationStore),
 		)
 
-		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		if err != nil {
+			wrapFatalln("failed to initialize bundle options", err)
+		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		remoteBundle := core.NewBundle(core.NewBDescriptor(),
@@ -87,7 +91,9 @@ var bundleUpdateCmd = &cobra.Command{
 
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 

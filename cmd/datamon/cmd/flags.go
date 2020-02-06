@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	gcscontext "github.com/oneconcern/datamon/pkg/context/gcs"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"github.com/docker/go-units"
 	"github.com/go-openapi/runtime/flagext"
@@ -22,6 +22,8 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"gopkg.in/yaml.v2"
 )
 
 type flagsT struct {
@@ -326,58 +328,33 @@ func addTemplateFlag(cmd *cobra.Command) string {
 	return c
 }
 
-/** parameters struct to other formats */
+/** parameters struct from other formats */
 
-func paramsToDatamonContext(ctx context.Context, params flagsT) (context2.Stores, error) {
-	// here we select a 100% gcs backend strategy (more elaborate strategies could be defined by the context pkg)
-	return gcscontext.MakeContext(ctx, params.context.Descriptor, config.Credential, gcs.Logger(config.mustGetLogger(params)))
+// apply config file + env vars to structure used to parse cli flags
+func (flags *flagsT) setDefaultsFromConfig(c *CLIConfig) {
+	if flags.context.Descriptor.Name == "" {
+		flags.context.Descriptor.Name = c.Context
+	}
+	if flags.core.Config == "" {
+		flags.core.Config = c.Config
+	}
 }
 
-func paramsToBundleOpts(stores context2.Stores) []core.BundleOption {
-	ops := []core.BundleOption{
-		core.ContextStores(stores),
-	}
-	return ops
+/** combined config (file + env var) and parameters (pflags) */
+
+type cliOptionInputs struct {
+	config *CLIConfig
+	params *flagsT
 }
 
-func paramsToSrcStore(ctx context.Context, params flagsT, create bool) (storage.Store, error) {
-	var err error
-	var consumableStorePath string
-
-	switch {
-	case params.bundle.DataPath == "":
-		consumableStorePath, err = ioutil.TempDir("", "datamon-mount-destination")
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create temporary directory: %w", err)
-		}
-	case strings.HasPrefix(params.bundle.DataPath, "gs://"):
-		consumableStorePath = params.bundle.DataPath
-	default:
-		consumableStorePath, err = sanitizePath(params.bundle.DataPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to sanitize destination: %v: %w",
-				params.bundle.DataPath, err)
-		}
+func newCliOptionInputs(config *CLIConfig, params *flagsT) *cliOptionInputs {
+	return &cliOptionInputs{
+		config: config,
+		params: params,
 	}
-
-	if create {
-		createPath(consumableStorePath)
-	}
-
-	var sourceStore storage.Store
-	if strings.HasPrefix(consumableStorePath, "gs://") {
-		infoLogger.Println(consumableStorePath[4:])
-		sourceStore, err = gcs.New(ctx, consumableStorePath[5:], config.Credential, gcs.Logger(config.mustGetLogger(params)))
-		if err != nil {
-			return sourceStore, err
-		}
-	} else {
-		DieIfNotAccessible(consumableStorePath)
-		DieIfNotDirectory(consumableStorePath)
-		sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath))
-	}
-	return sourceStore, nil
 }
+
+/** combined config and parameters to internal objects */
 
 // DestT defines the nomenclature for allowed destination types (e.g. Empty/NonEmpty)
 type DestT uint
@@ -388,13 +365,15 @@ const (
 	destTNonEmpty
 )
 
-func paramsToDestStore(params flagsT,
-	destT DestT,
+func (in *cliOptionInputs) destStore(destT DestT,
 	tmpdirPrefix string,
 ) (storage.Store, error) {
+	var params *flagsT
 	var err error
 	var consumableStorePath string
 	var destStore storage.Store
+
+	params = in.params
 
 	if tmpdirPrefix != "" && params.bundle.DataPath != "" {
 		tmpdirPrefix = ""
@@ -444,22 +423,144 @@ func paramsToDestStore(params flagsT,
 	return destStore, nil
 }
 
-func paramsToContributor(flags flagsT) (model.Contributor, error) {
+func (in *cliOptionInputs) datamonContext(ctx context.Context) (context2.Stores, error) {
+	logger, err := in.getLogger()
+	if err != nil {
+		return context2.New(), fmt.Errorf("get logger: %v", err)
+	}
+	// here we select a 100% gcs backend strategy (more elaborate strategies could be defined by the context pkg)
+	return gcscontext.MakeContext(ctx,
+		in.params.context.Descriptor,
+		in.config.Credential,
+		gcs.Logger(logger))
+}
+
+func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.Store, error) {
+	var (
+		err                 error
+		consumableStorePath string
+	)
+	switch {
+	case in.params.bundle.DataPath == "":
+		consumableStorePath, err = ioutil.TempDir("", "datamon-mount-destination")
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create temporary directory: %w", err)
+		}
+	case strings.HasPrefix(in.params.bundle.DataPath, "gs://"):
+		consumableStorePath = in.params.bundle.DataPath
+	default:
+		consumableStorePath, err = sanitizePath(in.params.bundle.DataPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sanitize destination: %v: %w",
+				in.params.bundle.DataPath, err)
+		}
+	}
+
+	if create {
+		createPath(consumableStorePath)
+	}
+
+	var sourceStore storage.Store
+	if strings.HasPrefix(consumableStorePath, "gs://") {
+		logger, err := in.getLogger()
+		if err != nil {
+			return sourceStore, fmt.Errorf("get logger: %v", err)
+		}
+		infoLogger.Println(consumableStorePath[4:])
+		sourceStore, err = gcs.New(ctx,
+			consumableStorePath[5:],
+			in.config.Credential,
+			gcs.Logger(logger))
+		if err != nil {
+			return sourceStore, err
+		}
+	} else {
+		DieIfNotAccessible(consumableStorePath)
+		DieIfNotDirectory(consumableStorePath)
+		sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath))
+	}
+	return sourceStore, nil
+}
+
+func (in *cliOptionInputs) bundleOpts(ctx context.Context) ([]core.BundleOption, error) {
+	stores, err := in.datamonContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ops := []core.BundleOption{
+		core.ContextStores(stores),
+	}
+	return ops, nil
+}
+
+func (in *cliOptionInputs) getLogger() (*zap.Logger, error) {
+	var err error
+	in.config.onceLogger.Do(func() {
+		in.config.logger, err = dlogger.GetLogger(in.params.root.logLevel)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set log level: %v", err)
+	}
+	return in.config.logger, nil
+}
+
+func (in *cliOptionInputs) populateRemoteConfig() error {
+	flags := in.params
+	if flags.core.Config == "" {
+		return fmt.Errorf("set environment variable $DATAMON_GLOBAL_CONFIG or define remote config in the config file")
+	}
+	logger, err := in.getLogger()
+	if err != nil {
+		return fmt.Errorf("get logger: %v", err)
+	}
+	configStore, err := handleRemoteConfigErr(
+		gcs.New(context.Background(),
+			flags.core.Config,
+			config.Credential,
+			gcs.Logger(logger)))
+	if err != nil {
+		return fmt.Errorf("failed to get config store: %v", err)
+	}
+	rdr, err := handleContextErr(configStore.Get(context.Background(), model.GetPathToContext(flags.context.Descriptor.Name)))
+	if err != nil {
+		return fmt.Errorf("failed to get context details from config store for context %q: %v",
+			flags.context.Descriptor.Name, err)
+	}
+	b, err := ioutil.ReadAll(rdr)
+	if err != nil {
+		return fmt.Errorf("failed to read context details: %v", err)
+	}
+	contextDescriptor := model.Context{}
+	err = yaml.Unmarshal(b, &contextDescriptor)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal: %v", err)
+	}
+	flags.context.Descriptor = contextDescriptor
+	return nil
+}
+
+func (in *cliOptionInputs) contributor() (model.Contributor, error) {
+	flags := in.params
 	var credentials string
 	switch {
 	case flags.root.credFile != "":
 		credentials = flags.root.credFile
 	case config.Credential != "":
 		credentials = config.Credential
-	default:
-		credentials = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	}
-	if credentials == "" {
+	contributor, err := authorizer.Principal(credentials)
+	if err != nil {
 		return model.Contributor{},
-			fmt.Errorf("could not resolve credentials: must be present as --credential flag, or in local config or as GOOGLE_APPLICATION_CREDENTIALS environment")
+			fmt.Errorf("could not resolve credentials: must be present as --credential flag, or in local config or as GOOGLE_APPLICATION_CREDENTIALS environment. err: %s", err)
 	}
-	return authorizer.Principal(credentials)
+	return contributor, err
 }
+
+func (in *cliOptionInputs) dumpContext() string {
+	return "using config:" + in.config.Config + " context:" + in.params.context.Descriptor.Name
+}
+
+/** misc util */
 
 // requireFlags sets a flag (local to the command or inherited) as required
 func requireFlags(cmd *cobra.Command, flags ...string) {

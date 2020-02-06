@@ -1,19 +1,14 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/errors"
-	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
-	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -62,58 +57,9 @@ type CLIConfig struct {
 	onceLogger sync.Once
 }
 
-func (c *CLIConfig) setDatamonParams(flags *flagsT) {
-	if flags.context.Descriptor.Name == "" {
-		flags.context.Descriptor.Name = c.Context
-	}
-	if flags.core.Config == "" {
-		flags.core.Config = c.Config
-	}
-}
-
 // MarshalConfig produces a CLI config as a YAML document
 func (c *CLIConfig) MarshalConfig() ([]byte, error) {
 	return yaml.Marshal(c)
-}
-
-func (c *CLIConfig) populateRemoteConfig(flags *flagsT) {
-	if flags.core.Config == "" {
-		wrapFatalln("set environment variable $DATAMON_GLOBAL_CONFIG or define remote config in the config file", nil)
-		return
-	}
-	configStore, err := handleRemoteConfigErr(gcs.New(context.Background(), flags.core.Config, config.Credential, gcs.Logger(c.mustGetLogger(*flags))))
-	if err != nil {
-		wrapFatalln("failed to get config store", err)
-		return
-	}
-	rdr, err := handleContextErr(configStore.Get(context.Background(), model.GetPathToContext(flags.context.Descriptor.Name)))
-	if err != nil {
-		wrapFatalln("failed to get context details from config store for context "+flags.context.Descriptor.Name, err)
-		return
-	}
-	b, err := ioutil.ReadAll(rdr)
-	if err != nil {
-		wrapFatalln("failed to read context details", err)
-		return
-	}
-	contextDescriptor := model.Context{}
-	err = yaml.Unmarshal(b, &contextDescriptor)
-	if err != nil {
-		wrapFatalln("failed to unmarshal", err)
-		return
-	}
-	flags.context.Descriptor = contextDescriptor
-}
-
-func (c *CLIConfig) mustGetLogger(flags flagsT) *zap.Logger {
-	c.onceLogger.Do(func() {
-		var err error
-		c.logger, err = dlogger.GetLogger(flags.root.logLevel)
-		if err != nil {
-			wrapFatalln("failed to set log level", err)
-		}
-	})
-	return c.logger
 }
 
 func handleRemoteConfigErr(store storage.Store, err error) (storage.Store, error) {

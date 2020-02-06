@@ -37,12 +37,13 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 
-		remoteStores, err := paramsToDatamonContext(ctx, datamonFlags)
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		destinationStore, err := paramsToDestStore(datamonFlags, destTEmpty, "")
+		destinationStore, err := optionInputs.destStore(destTEmpty, "")
 		if err != nil {
 			wrapFatalln("create destination store", err)
 			return
@@ -53,7 +54,10 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 			return
 		}
 
-		bundleOpts := paramsToBundleOpts(remoteStores)
+		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		if err != nil {
+			wrapFatalln("failed to initialize bundle options", err)
+		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(destinationStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
@@ -61,7 +65,12 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 			datamonFlags.bundle.ConcurrencyFactor/fileDownloadsByConcurrencyFactor))
 		bundleOpts = append(bundleOpts, core.ConcurrentFilelistDownloads(
 			datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
-		bundleOpts = append(bundleOpts, core.Logger(config.mustGetLogger(datamonFlags)))
+		logger, err := optionInputs.getLogger()
+		if err != nil {
+			wrapFatalln("get logger", err)
+			return
+		}
+		bundleOpts = append(bundleOpts, core.Logger(logger))
 
 		bundle := core.NewBundle(core.NewBDescriptor(),
 			bundleOpts...,
@@ -90,7 +99,9 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 		}
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		config.populateRemoteConfig(&datamonFlags)
+		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
+			wrapFatalln("populate remote config", err)
+		}
 	},
 }
 
