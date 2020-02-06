@@ -143,7 +143,6 @@ func setupTests(t *testing.T) func() {
 
 	createAllTestUploadTrees(t)
 	cleanup := func() {
-		c()
 		_ = os.RemoveAll(destinationDir)
 		deleteBucket(ctx, t, client, bucketMeta)
 		deleteBucket(ctx, t, client, bucketBlob)
