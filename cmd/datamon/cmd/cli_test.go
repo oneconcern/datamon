@@ -251,7 +251,7 @@ func TestUploadBundle(t *testing.T) {
 	}
 }
 
-func TestUploadBundle_filePath(t *testing.T) {
+func TestUploadBundleFilePath(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
 	runCmd(t, []string{"repo",
