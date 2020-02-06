@@ -45,6 +45,6 @@ func TestSelfUpgrade(t *testing.T) {
 	res := icmd.RunCommand(opts.selfBinary, "version")
 	require.EqualValues(t, 0, res.ExitCode)
 
-	rexp := regexp.MustCompile(`(?m)Version:\s*(.*?)\nBuild date:\s*(.*?)\nCommit:\s*(.*)`)
+	rexp := regexp.MustCompile(`(?m)Version:\s*(.*?)\nBuildDate:\s*(.*?)\nCommit:\s*(.*)`)
 	assert.Truef(t, rexp.MatchString(res.Stdout()), "unexpected datamon version result on updated binary: %q", res.Stdout())
 }
