@@ -556,6 +556,10 @@ func (in *cliOptionInputs) contributor() (model.Contributor, error) {
 	return contributor, err
 }
 
+func (in *cliOptionInputs) dumpContext() string {
+	return "using config:" + in.config.Config + " context:" + in.params.context.Descriptor.Name
+}
+
 /** misc util */
 
 // requireFlags sets a flag (local to the command or inherited) as required
