@@ -155,6 +155,7 @@ func unpackBundleDescriptor(ctx context.Context, bundle *Bundle, publish bool) e
 type bundleEntriesRes struct {
 	bundleEntries model.BundleEntries
 	idx           uint64
+	id            string // the splitID when used in a diamond split context
 }
 
 type downloadBundleFileListChans struct {

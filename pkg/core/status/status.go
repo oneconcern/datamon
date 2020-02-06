@@ -44,4 +44,22 @@ var (
 	//
 	// This may only appear when the feature to force (preserve) ksuid on bundle uploads is enabled.
 	ErrBundleIDExists = errors.New("bundleID already exists on this store")
+
+	// ErrNotImplemented occurs when calling a feature that is not implemented
+	ErrNotImplemented = errors.New("not implemented")
+
+	// ErrCommitGivenUp occurs when a diamond commit is abandoned on purpose
+	ErrCommitGivenUp = errors.New("commit operation given up")
+
+	// ErrForbiddenConflict occurs when a conflict is detected and committing a diamond with no conflict allowed
+	ErrForbiddenConflict = errors.New("forbidden conflict detected")
+
+	// ErrSplitAlreadyDone occurs when attempting to restart a split which has already successfully completed. A UI may safely recover from this.
+	ErrSplitAlreadyDone = errors.New("split is done and cannot be restarted (has not to be)")
+
+	// ErrSplitMustExist occurs when forcing a split ID: this one must already exist
+	ErrSplitMustExist = errors.New("cannot create split: split must already exist")
+
+	// ErrSplitUpdate tells there is an error when uploading a split descriptor the the vmetadata store
+	ErrSplitUpdate = errors.New("cannot update split descriptor")
 )
