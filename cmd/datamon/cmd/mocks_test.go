@@ -114,25 +114,39 @@ func setupTests(t *testing.T) func() {
 	osExit = MakeExitMock(exitMocks)
 
 	btag := internal.RandStringBytesMaskImprSrc(15)
-
-	bucketMeta := "datamon-deleteme-meta" + btag
-	bucketBlob := "datamon-deleteme-blob" + btag
-	bucketVMeta := "datamon-deleteme-vmeta" + btag
-	bucketWAL := "datamon-deleteme-wal" + btag
-	bucketReadLog := "datamon-deleteme-read-log" + btag
+	name := strings.ToLower(t.Name())
+	prefix := "delete-" + btag
+	bucketMeta := prefix + "-meta-" + name
+	bucketBlob := prefix + "-blob-" + name
+	bucketVMeta := prefix + "-vmeta-" + name
+	bucketWAL := prefix + "-wal-" + name
+	bucketReadLog := prefix + "-read-log-" + name
 
 	client, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err, "couldn't create bucket client")
-	err = client.Bucket(bucketMeta).Create(ctx, "onec-co", nil)
-	require.NoError(t, err, "couldn't create metadata bucket")
-	err = client.Bucket(bucketBlob).Create(ctx, "onec-co", nil)
-	require.NoError(t, err, "couldn't create blob bucket")
-	err = client.Bucket(bucketWAL).Create(ctx, "onec-co", nil)
-	require.NoError(t, err, "couldn't create wal bucket")
-	err = client.Bucket(bucketReadLog).Create(ctx, "onec-co", nil)
-	require.NoError(t, err, "couldn't create readLog bucket")
-	err = client.Bucket(bucketVMeta).Create(ctx, "onec-co", nil)
-	require.NoError(t, err, "couldn't create vMeta bucket")
+
+	buckets := []string{bucketBlob, bucketMeta, bucketVMeta, bucketWAL, bucketReadLog}
+	bucketsToClean := make([]func(), 0)
+	doBucketCleanup := func() {
+		for _, fn := range bucketsToClean {
+			fn()
+		}
+	}
+	handleErr := func() {
+		if err != nil {
+			doBucketCleanup()
+			t.Errorf("Filed to create bucket: %s", err)
+		}
+	}
+
+	for _, b := range buckets {
+		lb := b
+		err = client.Bucket(b).Create(ctx, "onec-co", nil)
+		handleErr()
+		bucketsToClean = append(bucketsToClean, func() {
+			deleteBucket(ctx, t, client, lb)
+		})
+	}
 
 	datamonFlags.context.Descriptor.Metadata = bucketMeta
 	datamonFlags.context.Descriptor.Blob = bucketBlob
@@ -145,11 +159,7 @@ func setupTests(t *testing.T) func() {
 	cleanup := func() {
 		c()
 		_ = os.RemoveAll(destinationDir)
-		deleteBucket(ctx, t, client, bucketMeta)
-		deleteBucket(ctx, t, client, bucketBlob)
-		deleteBucket(ctx, t, client, bucketWAL)
-		deleteBucket(ctx, t, client, bucketReadLog)
-		deleteBucket(ctx, t, client, bucketVMeta)
+		doBucketCleanup()
 	}
 	return cleanup
 }
