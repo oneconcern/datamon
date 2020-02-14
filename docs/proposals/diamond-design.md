@@ -31,12 +31,12 @@ For a diamond to start, datamon needs some unique ID. Datamon SDK allows for the
 3. The {diamond-id} is only used once: users cannot initialize the same diamond twice.
 4. Initialization command, returning an identifier which is guaranteed to be unique:
    ```
-   datamon bundle diamond initialize --repo {repo}
+   datamon diamond initialize --repo {repo}
    {diamond-id}
    ```
 5. Alternatively, a user can specify its own ID for diamond, which uniqueness is checked by datamon (this ID need not to be a KSUID).
    ```
-   datamon bundle diamond initialize --repo {repo} --diamond {diamond-id}
+   datamon diamond initialize --repo {repo} --diamond {diamond-id}
    {diamond-id}
    ```
 6. Backend model: the following path is created in the vmetadata bucket.
@@ -58,7 +58,7 @@ Uploading files in a diamond split first stores all files as blobs, then generat
    commands yet.
 2. Command:
    ```
-   datamon bundle diamond add --repo {repo} --diamond {diamond-id} --path {source}
+   datamon diamond add --repo {repo} --diamond {diamond-id} --path {source}
    {split-id}
    ```
    This command is similar to `datamon bundle upload`, the only difference being the required `--diamond` flag.
@@ -72,7 +72,7 @@ Uploading files in a diamond split first stores all files as blobs, then generat
 5. However, the user has the possibility to run again a split by explicitly recalling the same `{split-id}`.
    This disables all conflict detection on files coming from that split. See more about conflicts [below](#handling-conflicts).
    ```
-   datamon bundle diamond add --repo {repo} --diamond {diamond-id} --split {split-id} --path {source}
+   datamon diamond add --repo {repo} --diamond {diamond-id} --split {split-id} --path {source}
    {split-id}
    ```
    This command fails when when the split has not been already created.
@@ -92,12 +92,12 @@ Eventually, all file lists combine into a new bundle with the commit message and
 2. Any `split add` operation still in progress at commit time will be ignored in the resulting bundle.
 3. Command:
    ```
-   datamon bundle diamond commit --repo {repo} --diamond {id} --message {message} [--label {label}]
+   datamon diamond commit --repo {repo} --diamond {id} --message {message} [--label {label}]
    ```
 4. Optionally a commit can be set to fail on conflict.
    ```
-   datamon bundle diamond commit --repo {repo} --diamond {diamond-id} \
-                                 --message {message} --label {label} --no-conflicts
+   datamon diamond commit --repo {repo} --diamond {diamond-id} \
+                          --message {message} --label {label} --no-conflicts
    ```
    In that case, the conflicting splits are indicated in the error message.
 5. **Nice to have**. Alternatively, the whole diamond operation may be cancelled (see [§ Cancellation](#handling-failures-retries-and-cancellations)).
@@ -116,6 +116,22 @@ Eventually, all file lists combine into a new bundle with the commit message and
 
 > **NOTE**: while not critical, this task guards our `vmetadata` bucket against undesirable pollution from tracks of
 > failed CI jobs, etc. We could run this on every week-end for instance.
+
+
+## Example
+
+```bash
+repo="test-repo"
+diamond=$(datamon diamond initialize --repo "${repo}")
+
+datamon diamond add --repo "${repo}" --diamond "${diamond-id}" --path /datasource/part1 &
+datamon diamond add --repo "${repo}" --diamond "${diamond-id}" --path /datasource/part2 &
+datamon diamond add --repo "${repo}" --diamond "${diamond-id}" --path /datasource/part3 &
+
+datamon diamond split list --repo "${repo}" --diamond "${diamond-id}"
+
+datamon diamond commit --repo "${repo}" --diamond "${diamond-id}" --message "Diamond constructed"
+```
 
 
 ## Detailed design
@@ -157,11 +173,12 @@ datamon diamond commit --diamond {diamond-id} \
 Available option at upload time:
 ```
 datamon diamond add --diamond {diamond-id} \
-                    --split {split-id} --path {source}   #  <- locally ignores conflicts with previous instance of {split-id}, no change in behavior at commit time
+                    --split {split-id} --path {source}   #  <- locally ignores conflicts with previous instance of
+                                                         #     {split-id}, no change in behavior at commit time
 ```
 
-Note that the joint use of `--with-checkpoints` and `--no-conflicts` guards incremental uploads against clobbering
-already uploaded files, whenever this is not desirable.
+Use `--no-conflicts` to guard incremental uploads against clobbering already uploaded files, whenever this is not desirable.
+Flags determining the conflict handling mode cannot be used jointly.
 
 ### Handling concurrency
 
@@ -283,7 +300,7 @@ Design:
   2. `committing`
   3. `done`
 
-  **Nice to have**: and in addition, for diamond cancelling operations:
+**Nice to have**: and in addition, for diamond cancelling operations:
   4. `cancelling`
   5. `cancelled`
 
@@ -349,18 +366,23 @@ overall conflict handling is preserved at commit time, but such technical confli
 The container will have to persist the initial `{split-id}` returned by the commmand, then reuse it.
 
 ```bash
-# assume .split is mounted from some persistent volume
+# assume .split is mounted on some persistent volume
 if [[ ! -f ${mounted}/.split ]] ; then
-  datamon diamond add --diamond ${diamond} --path ${source} > .split
+  datamon diamond add --diamond ${diamond} --path ${source} > ${mounted}/.split
 else
   datamon diamond add --diamond ${diamond} --split $(cat ${mounted}/.split) --path ${source}
 fi
 ```
 
 1. The command fails whenever no split `{split-id}` is not already existing.
-2. The command fails whenever the split `{split-id}` is already `done` `running`.
-3. The command fails whenever the split `{split-id}` is already `running`: only `failed` splits may be restarted this way.
-   To recover from hangs/uncontrolled failures, one should start a new split (and accept the possible resulting conflicts).
+2. The command fails whenever the split `{split-id}` is already `done`.
+3. The command succeeds whenever the split `{split-id}` is already in state `running`: users must ensure that the split
+   job is terminated. In the use case above, the failed container cannot possibly have the previous run with the split
+   still running.
+4. The restarted `split add` job scratches all previously constructed file lists in:
+   ```
+   splits/{diamond-id}/{split-id}/bundle-fles-{index}.yaml
+   ```
 
 #### Failed commit
 
@@ -444,14 +466,14 @@ Design:
 
 ### List all initiated diamonds on a repo
 ```
-datamon bundle diamond list --repo {repo}
+datamon diamond list --repo {repo}
 ```
 
 Completed diamonds are available in this listing until they are eventually cleaned up by the background cleaner.
 
 ### List all ongoing splits for a diamond on a repo
 ```
-datamon bundle diamond split list --repo {repo} --diamond {diamond-id}
+datamon diamond split list --repo {repo} --diamond {diamond-id}
 ```
 
 Report about the ID, status and timings of every ongoing or failed split.
@@ -472,18 +494,18 @@ Please be reminded here that files with special paths `/.conflicts` and `/.check
 ## Recap of new commands or new options to existing commands
 
 ```
-datamon bundle diamond
-              |_  initialize --repo {repo}
-              |
-              |_  commit --repo {repo} --diamond {diamond-id} --message {commit message} [--with-conflicts|--with-checkpoints|--ignore-conflicts|--no-conflicts] [--label]
-              |
-              |_  list --repo {repo}
-              |
-              |_  split
-                    |
-                    |_ add --repo {repo} --diamond {diamond-id} --path {source} [--split-id {split-id}] [--split-tag {my-bespoke-distinctive-tag}] [--files {list of files}]
-                    |
-                    |_ list --repo {repo} --diamond {diamond-id}
+datamon diamond
+          |_  initialize --repo {repo}
+          |
+          |_  commit --repo {repo} --diamond {diamond-id} --message {commit message} [--with-conflicts|--with-checkpoints|--ignore-conflicts|--no-conflicts] [--label]
+          |
+          |_  list --repo {repo}
+          |
+          |_  split
+                |
+                |_ add --repo {repo} --diamond {diamond-id} --path {source} [--split-id {split-id}] [--split-tag {my-bespoke-distinctive-tag}] [--files {list of files}]
+                |
+                |_ list --repo {repo} --diamond {diamond-id}
 ```
 
 
@@ -506,7 +528,7 @@ No change.
 
 ### Cancel a diamond
 ```
-datamon bundle diamond cancel --repo {repo} --diamond {diamond-id}
+datamon diamond cancel --repo {repo} --diamond {diamond-id}
 ```
 
 This waits for ongoing running splits to complete then marks vmetadata ready for cleanup
@@ -516,7 +538,7 @@ This waits for ongoing running splits to complete then marks vmetadata ready for
 
 ### Identify splits with some custom node identifier
 ```
-datamon bundle diamond split add --repo {repo} --path {source} --split-tag {my-bespoke-distinctive-tag}
+datamon diamond split add --repo {repo} --path {source} --split-tag {my-bespoke-distinctive-tag}
 ```
 
 Tags are kept in metadata and can be used when reporting about running splits or help latter with conflict resolution.
@@ -529,5 +551,5 @@ Tags are typically a hostname or something that helps the end-user identify a no
 
 ### List files in one or all splits
 ```
-datamon bundle diamond split list files --repo {repo} --diamond {diamond-id} [--split-id {split-id}]
+datamon diamond split list files --repo {repo} --diamond {diamond-id} [--split-id {split-id}]
 ```
