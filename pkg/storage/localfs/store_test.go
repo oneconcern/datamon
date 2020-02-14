@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"strconv"
 	"testing"
 
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -112,4 +113,74 @@ func setupStore(t testing.TB) (storage.Store, func()) {
 	ff.Close()
 
 	return New(fs), func() {}
+}
+
+func TestKeysPrefix(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	err := fs.MkdirAll("/a/b/c", 0777)
+	require.NoError(t, err)
+	err = fs.MkdirAll("/a/d", 0777)
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		f, erc := fs.Create("/a/b/c/e" + strconv.Itoa(i))
+		require.NoError(t, erc)
+		_, erc = f.WriteString("this is the text")
+		require.NoError(t, erc)
+		_ = f.Close()
+		f, erc = fs.Create("/a/d/f" + strconv.Itoa(i))
+		require.NoError(t, erc)
+		_, erc = f.WriteString("this is the text")
+		require.NoError(t, erc)
+		_ = f.Close()
+	}
+
+	store := New(fs)
+
+	var (
+		keys []string
+		next string
+	)
+
+	i := 0
+	search := "/a"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 3); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 3) {
+		require.NoError(t, err)
+		assert.Len(t, keys, 3)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 2)
+	assert.Equal(t, i, 6)
+
+	i = 0
+	search = "/a/d/f"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 4); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 4) {
+		require.NoError(t, err)
+		assert.Len(t, keys, 4)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 2)
+	assert.Equal(t, i, 2)
+
+	i = 0
+	search = "a"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 3); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 3) {
+		require.NoError(t, err)
+		assert.Len(t, keys, 3)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 2)
+	assert.Equal(t, i, 6)
+
+	i = 0
+	search = "a/d"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 100); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 100) {
+		i++
+		t.Fail()
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 10)
+	assert.Equal(t, i, 0)
 }
