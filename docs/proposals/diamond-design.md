@@ -64,8 +64,8 @@ Uploading files in a diamond split first stores all files as blobs, then generat
    This command is similar to `datamon bundle upload`, the only difference being the required `--diamond` flag.
 3. Backend model: in the vmetadata bucket the following paths will be created or overwritten.
    ```
-   /splits/{repo}/{diamond-id}/{split-id}/split.yaml
-   /splits/{repo}/{diamond-id}/{split-id}/bundle-files-{index}.yaml
+   /splits/{repo}/{diamond-id}/splits/{split-id}/split.yaml
+   /splits/{repo}/{diamond-id}/splits/{split-id}/bundle-files-{index}.yaml
    ```
 4. The split ID is internal to datamon, and automatically generated with every `add` command.
    The user is normally not required to know about this ID.
@@ -324,7 +324,7 @@ Any subsequent commit will only consider splits in the `done` state.
 #### Failed add operation
 A controlled failure on such an operation would mark the split as explicitly failed (for further reporting and monitoring).
 ```
-/splits/{repo}/{diamond-id}/{split-id}/split.yaml   #  <- State pass to "failed"
+/splits/{repo}/{diamond-id}/splits/{split-id}/split.yaml   #  <- State pass to "failed"
 ```
 
 > **NOTE**: please mark that it is not possible to distinguish an aborted or hanging `add` operation from a merely long running one.
@@ -381,7 +381,7 @@ fi
    still running.
 4. The restarted `split add` job scratches all previously constructed file lists in:
    ```
-   splits/{diamond-id}/{split-id}/bundle-fles-{index}.yaml
+   splits/{diamond-id}/splits/{split-id}/bundle-files-{index}.yaml
    ```
 
 #### Failed commit
@@ -455,7 +455,7 @@ Design:
 * Each split keeps track of its originating contributor
 * This metadata is at first recorded in:
   ```
-  /splits/{repo}/{diamond-id}/{split-id}/split.yaml
+  /splits/{repo}/{diamond-id}/splits/{split-id}/split.yaml
   ```
 * At commit time, we merge contributors into the resulting bundle:
   ```
@@ -514,9 +514,9 @@ datamon diamond
 ### vmetadata
 
 ```
-splits/{repo}/{diamond-id}/diamond.yaml            # <- captures the diamond state: initialized, committing, done
-splits/{repo}/{diamond-id}/{split-id}/split.yaml   # <- captures the split state, plus holds information about the running split, eventually merged into metadata for bundle
-splits/{repo}/{diamond-id}/{split-id}/bundle-files-{index}.yaml # <- file index for uploaded data
+splits/{repo}/{diamond-id}/diamond.yaml                                # <- captures the diamond state: initialized, committing, done
+splits/{repo}/{diamond-id}/splits/{split-id}/split.yaml                # <- captures the split state, plus holds information about the running split, eventually merged into metadata for bundle
+splits/{repo}/{diamond-id}/splits/{split-id}/bundle-files-{index}.yaml # <- file index for uploaded data
 ```
 
 ### metadata
