@@ -75,11 +75,12 @@ var CommitDiamondCmd = &cobra.Command{
 
 		if datamonFlags.label.Name != "" {
 			label := core.NewLabel(
-				core.NewLabelDescriptor(
-					core.LabelContributors(d.BundleDescriptor.Contributors),
-				),
-				core.LabelName(datamonFlags.label.Name),
-			)
+				core.LabelDescriptor(
+					model.NewLabelDescriptor(
+						model.LabelContributors(d.BundleDescriptor.Contributors),
+						model.LabelName(datamonFlags.label.Name),
+					),
+				))
 			err = label.UploadDescriptor(ctx, d.Bundle)
 			if err != nil {
 				wrapFatalln("upload label", err)
@@ -101,6 +102,7 @@ func init() {
 		addDiamondFlag(CommitDiamondCmd),
 		addCommitMessageFlag(CommitDiamondCmd),
 	)
+
 	addWithConflictsFlag(CommitDiamondCmd)
 	addWithCheckpointFlag(CommitDiamondCmd)
 	addNoConflictsFlag(CommitDiamondCmd)

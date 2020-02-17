@@ -15,6 +15,10 @@ import (
 	"google.golang.org/api/option"
 )
 
+func generateRepoName(in string) string {
+	return "test-" + in + "-repo-" + rand.LetterString(10)
+}
+
 type ExitMocks struct {
 	mock.Mock
 	exitStatuses []int
