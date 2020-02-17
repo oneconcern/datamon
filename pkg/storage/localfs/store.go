@@ -195,15 +195,14 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 // NOTE: this cursory implementation is at the moment only used by mocks in test. A more thorough approach
 // is required to make KeyPrefix a first class citizen for localfs.
 //
-// NOTE: "delimiter" is ignored (always set to "/").
-//
 // TODO(known limitations):
 //   * this implementation does not really scale up, but it is quite workable for our testcases using localfs.
 //   * this implementation is not meant for parallel use with mutable FS.
-func (l *localFS) KeysPrefix(_ context.Context, token, prefix, _ string, count int) ([]string, string, error) {
+func (l *localFS) KeysPrefix(_ context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
 	l.exclusive.Lock()
 	defer l.exclusive.Unlock()
 
+	noRoot := !strings.HasPrefix(prefix, "/")
 	prefix = path.Clean("/" + prefix)
 
 	// we cache the result for the duration of the fetch loop: during this period, localfs updates are not seen
@@ -216,12 +215,37 @@ func (l *localFS) KeysPrefix(_ context.Context, token, prefix, _ string, count i
 				return nil
 			}
 			if strings.HasPrefix(pth, prefix) {
-				matches = append(matches, strings.TrimPrefix(pth, "/"))
+				if delimiter != "" && len(pth) > len(prefix) {
+					if cut := strings.Index(pth[len(prefix):], delimiter); cut > -1 {
+						pth = pth[0 : len(prefix)+cut+1]
+					}
+				}
+				if noRoot {
+					pth = strings.TrimPrefix(pth, "/")
+				}
+				matches = append(matches, pth)
 			}
 			return nil
 		})
 		if err != nil {
 			return nil, "", err
+		}
+		if delimiter != "" {
+			// dedupe truncated matches
+			deduped := make([]string, 0, len(matches))
+			for _, match := range matches {
+				dupe := false
+				for _, lookup := range deduped {
+					if match == lookup {
+						dupe = true
+						break
+					}
+				}
+				if !dupe {
+					deduped = append(deduped, match)
+				}
+			}
+			matches = deduped
 		}
 		l.glob[prefix], search = matches, matches
 	}
