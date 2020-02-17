@@ -125,6 +125,8 @@ func fakeFile(t testing.TB, fs afero.Fs, file string) {
 	require.NoError(t, err)
 }
 
+const aSearch = "/a"
+
 func TestKeysPrefix(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	err := fs.MkdirAll("/a/b/c", 0777)
@@ -144,7 +146,7 @@ func TestKeysPrefix(t *testing.T) {
 	)
 
 	i := 0
-	search := "/a"
+	search := aSearch
 	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 3); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 3) {
 		require.NoError(t, err)
 		assert.Len(t, keys, 3)
@@ -214,8 +216,8 @@ func TestKeysPrefixWithDelimiter(t *testing.T) {
 	assert.NoError(t, err)
 
 	// with invalid next
-	search = "/a"
-	keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 5)
+	search = aSearch
+	_, next, err = store.KeysPrefix(context.Background(), "", search, "", 5)
 	require.NotEmpty(t, next)
 	assert.NoError(t, err)
 	keys, next, err = store.KeysPrefix(context.Background(), "nowhere", search, "", 5)
@@ -225,7 +227,7 @@ func TestKeysPrefixWithDelimiter(t *testing.T) {
 
 	// with delimiters and deduplication
 	i := 0
-	search = "/a"
+	search = aSearch
 	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "-", 5); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "-", 5) {
 		require.NoError(t, err)
 		assert.Lenf(t, keys, 5, "got keys %v", keys)
