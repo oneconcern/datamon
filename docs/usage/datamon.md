@@ -33,6 +33,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 * [datamon bundle](datamon_bundle.md)	 - Commands to manage bundles for a repo
 * [datamon config](datamon_config.md)	 - Commands to manage the config file
 * [datamon context](datamon_context.md)	 - Commands to manage contexts.
+* [datamon diamond](datamon_diamond.md)	 - Commands to manage diamonds
 * [datamon label](datamon_label.md)	 - Commands to manage labels for a repo
 * [datamon repo](datamon_repo.md)	 - Commands to manage repos
 * [datamon upgrade](datamon_upgrade.md)	 - Upgrades datamon to the latest release

@@ -76,6 +76,18 @@ type flagsT struct {
 		BatchSize         int
 		Template          string
 	}
+	split struct {
+		splitID string
+		tag     string
+	}
+	diamond struct {
+		diamondID       string
+		tag             string
+		withConflicts   bool
+		withCheckpoints bool
+		ignoreConflicts bool
+		noConflicts     bool
+	}
 	upgrade upgradeFlags
 }
 
@@ -340,6 +352,70 @@ func addMetricsFlag(cmd *cobra.Command) string {
 func addMetricsURLFlag(cmd *cobra.Command) string {
 	c := "metrics-url"
 	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Fully qualified URL to an influxdb metrics collector, with user and password`)
+	return c
+}
+
+func addDiamondFlag(cmd *cobra.Command) string {
+	c := "diamond"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.diamond.diamondID, c, "", `The diamond to use`)
+	}
+	return c
+}
+
+func addSplitFlag(cmd *cobra.Command) string {
+	c := "split"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.split.splitID, c, "", `The split to use`)
+	}
+	return c
+}
+
+func addWithConflictsFlag(cmd *cobra.Command) string {
+	c := "with-conflicts"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.diamond.withConflicts, c, true, `Diamond commit handles conflicts and keeps them in store`)
+	}
+	return c
+}
+
+func addNoConflictsFlag(cmd *cobra.Command) string {
+	c := "no-conflicts"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.diamond.noConflicts, c, false, `Diamond commit fails if any conflict is detected`)
+	}
+	return c
+}
+
+func addIgnoreConflictsFlag(cmd *cobra.Command) string {
+	c := "ignore-conflicts"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.diamond.ignoreConflicts, c, false, `Diamond commit ignores conflicts and does not report about any`)
+	}
+	return c
+}
+
+func addWithCheckpointFlag(cmd *cobra.Command) string {
+	c := "with-checkpoints"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.diamond.withCheckpoints, c, false, `Diamond commit handles conflicts and keeps them as intermediate checkpoints rather than conflicts`)
+	}
+	return c
+}
+
+func addSplitTagFlag(cmd *cobra.Command) string {
+	c := "split-tag"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.split.tag, c, "", `A custom tag to identify your split in logs or datamon reports. Example: "pod-1"`)
+	}
+	return c
+}
+
+func addDiamondTagFlag(cmd *cobra.Command) string {
+	c := "diamond-tag"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.diamond.tag, c, "", `A custom tag to identify your diamond in logs or datamon reports. Example: "coordinator-pod-A"`)
+	}
 	return c
 }
 
