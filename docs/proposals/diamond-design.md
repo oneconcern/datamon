@@ -237,18 +237,18 @@ Premises: about detecting conflicts
 1. A bundle has a single namespace for files
 2. If _distinct_ splits upload a file with the same path but different data, a conflict is detected at commit time
 3. Conflicting files are the different versions of the same path uploaded by splits
-3. Identical files do not trigger conflicts (check the root hash)
-4. The current arbitration rule is latest write wins (use nano sec timestamp here, not ksuid)
+4. Identical files do not trigger conflicts (check the root hash)
+5. The current arbitration rule is latest write wins (use nano sec timestamp here, not ksuid)
 
 
 Premises: about what to do with conflicts
 
-5. By default, discarded versions of files are kept for possible future reuse (e.g. fixing merge conflicts),
+6. By default, discarded versions of files are kept for possible future reuse (e.g. fixing merge conflicts),
    unless the user tells datamon these may be safely dropped.
-6. Details about conflicts and checkpoints are retained as part of the bundled dataset, in some "hidden folders"
-7. When users explicitly mention their intent to carry out _incremental uploads_, conflicts are renamed as checkpoints,
+7. Details about conflicts and checkpoints are retained as part of the bundled dataset, in some "hidden folders"
+8. When users explicitly mention their intent to carry out _incremental uploads_, conflicts are renamed as checkpoints,
    thus establishing a distinction between "good" and "bad" conflicts.
-8. When users explicitly mention their intent to ignore conflicts, conflicts are discarded and older versions of files
+9. When users explicitly mention their intent to ignore conflicts, conflicts are discarded and older versions of files
    simply dropped at commit time.
 
 > **NOTE**: we don't want to upload blobs without keeping a track of the reference hashes
@@ -550,7 +550,8 @@ datamon diamond split add --repo {repo} --path {source} --split-tag {my-bespoke-
 Tags are kept in metadata and can be used when reporting about running splits or help later with conflict resolution.
 Tags are typically a hostname or something that helps the end-user identify a node in the diamond.
 
-   1. `add` commands can be strongly ordered based on a design similar to WAL (KSUIDs alone do not guarantee strong ordering).
+   1. `add` commands can be strongly ordered based on a design similar to WAL (KSUIDs alone do not guarantee strong ordering, and local timestamps
+      are not fully satisfactory).
       This is a nice to have addition and can be added later in the implementation.
    2. explicit cancellation could attempt to interrupt ongoing splits
 
