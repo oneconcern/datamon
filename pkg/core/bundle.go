@@ -5,15 +5,12 @@ package core
 import (
 	"context"
 	"fmt"
-	"time"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"go.uber.org/zap"
-
-	"github.com/oneconcern/datamon/pkg/cafs"
 
 	"github.com/segmentio/ksuid"
 
@@ -59,29 +56,6 @@ func (b *Bundle) InitializeBundleID() error {
 // GetBundleEntries retrieves all entries in a bundle
 func (b *Bundle) GetBundleEntries() []model.BundleEntry {
 	return b.BundleEntries
-}
-
-func defaultBundleDescriptor() *model.BundleDescriptor {
-	return &model.BundleDescriptor{
-		LeafSize:               cafs.DefaultLeafSize, // For now, fixed leaf size
-		ID:                     "",
-		Message:                "",
-		Parents:                nil,
-		Timestamp:              time.Now(),
-		Contributors:           nil,
-		BundleEntriesFileCount: 0,
-		Version:                model.CurrentBundleVersion,
-		Deduplication:          cafs.DeduplicationBlake,
-	}
-}
-
-// NewBDescriptor builds a new default bundle descriptor
-func NewBDescriptor(descriptorOps ...BundleDescriptorOption) *model.BundleDescriptor {
-	bd := defaultBundleDescriptor()
-	for _, apply := range descriptorOps {
-		apply(bd)
-	}
-	return bd
 }
 
 // BlobStore defines the blob storage (part of the context) for a bundle
@@ -144,6 +118,7 @@ func getReadLogStore(stores context2.Stores) storage.Store {
 
 func defaultBundle() *Bundle {
 	return &Bundle{
+		BundleDescriptor:            *model.NewBundleDescriptor(),
 		RepoID:                      "",
 		BundleID:                    "",
 		ConsumableStore:             nil,
@@ -156,12 +131,10 @@ func defaultBundle() *Bundle {
 }
 
 // NewBundle creates a new bundle
-func NewBundle(bd *model.BundleDescriptor, bundleOps ...BundleOption) *Bundle {
+func NewBundle(opts ...BundleOption) *Bundle {
 	b := defaultBundle()
-	b.BundleDescriptor = *bd
-
-	for _, bApply := range bundleOps {
-		bApply(b)
+	for _, apply := range opts {
+		apply(b)
 	}
 	return b
 }

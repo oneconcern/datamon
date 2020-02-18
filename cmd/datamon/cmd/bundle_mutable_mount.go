@@ -9,6 +9,7 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/fuse"
+	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/spf13/cobra"
 )
 
@@ -38,15 +39,16 @@ The destination path is a temporary staging area for write operations.`,
 			return
 		}
 
-		bd := core.NewBDescriptor(
-			core.Message(datamonFlags.bundle.Message),
-			core.Contributor(contributor),
+		bd := model.NewBundleDescriptor(
+			model.Message(datamonFlags.bundle.Message),
+			model.BundleContributor(contributor),
 		)
 		bundleOpts, err := optionInputs.bundleOpts(ctx)
 		if err != nil {
 			onDaemonError("failed to initialize bundle options", err)
 			return
 		}
+		bundleOpts = append(bundleOpts, core.BundleDescriptor(bd))
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(consumableStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
@@ -57,7 +59,7 @@ The destination path is a temporary staging area for write operations.`,
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 
-		bundle := core.NewBundle(bd, bundleOpts...)
+		bundle := core.NewBundle(bundleOpts...)
 
 		var fsOpts []fuse.Option
 		fsOpts = append(fsOpts, fuse.Logger(logger))
@@ -87,12 +89,13 @@ The destination path is a temporary staging area for write operations.`,
 		}
 		log.Printf("bundle: %v", bundle.BundleID)
 		if datamonFlags.label.Name != "" {
-			labelDescriptor := core.NewLabelDescriptor(
-				core.LabelContributor(contributor),
-			)
-			label := core.NewLabel(labelDescriptor,
-				core.LabelName(datamonFlags.label.Name),
-			)
+			label := core.NewLabel(
+				core.LabelDescriptor(
+					model.NewLabelDescriptor(
+						model.LabelContributor(contributor),
+						model.LabelName(datamonFlags.label.Name),
+					),
+				))
 			err = label.UploadDescriptor(ctx, bundle)
 			if err != nil {
 				wrapFatalln("upload label", err)

@@ -108,7 +108,6 @@ var mountBundleCmd = &cobra.Command{
 			onDaemonError("determine bundle id", err)
 			return
 		}
-		bd := core.NewBDescriptor()
 		bundleOpts, err := optionInputs.bundleOpts(ctx)
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
@@ -123,7 +122,7 @@ var mountBundleCmd = &cobra.Command{
 			return
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
-		bundle := core.NewBundle(bd, bundleOpts...)
+		bundle := core.NewBundle(bundleOpts...)
 		var fsOpts []fuse.Option
 		fsOpts = append(fsOpts, fuse.Streaming(datamonFlags.fs.Stream))
 		fsOpts = append(fsOpts, fuse.Logger(logger))

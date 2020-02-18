@@ -47,7 +47,7 @@ exits with ENOENT status otherwise.`,
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		bundle := core.NewBundle(
 			bundleOpts...,
 		)
 

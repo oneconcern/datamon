@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -48,9 +49,9 @@ set label 'init'
 			wrapFatalln("create source store", err)
 			return
 		}
-		bd := core.NewBDescriptor(
-			core.Message(datamonFlags.bundle.Message),
-			core.Contributor(contributor),
+		bd := model.NewBundleDescriptor(
+			model.Message(datamonFlags.bundle.Message),
+			model.BundleContributor(contributor),
 		)
 
 		bundleOpts, err := optionInputs.bundleOpts(ctx)
@@ -58,6 +59,7 @@ set label 'init'
 			wrapFatalln("failed to initialize bundle options", err)
 			return
 		}
+		bundleOpts = append(bundleOpts, core.BundleDescriptor(bd))
 		bundleOpts = append(bundleOpts, core.ConsumableStore(sourceStore))
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.SkipMissing(datamonFlags.bundle.SkipOnError))
@@ -74,7 +76,7 @@ set label 'init'
 		if enableBundlePreserve {
 			bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		}
-		bundle := core.NewBundle(bd,
+		bundle := core.NewBundle(
 			bundleOpts...,
 		)
 
@@ -118,12 +120,13 @@ set label 'init'
 		}()
 
 		if datamonFlags.label.Name != "" {
-			labelDescriptor := core.NewLabelDescriptor(
-				core.LabelContributor(contributor),
-			)
-			label := core.NewLabel(labelDescriptor,
-				core.LabelName(datamonFlags.label.Name),
-			)
+			label := core.NewLabel(
+				core.LabelDescriptor(
+					model.NewLabelDescriptor(
+						model.LabelContributor(contributor),
+						model.LabelName(datamonFlags.label.Name),
+					),
+				))
 			err = label.UploadDescriptor(ctx, bundle)
 			if err != nil {
 				wrapFatalln("upload label", err)
