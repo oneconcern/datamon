@@ -48,6 +48,7 @@ require (
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/net v0.0.0-20191207000613-e7e4b65ae663 // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5
 	golang.org/x/tools v0.0.0-20200107184032-11e9d9cc0042 // indirect
 	google.golang.org/api v0.14.0

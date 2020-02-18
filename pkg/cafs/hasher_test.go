@@ -74,7 +74,7 @@ func TestLeafHashes_Multi(t *testing.T) {
 		t.Run(tf.Original+"-hashes-multi", func(t *testing.T) {
 			t.Parallel()
 
-			rhash := readTextFile(t, tf.RootHash)
+			rhash := string(readTextFile(t, tf.RootHash))
 			rrdr, err := blobs.Get(context.Background(), rhash)
 			require.NoError(t, err)
 			rkey, err := KeyFromString(rhash)
