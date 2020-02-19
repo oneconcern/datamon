@@ -201,10 +201,7 @@ func uploadBundleFiles(
 }
 
 func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint, getKeys func() ([]string, error), opts ...Option) error {
-	settings := defaultSettings()
-	for _, apply := range opts {
-		apply(&settings)
-	}
+	settings := newSettings(opts...)
 
 	// Walk the entire tree
 	// TODO: #53 handle large file count

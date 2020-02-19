@@ -7,10 +7,7 @@ import (
 )
 
 func writeMemProfile(opts ...Option) error {
-	settings := defaultSettings()
-	for _, apply := range opts {
-		apply(&settings)
-	}
+	settings := newSettings(opts...)
 	if dir := settings.memProfDir; dir != "" {
 		path := filepath.Join(dir, "upload_bundle.mem.prof")
 		f, err := os.Create(path)

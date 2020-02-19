@@ -12,6 +12,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	typicalBundlesNum = 100
+	typicalReposNum   = 100
+)
+
 type testReadCloserWithErr struct {
 }
 

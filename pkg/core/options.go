@@ -1,67 +1,47 @@
 package core
 
 import (
-	"runtime"
-
 	"github.com/oneconcern/datamon/pkg/metrics"
 )
-
-// Option sets options for listing core objects
-type Option func(*Settings)
-
-// Settings defines various settings for core features
-type Settings struct {
-	concurrentList   int
-	batchSize        int
-	doneChannel      chan struct{}
-	profilingEnabled bool
-	memProfDir       string
-
-	metrics.Enable
-	//m *M // TODO(fred): enable metrics for list operations
-}
 
 const (
 	defaultBatchSize = 1024
 )
 
-var (
-	defaultListConcurrency = 2 * runtime.NumCPU()
-)
+// Option sets options for listing core objects
+type Option func(*settings)
 
-// ConcurrentList sets the max level of concurrency to retrieve core objects. It defaults to 2 x #cpus.
-func ConcurrentList(concurrentList int) Option {
-	return func(s *Settings) {
-		if concurrentList == 0 {
-			s.concurrentList = defaultListConcurrency
-			return
-		}
-		s.concurrentList = concurrentList
+// Settings defines various settings for core features
+type settings struct {
+	profilingEnabled bool
+	memProfDir       string
+
+	batchSize      int
+	concurrentList int
+
+	metrics.Enable
+	//m *M // TODO(fred): enable metrics for list operations
+}
+
+func defaultSettings() *settings {
+	return &settings{
+		memProfDir: ".",
+		batchSize:  defaultBatchSize,
 	}
 }
 
-// BatchSize sets the batch window to fetch core objects. It defaults to defaultBatchSize
-func BatchSize(batchSize int) Option {
-	return func(s *Settings) {
-		if batchSize == 0 {
-			s.batchSize = defaultBatchSize
-			return
-		}
-		s.batchSize = batchSize
+func newSettings(opts ...Option) *settings {
+	s := defaultSettings()
+	for _, apply := range opts {
+		apply(s)
 	}
-}
-
-// WithDoneChan sets a signaling channel controlled by the caller to interrupt ongoing goroutines
-func WithDoneChan(done chan struct{}) Option {
-	return func(s *Settings) {
-		s.doneChannel = done
-	}
+	return s
 }
 
 // WithMemProf enables profiling and sets the memory profile directory (defaults to the current working directory).
 // Currently, extra
 func WithMemProf(memProfDir string) Option {
-	return func(s *Settings) {
+	return func(s *settings) {
 		s.profilingEnabled = true
 		if memProfDir != "" {
 			s.memProfDir = memProfDir
@@ -71,15 +51,25 @@ func WithMemProf(memProfDir string) Option {
 
 // WithMetrics toggles metrics for the core package and its dependencies (e.g. cafs)
 func WithMetrics(enabled bool) Option {
-	return func(s *Settings) {
+	return func(s *settings) {
 		s.EnableMetrics(enabled)
 	}
 }
 
-func defaultSettings() Settings {
-	return Settings{
-		concurrentList: defaultListConcurrency,
-		batchSize:      defaultBatchSize,
-		memProfDir:     ".",
+// BatchSize sets the batch window to fetch lists of core objects. It defaults to defaultBatchSize
+func BatchSize(batchSize int) Option {
+	return func(s *settings) {
+		if batchSize != 0 {
+			s.batchSize = batchSize
+		}
+	}
+}
+
+// ConcurrentList sets the max level of concurrency to retrieve lists of core objects
+func ConcurrentList(concurrent int) Option {
+	return func(s *settings) {
+		if concurrent != 0 {
+			s.concurrentList = concurrent
+		}
 	}
 }
