@@ -5,7 +5,7 @@ RUN cp /stage/usr/bin/datamon /usr/bin/datamon
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 
 # Build the dist image
-FROM ubuntu:18.10
+FROM ubuntu:19.10
 RUN apt-get update && apt-get install -y --no-install-recommends \
     fuse \
     sudo \
