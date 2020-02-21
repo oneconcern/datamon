@@ -10,39 +10,12 @@ import (
 // BundleOption is a functor to build a bundle with some options
 type BundleOption func(*Bundle)
 
-// BundleDescriptorOption is a functor to build a bundle descriptor with some options
-type BundleDescriptorOption func(descriptor *model.BundleDescriptor)
-
-// Message defines the message of the bundle descriptor
-func Message(m string) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Message = m
-	}
-}
-
-// Contributors defines the list of contributors for a bundle descriptor
-func Contributors(c []model.Contributor) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Contributors = c
-	}
-}
-
-// Contributor defines a single contributor for a bundle descriptor
-func Contributor(c model.Contributor) BundleDescriptorOption {
-	return Contributors([]model.Contributor{c})
-}
-
-// Parents defines the parents for a bundle descriptor
-func Parents(p []string) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Parents = p
-	}
-}
-
-// Deduplication defines the deduplication scheme for a bundle descriptor
-func Deduplication(d string) BundleDescriptorOption {
-	return func(b *model.BundleDescriptor) {
-		b.Deduplication = d
+// BundleDescriptor sets the descriptor for this bundle
+func BundleDescriptor(r *model.BundleDescriptor) BundleOption {
+	return func(b *Bundle) {
+		if r != nil {
+			b.BundleDescriptor = *r
+		}
 	}
 }
 

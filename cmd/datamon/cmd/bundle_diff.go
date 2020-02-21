@@ -59,7 +59,7 @@ var bundleDiffCmd = &cobra.Command{
 			return
 		}
 
-		localBundle := core.NewBundle(core.NewBDescriptor(),
+		localBundle := core.NewBundle(
 			core.ConsumableStore(destinationStore),
 		)
 
@@ -72,7 +72,7 @@ var bundleDiffCmd = &cobra.Command{
 		bundleOpts = append(bundleOpts,
 			core.ConcurrentFilelistDownloads(datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
 
-		remoteBundle := core.NewBundle(core.NewBDescriptor(),
+		remoteBundle := core.NewBundle(
 			bundleOpts...,
 		)
 

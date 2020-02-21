@@ -47,7 +47,7 @@ You may use the "--label" flag as an alternate way to specify a particular bundl
 		bundleOpts = append(bundleOpts, core.ConsumableStore(destinationStore))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		bundle := core.NewBundle(
 			bundleOpts...,
 		)
 

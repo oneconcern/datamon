@@ -69,7 +69,7 @@ var bundleUpdateCmd = &cobra.Command{
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		localBundle := core.NewBundle(core.NewBDescriptor(),
+		localBundle := core.NewBundle(
 			core.ConsumableStore(destinationStore),
 		)
 
@@ -79,7 +79,7 @@ var bundleUpdateCmd = &cobra.Command{
 		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
-		remoteBundle := core.NewBundle(core.NewBDescriptor(),
+		remoteBundle := core.NewBundle(
 			bundleOpts...,
 		)
 

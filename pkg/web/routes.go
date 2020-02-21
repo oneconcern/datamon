@@ -140,7 +140,7 @@ func listBundlesDefault(repoName string, stores context2.Stores) []model.BundleD
 }
 
 func listBundleFilesDefault(repoName string, bundleID string, stores context2.Stores) []model.BundleEntry {
-	bundle := core.NewBundle(core.NewBDescriptor(),
+	bundle := core.NewBundle(
 		core.Repo(repoName),
 		core.ContextStores(stores),
 		core.BundleID(bundleID),

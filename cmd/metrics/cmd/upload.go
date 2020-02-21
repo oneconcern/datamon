@@ -163,9 +163,9 @@ var uploadCmd = &cobra.Command{
 			Name:  "contributors-name-" + contributorsTag,
 			Email: "contributors-email-" + contributorsTag,
 		}}
-		bd := core.NewBDescriptor(
-			core.Message("metrics bundle upload"),
-			core.Contributors(contributors),
+		bd := model.NewBundleDescriptor(
+			model.Message("metrics bundle upload"),
+			model.BundleContributors(contributors),
 		)
 		repoTag := internal.RandStringBytesMaskImprSrc(15)
 
@@ -182,7 +182,8 @@ var uploadCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 
-		bundle := core.NewBundle(bd,
+		bundle := core.NewBundle(
+			core.BundleDescriptor(bd),
 			core.Repo(repoName),
 			core.ContextStores(dmc),
 			core.ConsumableStore(sourceStore),

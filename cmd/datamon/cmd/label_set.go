@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +33,7 @@ Setting a label is analogous to the git command "git tag {label}".`,
 			return
 		}
 
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		bundle := core.NewBundle(
 			core.Repo(datamonFlags.repo.RepoName),
 			core.ContextStores(remoteStores),
 			core.BundleID(datamonFlags.bundle.ID),
@@ -48,12 +49,13 @@ Setting a label is analogous to the git command "git tag {label}".`,
 			return
 		}
 
-		labelDescriptor := core.NewLabelDescriptor(
-			core.LabelContributor(contributor),
-		)
-		label := core.NewLabel(labelDescriptor,
-			core.LabelName(datamonFlags.label.Name),
-		)
+		label := core.NewLabel(
+			core.LabelDescriptor(
+				model.NewLabelDescriptor(
+					model.LabelContributor(contributor),
+					model.LabelName(datamonFlags.label.Name),
+				),
+			))
 
 		err = label.UploadDescriptor(ctx, bundle)
 		if err != nil {

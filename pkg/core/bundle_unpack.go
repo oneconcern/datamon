@@ -562,7 +562,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle,
 				return err
 			}
 		}
-		publishMetadataBundle := NewBundle(NewBDescriptor(),
+		publishMetadataBundle := NewBundle(
 			Repo(bundle.RepoID),
 			ContextStores(bundle.contextStores),
 			ConsumableStore(bundleDest.ConsumableStore),
