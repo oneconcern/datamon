@@ -259,9 +259,9 @@ func getLabelAsync(repo string, stores context2.Stores, input <-chan string, out
 			output <- labelEvent{err: err}
 			continue
 		}
-		bundle := NewBundle(NewBDescriptor(), Repo(repo), ContextStores(stores))
+		bundle := NewBundle(Repo(repo), ContextStores(stores))
 		labelName := apc.LabelName
-		label := NewLabel(nil, LabelName(labelName))
+		label := NewLabel(LabelDescriptor(model.NewLabelDescriptor(model.LabelName(labelName))))
 		if err = label.DownloadDescriptor(context.Background(), bundle, false); err != nil {
 			output <- labelEvent{err: err}
 			continue

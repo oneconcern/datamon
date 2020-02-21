@@ -27,8 +27,7 @@ import (
 
 // FakeBundle produce some fake bundle structure for this test environment
 func FakeBundle(ev mocks.TestEnv) *core.Bundle {
-	bd := core.NewBDescriptor()
-	return core.NewBundle(bd,
+	return core.NewBundle(
 		core.Repo(ev.Repo),
 		core.BundleID(ev.BundleID),
 		core.ContextStores(mocks.FakeContext(ev.MetaDir, ev.BlobDir)),
@@ -39,8 +38,10 @@ func FakeBundle(ev mocks.TestEnv) *core.Bundle {
 
 // EmptyBundle produces an initialized bundle with proper staging and context, but no bundle ID yet
 func EmptyBundle(ev mocks.TestEnv) *core.Bundle {
-	bd := core.NewBDescriptor(core.Message("test bundle"))
-	bundle := core.NewBundle(bd,
+	bundle := core.NewBundle(
+		core.BundleDescriptor(
+			model.NewBundleDescriptor(model.Message("test bundle")),
+		),
 		core.Repo(ev.Repo),
 		core.ConsumableStore(localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.PathToStaging))),
 		core.ContextStores(mocks.FakeContext(ev.MetaDir, ev.BlobDir)),

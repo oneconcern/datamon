@@ -49,8 +49,7 @@ func testBundleEnv() mocks.TestEnv {
 // fakeBundle builds a fake bundle for the testing environment, with fake
 // context and consumable store located in DestinationDir.
 func fakeBundle(ev mocks.TestEnv) *Bundle {
-	bd := NewBDescriptor()
-	return NewBundle(bd,
+	return NewBundle(
 		Repo(ev.Repo),
 		BundleID(ev.BundleID),
 		ContextStores(mocks.FakeContext(ev.MetaDir, ev.BlobDir)),
@@ -88,9 +87,8 @@ func TestBundle(t *testing.T) {
 	mocks.ValidatePublish(t, bundle.ConsumableStore, bundleEntriesFileCount, ev)
 
 	// bundle id is set on upload
-	bd := NewBDescriptor()
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.DestinationDir))
-	archiveBundle2 := NewBundle(bd,
+	archiveBundle2 := NewBundle(
 		Repo(ev.Repo),
 		ConsumableStore(consumableStore),
 		ContextStores(mocks.FakeContext(ev.ReArchiveMetaDir, ev.ReArchiveBlobDir)),
@@ -114,8 +112,7 @@ func paramedTestPublishMetadata(t *testing.T, publish bool, ev mocks.TestEnv) {
 	require.NoError(t, CreateRepo(mocks.FakeRepoDescriptor(ev.Repo), mocks.FakeContext(ev.MetaDir, "")))
 
 	consumableStore := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.DestinationDir))
-	bd := NewBDescriptor()
-	bundle := NewBundle(bd,
+	bundle := NewBundle(
 		Repo(ev.Repo),
 		BundleID(ev.BundleID),
 		ConsumableStore(consumableStore),

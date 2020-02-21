@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/oneconcern/datamon/pkg/cafs"
 )
 
 const (
@@ -31,6 +33,24 @@ type BundleDescriptor struct {
 	Deduplication          string        `json:"deduplication,omitempty" yaml:"deduplication,omitempty"` // Type of deduplication used
 	RunStage               string        `json:"runstage,omitempty" yaml:"runstage,omitempty"`           // Path to the run stage
 	_                      struct{}
+}
+
+func defaultBundleDescriptor() *BundleDescriptor {
+	return &BundleDescriptor{
+		LeafSize:      cafs.DefaultLeafSize, // For now, fixed leaf size
+		Timestamp:     GetBundleTimeStamp(),
+		Version:       CurrentBundleVersion,
+		Deduplication: cafs.DeduplicationBlake,
+	}
+}
+
+// NewBundleDescriptor builds a new default bundle descriptor
+func NewBundleDescriptor(opts ...BundleDescriptorOption) *BundleDescriptor {
+	bd := defaultBundleDescriptor()
+	for _, apply := range opts {
+		apply(bd)
+	}
+	return bd
 }
 
 // BundleDescriptors is a sortable slice of BundleDescriptor
@@ -185,9 +205,9 @@ func GetBundleTimeStamp() time.Time {
 	return time.Now().UTC()
 }
 
-// IsGeneratedFile indicate if some file comes from auto-generation (e.g. .datamon files)
+// IsGeneratedFile indicates if some file comes from auto-generation (e.g. .datamon files)
 func IsGeneratedFile(file string) bool {
-	// TODO: Need to find a way for AeroFs to convert to abs patch while honoring the fake root
+	// TODO: Need to find a way for afero.Fs to convert to abs patch while honoring the fake root
 	//path, err := filepath.Abs(file)
 	return genFileRe.MatchString(file)
 }

@@ -72,7 +72,7 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		bundle := core.NewBundle(
 			bundleOpts...,
 		)
 

@@ -18,6 +18,21 @@ type LabelDescriptor struct {
 	_            struct{}
 }
 
+func defaultLabelDescriptor() *LabelDescriptor {
+	return &LabelDescriptor{
+		Timestamp: GetBundleTimeStamp(),
+	}
+}
+
+// NewLabelDescriptor builds a new label descriptor
+func NewLabelDescriptor(opts ...LabelDescriptorOption) *LabelDescriptor {
+	ld := defaultLabelDescriptor()
+	for _, apply := range opts {
+		apply(ld)
+	}
+	return ld
+}
+
 // LabelDescriptors is a sortable slice of LabelDescriptor
 type LabelDescriptors []LabelDescriptor
 
