@@ -50,6 +50,7 @@ config file created in /Users/ritesh/.config/.datamon/config.yaml
 			Config:     datamonFlags.core.Config,
 			Context:    datamonFlags.context.Descriptor.Name,
 			Credential: datamonFlags.root.credFile,
+			Metrics:    datamonFlags.root.metrics,
 		}
 
 		file := configFileLocation(true)

@@ -6,6 +6,8 @@
 package cmd
 
 import (
+	"time"
+
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/spf13/cobra"
 )
@@ -16,6 +18,12 @@ var ContextListCommand = &cobra.Command{
 	Short: "List available contexts",
 	Long:  "List all available contexts in a remote configuration",
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "context list", err)
+		}(time.Now())
+
 		listContexts()
 	},
 }

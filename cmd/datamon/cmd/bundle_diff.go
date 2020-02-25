@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"text/template"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
@@ -36,6 +37,11 @@ var bundleDiffCmd = &cobra.Command{
 	Long: "Diff a downloaded bundle with a remote bundle.  " +
 		"--destination is a location previously passed to the `bundle download` command.",
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "bundle diff", err)
+		}(time.Now())
 
 		ctx := context.Background()
 
@@ -61,6 +67,7 @@ var bundleDiffCmd = &cobra.Command{
 
 		localBundle := core.NewBundle(
 			core.ConsumableStore(destinationStore),
+			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 
 		bundleOpts, err := optionInputs.bundleOpts(ctx)
@@ -69,6 +76,7 @@ var bundleDiffCmd = &cobra.Command{
 		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		bundleOpts = append(bundleOpts,
 			core.ConcurrentFilelistDownloads(datamonFlags.bundle.ConcurrencyFactor/filelistDownloadsByConcurrencyFactor))
 

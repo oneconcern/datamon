@@ -13,3 +13,10 @@ func LabelDescriptor(r *model.LabelDescriptor) LabelOption {
 		}
 	}
 }
+
+// LabelWithMetrics toggles metrics for this label
+func LabelWithMetrics(enabled bool) LabelOption {
+	return func(l *Label) {
+		l.EnableMetrics(enabled)
+	}
+}

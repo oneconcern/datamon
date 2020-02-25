@@ -104,7 +104,9 @@ func mockedLabelContextStores(scenario string) context2.Stores {
 
 func testListLabels(t *testing.T, concurrency int, i int) {
 	initLabelBatchFixture.Do(buildLabelBatchFixture(t))
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t,
+		// opencensus stats collection goroutine
+		goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
 	for _, toPin := range labelTestCases() {
 		testcase := toPin
 

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -19,6 +20,12 @@ Setting a label is analogous to the git command "git tag {label}".`,
 	Example: `% datamon label set --repo ritesh-test-repo --label anotherlabel --bundle 1ISwIzeAR6m3aOVltAsj1kfQaml
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "label set", err)
+		}(time.Now())
+
 		ctx := context.Background()
 
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
@@ -37,6 +44,7 @@ Setting a label is analogous to the git command "git tag {label}".`,
 			core.Repo(datamonFlags.repo.RepoName),
 			core.ContextStores(remoteStores),
 			core.BundleID(datamonFlags.bundle.ID),
+			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 
 		bundleExists, err := bundle.Exists(ctx)
@@ -50,6 +58,7 @@ Setting a label is analogous to the git command "git tag {label}".`,
 		}
 
 		label := core.NewLabel(
+			core.LabelWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 			core.LabelDescriptor(
 				model.NewLabelDescriptor(
 					model.LabelContributor(contributor),

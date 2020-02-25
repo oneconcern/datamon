@@ -107,3 +107,10 @@ func KeysCacheSize(keys int) Option {
 		}
 	}
 }
+
+// WithMetrics enables metrics collection on this cafs
+func WithMetrics(enabled bool) Option {
+	return func(w *defaultFs) {
+		w.EnableMetrics(enabled)
+	}
+}

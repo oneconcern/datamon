@@ -15,6 +15,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
+	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
@@ -114,6 +115,10 @@ func newReader(blobs storage.Store, hash Key, leafSize uint32, opts ...ReaderOpt
 			r.destroy()
 		})
 	}
+
+	if c.MetricsEnabled() {
+		c.m = c.EnsureMetrics("cafs", &M{}).(*M)
+	}
 	return c, nil
 }
 
@@ -159,6 +164,9 @@ type chunkReader struct {
 	wasted      uint64 // number of wasted fetched leaf blocks
 	cacheHits   uint64
 	cacheMisses uint64
+
+	metrics.Enable
+	m *M
 }
 
 // cafsWriterAt wraps an io.WriterAt and avoids conlicting method calls
@@ -371,7 +379,7 @@ func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuff
 	return func(k Key, index, initiator int, doneC <-chan struct{}) (LeafBuffer, bool, error) {
 		// readLeaf fetches an entire leaf from store
 		logger := r.l.With(zap.String("prefix", r.prefix), zap.Stringer("key", k), zap.Int("index", index))
-		logger.Debug("cafs reading leaf from store")
+		logger.Debug("Start cafs reading leaf from store")
 		rdr, err := r.fs.Get(context.Background(), r.pather(k))
 		if err != nil {
 			return nil, false, err
@@ -383,7 +391,7 @@ func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuff
 
 		defer func() {
 			if !done {
-				logger.Debug("cafs has read leaf from store", zap.Error(err))
+				logger.Debug("End cafs reading leaf from store", zap.Error(err))
 			}
 		}()
 
@@ -433,6 +441,11 @@ func readLeafFunc(r *chunkReader) func(Key, int, int, <-chan struct{}) (LeafBuff
 
 			buffer := lb.Bytes()
 			read, e := rdr.Read(buffer[len(buffer):cap(buffer)])
+			if r.MetricsEnabled() && (e == nil || e == io.EOF) {
+				r.m.Volume.Blobs.IncBlob("readAt")
+				r.m.Volume.Blobs.Size(int64(read), "readAt")
+			}
+
 			if e != nil && e != io.EOF {
 				// relinquish trashed buffer
 				lb.Unpin()
@@ -537,16 +550,14 @@ func (r *chunkReader) ReadAt(data []byte, off int64) (readBytes int, err error) 
 	readLogger := r.l.With(zap.String("prefix", r.prefix))
 	readLogger.Debug("Start cafs reader ReadAt", zap.Int("requested length", bytesToRead), zap.Int64("offset", off))
 	defer func() {
-		readLogger.Debug("End cafs reader ReadAt",
-			zap.Int("requested length", bytesToRead),
-			zap.Int64("offset", off),
-			zap.Int("total read", readBytes),
-			zap.Uint64("requested leaves", r.requested),
-			zap.Uint64("fetched leaves", r.fetched),
-			zap.Uint64("wasted fetched leaves", r.wasted),
-			zap.Uint64("cache hits", r.cacheHits),
-			zap.Uint64("cache misses", r.cacheMisses),
-			zap.Error(err))
+		readLogger.Debug("End cafs reader ReadAt", zap.Int64("offset", off), zap.Error(err))
+		if r.MetricsEnabled() {
+			r.m.Volume.Cache.Capture(
+				bytesToRead, readBytes,
+				r.requested, r.fetched, r.wasted,
+				r.cacheHits, r.cacheMisses,
+				r.leafSize, "readAt")
+		}
 	}()
 
 	// calculate first key and offset
@@ -609,7 +620,7 @@ func (r *chunkReader) ReadAt(data []byte, off int64) (readBytes int, err error) 
 // TODO(fred): great - this should be factorized with ReadAt
 func (r *chunkReader) Read(data []byte) (int, error) {
 	bytesToRead := len(data)
-	r.l.Debug("cafs reader Read", zap.Int("length", bytesToRead))
+	r.l.Debug("Start cafs reader Read", zap.Int("length", bytesToRead))
 
 	if r.lastChunk && r.rdr == nil {
 		return 0, io.EOF
@@ -625,6 +636,15 @@ func (r *chunkReader) Read(data []byte) (int, error) {
 		}
 
 		n, errRead := r.rdr.Read(data[r.readSoFar:])
+
+		defer func() {
+			if r.MetricsEnabled() && errRead == nil {
+				r.m.Volume.Blobs.IncBlob("read")
+				r.m.Volume.Blobs.Size(int64(n), "read")
+			}
+			r.l.Debug("End cafs reader Read", zap.Int("length", bytesToRead))
+		}()
+
 		r.currLeaf = append(r.currLeaf, data[r.readSoFar:r.readSoFar+n]...)
 		if errRead != nil {
 			r.rdr.Close() // TODO(fred): nice - why are we ignoring errors here?

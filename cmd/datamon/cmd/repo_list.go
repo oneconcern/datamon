@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -26,6 +27,12 @@ var repoList = &cobra.Command{
 	Example: `% datamon repo list --context ctx2
 fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01:18.181535 +0100 CET`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "repo list", err)
+		}(time.Now())
+
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
@@ -36,7 +43,9 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 		}
 		err = core.ListReposApply(remoteStores, applyRepoTemplate,
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
-			core.BatchSize(datamonFlags.core.BatchSize))
+			core.BatchSize(datamonFlags.core.BatchSize),
+			core.WithMetrics(datamonFlags.root.metrics.IsEnabled()),
+		)
 		if err != nil {
 			wrapFatalln("download repo list", err)
 			return

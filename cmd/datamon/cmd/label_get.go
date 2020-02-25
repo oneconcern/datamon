@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"
@@ -21,6 +22,12 @@ var GetLabelCommand = &cobra.Command{
 Prints corresponding bundle information if the label exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "label get", err)
+		}(time.Now())
+
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
@@ -32,9 +39,11 @@ exits with ENOENT status otherwise.`,
 		bundle := core.NewBundle(
 			core.Repo(datamonFlags.repo.RepoName),
 			core.ContextStores(remoteStores),
+			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 
 		label := core.NewLabel(
+			core.LabelWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 			core.LabelDescriptor(
 				model.NewLabelDescriptor(
 					model.LabelName(datamonFlags.label.Name),

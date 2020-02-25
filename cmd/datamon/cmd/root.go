@@ -3,13 +3,17 @@
 package cmd
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"sync/atomic"
 
 	"github.com/spf13/viper"
 
 	gauth "github.com/oneconcern/datamon/pkg/auth/google"
+	"github.com/oneconcern/datamon/pkg/metrics"
+	"github.com/oneconcern/datamon/pkg/metrics/exporters/influxdb"
 	"github.com/spf13/cobra"
 )
 
@@ -39,6 +43,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 				}
 			}
 		}
+
 		if datamonFlags.root.cpuProf {
 			f, err := os.Create("cpu.prof")
 			if err != nil {
@@ -46,12 +51,61 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 			}
 			_ = pprof.StartCPUProfile(f)
 		}
+
+		if datamonFlags.root.metrics.IsEnabled() {
+			version := NewVersionInfo()
+			ip := getOutboundIP()
+
+			// sink, err := influxdb.NewStore()
+			sink, err := influxdb.NewStore(
+				influxdb.WithDatabase("datamon"),
+				influxdb.WithURL(datamonFlags.root.metrics.URL),
+				influxdb.WithNameAsTag("metrics"), // use metric name as an influxdb tag, with unique time series "metrics"
+			)
+			if err != nil {
+				wrapFatalln("cannot register metrics store", err)
+			}
+
+			optionInputs := newCliOptionInputs(config, &datamonFlags)
+			contributor, err := optionInputs.contributor()
+			if err != nil {
+				wrapFatalln("populate contributor struct", err)
+				return
+			}
+
+			var errorReported int64
+			exporter := metrics.DefaultExporter(
+				influxdb.WithStore(sink),
+				influxdb.WithErrorHandler(func(e error) {
+					// only report first error on metrics
+					firstTime := atomic.CompareAndSwapInt64(&errorReported, 0, 1)
+					if firstTime {
+						errlog.Printf("warning: metrics export failed: %v", e)
+					}
+				}),
+				influxdb.WithTags(map[string]string{
+					"service": "datamon",
+					"version": version.Version, // want to track datamon versions in all metrics
+					"ip":      ip.String(),     // want to track originating IP in all metrics
+					"context": datamonFlags.context.Descriptor.Name,
+					"user":    contributor.Email,
+				}),
+			)
+
+			metrics.Init(
+				metrics.WithBasePath("datamon"), // all metrics are organized in a tree rooted by "/datamon/..."
+				metrics.WithExporter(exporter),
+			)
+			// register CLI specific metrics
+			datamonFlags.root.metrics.m = metrics.EnsureMetrics("cmd", &M{}).(*M)
+		}
 	},
 	// upstream api note:  *PostRun functions aren't called in case of a panic() in Run
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		if datamonFlags.root.cpuProf {
 			pprof.StopCPUProfile()
 		}
+
 	},
 }
 
@@ -59,7 +113,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	var err error
-	// Check OAuth
+
 	if err = rootCmd.Execute(); err != nil {
 		errlog.Println(err)
 		os.Exit(1)
@@ -74,6 +128,8 @@ func init() {
 	addUpgradeFlag(rootCmd)
 	addUpgradeForceFlag(rootCmd)
 	addLogLevel(rootCmd)
+	addMetricsFlag(rootCmd)
+	addMetricsURLFlag(rootCmd)
 }
 
 // readConfig reads in config file and ENV variables if set.
@@ -131,6 +187,13 @@ func initConfig() {
 		datamonFlags.core.Config = viper.GetString("DATAMON_GLOBAL_CONFIG")
 	}
 
+	if config.Metrics.Enabled != nil && datamonFlags.root.metrics.Enabled == nil {
+		datamonFlags.root.metrics.Enabled = config.Metrics.Enabled
+	}
+	if config.Metrics.URL != "" && datamonFlags.root.metrics.URL == "" {
+		datamonFlags.root.metrics.URL = config.Metrics.URL
+	}
+
 	datamonFlagsPtr := &datamonFlags
 	datamonFlagsPtr.setDefaultsFromConfig(config)
 
@@ -161,4 +224,15 @@ func handleConfigErrors(err error) {
 		wrapFatalln("error reading the config file "+viper.ConfigFileUsed(), err)
 		return
 	}
+}
+
+//  getOutboundIP returns the preferred outbound ip of this machine
+func getOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80") // doesn't actually connect: only resolves
+	if err != nil {
+		return net.IP{}
+	}
+	defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP
 }

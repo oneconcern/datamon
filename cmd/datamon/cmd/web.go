@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/web"
 
 	"github.com/pkg/browser"
@@ -17,6 +18,12 @@ var webSrv = &cobra.Command{
 	Short: "Webserver",
 	Long:  "A webserver process to browse datamon data",
 	Run: func(cmd *cobra.Command, args []string) {
+		if datamonFlags.root.metrics.IsEnabled() {
+			// do not record timings or failures for long running or daemonized commands, do not wait for completion to report
+			datamonFlags.root.metrics.m.Usage.Inc("web")
+			metrics.Flush()
+		}
+
 		infoLogger.Println("begin webserver")
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)

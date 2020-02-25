@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"text/template"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -36,6 +37,12 @@ Uploaded bundle id:1INzQ5TV4vAAfU2PbRFgPfnzEwR
 set label 'init'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "bundle upload", err)
+		}(time.Now())
+
 		ctx := context.Background()
 
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
@@ -71,6 +78,7 @@ set label 'init'
 			return
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
+		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 
 		// feature guard
 		if enableBundlePreserve {
@@ -121,6 +129,7 @@ set label 'init'
 
 		if datamonFlags.label.Name != "" {
 			label := core.NewLabel(
+				core.LabelWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 				core.LabelDescriptor(
 					model.NewLabelDescriptor(
 						model.LabelContributor(contributor),

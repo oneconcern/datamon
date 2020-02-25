@@ -39,3 +39,12 @@ func WriterPather(fn func(Key) string) WriterOption {
 		}
 	}
 }
+
+// WriterWithMetrics enables metrics collection on this writer
+func WriterWithMetrics(enabled bool) WriterOption {
+	return func(writer *fsWriter) {
+		if enabled {
+			writer.EnableMetrics(enabled)
+		}
+	}
+}
