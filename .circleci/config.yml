@@ -137,7 +137,7 @@ commands:
           command: |
             go get -u gotest.tools/gotestsum@latest
             go get -u github.com/matryer/moq@latest
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@1.23.3 # temporarily pin linter, which breaks on CI with v1.23.6
+            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.23.3 # temporarily pin linter, which breaks on CI with v1.23.6
             go clean -modcache
 
   login_to_google:
