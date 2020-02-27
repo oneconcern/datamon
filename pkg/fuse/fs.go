@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/core"
@@ -180,8 +179,8 @@ func (dfs *ReadOnlyFS) Mount(path string, opts ...MountOption) error {
 	return dfs.MountReadOnly(path, opts...)
 }
 
-func defaultMountConfig(bundle *core.Bundle, readOnly bool, subType string) *fuse.MountConfig {
-	return &fuse.MountConfig{
+func defaultMountConfig(bundle *core.Bundle, readOnly bool, subType string) *jfuse.MountConfig {
+	return &jfuse.MountConfig{
 		Subtype:    subType, // mount appears as "fuse.{subType}"
 		ReadOnly:   readOnly,
 		FSName:     bundle.RepoID,
@@ -213,7 +212,7 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string, opts ...MountOption) error {
 	mountCfg.ErrorLogger = el
 	mountCfg.DebugLogger = dl
 
-	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
+	dfs.mfs, err = jfuse.Mount(path, dfs.server, mountCfg)
 	if err == nil {
 		dfs.fsInternal.l.Info("mounting", zap.String("mountpoint", path))
 	}
