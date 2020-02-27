@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	gcsStorage "cloud.google.com/go/storage"
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -71,7 +71,7 @@ func testContext() string {
 }
 
 func setupConfig(t *testing.T, flags flagsT) func() {
-	r := internal.RandStringBytesMaskImprSrc(15)
+	r := rand.LetterString(15)
 	bucketConfig := "datamon-deleteme-config" + r
 	testContext := testContext()
 	client, err := gcsStorage.NewClient(context.Background(), option.WithScopes(gcsStorage.ScopeFullControl))
@@ -113,7 +113,7 @@ func setupTests(t *testing.T) func() {
 	exitMocks = NewExitMocks()
 	osExit = MakeExitMock(exitMocks)
 
-	btag := internal.RandStringBytesMaskImprSrc(15)
+	btag := rand.LetterString(15)
 	name := strings.ToLower(t.Name())
 	prefix := "delete-" + btag
 	bucketMeta := prefix + "-meta-" + name

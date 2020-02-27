@@ -18,7 +18,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/model"
 
 	gcsStorage "cloud.google.com/go/storage"
-	"github.com/oneconcern/datamon/internal"
+	irand "github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
@@ -50,7 +50,7 @@ func randSleep() {
 func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
 	ctx := context.Background()
 
-	bucket := "deleteme-wal-test-" + internal.RandStringBytesMaskImprSrc(15)
+	bucket := "deleteme-wal-test-" + irand.LetterString(15)
 	log.Printf("Created bucket %s ", bucket)
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))

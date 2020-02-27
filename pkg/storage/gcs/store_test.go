@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	gcsStorage "cloud.google.com/go/storage"
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +31,7 @@ func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
 
 	ctx := context.Background()
 
-	bucket := "deleteme-datamontest-" + internal.RandStringBytesMaskImprSrc(15)
+	bucket := "deleteme-datamontest-" + rand.LetterString(15)
 	t.Logf("Created bucket %s ", bucket)
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))

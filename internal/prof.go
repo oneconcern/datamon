@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 
 	"go.uber.org/zap"
@@ -47,7 +48,7 @@ func maybeMemProfDefaults(params MaybeMemProfParams) MaybeMemProfParams {
 		params.DestDir = "/home/developer/"
 	}
 	if params.NamePrefix == "" {
-		params.NamePrefix = "mem_" + RandStringBytesMaskImprSrc(3)
+		params.NamePrefix = "mem_" + rand.LetterString(3)
 	}
 	if params.MemStats == nil {
 		mstats := new(runtime.MemStats)
