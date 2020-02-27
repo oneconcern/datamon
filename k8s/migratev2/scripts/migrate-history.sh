@@ -2,6 +2,7 @@
 #
 # Migrate a sequence of bundles
 #
+# shellcheck disable=SC1091
 source /scripts/funcs.sh
 
 echo "INFO: history migration to datamon v2 for repo ${REPO}"
@@ -16,12 +17,11 @@ fi
 # resolve starting bundle when specified by label
 if [[ ! -z ${SOURCELABEL} ]] ; then
   srcLabel="--label \"${SOURCELABEL}\""
-  res=$(eval "datamon1 bundle get --repo ${REPO} ${srcLabel}" 2>&1|tail -1|cut -d, -f1)
-  if [[ $? != 0  ]] ; then
+  if ! res=$(eval "datamon1 bundle get --repo ${REPO} ${srcLabel}" 2>&1|tail -1|cut -d, -f1) ; then
     echo "ERROR: failed to retrieve bundle for label ${SOURCELABEL} in repo: ${REPO}"
     exit 1
   fi
-  srcBundle=$(echo $res) # trim space
+  srcBundle=$(trim "$res")
   if [[ -z ${srcBundle} ]] ; then
     echo "ERROR: could not find bundle for label ${SOURCELABEL} in repo: ${REPO}"
     exit 1
@@ -40,11 +40,11 @@ fi
 export REPO DESTLABEL DESTCONTEXT
 
 # iterate through bundles sequentially
-eval "datamon1 bundle list --repo ${REPO} 2>&1"|grep -v '{level:"'|cut -d, -f1|\
-while read b ;do
-  bundle=$(echo ${b}) # trim space
+if ! eval "datamon1 bundle list --repo ${REPO} 2>&1"|grep -v '{level:"'|cut -d, -f1|\
+while read -r b ;do
+  bundle=$(trim "${b}")
   if [[ -z ${start} ]] ; then
-    if [[ ${bundle} == ${srcBundle} ]] ; then
+    if [[ ${bundle} == "${srcBundle}" ]] ; then
       # ok found the starting point for migration
       echo "INFO: starting migration from bundle ${bundle} in repo: ${REPO}"
       start="true"
@@ -68,8 +68,7 @@ while read b ;do
       exit 1
     fi
   fi
-done
-if [[ $? -ne 0 ]] ; then
+done ; then
   echo "ERROR: interrupted migration"
   exit 1
 fi

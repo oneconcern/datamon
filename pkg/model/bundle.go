@@ -187,7 +187,7 @@ func GetArchivePathPrefixToBundles(repo string) string {
 }
 
 func getArchivePathToBundles() string {
-	return fmt.Sprint("bundles/")
+	return "bundles/"
 }
 
 // GetArchivePathToBundleFileList yields a path to the list of the files in a bundle

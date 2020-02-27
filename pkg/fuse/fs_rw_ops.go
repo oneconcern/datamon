@@ -112,7 +112,7 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 	cn, found := fs.iNodeStore.Get(formKey(cLE.iNode))
 	if !found {
 		fs.l.Error("Did not find node after lookup", zap.Uint64("childInode", uint64(cLE.iNode)), zap.String("name", c))
-		panic(fmt.Sprintf("Did not find node after lookup"))
+		panic("did not find node after lookup")
 	}
 
 	cNode := cn.(*nodeEntry)

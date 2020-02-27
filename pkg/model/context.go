@@ -40,7 +40,7 @@ func GetArchivePathPrefixToContexts() string {
 }
 
 func getArchivePathToContexts() string {
-	return fmt.Sprint("contexts/")
+	return "contexts/"
 }
 
 // GetWALName yields the name of the Write Ahead Log store
