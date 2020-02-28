@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/core/mocks"
@@ -140,7 +140,7 @@ func PopulateFS(t testing.TB, mountPath string, fixtureBuilders ...func() Upload
 			require.NoError(t, os.MkdirAll(target, 0755))
 			continue
 		}
-		data := internal.RandBytesMaskImprSrc(uf.size)
+		data := rand.Bytes(uf.size)
 		require.NoError(t, ioutil.WriteFile(target, data, 0644))
 
 		testUploadTree[idx].data = data
@@ -183,7 +183,7 @@ func PopulateFSWithDirs(t testing.TB, mountPath string, withFile bool, fixtureBu
 		// BUG(fred): spotted in rw mount. If we put all files with same content, the deduplication ends up with an error on commit...
 		// => have to randomize for now
 		//data := []byte(`not empty`)
-		data := internal.RandBytesMaskImprSrc(10)
+		data := rand.Bytes(10)
 		require.NoError(t, ioutil.WriteFile(target, data, 0644))
 
 		normalizedPath, _ := filepath.Rel(mountPath, target)
@@ -271,7 +271,7 @@ func NewErrPutCaFs(t testing.TB, blob storage.Store, leafSize uint32) (cafs.Fs, 
 		cafs.Backend(blob),
 	)
 	require.NoError(t, err)
-	randErrData := internal.RandStringBytesMaskImprSrc(15)
+	randErrData := rand.String(15)
 	err = errors.New(randErrData)
 	return &testErrCaFs{
 		Fs:  caFsImpl,

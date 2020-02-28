@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -112,7 +112,7 @@ func TestKeysPrefix(t *testing.T) {
 func setupStore(t testing.TB) (storage.Store, func()) {
 	t.Helper()
 
-	bid := internal.RandStringBytesMaskImprSrc(15)
+	bid := rand.LetterString(15)
 	bucket := aws.String(bid)
 
 	minioConfig := &aws.Config{

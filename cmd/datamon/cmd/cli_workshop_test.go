@@ -22,7 +22,7 @@ import (
 
 	gcsStorage "cloud.google.com/go/storage"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,7 +104,7 @@ func TestWorkshop(t *testing.T) {
 	// upload a bundle
 	pathToData, _ := ioutil.TempDir("", "bdle-workshop-")
 	defer os.RemoveAll(pathToData)
-	msg := internal.RandStringBytesMaskImprSrc(15)
+	msg := rand.LetterString(15)
 
 	files := makeTestWorkshopBundle(t, pathToData)
 
@@ -136,7 +136,7 @@ func TestWorkshop(t *testing.T) {
 	assert.Contains(t, string(output), msg)
 
 	// set label
-	label := internal.RandStringBytesMaskImprSrc(10)
+	label := rand.LetterString(10)
 	cmd, _ = testCommand(t, false, false, targetBinary,
 		"label",
 		"set",
@@ -159,7 +159,7 @@ func TestWorkshop(t *testing.T) {
 	require.Truef(t, rex1.Match(output), "output not matching: %s", string(output))
 
 	// additional label
-	extraLabel := internal.RandStringBytesMaskImprSrc(10)
+	extraLabel := rand.LetterString(10)
 	cmd, _ = testCommand(t, false, false, targetBinary,
 		"label",
 		"set",
@@ -396,13 +396,13 @@ func TestWorkshop(t *testing.T) {
 func makeTestWorkshopBundle(t testing.TB, pathToData string) map[string]*testFile {
 	files := make(map[string]*testFile, 10)
 	for i := 0; i < 9; i++ {
-		name := internal.RandStringBytesMaskImprSrc(10)
-		data := internal.RandBytesMaskImprSrc(100)
+		name := rand.LetterString(10)
+		data := rand.Bytes(100)
 		err := ioutil.WriteFile(filepath.Join(pathToData, name), data, 0644)
 		require.NoError(t, err)
 		files[name] = &testFile{data: data, size: 100}
 	}
-	name := internal.RandStringBytesMaskImprSrc(10)
+	name := rand.LetterString(10)
 	data := []byte{} // empty file
 	err := ioutil.WriteFile(filepath.Join(pathToData, name), data, 0644)
 	require.NoError(t, err)

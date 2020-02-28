@@ -9,7 +9,7 @@ import (
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -57,7 +57,7 @@ func deleteBucket(ctx context.Context, client *gcsStorage.Client, bucketName str
 
 func setupBuckets() (func(), error) {
 	ctx := context.Background()
-	btag := internal.RandStringBytesMaskImprSrc(15)
+	btag := rand.LetterString(15)
 	bucketMeta := "datamonmetricsmeta-" + btag
 	bucketBlob := "datamonmetricsblob-" + btag
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
@@ -158,7 +158,7 @@ var uploadCmd = &cobra.Command{
 			return s
 		}()
 
-		contributorsTag := internal.RandStringBytesMaskImprSrc(15)
+		contributorsTag := rand.LetterString(15)
 		contributors := []model.Contributor{{
 			Name:  "contributors-name-" + contributorsTag,
 			Email: "contributors-email-" + contributorsTag,
@@ -167,7 +167,7 @@ var uploadCmd = &cobra.Command{
 			model.Message("metrics bundle upload"),
 			model.BundleContributors(contributors),
 		)
-		repoTag := internal.RandStringBytesMaskImprSrc(15)
+		repoTag := rand.LetterString(15)
 
 		repoName := "repo-" + repoTag
 

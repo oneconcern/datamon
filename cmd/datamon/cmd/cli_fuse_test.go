@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,7 +77,7 @@ func testCommand(t testing.TB, withPipe, withEnv bool, target string, args ...st
 }
 
 func generateRepoName(in string) string {
-	return "test-" + in + "-repo-" + internal.RandStringBytesMaskImprSrc(10)
+	return "test-" + in + "-repo-" + rand.LetterString(10)
 }
 
 func testBundleMount(t *testing.T, testType string, waiter func(*zap.Logger, io.Reader)) {
