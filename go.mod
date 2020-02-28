@@ -17,6 +17,7 @@ require (
 	github.com/gobuffalo/packr/v2 v2.7.1
 	github.com/hashicorp/go-immutable-radix v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
+	github.com/influxdata/influxdb v1.7.9
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20200128091008-ae5da07e4c80
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
@@ -38,6 +39,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.5.0
 	github.com/stretchr/testify v1.4.0
+	go.opencensus.io v0.22.2
 	go.uber.org/goleak v0.10.1-0.20191111212139-7380c5a9fa84
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876 // indirect

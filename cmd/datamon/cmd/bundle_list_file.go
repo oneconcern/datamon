@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"text/template"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -26,6 +27,12 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995dbb989e6091328e6be3d9e3161ad22d9ad0fbfb71410f9e4730f6ac4482cc592c0bc6011585bd9b0f00b11463
 ...`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "bundle list files", err)
+		}(time.Now())
+
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
@@ -45,6 +52,7 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
+		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		bundle := core.NewBundle(
 			bundleOpts...,
 		)

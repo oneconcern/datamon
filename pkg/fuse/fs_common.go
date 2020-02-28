@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"time"
 	"unsafe"
 
 	"go.uber.org/zap"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/convert"
 	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/metrics"
 )
 
 type fsCommon struct {
@@ -28,13 +30,16 @@ type fsCommon struct {
 
 	// logger
 	l *zap.Logger
+
+	metrics.Enable
+	m *M
 }
 
 func (fs *fsCommon) StatFS(
 	ctx context.Context,
 	op *fuseops.StatFSOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	return statFS()
 }
@@ -59,20 +64,17 @@ func statFS() (err error) {
 	return
 }
 
-func (fs *fsCommon) opStart(op interface{}) {
+func (fs *fsCommon) opStart(op interface{}) time.Time {
 	logger := fs.l.With(zap.String("Request", fmt.Sprintf("%T", op)))
 	switch t := op.(type) {
 	case *fuseops.StatFSOp:
 		logger.Debug("Start", zap.Uint64("inodes", t.Inodes), zap.Uint64("blocks", t.Blocks))
 	case *fuseops.ReadFileOp:
 		logger.Debug("Start", zap.Uint64("inode", uint64(t.Inode)), zap.Int("buffer", len(t.Dst)), zap.Int64("offset", t.Offset))
-		return
 	case *fuseops.WriteFileOp:
 		logger.Debug("Start", zap.Uint64("inode", uint64(t.Inode)))
-		return
 	case *fuseops.ReadDirOp:
 		logger.Debug("Start", zap.Uint64("inode", uint64(t.Inode)))
-		return
 	case *fuseops.LookUpInodeOp:
 		logger.Debug("Start", zap.Uint64("parent", uint64(t.Parent)), zap.String("child", t.Name))
 	case *fuseops.GetInodeAttributesOp:
@@ -98,12 +100,15 @@ func (fs *fsCommon) opStart(op interface{}) {
 		logger.Debug("Start", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name))
 	case *fuseops.UnlinkOp:
 		logger.Debug("Start", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name))
+	default:
+		logger.Debug("Start", zap.Any("op", op))
 	}
-	logger.Debug("Start", zap.Any("op", op))
+	return time.Now()
 }
 
-func (fs *fsCommon) opEnd(op interface{}, err error) {
-	logger := fs.l.With(zap.String("Request", fmt.Sprintf("%T", op)))
+func (fs *fsCommon) opEnd(t0 time.Time, op interface{}, err error) {
+	opName := fmt.Sprintf("%T", op)
+	logger := fs.l.With(zap.String("Request", opName))
 	switch t := op.(type) {
 	case *fuseops.StatFSOp:
 		logger.Debug("End", zap.Uint64("inodes", t.Inodes), zap.Uint64("blocks", t.Blocks), zap.Error(err))
@@ -141,6 +146,9 @@ func (fs *fsCommon) opEnd(op interface{}, err error) {
 		logger.Debug("End", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name), zap.Error(err))
 	case *fuseops.UnlinkOp:
 		logger.Debug("End", zap.Uint64("id", uint64(t.Parent)), zap.String("name", t.Name), zap.Error(err))
+	}
+	if fs.MetricsEnabled() {
+		fs.m.Usage.UsedAll(t0, opName)(err)
 	}
 	logger.Debug("End", zap.Any("op", op), zap.Error(err))
 }

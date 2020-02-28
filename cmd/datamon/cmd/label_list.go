@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -30,6 +31,12 @@ This is analogous to the "git tag --list" command.`,
 	Example: `% datamon label list --repo ritesh-test-repo
 init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "label list", err)
+		}(time.Now())
+
 		ctx := context.Background()
 
 		datamonFlagsPtr := &datamonFlags
@@ -41,7 +48,9 @@ init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT`,
 		}
 		err = core.ListLabelsApply(datamonFlags.repo.RepoName, remoteStores, datamonFlags.label.Prefix, applyLabelTemplate,
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
-			core.BatchSize(datamonFlags.core.BatchSize))
+			core.BatchSize(datamonFlags.core.BatchSize),
+			core.WithMetrics(datamonFlags.root.metrics.IsEnabled()),
+		)
 
 		if err != nil {
 			wrapFatalln("download label list", err)

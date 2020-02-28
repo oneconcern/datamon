@@ -37,6 +37,28 @@ executors:
     machine:
       image: ubuntu-1604:201903-01
 
+  metrics_tester:
+    working_directory: ~/project
+    environment:
+      GOOGLE_COMPUTE_ZONE: us-west2-c
+    docker:
+      - image: circleci/golang
+      - image: minio/minio
+        environment:
+          MINIO_ACCESS_KEY: access-key
+          MINIO_SECRET_KEY: secret-key-thing
+          MINIO_BROWSER: "off"
+          MINIO_DOMAIN: s3.local
+          MINIO_HTTP_TRACE: /tmp/minio.log
+        command:
+          - server
+          - data
+      - image: influxdb:1.7-alpine
+        environment:
+          INFLUXDB_DB: datamon
+        command:
+          - influxd
+
 commands:
   install_base:
     steps:
@@ -179,7 +201,8 @@ commands:
           name: Prepare golang tests
           command: |
             mkdir -p /tmp/test-results/cafs /tmp/test-results/noncafs /tmp/test-results/fuse \
-                     /tmp/test-coverage/cafs /tmp/test-coverage/noncafs /tmp/test-coverage/fuse
+                     /tmp/test-coverage/cafs /tmp/test-coverage/noncafs /tmp/test-coverage/fuse \
+                     /tmp/test-results/metrics /tmp/test-coverage/metrics
             hack/go-generate.sh
             go mod download
 
@@ -241,6 +264,37 @@ jobs:
           paths:
             - noncafs
             - cafs
+      - store_test_results:
+          path: /tmp/test-results
+
+  go_test_metrics:
+    executor: metrics_tester
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
+      GO111MODULE: 'on'
+    steps:
+      - install_base
+      - checkout
+      - get_cache
+      - install_test_tools
+      - login_to_google
+      - prepare_tests
+      - run:
+         name: Create influxdb test db
+         command: |
+           curl --get http://localhost:8086/query --data-urlencode "q=CREATE DATABASE test"
+      - run:
+          name: Run golang tests with metrics (1)
+          command: |
+            gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format short-with-failures -- \
+              -tags influxdbintegration \
+              -race -cover -covermode atomic -coverprofile /tmp/test-coverage/metrics/c_metrics.out \
+              ./cmd/datamon/cmd ./pkg/metrics
+      - put_cache
+      - persist_to_workspace:
+          root: /tmp/test-coverage
+          paths:
+            - metrics
       - store_test_results:
           path: /tmp/test-results
 
@@ -444,12 +498,21 @@ workflows:
             branches:
               only: /.*/
 
+      - go_test_metrics:
+          context: "OC Common"
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
       - test_coverage:
           context: "OC Common"
           requires:
             - go_lint
             - go_test
             - go_test_fuse
+            - go_test_metrics
           filters:
             tags:
               only: /.*/

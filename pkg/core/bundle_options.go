@@ -81,3 +81,10 @@ func ConcurrentFilelistDownloads(concurrentFilelistDownloads int) BundleOption {
 		b.concurrentFilelistDownloads = concurrentFilelistDownloads
 	}
 }
+
+// BundleWithMetrics toggles metrics on a core Bundle object
+func BundleWithMetrics(enabled bool) BundleOption {
+	return func(b *Bundle) {
+		b.EnableMetrics(enabled)
+	}
+}

@@ -5,8 +5,10 @@ package core
 import (
 	"context"
 	"fmt"
+	"time"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
+	"github.com/oneconcern/datamon/pkg/metrics"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
 
@@ -35,6 +37,9 @@ type Bundle struct {
 	concurrentFileUploads       int
 	concurrentFileDownloads     int
 	concurrentFilelistDownloads int
+
+	metrics.Enable
+	m *M
 }
 
 // SetBundleID for the bundle
@@ -136,17 +141,35 @@ func NewBundle(opts ...BundleOption) *Bundle {
 	for _, apply := range opts {
 		apply(b)
 	}
+
+	if b.MetricsEnabled() {
+		b.m = b.EnsureMetrics("core", &M{}).(*M)
+	}
 	return b
 }
 
 // Publish a bundle to a consumable store
-func Publish(ctx context.Context, bundle *Bundle) error {
-	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
+func Publish(ctx context.Context, bundle *Bundle) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "Publish")(err)
+		}
+	}(time.Now())
+
+	err = implPublish(ctx, bundle, defaultBundleEntriesPerFile, func(s string) (bool, error) { return true, nil })
+	return
 }
 
 // PublishSelectBundleEntries publish a selected list of entries from a bundle to a ConsumableStore, based on a predicate filter
-func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) error {
-	return implPublish(ctx, bundle, defaultBundleEntriesPerFile, selectionPredicate)
+func PublishSelectBundleEntries(ctx context.Context, bundle *Bundle, selectionPredicate func(string) (bool, error)) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "PublishSelectBundleEntries")(err)
+		}
+	}(time.Now())
+
+	err = implPublish(ctx, bundle, defaultBundleEntriesPerFile, selectionPredicate)
+	return
 }
 
 // implementation of Publish() with some additional parameters for test
@@ -164,13 +187,27 @@ func implPublish(ctx context.Context, bundle *Bundle, entriesPerFile uint,
 }
 
 // PublishMetadata from the archive to the consumable store
-func PublishMetadata(ctx context.Context, bundle *Bundle) error {
-	return implPublishMetadata(ctx, bundle, true, defaultBundleEntriesPerFile)
+func PublishMetadata(ctx context.Context, bundle *Bundle) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "PublishMetadata")(err)
+		}
+	}(time.Now())
+
+	err = implPublishMetadata(ctx, bundle, true, defaultBundleEntriesPerFile)
+	return
 }
 
 // DownloadMetadata from the archive to main memory
-func DownloadMetadata(ctx context.Context, bundle *Bundle) error {
-	return implPublishMetadata(ctx, bundle, false, defaultBundleEntriesPerFile)
+func DownloadMetadata(ctx context.Context, bundle *Bundle) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "DownloadMetadata")(err)
+		}
+	}(time.Now())
+
+	err = implPublishMetadata(ctx, bundle, false, defaultBundleEntriesPerFile)
+	return
 }
 
 // implementation of PublishMetadata() with some additional parameters for test
@@ -195,13 +232,27 @@ func implPublishMetadata(ctx context.Context, bundle *Bundle, publish bool, entr
 }
 
 // Upload an bundle to archive
-func Upload(ctx context.Context, bundle *Bundle, opts ...Option) error {
-	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, nil, opts...)
+func Upload(ctx context.Context, bundle *Bundle, opts ...Option) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "Upload")(err)
+		}
+	}(time.Now())
+
+	err = implUpload(ctx, bundle, defaultBundleEntriesPerFile, nil, opts...)
+	return
 }
 
 // UploadSpecificKeys uploads some specified keys (files) within a bundle's consumable store
-func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error), opts ...Option) error {
-	return implUpload(ctx, bundle, defaultBundleEntriesPerFile, getKeys, opts...)
+func UploadSpecificKeys(ctx context.Context, bundle *Bundle, getKeys func() ([]string, error), opts ...Option) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "UploadSpecificKeys")(err)
+		}
+	}(time.Now())
+
+	err = implUpload(ctx, bundle, defaultBundleEntriesPerFile, getKeys, opts...)
+	return
 }
 
 // implementation of Upload() with some additional parameters for test
@@ -228,68 +279,101 @@ func implUpload(ctx context.Context, bundle *Bundle, entriesPerFile uint, getKey
 }
 
 // PopulateFiles populates a ConsumableStore with the metadata for this bundle
-func PopulateFiles(ctx context.Context, bundle *Bundle) error {
+func PopulateFiles(ctx context.Context, bundle *Bundle) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "PopulateFiles")(err)
+		}
+	}(time.Now())
+
 	switch {
 	case bundle.ConsumableStore != nil && bundle.MetaStore() != nil:
 		return status.ErrAmbiguousBundle
 	case bundle.ConsumableStore != nil:
 		if bundle.BundleID == "" {
-			if err := setBundleIDFromConsumableStore(ctx, bundle); err != nil {
-				return err
+			if err = setBundleIDFromConsumableStore(ctx, bundle); err != nil {
+				return
 			}
 		}
 	case bundle.MetaStore() != nil:
-		if err := RepoExists(bundle.RepoID, bundle.contextStores); err != nil {
-			return err
+		if err = RepoExists(bundle.RepoID, bundle.contextStores); err != nil {
+			return
 		}
 	default:
-		return status.ErrInvalidBundle
+		err = status.ErrInvalidBundle
+		return
 	}
-	if err := implPublishMetadata(ctx, bundle, false, defaultBundleEntriesPerFile); err != nil {
-		return err
+	if err = implPublishMetadata(ctx, bundle, false, defaultBundleEntriesPerFile); err != nil {
+		return
 	}
 	return nil
 }
 
 // PublishFile publish a single bundle file to a ConsumableStore
-func PublishFile(ctx context.Context, bundle *Bundle, file string) error {
-	err := PublishMetadata(ctx, bundle)
+func PublishFile(ctx context.Context, bundle *Bundle, file string) (err error) {
+	defer func(t0 time.Time) {
+		if bundle.MetricsEnabled() {
+			bundle.m.Usage.UsedAll(t0, "PublishFile")(err)
+		}
+	}(time.Now())
+
+	err = PublishMetadata(ctx, bundle)
 	if err != nil {
-		return err
+		return
 	}
 
 	err = unpackDataFile(ctx, bundle, file)
 	if err != nil {
-		return err
+		return
 	}
 	return nil
 }
 
 // Exists checks for the existence of this bundle in the repository
 func (b *Bundle) Exists(ctx context.Context) (bool, error) {
+	defer func(t0 time.Time) {
+		if b.MetricsEnabled() {
+			b.m.Usage.Used(t0, "Exists") // don't report about errors
+		}
+	}(time.Now())
+
 	return b.MetaStore().Has(ctx, model.GetArchivePathToBundle(b.RepoID, b.BundleID))
 }
 
 // Diff shows the differences between two bundles
 func Diff(ctx context.Context, existing, additional *Bundle) (BundleDiff, error) {
-	if err := PopulateFiles(ctx, existing); err != nil {
+	var err error
+	defer func(t0 time.Time) {
+		if existing.MetricsEnabled() {
+			existing.m.Usage.UsedAll(t0, "Diff")(err)
+		}
+	}(time.Now())
+
+	if err = PopulateFiles(ctx, existing); err != nil {
 		return BundleDiff{}, err
 	}
-	if err := PopulateFiles(ctx, additional); err != nil {
+	if err = PopulateFiles(ctx, additional); err != nil {
 		return BundleDiff{}, err
 	}
-	return diffBundles(existing, additional)
+	diff, err := diffBundles(existing, additional)
+	return diff, err
 }
 
 // Update a destination bundle from a source bundle
-func Update(ctx context.Context, bundleSrc, bundleDest *Bundle) error {
-	if err := implPublishMetadata(ctx, bundleSrc, false, defaultBundleEntriesPerFile); err != nil {
+func Update(ctx context.Context, bundleSrc, bundleDest *Bundle) (err error) {
+	defer func(t0 time.Time) {
+		if bundleSrc.MetricsEnabled() {
+			bundleSrc.m.Usage.UsedAll(t0, "Update")(err)
+		}
+	}(time.Now())
+
+	if err = implPublishMetadata(ctx, bundleSrc, false, defaultBundleEntriesPerFile); err != nil {
 		return err
 	}
-	if err := implPublishMetadata(ctx, bundleDest, false, defaultBundleEntriesPerFile); err != nil {
+	if err = implPublishMetadata(ctx, bundleDest, false, defaultBundleEntriesPerFile); err != nil {
 		return err
 	}
-	if err := unpackDataFiles(ctx, bundleSrc, bundleDest, nil); err != nil {
+	if err = unpackDataFiles(ctx, bundleSrc, bundleDest, nil); err != nil {
 		return err
 	}
 	return nil
@@ -301,20 +385,27 @@ func GetBundleStore(stores context2.Stores) storage.Store {
 }
 
 // UploadBundleEntries uploads the current list of entries for that bundle
-func (b *Bundle) UploadBundleEntries(ctx context.Context) error {
+func (b *Bundle) UploadBundleEntries(ctx context.Context) (err error) {
+	defer func(t0 time.Time) {
+		if b.MetricsEnabled() {
+			b.m.Usage.Used(t0, "Exists") // don't report about errors
+		}
+	}(time.Now())
+
 	fileList := b.BundleEntries
 	for i := 0; i*defaultBundleEntriesPerFile < len(fileList); i++ {
 		firstIdx := i * defaultBundleEntriesPerFile
 		nextFirstIdx := (i + 1) * defaultBundleEntriesPerFile
 		if nextFirstIdx < len(fileList) {
-			if err := uploadBundleEntriesFileList(ctx, b, fileList[firstIdx:nextFirstIdx]); err != nil {
-				return err
+			if err = uploadBundleEntriesFileList(ctx, b, fileList[firstIdx:nextFirstIdx]); err != nil {
+				return
 			}
 		} else {
-			if err := uploadBundleEntriesFileList(ctx, b, fileList[firstIdx:]); err != nil {
-				return err
+			if err = uploadBundleEntriesFileList(ctx, b, fileList[firstIdx:]); err != nil {
+				return
 			}
 		}
 	}
-	return uploadBundleDescriptor(ctx, b)
+	err = uploadBundleDescriptor(ctx, b)
+	return
 }

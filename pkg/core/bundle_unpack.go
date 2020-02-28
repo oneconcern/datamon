@@ -323,6 +323,10 @@ func downloadBundleEntrySyncMaybeOverwrite(ctx context.Context, bundleEntry mode
 	overwrite bool) error {
 	bundle.l.Info("starting bundle entry download",
 		zap.String("name", bundleEntry.NameWithPath))
+
+	if bundle.MetricsEnabled() {
+		bundle.m.Volume.Bundles.Inc("download")
+	}
 	key, err := cafs.KeyFromString(bundleEntry.Hash)
 	if err != nil {
 		return err
@@ -524,6 +528,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle,
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
 		cafs.VerifyHash(true),
 		cafs.Logger(bundle.l),
+		cafs.WithMetrics(bundle.MetricsEnabled()),
 	)
 	if err != nil {
 		return err
@@ -567,6 +572,7 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle,
 			ContextStores(bundle.contextStores),
 			ConsumableStore(bundleDest.ConsumableStore),
 			BundleID(bundle.BundleID),
+			BundleWithMetrics(bundle.MetricsEnabled()),
 		)
 		err = PublishMetadata(ctx, publishMetadataBundle)
 		if err != nil {
@@ -584,6 +590,7 @@ func unpackDataFile(ctx context.Context, bundle *Bundle, file string) error {
 		cafs.Backend(bundle.BlobStore()),
 		cafs.Logger(bundle.l),
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
+		cafs.WithMetrics(bundle.MetricsEnabled()),
 	)
 	if err != nil {
 		return err

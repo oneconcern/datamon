@@ -70,8 +70,8 @@ func asFsEntry(p interface{}) *FsEntry {
 }
 
 func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	lookupKey := formLookupKey(op.Parent, op.Name)
 	val, found := fs.lookupTree.Get(lookupKey)
@@ -96,8 +96,8 @@ func (fs *readOnlyFsInternal) LookUpInode(ctx context.Context, op *fuseops.LookU
 func (fs *readOnlyFsInternal) GetInodeAttributes(
 	ctx context.Context,
 	op *fuseops.GetInodeAttributesOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	key := formKey(op.Inode)
 	e, found := fs.fsEntryStore.Get(key)
@@ -114,14 +114,14 @@ func (fs *readOnlyFsInternal) GetInodeAttributes(
 func (fs *readOnlyFsInternal) ForgetInode(
 	ctx context.Context,
 	op *fuseops.ForgetInodeOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 	return
 }
 
 func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	fs.opEnd(t0, op, err)
 
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
 	if !found {
@@ -137,8 +137,8 @@ func (fs *readOnlyFsInternal) OpenDir(ctx context.Context, op *fuseops.OpenDirOp
 }
 
 func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	offset := int(op.Offset)
 	iNode := op.Inode
@@ -168,24 +168,33 @@ func (fs *readOnlyFsInternal) ReadDir(ctx context.Context, op *fuseops.ReadDirOp
 func (fs *readOnlyFsInternal) ReleaseDirHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseDirHandleOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 	return
 }
 
 func (fs *readOnlyFsInternal) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 	return
 }
 
 func (fs *readOnlyFsInternal) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	var n int
+
+	t0 := fs.opStart(op)
+	defer func() {
+		fs.opEnd(t0, op, err)
+		if fs.MetricsEnabled() {
+			fs.m.Volume.Files.Inc("read")
+			fs.m.Volume.Files.Size(int64(n), "read")
+			fs.m.Volume.IO.IORecord(t0, "read")(int64(n), err)
+		}
+	}()
 
 	// If file has not been mutated.
 	p, found := fs.fsEntryStore.Get(formKey(op.Inode))
@@ -197,7 +206,7 @@ func (fs *readOnlyFsInternal) ReadFile(
 	fs.l.Debug("reading file", zap.String("file", fe.fullPath), zap.Uint64("inode", uint64(fe.iNode)))
 
 	// now consumes the file from the bundle
-	n, err := fs.readAtBundle(fe, op.Dst, op.Offset)
+	n, err = fs.readAtBundle(fe, op.Dst, op.Offset)
 	op.BytesRead = n
 	return err
 }
@@ -205,8 +214,8 @@ func (fs *readOnlyFsInternal) ReadFile(
 func (fs *readOnlyFsInternal) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 	return
 }
 

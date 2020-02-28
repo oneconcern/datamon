@@ -76,6 +76,10 @@ func NewReadOnlyFS(bundle *core.Bundle, opts ...Option) (*ReadOnlyFS, error) {
 		bapply(fs)
 	}
 
+	if fs.MetricsEnabled() {
+		fs.m = fs.EnsureMetrics("fuse", &M{}).(*M)
+	}
+
 	if fs.streamed {
 		// prepare the content-addressable backend for this bundle
 		cafs, err := cafs.New(
@@ -86,6 +90,7 @@ func NewReadOnlyFS(bundle *core.Bundle, opts ...Option) (*ReadOnlyFS, error) {
 			cafs.CacheSize(fs.lruSize),
 			cafs.Prefetch(fs.prefetch),
 			cafs.VerifyHash(fs.withVerifyHash),
+			cafs.WithMetrics(fs.MetricsEnabled()),
 		)
 		if err != nil {
 			return nil, err
@@ -155,6 +160,10 @@ func NewMutableFS(bundle *core.Bundle, opts ...Option) (*MutableFS, error) {
 	fs.l = fs.l.With(zap.String("repo", bundle.RepoID))
 	if bundle.BundleID != "" {
 		fs.l = fs.l.With(zap.String("bundle", bundle.BundleID))
+	}
+
+	if fs.MetricsEnabled() {
+		fs.m = fs.EnsureMetrics("fuse", &M{}).(*M)
 	}
 
 	fs.l.Info("mutable mount staging storage", zap.String("path", pathToStaging))

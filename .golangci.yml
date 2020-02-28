@@ -21,6 +21,7 @@ linters:
   build-tags:
     - fuse_cli
     - fsintegration
+    - influxdbintegration
   disable:
     - maligned
     - lll

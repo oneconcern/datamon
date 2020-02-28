@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
+	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"go.uber.org/zap"
 )
@@ -40,6 +41,9 @@ type fsWriter struct {
 	blobFlushes         []blobFlush
 	errors              []error
 	l                   *zap.Logger
+
+	metrics.Enable
+	m *M
 }
 
 func defaultFsWriter(blobs storage.Store, leafSize uint32) *fsWriter {
@@ -68,6 +72,10 @@ func newWriter(blobs storage.Store, leafSize uint32, opts ...WriterOption) Write
 	if w.pather == nil {
 		// default prefix path logic
 		w.pather = func(lks Key) string { return lks.StringWithPrefix(w.prefix) }
+	}
+
+	if w.MetricsEnabled() {
+		w.m = w.EnsureMetrics("cafs", &M{}).(*M)
 	}
 
 	go w.flushThread()
@@ -171,6 +179,10 @@ func (w *fsWriter) writeBlob(data []byte, key Key, n uint64) (err error) {
 	found, _ := w.store.Has(context.TODO(), w.pather(key))
 	if found {
 		w.l.Info("Duplicate blob", zap.Stringer("key", key), zap.Uint64("offset", n))
+		if w.MetricsEnabled() {
+			w.m.Volume.Blobs.IncBlob("write")
+			w.m.Volume.Blobs.IncDuplicate("write")
+		}
 		return nil
 	}
 	switch d := w.store.(type) {
@@ -184,6 +196,10 @@ func (w *fsWriter) writeBlob(data []byte, key Key, n uint64) (err error) {
 		return fmt.Errorf("write segment file: %s err:%w", w.pather(key), err)
 	}
 	w.l.Info("Uploading blob", zap.Stringer("key", key), zap.Int("chunk size", len(data)), zap.Uint64("offset", n))
+	if w.MetricsEnabled() {
+		w.m.Volume.Blobs.IncBlob("write")
+		w.m.Volume.Blobs.Size(int64(len(data)), "write")
+	}
 	return
 }
 

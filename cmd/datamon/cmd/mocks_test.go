@@ -181,6 +181,9 @@ func runCmd(t *testing.T, cmd []string, intentMsg string, expectError bool, as .
 	datamonFlags.context.Descriptor.VMetadata = bucketVMeta
 	datamonFlags.core.Config = config
 
+	// test with metrics, depending on build flag
+	datamonFlags.root.metrics.Enabled = testMetricsEnabled()
+
 	if len(as) == 0 {
 		authorizer = AuthMock{name: "tests", email: "datamon@oneconcern.com"}
 	} else {

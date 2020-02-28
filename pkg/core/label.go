@@ -5,8 +5,10 @@ import (
 	"context"
 	"hash/crc32"
 	"io/ioutil"
+	"time"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
+	"github.com/oneconcern/datamon/pkg/metrics"
 
 	"gopkg.in/yaml.v2"
 
@@ -21,6 +23,9 @@ import (
 // Examples: Latest, production.
 type Label struct {
 	Descriptor model.LabelDescriptor
+
+	metrics.Enable
+	m *M
 }
 
 func defaultLabel() *Label {
@@ -35,14 +40,24 @@ func NewLabel(opts ...LabelOption) *Label {
 	for _, apply := range opts {
 		apply(label)
 	}
+
+	if label.MetricsEnabled() {
+		label.m = label.EnsureMetrics("core", &M{}).(*M)
+	}
 	return label
 }
 
 // UploadDescriptor persists the label descriptor for a bundle
-func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error {
-	e := RepoExists(bundle.RepoID, bundle.contextStores)
-	if e != nil {
-		return e
+func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) (err error) {
+	defer func(t0 time.Time) {
+		if label.MetricsEnabled() {
+			label.m.Usage.UsedAll(t0, "LabelUpload")(err)
+		}
+	}(time.Now())
+
+	err = RepoExists(bundle.RepoID, bundle.contextStores)
+	if err != nil {
+		return err
 	}
 	label.Descriptor.BundleID = bundle.BundleID
 	buffer, err := yaml.Marshal(label.Descriptor)
@@ -68,11 +83,17 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 }
 
 // DownloadDescriptor retrieves the label descriptor for a bundle
-func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, checkRepoExists bool) error {
+func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, checkRepoExists bool) (err error) {
+	defer func(t0 time.Time) {
+		if label.MetricsEnabled() {
+			label.m.Usage.UsedAll(t0, "LabelDownload")(err)
+		}
+	}(time.Now())
+
 	if checkRepoExists {
-		e := RepoExists(bundle.RepoID, bundle.contextStores)
-		if e != nil {
-			return e
+		err = RepoExists(bundle.RepoID, bundle.contextStores)
+		if err != nil {
+			return err
 		}
 	}
 	archivePath := model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name)

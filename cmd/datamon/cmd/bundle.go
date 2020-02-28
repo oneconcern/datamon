@@ -74,6 +74,7 @@ func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) erro
 		datamonFlags.bundle.ID = key
 	case datamonFlags.bundle.ID == "" && datamonFlags.label.Name != "":
 		label := core.NewLabel(
+			core.LabelWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 			core.LabelDescriptor(
 				model.NewLabelDescriptor(
 					model.LabelName(datamonFlags.label.Name),
@@ -82,6 +83,7 @@ func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) erro
 		bundle := core.NewBundle(
 			core.Repo(datamonFlags.repo.RepoName),
 			core.ContextStores(remote),
+			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 		if err := label.DownloadDescriptor(ctx, bundle, true); err != nil {
 			return err

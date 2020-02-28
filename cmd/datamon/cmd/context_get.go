@@ -8,6 +8,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"time"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	status "github.com/oneconcern/datamon/pkg/core/status"
@@ -24,6 +25,12 @@ var ContextGetCommand = &cobra.Command{
 	Short: "Get a context info",
 	Long:  "Get a Datamon context's info",
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "context get", err)
+		}(time.Now())
+
 		getContext()
 	},
 }
