@@ -248,6 +248,7 @@ jobs:
           name: Run golang tests (1)
           command: |
             gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures -- \
+              -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/noncafs/c_non_cafs.out \
               $(go list ./...|grep -v cafs)
       - run:
@@ -256,6 +257,7 @@ jobs:
             # cafs tests are memory intensive: best to run them separately
             # cafs tests have a lot of parallel testcases, using -race here would hog CI ressources
             gotestsum --junitfile /tmp/test-results/cafs/go-test-report-cafs.xml --format short-with-failures -- \
+              -timeout 15m \
               -parallel 4 -covermode atomic -coverprofile /tmp/test-coverage/cafs/c_cafs_only.out \
               ./pkg/cafs/...
       - put_cache
@@ -288,6 +290,7 @@ jobs:
           command: |
             gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format short-with-failures -- \
               -tags influxdbintegration \
+              -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/metrics/c_metrics.out \
               ./cmd/datamon/cmd ./pkg/metrics
       - put_cache
@@ -316,7 +319,8 @@ jobs:
             gotestsum \
               --junitfile /tmp/test-results/fuse/go-test-report-fuse.xml --format standard-verbose -- \
               -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)' \
-              -timeout 20m -covermode atomic -coverprofile /tmp/test-coverage/fuse/c_fuse_integration.out \
+              -timeout 15m \
+              -covermode atomic -coverprofile /tmp/test-coverage/fuse/c_fuse_integration.out \
               ./pkg/core ./cmd/datamon/cmd
       - put_cache
       - persist_to_workspace:
