@@ -4,7 +4,6 @@ executors:
   docker_minio:
     working_directory: ~/project
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
       - image: circleci/golang
@@ -24,7 +23,6 @@ executors:
   docker_builder:
     working_directory: ~/project
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
       - image: circleci/golang
@@ -32,7 +30,6 @@ executors:
   fuse_tester:
     working_directory: ~/project
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOROOT: /usr/local/go
       GOPATH: /go
@@ -124,7 +121,7 @@ commands:
           command: |
             sudo apt-get update -y --quiet
             sudo apt-get install --quiet kubectl
-            gcloud container clusters get-credentials onec-dev
+            gcloud container clusters get-credentials ${CLUSTER}
 
   install_test_tools:
     steps:
