@@ -154,10 +154,7 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 }
 
 func (l *localFS) Delete(ctx context.Context, key string) error {
-	if l.lock {
-		l.rw.Lock()
-		defer l.rw.Unlock()
-	}
+	// unlink is atomic: no need to lock the in-memory object for that
 	if err := l.fs.Remove(key); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing %q: %v", key, err)
 	}
