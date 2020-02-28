@@ -168,7 +168,7 @@ func assertReadAtContent(t testing.TB, size int, name string, expected, received
 			expected=%s
 			actual=%s`, name, len(expected), offset, n, diff,
 			expected,
-			spew.Sdump(expectedBytes), spew.Sdump(received[:n]))), 0644)
+			spew.Sdump(expectedBytes), spew.Sdump(received[:n]))), 0600)
 	}
 }
 

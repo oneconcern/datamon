@@ -398,13 +398,13 @@ func makeTestWorkshopBundle(t testing.TB, pathToData string) map[string]*testFil
 	for i := 0; i < 9; i++ {
 		name := rand.LetterString(10)
 		data := rand.Bytes(100)
-		err := ioutil.WriteFile(filepath.Join(pathToData, name), data, 0644)
+		err := ioutil.WriteFile(filepath.Join(pathToData, name), data, 0600)
 		require.NoError(t, err)
 		files[name] = &testFile{data: data, size: 100}
 	}
 	name := rand.LetterString(10)
 	data := []byte{} // empty file
-	err := ioutil.WriteFile(filepath.Join(pathToData, name), data, 0644)
+	err := ioutil.WriteFile(filepath.Join(pathToData, name), data, 0600)
 	require.NoError(t, err)
 	files[name] = &testFile{data: data, size: 0}
 	return files

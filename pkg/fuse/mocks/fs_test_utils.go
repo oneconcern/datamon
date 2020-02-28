@@ -141,7 +141,7 @@ func PopulateFS(t testing.TB, mountPath string, fixtureBuilders ...func() Upload
 			continue
 		}
 		data := rand.Bytes(uf.size)
-		require.NoError(t, ioutil.WriteFile(target, data, 0644))
+		require.NoError(t, ioutil.WriteFile(target, data, 0600))
 
 		testUploadTree[idx].data = data
 		//#nosec
@@ -184,7 +184,7 @@ func PopulateFSWithDirs(t testing.TB, mountPath string, withFile bool, fixtureBu
 		// => have to randomize for now
 		//data := []byte(`not empty`)
 		data := rand.Bytes(10)
-		require.NoError(t, ioutil.WriteFile(target, data, 0644))
+		require.NoError(t, ioutil.WriteFile(target, data, 0600))
 
 		normalizedPath, _ := filepath.Rel(mountPath, target)
 		extraFiles = append(extraFiles, &UploadFileTest{

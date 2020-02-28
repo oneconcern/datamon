@@ -156,7 +156,7 @@ commands:
           command: |
             go get -u gotest.tools/gotestsum@latest
             go get -u github.com/matryer/moq@latest
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.23.3 # temporarily pin linter, which breaks on CI with v1.23.6
+            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
             go clean -modcache
 
   login_to_google:
@@ -219,7 +219,7 @@ jobs:
           command: |
             hack/go-generate.sh
             go mod download
-            golangci-lint run
+            golangci-lint run --new-from-rev master --timeout 10m
       - run:
           name: Lint shell scripts
           command: |
