@@ -292,37 +292,46 @@ func fetchBundleBatch(repo string, store storage.Store, settings Settings, keys 
 	return bds, nil
 }
 
+func downloadBundleDescriptor(store storage.Store, repo, key string) (model.BundleDescriptor, error) {
+	apc, err := model.GetArchivePathComponents(key)
+	if err != nil {
+		return model.BundleDescriptor{}, err
+	}
+
+	r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, apc.BundleID))
+	if err != nil {
+		return model.BundleDescriptor{}, err
+	}
+
+	o, err := ioutil.ReadAll(r)
+	if err != nil {
+		return model.BundleDescriptor{}, err
+	}
+
+	var bd model.BundleDescriptor
+	err = yaml.Unmarshal(o, &bd)
+	if err != nil {
+		return model.BundleDescriptor{}, err
+	}
+
+	if bd.ID != apc.BundleID {
+		err = fmt.Errorf("bundle IDs in descriptor '%v' and archive path '%v' don't match", bd.ID, apc.BundleID)
+		return model.BundleDescriptor{}, err
+	}
+	return bd, nil
+}
+
 // getBundleAsync fetches and unmarshalls the bundle descriptor for each single key submitted as input
 func getBundleAsync(repo string, store storage.Store, input <-chan string, output chan<- bundleEvent,
 	wg *sync.WaitGroup) {
 	defer wg.Done()
 	for k := range input {
-		apc, err := model.GetArchivePathComponents(k)
-		if err != nil {
-			output <- bundleEvent{err: err}
-			continue
-		}
-		r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, apc.BundleID))
+		bd, err := downloadBundleDescriptor(store, repo, k)
+
 		if err != nil {
 			if errors.Is(err, storagestatus.ErrNotExists) {
 				continue
 			}
-			output <- bundleEvent{err: err}
-			continue
-		}
-		o, err := ioutil.ReadAll(r)
-		if err != nil {
-			output <- bundleEvent{err: err}
-			continue
-		}
-		var bd model.BundleDescriptor
-		err = yaml.Unmarshal(o, &bd)
-		if err != nil {
-			output <- bundleEvent{err: err}
-			continue
-		}
-		if bd.ID != apc.BundleID {
-			err = fmt.Errorf("bundle IDs in descriptor '%v' and archive path '%v' don't match", bd.ID, apc.BundleID)
 			output <- bundleEvent{err: err}
 			continue
 		}

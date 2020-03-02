@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/spf13/cobra"
@@ -35,8 +36,13 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 ...
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx := context.Background()
+		var err error
 
+		defer func(t0 time.Time) {
+			cliUsage(t0, "bundle download", err)
+		}(time.Now())
+
+		ctx := context.Background()
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
 		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
@@ -71,8 +77,9 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 			return
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
+		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		bundle := core.NewBundle(
 			bundleOpts...,
 		)
 

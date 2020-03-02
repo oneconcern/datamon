@@ -3,10 +3,12 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/errors"
+	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
@@ -20,6 +22,12 @@ var GetLabelCommand = &cobra.Command{
 Prints corresponding bundle information if the label exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "label get", err)
+		}(time.Now())
+
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
@@ -28,13 +36,20 @@ exits with ENOENT status otherwise.`,
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		bundle := core.NewBundle(
 			core.Repo(datamonFlags.repo.RepoName),
 			core.ContextStores(remoteStores),
+			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
-		label := core.NewLabel(core.NewLabelDescriptor(),
-			core.LabelName(datamonFlags.label.Name),
-		)
+
+		label := core.NewLabel(
+			core.LabelWithMetrics(datamonFlags.root.metrics.IsEnabled()),
+			core.LabelDescriptor(
+				model.NewLabelDescriptor(
+					model.LabelName(datamonFlags.label.Name),
+				),
+			))
+
 		err = label.DownloadDescriptor(ctx, bundle, true)
 		if errors.Is(err, status.ErrNotFound) {
 			wrapFatalWithCodef(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"text/template"
+	"time"
 
 	"syscall"
 
@@ -146,6 +147,12 @@ var selfUpgradeCmd = &cobra.Command{
 	Short: "Upgrades datamon to the latest release",
 	Long:  `Checks for the latest release on github repo then upgrades. By default upgrade is skipped if the current datamon is not a released version`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "upgrade", err)
+		}(time.Now())
+
 		datamonFlags.upgrade.verbose = datamonFlags.root.logLevel == "debug"
 		if datamonFlags.upgrade.checkOnly {
 			if err := doCheckVersion(); err != nil {

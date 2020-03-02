@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
+	"github.com/oneconcern/datamon/pkg/model"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/spf13/cobra"
@@ -72,12 +73,17 @@ func setLatestOrLabelledBundle(ctx context.Context, remote context2.Stores) erro
 		}
 		datamonFlags.bundle.ID = key
 	case datamonFlags.bundle.ID == "" && datamonFlags.label.Name != "":
-		label := core.NewLabel(nil,
-			core.LabelName(datamonFlags.label.Name),
-		)
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		label := core.NewLabel(
+			core.LabelWithMetrics(datamonFlags.root.metrics.IsEnabled()),
+			core.LabelDescriptor(
+				model.NewLabelDescriptor(
+					model.LabelName(datamonFlags.label.Name),
+				),
+			))
+		bundle := core.NewBundle(
 			core.Repo(datamonFlags.repo.RepoName),
 			core.ContextStores(remote),
+			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 		if err := label.DownloadDescriptor(ctx, bundle, true); err != nil {
 			return err

@@ -112,7 +112,7 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 	cn, found := fs.iNodeStore.Get(formKey(cLE.iNode))
 	if !found {
 		fs.l.Error("Did not find node after lookup", zap.Uint64("childInode", uint64(cLE.iNode)), zap.String("name", c))
-		panic(fmt.Sprintf("Did not find node after lookup"))
+		panic("did not find node after lookup")
 	}
 
 	cNode := cn.(*nodeEntry)
@@ -135,8 +135,8 @@ func (fs *fsMutable) deleteNSEntry(p fuseops.InodeID, c string) error {
 }
 
 func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	nodeStore, lookupTree := fs.atomicGetReferences()
 
@@ -163,8 +163,8 @@ func (fs *fsMutable) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp)
 }
 
 func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	nodeStore, _ := fs.atomicGetReferences()
 
@@ -185,8 +185,8 @@ func (fs *fsMutable) GetInodeAttributes(ctx context.Context, op *fuseops.GetInod
 }
 
 func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInodeAttributesOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	if op.Mode != nil { // File permissions not supported
 		fs.l.Debug("setting permissions mode is not supported", zap.Uint32("mode", uint32(*op.Mode)))
@@ -245,8 +245,8 @@ func (fs *fsMutable) SetInodeAttributes(ctx context.Context, op *fuseops.SetInod
 func (fs *fsMutable) ForgetInode(
 	ctx context.Context,
 	op *fuseops.ForgetInodeOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	// Check reference count for iNode and remove from iNodeStore
 	// Get the node.
@@ -340,8 +340,8 @@ func (fs *fsMutable) CreateFile(
 // If newpath exists but the operation fails for some reason, rename() guarantees to leave an instance of newpath in place.
 // oldpath can specify a directory.  In this case, newpath must either not exist, or it must specify an empty directory.
 func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
@@ -384,8 +384,8 @@ func (fs *fsMutable) Rename(ctx context.Context, op *fuseops.RenameOp) (err erro
 func (fs *fsMutable) RmDir(
 	ctx context.Context,
 	op *fuseops.RmDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
@@ -396,8 +396,8 @@ func (fs *fsMutable) RmDir(
 func (fs *fsMutable) Unlink(
 	ctx context.Context,
 	op *fuseops.UnlinkOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
@@ -409,8 +409,8 @@ func (fs *fsMutable) Unlink(
 func (fs *fsMutable) OpenDir(
 	ctx context.Context,
 	op *fuseops.OpenDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	return
 }
@@ -418,8 +418,8 @@ func (fs *fsMutable) OpenDir(
 func (fs *fsMutable) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	offset := int(op.Offset)
 	iNode := op.Inode
@@ -457,24 +457,31 @@ func (fs *fsMutable) ReadDir(
 func (fs *fsMutable) ReleaseDirHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseDirHandleOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 	return
 }
 
 func (fs *fsMutable) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 	return
 }
 
 func (fs *fsMutable) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer func() {
+		fs.opEnd(t0, op, err)
+		if fs.MetricsEnabled() {
+			fs.m.Volume.Files.Inc("read")
+			fs.m.Volume.Files.Size(int64(op.BytesRead), "read")
+			fs.m.Volume.IO.IORecord(t0, "read")(int64(op.BytesRead), err)
+		}
+	}()
 
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_RDONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
@@ -494,8 +501,16 @@ func (fs *fsMutable) ReadFile(
 func (fs *fsMutable) WriteFile(
 	ctx context.Context,
 	op *fuseops.WriteFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	var n int
+	t0 := fs.opStart(op)
+	defer func() {
+		fs.opEnd(t0, op, err)
+		if fs.MetricsEnabled() {
+			fs.m.Volume.Files.Inc("write")
+			fs.m.Volume.Files.Size(int64(n), "write")
+			fs.m.Volume.IO.IORecord(t0, "write")(int64(n), err)
+		}
+	}()
 
 	file, err := fs.localCache.OpenFile(getPathToBackingFile(op.Inode), os.O_WRONLY|os.O_SYNC, fileDefaultMode)
 	if err != nil {
@@ -505,10 +520,11 @@ func (fs *fsMutable) WriteFile(
 	defer fs.lockBackingFiles.Unlock()
 
 	fs.backingFiles[op.Inode] = &file
-	_, err = file.WriteAt(op.Data, op.Offset)
+	n, err = file.WriteAt(op.Data, op.Offset)
 	if err != nil {
 		return jfuse.EIO
 	}
+
 	ne, found := fs.iNodeStore.Get(formKey(op.Inode))
 	if !found {
 		panic("Invalid state inode: not found" + fmt.Sprint(uint64(op.Inode)))
@@ -518,14 +534,14 @@ func (fs *fsMutable) WriteFile(
 	s, _ := file.Stat()
 	nodeEntry.attr.Size = uint64(s.Size())
 	nodeEntry.lock.Unlock()
-	return
+	return err
 }
 
 func (fs *fsMutable) SyncFile(
 	ctx context.Context,
 	op *fuseops.SyncFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	fs.lockBackingFiles.RLock()
 	defer fs.lockBackingFiles.RUnlock()
@@ -543,8 +559,8 @@ func (fs *fsMutable) SyncFile(
 func (fs *fsMutable) FlushFile(
 	ctx context.Context,
 	op *fuseops.FlushFileOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	fs.lockBackingFiles.RLock()
 	defer fs.lockBackingFiles.RUnlock()
@@ -563,8 +579,8 @@ func (fs *fsMutable) FlushFile(
 func (fs *fsMutable) ReleaseFileHandle(
 	ctx context.Context,
 	op *fuseops.ReleaseFileHandleOp) (err error) {
-	fs.opStart(op)
-	defer fs.opEnd(op, err)
+	t0 := fs.opStart(op)
+	defer fs.opEnd(t0, op, err)
 
 	return
 }
@@ -970,12 +986,19 @@ func (fs *fsMutable) commitImpl(caFs cafs.Fs) error {
 	return nil
 }
 
-func (fs *fsMutable) Commit() error {
+func (fs *fsMutable) Commit() (err error) {
+	defer func(t0 time.Time) {
+		if fs.MetricsEnabled() {
+			fs.m.Usage.UsedAll(t0, "commit")(err)
+		}
+	}(time.Now())
+
 	caFs, err := cafs.New(
 		cafs.LeafSize(fs.bundle.BundleDescriptor.LeafSize),
 		cafs.Backend(fs.bundle.BlobStore()),
 		cafs.LeafTruncation(fs.bundle.BundleDescriptor.Version < 1),
 		cafs.Logger(fs.l),
+		cafs.WithMetrics(fs.MetricsEnabled()),
 	)
 	if err != nil {
 		return err

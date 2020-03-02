@@ -72,6 +72,7 @@ func (fuseParams *FUSEParams) FirstCutSidecarFmt(destPath string) error {
 	if err != nil {
 		return err
 	}
+	//nolint: gosec
 	err = ioutil.WriteFile(destPath, o,
 		// @gabe, pls verify, contasting 0660 and r-- on the same octets
 		0666)
@@ -119,6 +120,7 @@ func (pgParams *PGParams) FirstCutSidecarFmt(destPath string) error {
 	if err != nil {
 		return err
 	}
+	//nolint: gosec
 	err = ioutil.WriteFile(destPath, o,
 		// @gabe, pls verify, contasting 0660 and r-- on the same octets
 		0666)

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/core/mocks"
@@ -27,8 +27,7 @@ import (
 
 // FakeBundle produce some fake bundle structure for this test environment
 func FakeBundle(ev mocks.TestEnv) *core.Bundle {
-	bd := core.NewBDescriptor()
-	return core.NewBundle(bd,
+	return core.NewBundle(
 		core.Repo(ev.Repo),
 		core.BundleID(ev.BundleID),
 		core.ContextStores(mocks.FakeContext(ev.MetaDir, ev.BlobDir)),
@@ -39,8 +38,10 @@ func FakeBundle(ev mocks.TestEnv) *core.Bundle {
 
 // EmptyBundle produces an initialized bundle with proper staging and context, but no bundle ID yet
 func EmptyBundle(ev mocks.TestEnv) *core.Bundle {
-	bd := core.NewBDescriptor(core.Message("test bundle"))
-	bundle := core.NewBundle(bd,
+	bundle := core.NewBundle(
+		core.BundleDescriptor(
+			model.NewBundleDescriptor(model.Message("test bundle")),
+		),
 		core.Repo(ev.Repo),
 		core.ConsumableStore(localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.PathToStaging))),
 		core.ContextStores(mocks.FakeContext(ev.MetaDir, ev.BlobDir)),
@@ -139,8 +140,8 @@ func PopulateFS(t testing.TB, mountPath string, fixtureBuilders ...func() Upload
 			require.NoError(t, os.MkdirAll(target, 0755))
 			continue
 		}
-		data := internal.RandBytesMaskImprSrc(uf.size)
-		require.NoError(t, ioutil.WriteFile(target, data, 0644))
+		data := rand.Bytes(uf.size)
+		require.NoError(t, ioutil.WriteFile(target, data, 0600))
 
 		testUploadTree[idx].data = data
 		//#nosec
@@ -182,8 +183,8 @@ func PopulateFSWithDirs(t testing.TB, mountPath string, withFile bool, fixtureBu
 		// BUG(fred): spotted in rw mount. If we put all files with same content, the deduplication ends up with an error on commit...
 		// => have to randomize for now
 		//data := []byte(`not empty`)
-		data := internal.RandBytesMaskImprSrc(10)
-		require.NoError(t, ioutil.WriteFile(target, data, 0644))
+		data := rand.Bytes(10)
+		require.NoError(t, ioutil.WriteFile(target, data, 0600))
 
 		normalizedPath, _ := filepath.Rel(mountPath, target)
 		extraFiles = append(extraFiles, &UploadFileTest{
@@ -270,7 +271,7 @@ func NewErrPutCaFs(t testing.TB, blob storage.Store, leafSize uint32) (cafs.Fs, 
 		cafs.Backend(blob),
 	)
 	require.NoError(t, err)
-	randErrData := internal.RandStringBytesMaskImprSrc(15)
+	randErrData := rand.String(15)
 	err = errors.New(randErrData)
 	return &testErrCaFs{
 		Fs:  caFsImpl,

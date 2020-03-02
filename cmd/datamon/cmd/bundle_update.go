@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"path/filepath"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 
@@ -18,6 +19,12 @@ var bundleUpdateCmd = &cobra.Command{
 	Long: "Update a downloaded bundle with a remote bundle.  " +
 		"--destination is a location previously passed to the `bundle download` command.",
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "bundle update", err)
+		}(time.Now())
+
 		ctx := context.Background()
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
 		remoteStores, err := optionInputs.datamonContext(ctx)
@@ -69,17 +76,18 @@ var bundleUpdateCmd = &cobra.Command{
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		localBundle := core.NewBundle(core.NewBDescriptor(),
+		localBundle := core.NewBundle(
 			core.ConsumableStore(destinationStore),
+			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
-
 		bundleOpts, err := optionInputs.bundleOpts(ctx)
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
 		}
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
-		remoteBundle := core.NewBundle(core.NewBDescriptor(),
+		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
+		remoteBundle := core.NewBundle(
 			bundleOpts...,
 		)
 

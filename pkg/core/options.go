@@ -1,6 +1,10 @@
 package core
 
-import "runtime"
+import (
+	"runtime"
+
+	"github.com/oneconcern/datamon/pkg/metrics"
+)
 
 // Option sets options for listing core objects
 type Option func(*Settings)
@@ -12,6 +16,9 @@ type Settings struct {
 	doneChannel      chan struct{}
 	profilingEnabled bool
 	memProfDir       string
+
+	metrics.Enable
+	//m *M // TODO(fred): enable metrics for list operations
 }
 
 const (
@@ -59,6 +66,13 @@ func WithMemProf(memProfDir string) Option {
 		if memProfDir != "" {
 			s.memProfDir = memProfDir
 		}
+	}
+}
+
+// WithMetrics toggles metrics for the core package and its dependencies (e.g. cafs)
+func WithMetrics(enabled bool) Option {
+	return func(s *Settings) {
+		s.EnableMetrics(enabled)
 	}
 }
 

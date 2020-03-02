@@ -11,6 +11,7 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/fuse"
+	"github.com/oneconcern/datamon/pkg/metrics"
 
 	"github.com/spf13/cobra"
 )
@@ -84,6 +85,12 @@ var mountBundleCmd = &cobra.Command{
 	Short: "Mount a bundle",
 	Long:  "Mount a readonly, non-interactive view of the entire data that is part of a bundle",
 	Run: func(cmd *cobra.Command, args []string) {
+		if datamonFlags.root.metrics.IsEnabled() {
+			// do not record timings or failures for long running or daemonized commands, do not wait for completion to report
+			datamonFlags.root.metrics.m.Usage.Inc("bundle mount")
+			metrics.Flush()
+		}
+
 		ctx := context.Background()
 
 		// cf. comments on runDaemonized
@@ -108,7 +115,6 @@ var mountBundleCmd = &cobra.Command{
 			onDaemonError("determine bundle id", err)
 			return
 		}
-		bd := core.NewBDescriptor()
 		bundleOpts, err := optionInputs.bundleOpts(ctx)
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
@@ -123,7 +129,9 @@ var mountBundleCmd = &cobra.Command{
 			return
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
-		bundle := core.NewBundle(bd, bundleOpts...)
+		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
+
+		bundle := core.NewBundle(bundleOpts...)
 		var fsOpts []fuse.Option
 		fsOpts = append(fsOpts, fuse.Streaming(datamonFlags.fs.Stream))
 		fsOpts = append(fsOpts, fuse.Logger(logger))
@@ -131,6 +139,7 @@ var mountBundleCmd = &cobra.Command{
 			fsOpts = append(fsOpts, fuse.CacheSize(int(datamonFlags.fs.CacheSize)))
 			fsOpts = append(fsOpts, fuse.Prefetch(datamonFlags.fs.WithPrefetch))
 			fsOpts = append(fsOpts, fuse.VerifyHash(datamonFlags.fs.WithVerifyHash))
+			fsOpts = append(fsOpts, fuse.WithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		}
 		fs, err := fuse.NewReadOnlyFS(bundle, fsOpts...)
 		if err != nil {

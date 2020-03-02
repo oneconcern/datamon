@@ -65,6 +65,7 @@ type flagsT struct {
 		logLevel string
 		cpuProf  bool
 		upgrade  bool
+		metrics  metricsFlags
 	}
 	doc struct {
 		docTarget string
@@ -325,6 +326,20 @@ func addVerifyHashFlag(cmd *cobra.Command) string {
 func addTemplateFlag(cmd *cobra.Command) string {
 	c := "format"
 	cmd.PersistentFlags().StringVar(&datamonFlags.core.Template, c, "", `Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields`)
+	return c
+}
+
+func addMetricsFlag(cmd *cobra.Command) string {
+	c := "metrics"
+	defaultMetrics := false // TODO(fred): once our concern about metrics backend security is addressed, move back the default to true
+	datamonFlags.root.metrics.Enabled = &defaultMetrics
+	cmd.PersistentFlags().BoolVar(datamonFlags.root.metrics.Enabled, c, defaultMetrics, `Toggle telemetry and metrics collection`)
+	return c
+}
+
+func addMetricsURLFlag(cmd *cobra.Command) string {
+	c := "metrics-url"
+	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Fully qualified URL to an influxdb metrics collector, with user and password`)
 	return c
 }
 

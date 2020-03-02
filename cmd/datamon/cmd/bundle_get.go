@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	status "github.com/oneconcern/datamon/pkg/core/status"
@@ -21,6 +22,12 @@ var GetBundleCommand = &cobra.Command{
 Prints corresponding bundle metadata if the bundle exists,
 exits with ENOENT status otherwise.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "bundle get", err)
+		}(time.Now())
+
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
@@ -46,8 +53,9 @@ exits with ENOENT status otherwise.`,
 		}
 		bundleOpts = append(bundleOpts, core.BundleID(datamonFlags.bundle.ID))
 		bundleOpts = append(bundleOpts, core.Repo(datamonFlags.repo.RepoName))
+		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 
-		bundle := core.NewBundle(core.NewBDescriptor(),
+		bundle := core.NewBundle(
 			bundleOpts...,
 		)
 

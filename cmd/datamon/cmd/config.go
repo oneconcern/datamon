@@ -55,6 +55,7 @@ type CLIConfig struct {
 	Context    string `json:"context" yaml:"context"`       // Current context for datamon
 	logger     *zap.Logger
 	onceLogger sync.Once
+	Metrics    metricsFlags `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }
 
 // MarshalConfig produces a CLI config as a YAML document

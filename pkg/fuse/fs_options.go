@@ -60,6 +60,18 @@ func VerifyHash(enabled bool) Option {
 	}
 }
 
+// WithMetrics toggles metrics on the fuse package
+func WithMetrics(enabled bool) Option {
+	return func(mfs fuseutil.FileSystem) {
+		switch fs := mfs.(type) {
+		case *readOnlyFsInternal:
+			fs.EnableMetrics(enabled)
+		case *fsMutable:
+			fs.EnableMetrics(enabled)
+		}
+	}
+}
+
 // MountOption enables options when mounting the file system
 //
 // TODO plumb additional mount options

@@ -16,7 +16,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"go.uber.org/zap"
 
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -28,15 +28,15 @@ import (
 
 func keyFromFile(t testing.TB, pth string) Key {
 	rhash := readTextFile(t, pth)
-	rkey, err := KeyFromString(rhash)
+	rkey, err := KeyFromString(string(rhash))
 	require.NoError(t, err)
 	return rkey
 }
 
-func readTextFile(t testing.TB, pth string) string {
+func readTextFile(t testing.TB, pth string) []byte {
 	v, err := ioutil.ReadFile(pth)
 	require.NoError(t, err)
-	return string(v)
+	return v
 }
 
 func TestChunkReader_SmallOnly(t *testing.T) {
@@ -58,11 +58,10 @@ func verifyChunkReader(t testing.TB, blobs storage.Store, tf testFile) {
 	require.NoError(t, err)
 	defer rdr.Close()
 
-	b, err := ioutil.ReadAll(rdr)
+	actual, err := ioutil.ReadAll(rdr)
 	require.NoError(t, err)
 
 	expected := readTextFile(t, tf.Original)
-	actual := string(b)
 	require.Equal(t, len(expected), len(actual))
 	require.Equal(t, expected, actual)
 }
@@ -75,7 +74,7 @@ func verifyChunkReaderAt(t testing.TB, blobs storage.Store, tf testFile, opts ..
 	r, err := newReader(blobs, rkey, leafSize, opts...)
 	require.NoErrorf(t, err, "did not expect newReader to fail, but got: %v", err)
 
-	// assert that the reader is actually destroyable, when the gc will eventually reclaim it
+	// assert that the reader is actually destroyable, when the gc eventually reclaims it
 	// (terminates prefetching routines)
 	defer r.(*chunkReader).destroy()
 
@@ -135,7 +134,7 @@ func filterEOF(err error) error {
 	return err
 }
 
-func assertReadAtContent(t testing.TB, size int, name, expected string, received []byte, n int, offset int64) {
+func assertReadAtContent(t testing.TB, size int, name string, expected, received []byte, n int, offset int64) {
 	var count int
 	// truncate tested data to the first 2*leafSize bytes
 	if len(expected) > size {
@@ -169,7 +168,7 @@ func assertReadAtContent(t testing.TB, size int, name, expected string, received
 			expected=%s
 			actual=%s`, name, len(expected), offset, n, diff,
 			expected,
-			spew.Sdump(expectedBytes), spew.Sdump(received[:n]))), 0644)
+			spew.Sdump(expectedBytes), spew.Sdump(received[:n]))), 0600)
 	}
 }
 
@@ -331,8 +330,10 @@ func TestWriteTo(t *testing.T) {
 	testFakeStore := fakeStore{
 		chunks: make(map[string][]byte, 2),
 	}
-	testFakeStore.chunks[keyStr1] = internal.RandBytesMaskImprSrc(64 * 1024)
-	testFakeStore.chunks[keyStr2] = internal.RandBytesMaskImprSrc(64 * 1024)
+	const chunkSize = 64 * 1024
+
+	testFakeStore.chunks[keyStr1] = rand.Bytes(chunkSize)
+	testFakeStore.chunks[keyStr2] = rand.Bytes(chunkSize)
 	key, err := KeyFromString(rKeyStr)
 	require.NoError(t, err)
 	key1, err := KeyFromString(keyStr1)
@@ -340,7 +341,7 @@ func TestWriteTo(t *testing.T) {
 	key2, err := KeyFromString(keyStr2)
 	require.NoError(t, err)
 	keys := []Key{key1, key2}
-	reader, err := newReader(&testFakeStore, key, 64*1024,
+	reader, err := newReader(&testFakeStore, key, chunkSize,
 		ReaderPrefix(""),
 		TruncateLeaf(false),
 		Keys(keys),
@@ -349,22 +350,22 @@ func TestWriteTo(t *testing.T) {
 	rWriteTo, ok := reader.(io.WriterTo)
 	require.True(t, ok)
 	fakeWriterAt := &fakeWriteAt{
-		data: make([]byte, 2*64*1024),
+		data: make([]byte, 2*chunkSize),
 	}
 	written, err := rWriteTo.WriteTo(fakeWriterAt)
 	require.NoError(t, err)
-	require.Equal(t, written, int64(2*64*1024))
-	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriterAt.data[:64*1024])
-	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriterAt.data[64*1024:])
+	require.Equal(t, written, int64(2*chunkSize))
+	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriterAt.data[:chunkSize])
+	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriterAt.data[chunkSize:])
 	// Pass writer with write at. make sure data read from reader is written to writerAt
 	fakeWriter := &fakeWriter{
-		data: make([]byte, 2*64*1024),
+		data: make([]byte, 2*chunkSize),
 	}
 	written, err = rWriteTo.WriteTo(fakeWriter)
 	require.NoError(t, err)
-	require.Equal(t, written, int64(2*64*1024))
-	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriter.data[:64*1024])
-	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriter.data[64*1024:])
+	require.Equal(t, written, int64(2*chunkSize))
+	require.Equal(t, testFakeStore.chunks[keyStr1], fakeWriter.data[:chunkSize])
+	require.Equal(t, testFakeStore.chunks[keyStr2], fakeWriter.data[chunkSize:])
 	// TODO: Set truncation on and verify.
 }
 

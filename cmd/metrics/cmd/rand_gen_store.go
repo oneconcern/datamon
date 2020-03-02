@@ -10,8 +10,6 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 )
 
-// internal.RandStringBytesMaskImprSrc(15)
-
 /**
  * this is a storage.Store implementation that generates random or patterned data on read,
  * the sort of data that's useful for gathering metrics.

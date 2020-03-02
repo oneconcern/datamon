@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 
 	"go.uber.org/zap"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
+	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 
@@ -114,6 +116,11 @@ func New(opts ...Option) (Fs, error) {
 
 	f.pather = func(lks Key) string { return lks.StringWithPrefix(f.prefix) }
 
+	if f.MetricsEnabled() {
+		f.m = f.EnsureMetrics("cafs", &M{}).(*M)
+		f.m.Volume.Cache.Sizing(cacheBuffers, cacheBuffers+buffersForparallelReaders, f.leafSize)
+	}
+
 	return f, nil
 }
 
@@ -147,6 +154,9 @@ type defaultFs struct {
 	deduplicationScheme         string
 	withPrefetch                int
 	withVerifyHash              bool
+
+	metrics.Enable
+	m *M
 }
 
 func (d *defaultFs) GetAddressingScheme() string {
@@ -154,13 +164,24 @@ func (d *defaultFs) GetAddressingScheme() string {
 }
 
 func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
+	var (
+		err     error
+		written int64
+	)
+
 	d.l.Debug("Start cafs Put")
-	defer d.l.Debug("End cafs Put")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "Put")(err)
+			d.m.Volume.IO.IORecord(t0, "Put")(written, err)
+		}
+		d.l.Debug("End cafs Put")
+	}(time.Now())
 
 	w := d.writer()
 
 	// write leaf blobs
-	written, err := io.Copy(w, src)
+	written, err = io.Copy(w, src)
 	if err != nil {
 		w.Close()
 		return PutRes{}, err
@@ -198,6 +219,9 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
 	if d.keysCache != nil {
 		_, _ = d.keysCache.ContainsOrAdd(root, UnverifiedLeafKeys(keys, d.leafSize))
 	}
+	if d.MetricsEnabled() {
+		d.m.Volume.Blobs.IntRoot(1, "Put")
+	}
 	return PutRes{
 		Written: written,
 		Key:     root,
@@ -207,11 +231,33 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
-	return d.reader(hash)
+	var err error
+
+	d.l.Debug("Start cafs Get")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "Get")(err)
+		}
+		d.l.Debug("End cafs Get")
+	}(time.Now())
+
+	r, err := d.reader(hash)
+	return r, err
 }
 
 func (d *defaultFs) GetAt(ctx context.Context, hash Key) (io.ReaderAt, error) {
-	return d.reader(hash)
+	var err error
+
+	d.l.Debug("Start cafs GetAt")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "GetAt")(err)
+		}
+		d.l.Debug("End cafs GetAt")
+	}(time.Now())
+
+	r, err := d.reader(hash)
+	return r, err
 }
 
 func (d *defaultFs) reader(hash Key) (Reader, error) {
@@ -244,6 +290,7 @@ func (d *defaultFs) reader(hash Key) (Reader, error) {
 		ReaderPrefix(d.prefix),
 		ReaderLogger(d.l),
 		ReaderPrefetch(d.withPrefetch),
+		ReaderWithMetrics(d.MetricsEnabled()),
 	)
 	if err != nil {
 		return nil, err
@@ -258,10 +305,21 @@ func (d *defaultFs) writer() Writer {
 		WriterConcurrentFlushes(d.concurrentFlushes),
 		WriterLogger(d.l),
 		WriterPather(d.pather),
+		WriterWithMetrics(d.MetricsEnabled()),
 	)
 }
 
 func (d *defaultFs) Delete(ctx context.Context, hash Key) error {
+	var err error
+
+	d.l.Debug("Start cafs Delete")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "Delete")(err)
+		}
+		d.l.Debug("End cafs Delete")
+	}(time.Now())
+
 	keys, err := LeavesForHash(d.store.backend, hash, d.leafSize, d.prefix)
 	if err != nil {
 		return err
@@ -276,6 +334,16 @@ func (d *defaultFs) Delete(ctx context.Context, hash Key) error {
 }
 
 func (d *defaultFs) Clear(ctx context.Context) error {
+	var err error
+
+	d.l.Debug("Start cafs Clear")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "Clear")(err)
+		}
+		d.l.Debug("End cafs Clear")
+	}(time.Now())
+
 	return d.store.backend.Clear(ctx)
 }
 
@@ -284,7 +352,18 @@ func (d *defaultFs) Clear(ctx context.Context) error {
 // TODO(fred): nice - since the FS is configured with some prefix, one should only
 // return prefixed keys.
 func (d *defaultFs) Keys(ctx context.Context) ([]Key, error) {
-	return d.keys(ctx, matchAnyKey)
+	var err error
+
+	d.l.Debug("Start cafs Keys")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "Keys")(err)
+		}
+		d.l.Debug("End cafs Keys")
+	}(time.Now())
+
+	keys, err := d.keys(ctx, matchAnyKey)
+	return keys, err
 }
 
 func (d *defaultFs) keys(ctx context.Context, matches func(Key) bool) ([]Key, error) {
@@ -308,7 +387,22 @@ func (d *defaultFs) keys(ctx context.Context, matches func(Key) bool) ([]Key, er
 }
 
 func (d *defaultFs) RootKeys(ctx context.Context) ([]Key, error) {
-	return d.keys(ctx, d.matchOnlyObjectRoots)
+	var err error
+
+	d.l.Debug("Start cafs RootKeys")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "RootKeys")(err)
+		}
+		d.l.Debug("End cafs RootKeys")
+	}(time.Now())
+
+	keys, err := d.keys(ctx, d.matchOnlyObjectRoots)
+
+	if d.MetricsEnabled() {
+		d.m.Volume.Blobs.IntRoot(len(keys), "RootKeys")
+	}
+	return keys, err
 }
 
 func (d *defaultFs) matchOnlyObjectRoots(key Key) bool {
@@ -316,7 +410,19 @@ func (d *defaultFs) matchOnlyObjectRoots(key Key) bool {
 }
 
 func (d *defaultFs) Has(ctx context.Context, key Key, cfgs ...HasOption) (bool, []Key, error) {
-	var opts hasOpts
+	var (
+		opts hasOpts
+		err  error
+	)
+
+	d.l.Debug("Start cafs Has")
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "Has")(err)
+		}
+		d.l.Debug("End cafs Has")
+	}(time.Now())
+
 	for _, apply := range cfgs {
 		apply(&opts)
 	}

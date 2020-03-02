@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -32,6 +33,12 @@ This is analogous to the "git log" command. The bundle ID works like a git commi
 	Example: `% datamon bundle list --repo ritesh-test-repo
 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT , Updating test bundle`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "bundle list", err)
+		}(time.Now())
+
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
@@ -42,7 +49,9 @@ This is analogous to the "git log" command. The bundle ID works like a git commi
 		}
 		err = core.ListBundlesApply(datamonFlags.repo.RepoName, remoteStores, applyBundleTemplate,
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
-			core.BatchSize(datamonFlags.core.BatchSize))
+			core.BatchSize(datamonFlags.core.BatchSize),
+			core.WithMetrics(datamonFlags.root.metrics.IsEnabled()),
+		)
 		if err != nil {
 			wrapFatalln("concurrent list bundles", err)
 			return

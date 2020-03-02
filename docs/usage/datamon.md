@@ -18,12 +18,14 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 ### Options
 
 ```
-      --config string     Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context string    Set the context for datamon (default "dev")
-      --force             Forces upgrade even if the current version is not a released version
-  -h, --help              help for datamon
-      --loglevel string   The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
-      --upgrade           Upgrades the current version then carries on with the specified command
+      --config string        Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
+      --context string       Set the context for datamon (default "dev")
+      --force                Forces upgrade even if the current version is not a released version
+  -h, --help                 help for datamon
+      --loglevel string      The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
+      --metrics              Toggle telemetry and metrics collection
+      --metrics-url string   Fully qualified URL to an influxdb metrics collector, with user and password
+      --upgrade              Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO

@@ -7,6 +7,7 @@ package cmd
 
 import (
 	context2 "context"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/storage/gcs"
@@ -19,6 +20,12 @@ var ContextCreateCommand = &cobra.Command{
 	Short: "Create a context",
 	Long:  "Create a context for Datamon",
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+
+		defer func(t0 time.Time) {
+			cliUsage(t0, "context create", err)
+		}(time.Now())
+
 		createContext()
 	},
 }

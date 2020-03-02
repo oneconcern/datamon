@@ -8,6 +8,7 @@ import (
 	"time"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
+	"github.com/oneconcern/datamon/pkg/metrics"
 
 	"gopkg.in/yaml.v2"
 
@@ -22,67 +23,41 @@ import (
 // Examples: Latest, production.
 type Label struct {
 	Descriptor model.LabelDescriptor
+
+	metrics.Enable
+	m *M
 }
 
-// LabelOption is a functor to build labels
-type LabelOption func(*Label)
-
-// LabelDescriptorOption is a functor to build label descriptors
-type LabelDescriptorOption func(descriptor *model.LabelDescriptor)
-
-// LabelContributors sets a list of contributors for the label
-func LabelContributors(c []model.Contributor) LabelDescriptorOption {
-	return func(ld *model.LabelDescriptor) {
-		ld.Contributors = c
-	}
-}
-
-func getLabelStore(stores context2.Stores) storage.Store {
-	return stores.VMetadata()
-}
-
-// LabelContributor sets a single contributor for the label
-func LabelContributor(c model.Contributor) LabelDescriptorOption {
-	return LabelContributors([]model.Contributor{c})
-}
-
-// NewLabelDescriptor builds a new label descriptor
-func NewLabelDescriptor(descriptorOps ...LabelDescriptorOption) *model.LabelDescriptor {
-	ld := model.LabelDescriptor{
-		Timestamp: time.Now(),
-	}
-	for _, apply := range descriptorOps {
-		apply(&ld)
-	}
-	return &ld
-}
-
-// LabelName sets a name for the label
-func LabelName(name string) LabelOption {
-	return func(l *Label) {
-		l.Descriptor.Name = name
+func defaultLabel() *Label {
+	return &Label{
+		Descriptor: *model.NewLabelDescriptor(),
 	}
 }
 
 // NewLabel builds a new label with a descriptor
-func NewLabel(ld *model.LabelDescriptor, labelOps ...LabelOption) *Label {
-	if ld == nil {
-		ld = NewLabelDescriptor()
+func NewLabel(opts ...LabelOption) *Label {
+	label := defaultLabel()
+	for _, apply := range opts {
+		apply(label)
 	}
-	label := Label{
-		Descriptor: *ld,
+
+	if label.MetricsEnabled() {
+		label.m = label.EnsureMetrics("core", &M{}).(*M)
 	}
-	for _, apply := range labelOps {
-		apply(&label)
-	}
-	return &label
+	return label
 }
 
 // UploadDescriptor persists the label descriptor for a bundle
-func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error {
-	e := RepoExists(bundle.RepoID, bundle.contextStores)
-	if e != nil {
-		return e
+func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) (err error) {
+	defer func(t0 time.Time) {
+		if label.MetricsEnabled() {
+			label.m.Usage.UsedAll(t0, "LabelUpload")(err)
+		}
+	}(time.Now())
+
+	err = RepoExists(bundle.RepoID, bundle.contextStores)
+	if err != nil {
+		return err
 	}
 	label.Descriptor.BundleID = bundle.BundleID
 	buffer, err := yaml.Marshal(label.Descriptor)
@@ -108,11 +83,17 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) error 
 }
 
 // DownloadDescriptor retrieves the label descriptor for a bundle
-func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, checkRepoExists bool) error {
+func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, checkRepoExists bool) (err error) {
+	defer func(t0 time.Time) {
+		if label.MetricsEnabled() {
+			label.m.Usage.UsedAll(t0, "LabelDownload")(err)
+		}
+	}(time.Now())
+
 	if checkRepoExists {
-		e := RepoExists(bundle.RepoID, bundle.contextStores)
-		if e != nil {
-			return e
+		err = RepoExists(bundle.RepoID, bundle.contextStores)
+		if err != nil {
+			return err
 		}
 	}
 	archivePath := model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name)
@@ -138,7 +119,11 @@ func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, chec
 	return nil
 }
 
-// GetLabelStore extracts the versioning metadata store from some context's stores
+// GetLabelStore tells which store holds label metadata
 func GetLabelStore(stores context2.Stores) storage.Store {
-	return getVMetaStore(stores)
+	return getLabelStore(stores)
+}
+
+func getLabelStore(stores context2.Stores) storage.Store {
+	return stores.VMetadata()
 }

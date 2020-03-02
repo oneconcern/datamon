@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -94,6 +95,7 @@ func testFiles(destDir string) []testFile {
 			Parts:    1,
 			Size:     15,
 		},
+		// TODO(fred): empty file
 	}
 }
 
@@ -105,7 +107,13 @@ func TestMain(m *testing.M) {
 }
 
 func setupTestData(dir string, files []testFile) (*testDataGenerator, storage.Store, Fs, error) {
-	os.RemoveAll(dir)
+	t0 := time.Now()
+	defer func() {
+		log.Printf("INFO: setup duration: %v", time.Since(t0).Truncate(time.Millisecond))
+	}()
+
+	_ = os.RemoveAll(dir)
+
 	blobs := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(dir, "cafs")))
 	fs, err := New(
 		LeafSize(leafSize),
@@ -131,16 +139,14 @@ type testDataGenerator struct {
 }
 
 func (t *testDataGenerator) Initialize() error {
-	if err := os.MkdirAll(filepath.Join(t.destDir, "original"), 0700); err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(filepath.Join(t.destDir, "cafs"), 0700); err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(filepath.Join(t.destDir, "roots"), 0700); err != nil {
-		return err
+	for _, location := range []string{
+		"original", // the generated dataset
+		"cafs",     // the cafs store with blobs
+		"roots",    // the location of root keys
+	} {
+		if err := os.MkdirAll(filepath.Join(t.destDir, location), 0700); err != nil {
+			return err
+		}
 	}
 	return nil
 }

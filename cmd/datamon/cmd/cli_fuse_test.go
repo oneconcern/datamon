@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,7 +77,7 @@ func testCommand(t testing.TB, withPipe, withEnv bool, target string, args ...st
 }
 
 func generateRepoName(in string) string {
-	return "test-" + in + "-repo-" + internal.RandStringBytesMaskImprSrc(10)
+	return "test-" + in + "-repo-" + rand.LetterString(10)
 }
 
 func testBundleMount(t *testing.T, testType string, waiter func(*zap.Logger, io.Reader)) {
@@ -206,7 +206,7 @@ func testMountCmdParams(t testing.TB, testType, repo, pathToMount, pathBackingFs
 	}
 }
 
-func testMountReady(t testing.TB, token string, defaultWait time.Duration) func(*zap.Logger, io.Reader) {
+func testWaitForReader(t testing.TB, token string, defaultWait time.Duration) func(*zap.Logger, io.Reader) {
 	return func(l *zap.Logger, output io.Reader) {
 		// awaits expected ready message
 		// TODO(fred): we may use that to time out on waiting if needed
@@ -245,15 +245,15 @@ func testMountReady(t testing.TB, token string, defaultWait time.Duration) func(
 }
 
 func TestBundleMount(t *testing.T) {
-	testBundleMount(t, "stream-dest", testMountReady(t, `"mounting"`, 5*time.Second))
+	testBundleMount(t, "stream-dest", testWaitForReader(t, `"mounting"`, 5*time.Second))
 }
 
 func TestBundleMountNoStream(t *testing.T) {
-	testBundleMount(t, "nostream-dest", testMountReady(t, `"mounting"`, 5*time.Second))
+	testBundleMount(t, "nostream-dest", testWaitForReader(t, `"mounting"`, 5*time.Second))
 }
 
 func TestBundleMountNoStreamNoDest(t *testing.T) {
-	testBundleMount(t, "nostream-nodest", testMountReady(t, `"mounting"`, 5*time.Second))
+	testBundleMount(t, "nostream-nodest", testWaitForReader(t, `"mounting"`, 5*time.Second))
 }
 
 func captureOutputProgress(p io.Reader) (*bytes.Buffer, *sync.WaitGroup) {
@@ -321,7 +321,7 @@ func TestBundleMutableMount(t *testing.T) {
 		}
 	}()
 
-	testMountReady(t, `"mounting"`, 5*time.Second)(logger, pipe)
+	testWaitForReader(t, `"mounting"`, 5*time.Second)(logger, pipe)
 
 	logger.Info("copying files to the mount")
 	// copy files to mount

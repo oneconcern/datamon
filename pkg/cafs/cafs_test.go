@@ -16,12 +16,11 @@ import (
 func assertReaderOriginal(t testing.TB, original string, rdr io.ReadCloser) {
 	defer rdr.Close()
 
-	b, err := ioutil.ReadAll(rdr)
+	actual, err := ioutil.ReadAll(rdr)
 	require.NoError(t, err)
 	require.NoError(t, rdr.Close())
 
 	expected := readTextFile(t, original)
-	actual := string(b)
 	require.Equal(t, len(expected), len(actual))
 	require.Equal(t, expected, actual)
 }
@@ -35,9 +34,7 @@ func TestCAFS_Get(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, tf := range testFiles(destDir) {
-		rhash := readTextFile(t, tf.RootHash)
-		rkey, err := KeyFromString(rhash)
-		require.NoError(t, err)
+		rkey := keyFromFile(t, tf.RootHash)
 
 		rdr, err := fs.Get(context.Background(), rkey)
 		require.NoError(t, err)

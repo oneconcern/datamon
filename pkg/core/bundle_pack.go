@@ -116,6 +116,7 @@ func uploadBundleFile(
 	logger.Debug("putting file in cafs",
 		zap.String("filename", file),
 	)
+
 	putRes, e := cafsArchive.Put(ctx, fileReader)
 	if e != nil {
 		chans.error <- errorHit{
@@ -177,6 +178,9 @@ func uploadBundleFiles(
 		bundle.l.Debug("kicking off upload file",
 			zap.Int("idx", fileIdx),
 		)
+		if bundle.MetricsEnabled() {
+			bundle.m.Volume.Bundles.Inc("upload")
+		}
 		go uploadBundleFile(ctx, file, cafsArchive, fileReader, chans,
 			fileIdx, bundle.l)
 	}
@@ -216,6 +220,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		cafs.ConcurrentFlushes(bundle.concurrentFileUploads/fileUploadsPerFlush),
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Logger(bundle.l),
+		cafs.WithMetrics(bundle.MetricsEnabled()),
 	)
 	if err != nil {
 		return err

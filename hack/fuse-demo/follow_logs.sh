@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/zsh
 
 STARTUP_POLL_INTERVAL=1
 

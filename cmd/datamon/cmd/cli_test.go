@@ -20,7 +20,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 
 	gcsStorage "cloud.google.com/go/storage"
-	"github.com/oneconcern/datamon/internal"
+	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -193,7 +193,7 @@ func TestRepoList(t *testing.T) {
 func TestGetRepo(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	repoName := internal.RandStringBytesMaskImprSrc(8)
+	repoName := rand.LetterString(8)
 	runCmd(t, []string{"repo",
 		"get",
 		"--repo", repoName,
@@ -223,7 +223,8 @@ func testUploadBundle(t *testing.T, file uploadTree) {
 		"--path", dirPathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
-		"--concurrency-factor", concurrencyFactor,
+		//"--concurrency-factor", concurrencyFactor,
+		"--concurrency-factor", "1",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	//
 	log.SetOutput(os.Stdout)
@@ -251,7 +252,7 @@ func TestUploadBundle(t *testing.T) {
 	}
 }
 
-func TestUploadBundle_filePath(t *testing.T) {
+func TestUploadBundleFilePath(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
 	runCmd(t, []string{"repo",
@@ -468,7 +469,7 @@ func listBundles(t *testing.T, repoName string) (bundleListEntries, error) {
 }
 
 func testListBundle(t *testing.T, file uploadTree, bcnt int) {
-	msg := internal.RandStringBytesMaskImprSrc(15)
+	msg := rand.LetterString(15)
 	testNow := time.Now()
 	runCmd(t, []string{"bundle",
 		"upload",
@@ -531,7 +532,7 @@ func TestGetBundle(t *testing.T) {
 		"--description", "testing",
 		"--repo", repo1,
 	}, "create second test repo", false)
-	label := internal.RandStringBytesMaskImprSrc(8)
+	label := rand.LetterString(8)
 	runCmd(t, []string{"bundle",
 		"get",
 		"--repo", repo1,
@@ -559,7 +560,7 @@ func TestGetBundle(t *testing.T) {
 func TestGetLabel(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
-	label := internal.RandStringBytesMaskImprSrc(8)
+	label := rand.LetterString(8)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
@@ -646,7 +647,7 @@ func TestListLabels(t *testing.T) {
 	ll = listLabels(t, repo2, "")
 	require.Equal(t, 0, len(ll), "no labels created yet")
 	file := testUploadTrees[0][0]
-	label := internal.RandStringBytesMaskImprSrc(8)
+	label := rand.LetterString(8)
 	testNow := time.Now()
 	runCmd(t, []string{"bundle",
 		"upload",
@@ -692,7 +693,7 @@ func TestSetLabel(t *testing.T) {
 	ll := listLabels(t, repo1, "")
 	require.Equal(t, len(ll), 0, "no labels created yet")
 	file := testUploadTrees[0][0]
-	msg := internal.RandStringBytesMaskImprSrc(15)
+	msg := rand.LetterString(15)
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, file),
@@ -709,7 +710,7 @@ func TestSetLabel(t *testing.T) {
 	require.Equal(t, 1, bundles.Len(), "bundle count in test repo")
 
 	bundleEnt := bundles.Last()
-	label := internal.RandStringBytesMaskImprSrc(8)
+	label := rand.LetterString(8)
 	testNow := time.Now()
 	runCmd(t, []string{"label",
 		"set",
@@ -728,7 +729,7 @@ func TestSetLabel(t *testing.T) {
 }
 
 func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
-	msg := internal.RandStringBytesMaskImprSrc(15)
+	msg := rand.LetterString(15)
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, files[0]),
@@ -791,7 +792,7 @@ func TestDownloadBundleNameFilter(t *testing.T) {
 	}, "create test repo", false)
 
 	files := testUploadTrees[1]
-	msg := internal.RandStringBytesMaskImprSrc(15)
+	msg := rand.LetterString(15)
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, files[0]),
@@ -867,7 +868,7 @@ func TestDiffBundle(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
 	files := testUploadTrees[1]
-	label := internal.RandStringBytesMaskImprSrc(8)
+	label := rand.LetterString(8)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
@@ -914,7 +915,7 @@ func TestDiffBundle(t *testing.T) {
 	require.NoError(t, srcFS.Remove(pathInBundle(difFile)), "remove file to change")
 	f, err = srcFS.OpenFile(pathInBundle(difFile), os.O_CREATE|os.O_WRONLY|os.O_SYNC|0600, 0600)
 	require.NoError(t, err, "open file to change")
-	_, err = f.WriteString(internal.RandStringBytesMaskImprSrc(10))
+	_, err = f.WriteString(rand.String(10))
 	require.NoError(t, err, "write to changed file")
 	require.NoError(t, f.Close(), "close changed file")
 	//
@@ -992,7 +993,7 @@ func TestUpdateBundle(t *testing.T) {
 	cleanup := setupTests(t)
 	defer cleanup()
 	files := testUploadTrees[1]
-	label := internal.RandStringBytesMaskImprSrc(8)
+	label := rand.LetterString(8)
 	runCmd(t, []string{"repo",
 		"create",
 		"--description", "testing",
@@ -1039,7 +1040,7 @@ func TestUpdateBundle(t *testing.T) {
 	require.NoError(t, srcFS.Remove(pathInBundle(difFile)), "remove file to change")
 	f, err = srcFS.OpenFile(pathInBundle(difFile), os.O_CREATE|os.O_WRONLY|os.O_SYNC|0600, 0600)
 	require.NoError(t, err, "open file to change")
-	_, err = f.WriteString(internal.RandStringBytesMaskImprSrc(10))
+	_, err = f.WriteString(rand.String(10))
 	require.NoError(t, err, "write to changed file")
 	require.NoError(t, f.Close(), "close changed file")
 	//
@@ -1127,7 +1128,7 @@ func TestDownloadBundleByLabel(t *testing.T) {
 	}, "create test repo", false)
 	files := testUploadTrees[0]
 	file := files[0]
-	label := internal.RandStringBytesMaskImprSrc(8)
+	label := rand.LetterString(8)
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, file),
@@ -1225,7 +1226,7 @@ func listBundleFiles(t *testing.T, repoName string, bid string) []bundleFileList
 }
 
 func testListBundleFiles(t *testing.T, files []uploadTree, bcnt int) {
-	msg := internal.RandStringBytesMaskImprSrc(15)
+	msg := rand.LetterString(15)
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, files[0]),
@@ -1303,7 +1304,7 @@ func testBundleDownloadFile(t *testing.T, file uploadTree, bid string) {
 }
 
 func testBundleDownloadFiles(t *testing.T, files []uploadTree, bcnt int) {
-	msg := internal.RandStringBytesMaskImprSrc(15)
+	msg := rand.LetterString(15)
 	runCmd(t, []string{"bundle",
 		"upload",
 		"--path", dirPathStr(t, files[0]),
@@ -1357,7 +1358,7 @@ func createTestUploadTreeHelper(t *testing.T, sourceFS storage.Store, tree []upl
 		for i := 0; i < rc; i++ {
 			err = sourceFS.Put(context.Background(),
 				file.path,
-				bytes.NewReader(internal.RandBytesMaskImprSrc(file.size)),
+				bytes.NewReader(rand.Bytes(file.size)),
 				storage.NoOverWrite)
 			if err == nil {
 				break

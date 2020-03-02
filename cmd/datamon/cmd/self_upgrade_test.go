@@ -37,7 +37,7 @@ func TestSelfUpgrade(t *testing.T) {
 
 	opts.selfBinary = filepath.Join(dummyDir, "datamon2")
 
-	err = ioutil.WriteFile(opts.selfBinary, []byte(`dummy`), 0700)
+	err = ioutil.WriteFile(opts.selfBinary, []byte(`dummy`), 0700) //nolint: gosec
 	require.NoError(t, err)
 
 	require.NoError(t, doSelfUpgrade(opts))

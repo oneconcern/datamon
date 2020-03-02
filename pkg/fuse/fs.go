@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/core"
@@ -77,6 +76,10 @@ func NewReadOnlyFS(bundle *core.Bundle, opts ...Option) (*ReadOnlyFS, error) {
 		bapply(fs)
 	}
 
+	if fs.MetricsEnabled() {
+		fs.m = fs.EnsureMetrics("fuse", &M{}).(*M)
+	}
+
 	if fs.streamed {
 		// prepare the content-addressable backend for this bundle
 		cafs, err := cafs.New(
@@ -87,6 +90,7 @@ func NewReadOnlyFS(bundle *core.Bundle, opts ...Option) (*ReadOnlyFS, error) {
 			cafs.CacheSize(fs.lruSize),
 			cafs.Prefetch(fs.prefetch),
 			cafs.VerifyHash(fs.withVerifyHash),
+			cafs.WithMetrics(fs.MetricsEnabled()),
 		)
 		if err != nil {
 			return nil, err
@@ -158,6 +162,10 @@ func NewMutableFS(bundle *core.Bundle, opts ...Option) (*MutableFS, error) {
 		fs.l = fs.l.With(zap.String("bundle", bundle.BundleID))
 	}
 
+	if fs.MetricsEnabled() {
+		fs.m = fs.EnsureMetrics("fuse", &M{}).(*M)
+	}
+
 	fs.l.Info("mutable mount staging storage", zap.String("path", pathToStaging))
 
 	err = fs.initRoot()
@@ -180,8 +188,8 @@ func (dfs *ReadOnlyFS) Mount(path string, opts ...MountOption) error {
 	return dfs.MountReadOnly(path, opts...)
 }
 
-func defaultMountConfig(bundle *core.Bundle, readOnly bool, subType string) *fuse.MountConfig {
-	return &fuse.MountConfig{
+func defaultMountConfig(bundle *core.Bundle, readOnly bool, subType string) *jfuse.MountConfig {
+	return &jfuse.MountConfig{
 		Subtype:    subType, // mount appears as "fuse.{subType}"
 		ReadOnly:   readOnly,
 		FSName:     bundle.RepoID,
@@ -213,7 +221,7 @@ func (dfs *ReadOnlyFS) MountReadOnly(path string, opts ...MountOption) error {
 	mountCfg.ErrorLogger = el
 	mountCfg.DebugLogger = dl
 
-	dfs.mfs, err = fuse.Mount(path, dfs.server, mountCfg)
+	dfs.mfs, err = jfuse.Mount(path, dfs.server, mountCfg)
 	if err == nil {
 		dfs.fsInternal.l.Info("mounting", zap.String("mountpoint", path))
 	}

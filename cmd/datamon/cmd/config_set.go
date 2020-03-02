@@ -50,6 +50,7 @@ config file created in /Users/ritesh/.config/.datamon/config.yaml
 			Config:     datamonFlags.core.Config,
 			Context:    datamonFlags.context.Descriptor.Name,
 			Credential: datamonFlags.root.credFile,
+			Metrics:    datamonFlags.root.metrics,
 		}
 
 		file := configFileLocation(true)
@@ -69,7 +70,7 @@ config file created in /Users/ritesh/.config/.datamon/config.yaml
 			return
 		}
 
-		err = ioutil.WriteFile(file, o, 0666)
+		err = ioutil.WriteFile(file, o, 0600)
 		if err != nil {
 			wrapFatalln("error writing config file "+file, err)
 			return

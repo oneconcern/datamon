@@ -4,7 +4,6 @@ executors:
   docker_minio:
     working_directory: ~/project
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
       - image: circleci/golang
@@ -24,7 +23,6 @@ executors:
   docker_builder:
     working_directory: ~/project
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
       - image: circleci/golang
@@ -32,13 +30,34 @@ executors:
   fuse_tester:
     working_directory: ~/project
     environment:
-      GOOGLE_PROJECT_ID: "onec-co"
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOROOT: /usr/local/go
       GOPATH: /go
       PATH: /go/bin:/usr/local/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
     machine:
       image: ubuntu-1604:201903-01
+
+  metrics_tester:
+    working_directory: ~/project
+    environment:
+      GOOGLE_COMPUTE_ZONE: us-west2-c
+    docker:
+      - image: circleci/golang
+      - image: minio/minio
+        environment:
+          MINIO_ACCESS_KEY: access-key
+          MINIO_SECRET_KEY: secret-key-thing
+          MINIO_BROWSER: "off"
+          MINIO_DOMAIN: s3.local
+          MINIO_HTTP_TRACE: /tmp/minio.log
+        command:
+          - server
+          - data
+      - image: influxdb:1.7-alpine
+        environment:
+          INFLUXDB_DB: datamon
+        command:
+          - influxd
 
 commands:
   install_base:
@@ -124,7 +143,7 @@ commands:
           command: |
             sudo apt-get update -y --quiet
             sudo apt-get install --quiet kubectl
-            gcloud container clusters get-credentials onec-dev
+            gcloud container clusters get-credentials ${CLUSTER}
 
   install_test_tools:
     steps:
@@ -137,7 +156,7 @@ commands:
           command: |
             go get -u gotest.tools/gotestsum@latest
             go get -u github.com/matryer/moq@latest
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
             go clean -modcache
 
   login_to_google:
@@ -182,7 +201,8 @@ commands:
           name: Prepare golang tests
           command: |
             mkdir -p /tmp/test-results/cafs /tmp/test-results/noncafs /tmp/test-results/fuse \
-                     /tmp/test-coverage/cafs /tmp/test-coverage/noncafs /tmp/test-coverage/fuse
+                     /tmp/test-coverage/cafs /tmp/test-coverage/noncafs /tmp/test-coverage/fuse \
+                     /tmp/test-results/metrics /tmp/test-coverage/metrics
             hack/go-generate.sh
             go mod download
 
@@ -199,11 +219,14 @@ jobs:
           command: |
             hack/go-generate.sh
             go mod download
-            golangci-lint run
+            golangci-lint run --new-from-rev master --timeout 10m
       - run:
           name: Lint shell scripts
           command: |
-            shellcheck hack/fuse-demo/wrap_application.sh
+            # scans all shells in repo, excluding zsh which is not linted
+            find . -name \*.sh|\
+            while read -r arg ;do shell=$(head -1q "${arg}");if [[ ! $shell =~ "zsh" ]] ; then echo "${arg}"; fi;done|\
+            xargs shellcheck
       - run:
           name: Ensure metrics
           command: |
@@ -225,6 +248,7 @@ jobs:
           name: Run golang tests (1)
           command: |
             gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures -- \
+              -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/noncafs/c_non_cafs.out \
               $(go list ./...|grep -v cafs)
       - run:
@@ -233,6 +257,7 @@ jobs:
             # cafs tests are memory intensive: best to run them separately
             # cafs tests have a lot of parallel testcases, using -race here would hog CI ressources
             gotestsum --junitfile /tmp/test-results/cafs/go-test-report-cafs.xml --format short-with-failures -- \
+              -timeout 15m \
               -parallel 4 -covermode atomic -coverprofile /tmp/test-coverage/cafs/c_cafs_only.out \
               ./pkg/cafs/...
       - put_cache
@@ -241,6 +266,38 @@ jobs:
           paths:
             - noncafs
             - cafs
+      - store_test_results:
+          path: /tmp/test-results
+
+  go_test_metrics:
+    executor: metrics_tester
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
+      GO111MODULE: 'on'
+    steps:
+      - install_base
+      - checkout
+      - get_cache
+      - install_test_tools
+      - login_to_google
+      - prepare_tests
+      - run:
+         name: Create influxdb test db
+         command: |
+           curl --get http://localhost:8086/query --data-urlencode "q=CREATE DATABASE test"
+      - run:
+          name: Run golang tests with metrics (1)
+          command: |
+            gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format short-with-failures -- \
+              -tags influxdbintegration \
+              -timeout 15m \
+              -race -cover -covermode atomic -coverprofile /tmp/test-coverage/metrics/c_metrics.out \
+              ./cmd/datamon/cmd ./pkg/metrics
+      - put_cache
+      - persist_to_workspace:
+          root: /tmp/test-coverage
+          paths:
+            - metrics
       - store_test_results:
           path: /tmp/test-results
 
@@ -262,7 +319,8 @@ jobs:
             gotestsum \
               --junitfile /tmp/test-results/fuse/go-test-report-fuse.xml --format standard-verbose -- \
               -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)' \
-              -timeout 20m -covermode atomic -coverprofile /tmp/test-coverage/fuse/c_fuse_integration.out \
+              -timeout 15m \
+              -covermode atomic -coverprofile /tmp/test-coverage/fuse/c_fuse_integration.out \
               ./pkg/core ./cmd/datamon/cmd
       - put_cache
       - persist_to_workspace:
@@ -292,7 +350,7 @@ jobs:
             #mkdir -p coverage-results/debug
             #cp ${collected} merged_coverprofile.out coverage-results/debug
 
-            # Fully detailed report with gocov
+            # Fully detailed report with go tool cover
             go tool cover -html=merged_coverprofile.out -o coverage-results/coverage_datamon_ci.html
 
             # Alternative report with gocov
@@ -444,12 +502,21 @@ workflows:
             branches:
               only: /.*/
 
+      - go_test_metrics:
+          context: "OC Common"
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
       - test_coverage:
           context: "OC Common"
           requires:
             - go_lint
             - go_test
             - go_test_fuse
+            - go_test_metrics
           filters:
             tags:
               only: /.*/

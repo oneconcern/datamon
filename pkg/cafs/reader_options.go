@@ -98,3 +98,12 @@ func ReaderPather(fn func(Key) string) ReaderOption {
 		}
 	}
 }
+
+// ReaderWithMetrics enables metrics collection on this reader
+func ReaderWithMetrics(enabled bool) ReaderOption {
+	return func(reader *chunkReader) {
+		if enabled {
+			reader.EnableMetrics(enabled)
+		}
+	}
+}
