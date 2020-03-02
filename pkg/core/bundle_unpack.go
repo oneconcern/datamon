@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/core/status"
@@ -340,12 +341,23 @@ func downloadBundleEntrySyncMaybeOverwrite(ctx context.Context, bundleEntry mode
 			return err
 		}
 	}
-	err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.NoOverWrite)
-	if err != nil {
-		bundle.l.Error("Failed to download bundle entry: put to store",
-			zap.String("name", bundleEntry.NameWithPath),
-			zap.Error(err))
-		return err
+	count := 0
+	for {
+		count++
+		err = bundle.ConsumableStore.Put(ctx, bundleEntry.NameWithPath, reader, storage.NoOverWrite)
+		if err == nil {
+			break
+		}
+		if count > 3 || !strings.Contains("INTERNAL_ERROR", err.Error()) {
+			bundle.l.Error("Failed to download bundle entry: put to store",
+				zap.String("name", bundleEntry.NameWithPath),
+				zap.Error(err))
+			return err
+		} else {
+			bundle.l.Error("Failed to download bundle entry, retrying: put to store ",
+				zap.String("name", bundleEntry.NameWithPath),
+				zap.Error(err))
+		}
 	}
 	bundle.l.Info("downloaded bundle entry",
 		zap.String("name", bundleEntry.NameWithPath))
