@@ -1,6 +1,7 @@
-# Diamond workflow support
+# Diamond upload support
 
 A diamond workflow allows for a pipeline to scale out the generation of a single bundle.
+This relies on datamon's diamond uploads.
 
 A diamond is composed of multiple splits; each split tries to write a set of files.
 Ideally, 2 splits do not write the same file.
@@ -14,8 +15,20 @@ Commit logic handles any conflicts that exist. Conflicts can only occur if the s
 the bundle is written to by more than one split with different data.
 
 Diamonds and splits are essentially transitory objects, which live in the metadata namespace of a datamon repo,
-and can be deleted once completed.
+and can be deleted once completed. Just like for labels, these objects are not part of the "core" metadata
+describing repos and bundles and are stored on an ancillary _versioned_ metadata bucket (`vmetadata`).
 
+## Terminology
+
+* **node**: a computer running an instance of datamon, e.g. a container or a pod
+* **diamond**: an action performed in parallel by several independent nodes.
+  In the remainder of this document, the action corresponds to uploading files as a datamon bundle.
+* **split**: the portion of work in a diamond carried out by a single node
+* **conflict**: a situation in which several splits upload overlapping files with different content
+* **checkpoint**: another name for conflict, which denotes the user's intent to follow up overlapping files as versions of the same file
+* **workflow**: in the context of this document, refers to a sequence of operations carried out by some collaborating nodes,
+  not implying necessarily that this is an _ARGO_ workflow
+* **incremental upload**: an upload operation conducted in several subsequent steps, resulting in a final commit as a bundle
 
 ## Workflow
 
@@ -27,7 +40,7 @@ For a diamond to start, datamon needs some unique ID. Datamon SDK allows for the
 
 1. Prerequisite: generate a unique KSUID and a signaling metadata object that allows for starting splits.
 2. All clients participating in the same diamond are expected to use the same ID at each step.
-   **This is a requirement on client coordination**.
+   **This is a requirement for client coordination**.
 3. The {diamond-id} is only used once: users cannot initialize the same diamond twice.
 4. Initialization command, returning an identifier which is guaranteed to be unique:
    ```
@@ -41,13 +54,21 @@ For a diamond to start, datamon needs some unique ID. Datamon SDK allows for the
    ```
 6. Backend model: the following path is created in the vmetadata bucket.
    ```
-   /diamonds/{repo}/{diamond-id}/diamond.yaml
+   /diamonds/{repo}/{diamond-id}/diamond-running.yaml
    ```
 
-> **Trade-off**: the requirement on the initialization stage is set on purpose.
+> **Trade-off**: the requirement for the initialization stage is set on purpose.
 >
 > This is not guided by implementation constraints but by the desire to protect users against unintentional silent data
 > corruption, which could occur if the diamond ID were left as a user-controlled parameter.
+
+## Concurrency model
+
+The metadata model ensures that no metadata object is ever overwritten: some metadata may be wasted, but never be corrupted
+by a concurrent operation.
+
+As such, files are never locked: the only concurrency property required from the underlying storage is to be able to
+ensure object creation in some bucket in an atomic way, with no allowed clobbering of its previous content.
 
 ### Files uploading
 
@@ -62,10 +83,10 @@ Uploading files in a diamond split first stores all files as blobs, then generat
    {split-id}
    ```
    This command is similar to `datamon bundle upload`, the only difference being the required `--diamond` flag.
-3. Backend model: in the vmetadata bucket, the following paths will be created or overwritten.
+3. Backend model: in the vmetadata bucket, the following paths will be created, and **never overwritten**.
    ```
-   /diamonds/{repo}/{diamond-id}/splits/{split-id}/split.yaml
-   /diamonds/{repo}/{diamond-id}/splits/{split-id}/bundle-files-{index}.yaml
+   /diamonds/{repo}/{diamond-id}/splits/{split-id}/split-running.yaml
+   /diamonds/{repo}/{diamond-id}/splits/{split-id}/{generation-id}/bundle-files-{index}.yaml
    ```
 4. The split ID is internal to datamon, and automatically generated with every `add` command.
    The user is normally not required to know about this ID.
@@ -75,7 +96,7 @@ Uploading files in a diamond split first stores all files as blobs, then generat
    datamon diamond add --repo {repo} --diamond {diamond-id} --split {split-id} --path {source}
    {split-id}
    ```
-   This command fails when when the split has not been already created.
+   This command fails when the split has not been already created.
 6. Incremental uploads for a bundle and diamonds work the same way. See [below](#diamonds-vs-incremental-uploads)
 
 
@@ -83,6 +104,9 @@ Uploading files in a diamond split first stores all files as blobs, then generat
 > to avoid "technical conflicts" whenever needed.
 >
 > In all situations not requiring this kind of handling, not caring about this id is the recommended way.
+
+> **generation-id**: this internal ID is allocated automatically and ensures that no action on splits can interfere
+> with the file lists produced during the execution of a split, even when a user specifies the `{split-id}`.
 
 ### Commit as a bundle
 
@@ -92,7 +116,7 @@ Eventually, all file lists combine into a new bundle with the commit message and
 2. Any `split add` operation still in progress at commit time will be ignored in the resulting bundle.
 3. Command:
    ```
-   datamon diamond commit --repo {repo} --diamond {id} --message {message} [--label {label}]
+   datamon diamond commit --repo {repo} --diamond {diamond-id} --message {message} [--label {label}]
    ```
 4. Optionally a commit can be set to fail on conflict.
    ```
@@ -100,8 +124,9 @@ Eventually, all file lists combine into a new bundle with the commit message and
                           --message {message} --label {label} --no-conflicts
    ```
    In that case, the conflicting splits are indicated in the error message.
-5. **Nice to have**. Alternatively, the whole diamond operation may be canceled (see [§ Cancellation](#handling-failures-retries-and-cancellations)).
-   This allows for some housekeeping of the `vmetadata` bucket (see below)
+5. Alternatively, the whole diamond operation may be canceled (see [§ Cancellation](#handling-failures-retries-and-cancellations)).
+   This allows for explicit reporting about the state of ongoing tasks as well as for some housekeeping of the
+   `vmetadata` bucket (see below).
 
 
 ### Metadata housekeeping
@@ -111,7 +136,7 @@ Eventually, all file lists combine into a new bundle with the commit message and
 1. Regular users and service accounts are not authorized to delete objects in buckets.
 2. After a commit or cancel has been carried out, we may safely remove all diamond-related metata.
 3. We don't want metadata buckets to grow and hold forever what is essentially temporary.
-4. A privileged job is in responsible for cleaning, for all repositories in a given context, all references to terminated
+4. A privileged job is responsible for cleaning, for all repositories in a given context, all references to terminated
    diamonds and their splits in the vmetadata bucket.
 
 > **NOTE**: while not critical, this task guards our `vmetadata` bucket against undesirable pollution from tracks of
@@ -122,15 +147,19 @@ Eventually, all file lists combine into a new bundle with the commit message and
 
 ```bash
 repo="test-repo"
-diamond=$(datamon diamond initialize --repo "${repo}")
+diamond_id=$(datamon diamond initialize --repo "${repo}")
 
-datamon diamond add --repo "${repo}" --diamond "${diamond-id}" --path /datasource/part1 &
-datamon diamond add --repo "${repo}" --diamond "${diamond-id}" --path /datasource/part2 &
-datamon diamond add --repo "${repo}" --diamond "${diamond-id}" --path /datasource/part3 &
+datamon diamond add --repo "${repo}" --diamond "${diamond_id}" --path /datasource/part1 &
+datamon diamond add --repo "${repo}" --diamond "${diamond_id}" --path /datasource/part2 &
+datamon diamond add --repo "${repo}" --diamond "${diamond_id}" --path /datasource/part3 &
+{split-id-1}
+{split-id-2}
+{split-id-3}
 
-datamon diamond split list --repo "${repo}" --diamond "${diamond-id}"
+datamon diamond split list --repo "${repo}" --diamond "${diamond_id}"
 
-datamon diamond commit --repo "${repo}" --diamond "${diamond-id}" --message "Diamond constructed"
+datamon diamond commit --repo "${repo}" --diamond "${diamond_id}" --message "Diamond constructed"
+{bundle-id}
 ```
 
 
@@ -138,7 +167,8 @@ datamon diamond commit --repo "${repo}" --diamond "${diamond-id}" --message "Dia
 
 ### Diamonds vs incremental uploads
 
-Diamonds and incremental uploads are very much alike, the use-cases come with some nuances.
+Diamonds and incremental uploads are very much alike. However, these different use-cases come with some nuances
+regarding how to handle conflicts.
 
 Use-cases:
 
@@ -148,8 +178,10 @@ Use-cases:
 3. Incremental uploads in parallel: many pods output data incrementally, and eventually produce a bundle.
    We don't want conflicts between increments but would like to track conflicts between nodes.
 
-The main difference lies with concurrency and requirements on client coordination: a diamond carried out by a single
-client _is_ an incremental upload. The other difference is how the user wants to deal with conflicts.
+The main difference lies with concurrency and requirements for client coordination: a diamond carried out by a single
+client _is_ an incremental upload.
+
+Another key difference is how the user wants to deal with conflicts.
 
 Therefore, we need to capture user intent. We add some additional CLI flags to specify how datamon should deal
 with conflicts. See also [§ Handling Conflicts below](#handling-conflicts).
@@ -161,7 +193,7 @@ datamon diamond commit --diamond {diamond-id} \
                       [--with-conflicts]   # <- this is the default - overlaps are reported as conflicts detected when merging splits
 
 datamon diamond commit --diamond {diamond-id} \
-                       --with-checkpoints   # <- indicates an incremental upload: conflicts are subsequent versions of uploaded files
+                       --with-checkpoints   # <- indicates an incremental upload: "conflicts" are reported as subsequent versions of an uploaded file
 
 datamon diamond commit --diamond {diamond-id} \
                        --no-conflicts       # <- forbids any overlap to take place at commit time
@@ -178,15 +210,16 @@ datamon diamond add --diamond {diamond-id} \
 ```
 
 Use `--no-conflicts` to guard incremental uploads against clobbering already uploaded files, whenever this is not desirable.
+
 Flags determining the conflict-handling mode cannot be used jointly.
 
 ### Handling concurrency
 
 Premises:
 
-1. Several diamonds can run concurrently on the same repo, resulting in distinct bundles
-2. Within a single diamond, several `add` commands may run concurrently to contribute to a single same bundle
-3. Only one eventual commit operation may be carried out. Any attempt to compete on committing a diamond must be rejected.
+1. Several diamonds can run concurrently on the same repo, resulting in distinct bundles, without any interference
+2. Within a single diamond, several `add` commands may run concurrently to contribute to a single bundle
+3. Only one eventual commit operation may be carried out
 4. Some `split add` commands may fail, some may complete, some may be subject to a retry
 
 
@@ -198,24 +231,23 @@ Design:
     Note that uniqueness is required only for any single repo.
 
 2. Concurrent splits.
-  * Each `split add` command runs with its uniquely generated internal ID: metadata can be safely modified within this namespace.
+  * Each `split add` command runs with its unique split ID: metadata can be safely modified within this namespace.
+  * `split add` commands reusing a previously allocated split ID produce new file lists that are unique to this run.
+    Among all splits started with the same split ID, only the split that first reaches completion will be taken into account,
+    all the other will eventually fail and their work wasted, without corrupting the state of the completed split.
 
 3. Commit consistency.
   * The diamond is in effect concluded with the first commit associated with it. No further action is allowed on a committed diamond.
-  * Any attempt to commit while another commit is in progress is rejected (the operation should normally be fast
-    since only metadata is affected).
-  * For the duration of the commit operation, the diamond is in effect locked in "committing" status.
-  * To recover from uncontrolled failures during a commit (e.g. pod crash,...) this lock is considered stale after some
-    timeout (e.g. 30 sec) and a new commit may be attempted.
+  * Any attempt to commit while another commit is in progress will result in only one of these operations to eventually succeed
+  * Several concurrent attempts to commit the same diamond concurrently result in the same outcome, provided all splits have completed
 
 4. See below [§ Handling failures](#handling-failures-retries-and-cancellations)
 
 > **NOTE**: a _controlled_ failure occurs when some exception handling may be performed so the program exits gracefully
-> (example: network outage).
-> _Uncontrolled_ failures are sudden interruptions: pod crash, program panic, ...
+> (example: network outage).  _Uncontrolled_ failures are sudden interruptions: pod crash, program panic, ...
 >
-> Establishing a distinction between an explicitly failed status and some other kind of failures helps to report about
-> the status of ongoing splits. It also helps to clean metadata.
+> Datamon does not explicitly distinguish between these different cases: a split is either "done" or "running", running
+> meaning more precisely "not done", which implies that it may have failed and will never complete.
 
 
 ### Handling conflicts
@@ -223,13 +255,12 @@ Design:
 Use-cases:
 
 * Diamond use-case: a workflow deploys many splits, with some overlap in the resulting dataset.
-  Overlapping identical files do not trigger any conflict. The user wants to be warned about overlaps with differences
+  Overlapping identical files do not trigger any conflict. The user wants to be warned about overlaps with variations
   (conflicting versions).
 * One pod in the workflow did restart: we don't want to report any conflict from that kind of event.
-* Incremental upload: a single pod proceeds to dataset construction in several steps. We keep intermediate versions of
-  files as checkpoints.
-* Incremental upload with diamond: a workflow deploys many splits, each single pod proceeds to dataset construction in
-  several steps. Versions are checkpointed.
+* Incremental upload: a single pod proceeds with the construction of a dataset in several steps. We keep the intermediate versions of
+  all modified files as checkpoints.
+* Incremental upload with diamond: a workflow deploys many splits on different pods, every single pod proceeding incrementally. Versions are checkpointed.
 
 
 Premises: about detecting conflicts
@@ -243,21 +274,25 @@ Premises: about detecting conflicts
 
 Premises: about what to do with conflicts
 
-6. By default, discarded versions of files are kept for possible future reuse (e.g. fixing merge conflicts),
-   unless the user tells datamon these may be safely dropped.
+6. By default, discarded versions of files are kept for possible future reuse (e.g. fixing merge conflicts, retrieving clobbered content),
+   unless the user tells datamon these may be safely dropped (i.e. use the `--ignore-conflicts` flag).
 7. Details about conflicts and checkpoints are retained as part of the bundled dataset, in some "hidden folders"
 8. When users explicitly mention their intent to carry out _incremental uploads_, conflicts are renamed as checkpoints,
    thus establishing a distinction between "good" and "bad" conflicts.
-9. When users explicitly mention their intent to ignore conflicts, conflicts are discarded and older versions of files
+9. When users explicitly mention their intent to ignore conflicts, conflict reporting is discarded and older versions of files
    simply dropped at commit time.
+10. The various conflict-handling flags _do not change_ the content of the produced bundle, save the special hidden
+    folders used to keep track of conflicts/checkpoints
 
-> **NOTE**: we don't want to upload blobs without keeping a track of the reference hashes
-> (unrecoverable blobs), unless explicitly being told to.
+
+> **NOTE**: we don't want to upload blobs without keeping a track of the corresponding hashes
+> (which would lead to unrecoverable blobs) unless explicitly being told to.
+> That is precisely the meaning of the `--ignore-conflicts` flag.
 
 
 Design:
 
-* Latest version wins: incremental uploads overwriting the same file with several versions always ends up with a
+* The latest version always wins: incremental uploads overwriting the same file with several versions always ends up with
   safe deconfliction.
 * References to all conflicting files, save the winner, will be stored in a special path on the dataset available
   with the bundle, and may be readily downloaded:
@@ -268,8 +303,8 @@ Design:
   ```
   /.checkpoints/{split-id}/{path}
   ```
-* Conflicts and checkpoints in these special locations won't be uploaded if the download is reused to create a new
-  bundle (i.e. `/.conflicts`, `/.checkpoints` are ignored by uploads just as are the metadata in `.datamon`).
+* Conflicts and checkpoints in these special locations won't be uploaded if the downloaded content is reused to create a new
+  bundle (i.e. `/.conflicts`, `/.checkpoints` are ignored by uploads just as are the metadata in `/.datamon`).
 
 > **NOTE**: conflict resolution is based on the _upload time_ of the file (not modification time on the dataset), and
 > is resolved locally by the host running the split client.
@@ -291,8 +326,7 @@ Premises:
 4. Blobs put on storage resulting from split uploads cannot be relinquished. We accept the possibility of some wasted
    storage as a result.
 5. Failure to carry out a commit is a special case, see [below](#failed-commit).
-
-6. **Nice to have**. Explicit cancellation may be skipped and does not affect concurrent diamonds or diamonds initiated
+6. Explicit cancellation may be skipped and does not affect concurrent diamonds or diamonds initiated
    in the future. Explicit cancellation is only expected from well-behaved users and helps maintain orderly metadata.
    This is a consequence of the blob deduplication strategy (the same blob might be claimed by another file, so we can't
    mark it as something to be deleted).
@@ -302,51 +336,61 @@ Design:
 
 * Diamonds abide by the following state-transition model:
   1. `initialized`
-  2. `committing`
-  3. `done`
-
-* **Nice to have**: besides, for diamond canceling operations:
-  4. `canceling`
-  5. `canceled`
+  2. `done`|`canceled` (terminal states)
 
 * Splits:
   1. `running`
-  2. `done`|`failed`
+  2. `done` (terminal state)
 
-> **NOTE**: the `canceled` and `failed` states are not critical to the functionality: they merely provide better
-> monitoring capabilities ("what's going on with my splits?") as well as safe cleaning up.
+> **NOTE**: the `canceled` state is not critical to the functionality and merely provides better
+> monitoring capabilities as well as safe cleaning up.
 
 
 #### Successful add operation
 A split upload is marked as complete in the following metadata file:
 ```
-/diamonds/{repo}/{diamond-id}/{split-id}/split.yaml   #  <- State pass to "done"
+/diamonds/{repo}/{diamond-id}/{split-id}/split-done.yaml   #  <- State pass to "done"
 ```
 
 Any subsequent commit will only consider splits in the `done` state.
 
 
 #### Failed add operation
-A controlled failure on such an operation would mark the split as explicitly failed (for further reporting and monitoring).
+Any failure on a `split add` operation will just leave the split in a "running state".
+There is no update of the metadata to mark it explicitly as "failed".
+
 ```
-/diamonds/{repo}/{diamond-id}/splits/{split-id}/split.yaml   #  <- State pass to "failed"
+/diamonds/{repo}/{diamond-id}/splits/{split-id}/split-running.yaml   #  <- State remains "running"
 ```
 
-> **NOTE**: please mark that it is not possible to distinguish an aborted or hanging `add` operation from a merely long-running one.
-> To recover from hangs/uncontrolled failures, one should start a new split.
+> **NOTE**: it is not possible to distinguish an aborted or hanging `add` operation from a merely long-running one.
+> To recover from hangs/uncontrolled failures, one should start a new split, which is always a safe operation.
 
 
 #### Retry add operation
 
-Retrying is just starting a new split. Users are never required to specify the split ID (though they may: see
-[below](#controlling-the-split-id)). Failed splits have not been marked in state `done` and will be ignored at commit
-time.  This metadata will eventually be cleaned up.
+Retrying is just starting a new split.
 
-1. If a "done" split is played again, there should be no impact: all uploaded files being equal,
-   no conflict shall be triggered.
+Users are never required to specify the split ID (though they may do so: see also [below](#controlling-the-split-id)).
+
+There are 2 ways to do this:
+1. Without specifying any split ID
+2. With a previously allocated split ID, either provided by datamon **or by the user**
+
+
+Option (1) is the simplest way to go: this treats the new split as an independent one, and the choice of the adequate
+conflict handling strategy is deferred to commit time.
+
+Option (2) requires the user to keep the split ID and reuse it: all conflicts between 2 runs with the same split ID are
+simply ignored. Besides, this option allows for _removing_ some files in an incremental upload.
+
+
+Failed or still running splits have not been marked in state `done` and will be ignored at commit time.
+
+1. Any "done" split may be safely played again: datamon does nothing. The CLI warns the user but does not shoot any error.
 2. Retries should normally be faster since some blobs have most likely been already uploaded:
    the deduplication will recognize that fact and skip these blobs (no change here to the current ways).
-3. If on the other hand, this new run comes with some modified version of a file, this version will be kept
+3. If on the other hand, the new run comes with some modified version of a file, this version will be kept
    and a new conflict will be detected. For workflows favoring the latter approach, we suggest committing with either the
    `--with-checkpoints` to report overwritten files as checkpoints (good) rather than conflicts (bad).
    Workflows that don't want to care about such details should use `--ignore-conflicts`.
@@ -363,23 +407,32 @@ Let's assume too, that at every restart, the job is adding files with some uniqu
 
 In this situation, we don't want to keep track of conflicts, or even consider this as "checkpoints".
 
-The way to go here is to have the restarting container always restart with the same, explicit `{split-id}`:
-overall conflict-handling is preserved at commit time, but such technical conflicts are ignored.
+The way to go here is to have the restarting container reuse the same, explicit `{split-id}`:
+cross-pods conflict-handling strategy is preserved at commit time, but such local conflicts are ignored.
 
 The container will have to persist the initial `{split-id}` returned by the command, then reuse it.
 
-Example:
+Example: reusing the splitID generated by datamon
 
 ```bash
 # assume .split is mounted on some persistent volume
 if [[ ! -f ${mounted}/.split ]] ; then
+  # first time
   datamon diamond add --diamond ${diamond} --path ${source} > ${mounted}/.split
 else
+  # upon restarts
   datamon diamond add --diamond ${diamond} --split $(cat ${mounted}/.split) --path ${source}
 fi
 ```
 
-1. The command fails whenever no split `{split-id}` is not already existing.
+Example: using an arbitrary splitID provided by the user
+
+```bash
+user_split="some-unique-value-which-remains-stable-across-pod-restarts"
+datamon diamond add --diamond ${diamond} --path ${source} --split ${user_split}
+```
+
+1. The command succeeds even though no split `{split-id}` was already existing.
 2. The command fails whenever the split `{split-id}` is already `done`.
 3. The command succeeds whenever the split `{split-id}` is already `running`: users must ensure that the split
    job is terminated. In the use case above, the failed container cannot possibly have the previous run with the split
@@ -397,38 +450,25 @@ However, the sequence of internal operations is critical and must be protected a
 A failed commit must never leave metadata in an unusable or corrupted state.
 
 1. Work performed during commit is idempotent: any failed or interrupted commit can be restarted with the same eventual result.
-2. Controlled failure (managed error): the locked status on the diamond metadata file
-   (`diamond.yaml  #  <- State: "committing"`) moves the state back to "initialized" and a new commit operation may
-   be attempted straight away.
-3. Uncontrolled failure (container failure, panic...): the locked status could not be updated, but will expire.
-   Commit can be restarted after waiting for the lock to expire
+2. Diamond is marked in the `done` state: the bundle has been created and is readily available for use.
 
-
-Committing a bundle to metadata involves a critical section that _must_ be protected from concurrency.
-
-1. From aggregation of splits down to bundle metadata creation. Diamond is marked in the `committing` state.
-2. The bundle has been created and is readily available for use. Diamond is marked in the `done` state.
+Committing a bundle to metadata involves a critical section that _must_ be protected from concurrency:
+since the metadata files to be written cannot be overwritten, any attempt to overwrite one of them will cause the competing 
+commit operation to fail.
 
 Constraints:
-* Under normal conditions, commit occurs from the `initialized` state
-* Attempting a concurrent commit while in `committing` fresh state is rejected
-* Attempting a concurrent commit while in `committing` stale state, the lock timestamp is refreshed and commit may proceed
-* Before proceeding with finalizing the commit (i.e. `PUT bundle.yaml`), a last-ditch check on the lock timestamp is
-  performed: if it has been updated, the commit fails.
-* Attempting a concurrent commit while in `done` is always rejected.
-* When eventually cleaned up by the background job, the vmetadata no more hold any reference to the diamond.
-
-Technically, there is indeed a race condition on updating `diamond.yaml` twice. The last-ditch check on a nano sec
-timestamp ensures that only the latest started commit eventually completes (with its snapshot of done splits).
+* Commits occur from the `initialized` state only
+* Attempting a concurrent commit while in `done` or `canceled` states is always rejected.
 
 ##### Ensuring correctness for a commit operation
 
 This is not related to diamonds and should apply to ordinary `bundle upload` just as well.
 
-1. scan the splits in the done state and merge file lists: write the new file list
-   (<- if a failure leaves us here, the bundle metadata is incomplete, and deemed not being created)
+1. scan the splits in the done state and merge file lists: write the new file list.
+   If a failure leaves us here, the bundle metadata is incomplete, and deemed not being created.
 2. deal with conflicts/checkpoints: write these extra file list (<- same remark)
-3. write the `bundle.yaml` file
+3. write the bundle file lists (index files)
+4. write the `bundle.yaml` file
 
 ### Auditability & monitoring
 
@@ -436,16 +476,18 @@ Premises:
 
 * I'd like the metadata to keep track of the details of any split operation, with a track of failed and successful
   split uploads
-* This is useful information to trace back performance issues (e.g. one of the node took much more time than its siblings)
+* This is useful information to trace back performance issues (e.g. one node took much more time than its siblings)
   or understand conflicts
 * I'd like to report about the status of the various splits and get some feedback about failure or completion
 * This is useful to make sure I can safely proceed with committing the work done, without necessarily requiring an exit
   status from the clients
+* I'd like to distinguish the logs from every split when collecting all the logs on my cluster
 
 Design:
 
 * Bundle metadata are unaffected
 * Listing & reporting proceeds by querying `vmetadata` (just like labels)
+* A "tag" option is provided, which bears no functionality save tainting the logs with this tag
 
 
 #### Lineage tracking
@@ -461,7 +503,7 @@ Design:
 * Each split keeps track of its originating contributor
 * This metadata is at first recorded in:
   ```
-  /diamonds/{repo}/{diamond-id}/splits/{split-id}/split.yaml
+  /diamonds/{repo}/{diamond-id}/splits/{split-id}/split-done.yaml
   ```
 * At commit time, we merge contributors into the resulting bundle:
   ```
@@ -520,9 +562,12 @@ datamon diamond
 ### vmetadata
 
 ```
-diamonds/{repo}/{diamond-id}/diamond.yaml                                  # <- captures the diamond state: initialized, committing, done
-diamonds/{repo}/{diamond-id}/diamonds/{split-id}/split.yaml                # <- captures the split state, plus holds information about the running split, eventually merged into metadata for bundle
-diamonds/{repo}/{diamond-id}/diamonds/{split-id}/bundle-files-{index}.yaml # <- file index for uploaded data
+diamonds/{repo}/{diamond-id}/diamond-running.yaml                          # <- captures the diamond with its initialized state
+diamonds/{repo}/{diamond-id}/diamond-done.yaml                             # <- captures the diamond with a final state: done or canceled
+diamonds/{repo}/{diamond-id}/splits/{split-id}/split-running.yaml          # <- captures the split state, plus holds information about the running split, eventually merged into metadata for bundle
+diamonds/{repo}/{diamond-id}/splits/{split-id}/split-done.yaml             # <- captures the split state, plus holds information about the running split, eventually merged into metadata for bundle
+
+diamonds/{repo}/{diamond-id}/splits/{split-id}/{generation-id}/bundle-files-{index}.yaml # <- file index for uploaded data, at a unique location for this generation
 ```
 
 ### metadata
@@ -537,9 +582,7 @@ No change.
 datamon diamond cancel --repo {repo} --diamond {diamond-id}
 ```
 
-This waits for ongoing running splits to complete then marks vmetadata as ready for some cleanup
-
-> **NOTE**: in the future, we may interrupt running splits rather than waiting for them to complete _then_ cancel the diamond
+This immediately terminates the diamond. Any ongoing running split is not interrupted or waited for: its outcome will just remain ignored.
 
 
 ### Identify splits with some custom node identifier
@@ -548,13 +591,15 @@ datamon diamond split add --repo {repo} --path {source} --split-tag {my-bespoke-
 ```
 
 Tags are kept in metadata and can be used when reporting about running splits or help later with conflict resolution.
+Tags are used as a recognition mark when analyzing datamon log output over several nodes.
+
 Tags are typically a hostname or something that helps the end-user identify a node in the diamond.
 
-   1. `add` commands can be strongly ordered based on a design similar to WAL (KSUIDs alone do not guarantee strong ordering, and local timestamps
-      are not fully satisfactory).
-      This is a nice to have addition and can be added later in the implementation.
-   2. explicit cancellation could attempt to interrupt ongoing splits
 
+### Strong ordering
+`add` commands can be strongly ordered based on a design similar to WAL (KSUIDs alone do not guarantee strong ordering, and local timestamps
+are not fully satisfactory).
+This is a nice to have improvement, which can be added later to the implementation.
 
 ### List files in one or all splits
 ```
