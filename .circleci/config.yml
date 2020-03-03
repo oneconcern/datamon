@@ -5,6 +5,7 @@ executors:
     working_directory: ~/project
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
+    resource_class: 'medium+'
     docker:
       - image: circleci/golang
       - image: minio/minio
@@ -41,6 +42,7 @@ executors:
     working_directory: ~/project
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
+    resource_class: 'medium+'
     docker:
       - image: circleci/golang
       - image: minio/minio
