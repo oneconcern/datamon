@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -98,6 +99,62 @@ func TestDiamondList(t *testing.T) {
 		ID := wantsOneLineFirstField(t, r, w)
 		assert.Equal(t, diamondID, ID)
 	}
+}
+
+func TestDiamondUserSupplied(t *testing.T) {
+	// test user suppled splitID
+	cleanup := setupTests(t)
+	defer cleanup()
+
+	repo := generateRepoName("diamond")
+
+	runOK(t, "repo", "create", "--description", "testing", "--repo", repo)
+
+	r, w := startCapture(t)
+	runOK(t, "diamond", "initialize", "--repo", repo)
+
+	diamondID := wantsKSUID(t, r, w)
+
+	root := filePathStr(t, uploadTree{path: "/"})
+	rexSplit := regexp.MustCompile(`SPLIT-\d+`)
+	splits := make([]string, 0, len(testUploadTrees))
+	for i, tree := range testUploadTrees {
+		pth := tree[0].Root()
+		r, w = startCapture(t)
+		runOK(t, "diamond", "split", "add", "--repo", repo, "--diamond", diamondID, "--split", "SPLIT-"+strconv.Itoa(i), "--path", root, "--name-filter", pth)
+
+		// returns user supplied ID
+		lines := endCapture(t, r, w, []string{})
+		require.Len(t, lines, 1)
+		splitID := lines[0]
+		require.Regexp(t, rexSplit, splitID)
+		splits = append(splits, splitID)
+	}
+
+	r, w = startCapture(t)
+	runOK(t, "diamond", "split", "list", "--repo", repo, "--diamond", diamondID)
+
+	lines := endCapture(t, r, w, []string{})
+	require.Len(t, lines, len(testUploadTrees))
+	for i, line := range lines {
+		assert.Equal(t, firstField(line), "SPLIT-"+strconv.Itoa(i))
+	}
+
+	for i, line := range lines {
+		split := firstField(line)
+		assert.Equal(t, splits[i], split)
+
+		r, w = startCapture(t)
+		runOK(t, "diamond", "split", "get", "--repo", repo, "--diamond", diamondID, "--split", split)
+
+		splitID := wantsOneLineFirstField(t, r, w)
+		assert.Equal(t, split, splitID)
+	}
+
+	r, w = startCapture(t)
+	runOK(t, "diamond", "commit", "--repo", repo, "--diamond", diamondID, "--message", "commit test message")
+
+	_ = wantsBundleUploaded(t, r, w)
 }
 
 func startCapture(t testing.TB) (io.Reader, io.Closer) {

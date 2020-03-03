@@ -374,7 +374,8 @@ func addSplitFlag(cmd *cobra.Command) string {
 func addWithConflictsFlag(cmd *cobra.Command) string {
 	c := "with-conflicts"
 	if cmd != nil {
-		cmd.Flags().BoolVar(&datamonFlags.diamond.withConflicts, c, true, `Diamond commit handles conflicts and keeps them in store`)
+		cmd.Flags().BoolVar(&datamonFlags.diamond.withConflicts, c, true, `Diamond commit handles conflicts and keeps them in store`+
+			` Conflicting versions of your uploaded files are located in the .conflicts folder`)
 	}
 	return c
 }
@@ -390,7 +391,7 @@ func addNoConflictsFlag(cmd *cobra.Command) string {
 func addIgnoreConflictsFlag(cmd *cobra.Command) string {
 	c := "ignore-conflicts"
 	if cmd != nil {
-		cmd.Flags().BoolVar(&datamonFlags.diamond.ignoreConflicts, c, false, `Diamond commit ignores conflicts and does not report about any`)
+		cmd.Flags().BoolVar(&datamonFlags.diamond.ignoreConflicts, c, false, `Diamond commit ignores conflicts and does not report about them`)
 	}
 	return c
 }
@@ -398,7 +399,8 @@ func addIgnoreConflictsFlag(cmd *cobra.Command) string {
 func addWithCheckpointFlag(cmd *cobra.Command) string {
 	c := "with-checkpoints"
 	if cmd != nil {
-		cmd.Flags().BoolVar(&datamonFlags.diamond.withCheckpoints, c, false, `Diamond commit handles conflicts and keeps them as intermediate checkpoints rather than conflicts`)
+		cmd.Flags().BoolVar(&datamonFlags.diamond.withCheckpoints, c, false, `Diamond commit handles conflicts and keeps them as intermediate checkpoints rather than conflicts.`+
+			` Intermediate versions of your uploaded files are located in the .checkpoints folder`)
 	}
 	return c
 }

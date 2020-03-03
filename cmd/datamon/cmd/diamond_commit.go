@@ -15,7 +15,7 @@ import (
 var CommitDiamondCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commits a diamond",
-	Long:  `Commits a diamond to create a bundle, with conflicts handling`,
+	Long:  `Commits a diamond to create a bundle from multiple uploaded splits, with conflicts handling`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags

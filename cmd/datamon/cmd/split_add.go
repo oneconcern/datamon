@@ -18,7 +18,17 @@ import (
 var SplitAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "adds a new split and starts uploading",
-	Long:  ``,
+	Long: `this starts uploading files to produce a partial dataset.
+You'll have to use "datamon diamond commit" when you are done with all your splits.`,
+	Example: `
+# use datamon auto-generated split
+% datamon diamond split add --repo my-repo --diamond 0uk1HdCJ6hUZKDgcxhpJwUl5ZEI --path /to-upload
+0uk1Ha7hGJ1Q9Xbnkt0yZgNwg3g
+
+# use user-supplied splitID (unique for this diamond)
+% datamon diamond split add --repo my-repo --diamond 0uk1HdCJ6hUZKDgcxhpJwUl5ZEI --split my-pod --path /to-upload
+my-pod
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
@@ -67,7 +77,6 @@ var SplitAddCmd = &cobra.Command{
 		// TODO(fred): factorize with bundle_download
 		var filter core.KeyFilter
 		if datamonFlags.bundle.NameFilter != "" {
-			//	filterRex, erc := regexp.Compile(datamonFlags.bundle.FileList)
 			var nameFilterRe *regexp.Regexp
 			nameFilterRe, err = regexp.Compile(datamonFlags.bundle.NameFilter)
 			if err != nil {
@@ -89,7 +98,7 @@ var SplitAddCmd = &cobra.Command{
 			core.SplitKeyIterator(iterator),
 			core.SplitKeyFilter(filter),
 			core.SplitLogger(logger),
-			core.SplitMustExist(datamonFlags.split.splitID != ""),
+			//core.SplitMustExist(datamonFlags.split.splitID != ""),
 		)
 
 		split, err := core.CreateSplit(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, remoteStores,

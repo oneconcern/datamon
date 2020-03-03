@@ -6,10 +6,25 @@ adds a new split and starts uploading
 
 ### Synopsis
 
-adds a new split and starts uploading
+this starts uploading files to produce a partial dataset.
+You'll have to use "datamon diamond commit" when you are done with all your splits.
 
 ```
 datamon diamond split add [flags]
+```
+
+### Examples
+
+```
+
+# use datamon auto-generated split
+% datamon diamond split add --repo my-repo --diamond 0uk1HdCJ6hUZKDgcxhpJwUl5ZEI --path /to-upload
+0uk1Ha7hGJ1Q9Xbnkt0yZgNwg3g
+
+# use user-supplied splitID (unique for this diamond)
+% datamon diamond split add --repo my-repo --diamond 0uk1HdCJ6hUZKDgcxhpJwUl5ZEI --split my-pod --path /to-upload
+my-pod
+
 ```
 
 ### Options
@@ -30,11 +45,13 @@ datamon diamond split add [flags]
 ### Options inherited from parent commands
 
 ```
-      --config string     Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context string    Set the context for datamon (default "dev")
-      --format string     Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
-      --loglevel string   The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
-      --upgrade           Upgrades the current version then carries on with the specified command
+      --config string        Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
+      --context string       Set the context for datamon (default "dev")
+      --format string        Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
+      --loglevel string      The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
+      --metrics              Toggle telemetry and metrics collection
+      --metrics-url string   Fully qualified URL to an influxdb metrics collector, with user and password
+      --upgrade              Upgrades the current version then carries on with the specified command
 ```
 
 ### SEE ALSO
