@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -18,17 +21,36 @@ import (
 )
 
 // New creates a new local file system backed storage model
-func New(fs afero.Fs) storage.Store {
+func New(fs afero.Fs, opts ...Option) storage.Store {
 	if fs == nil {
 		fs = afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(".datamon", "objects"))
 	}
-	return &localFS{
-		fs: fs,
+	local := &localFS{
+		fs:   fs,
+		glob: make(map[string][]string),
+	}
+	for _, apply := range opts {
+		apply(local)
+	}
+	return local
+}
+
+// Option for the local FS store
+type Option func(*localFS)
+
+// WithLock prevents concurrent writes or concurrent read/writes on this local FS
+func WithLock(flag bool) Option {
+	return func(fs *localFS) {
+		fs.lock = flag
 	}
 }
 
 type localFS struct {
-	fs afero.Fs
+	fs        afero.Fs
+	glob      map[string][]string // current state of KeyPrefix matches
+	exclusive sync.Mutex          // mutex on glob access
+	lock      bool
+	rw        sync.RWMutex
 }
 
 func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
@@ -63,12 +85,16 @@ func (r localReader) Read(p []byte) (n int, err error) {
 func toSentinelErrors(err error) error {
 	// return sentinel errors defined by the status package
 	if os.IsNotExist(err) {
-		return storagestatus.ErrNotExists
+		return storagestatus.ErrNotExists.Wrap(err)
 	}
 	return err
 }
 
 func (l *localFS) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	if l.lock {
+		l.rw.RLock()
+		defer l.rw.RUnlock()
+	}
 	t, err := l.fs.Open(key)
 	return localReader{
 		objectReader: t,
@@ -82,11 +108,16 @@ type readCloser struct {
 func (rc readCloser) Read(p []byte) (n int, err error) {
 	return rc.reader.Read(p)
 }
+
 func (rc readCloser) Close() error {
 	return nil
 }
 
 func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
+	if l.lock {
+		l.rw.Lock()
+		defer l.rw.Unlock()
+	}
 	// TODO: Change this implementation to use rename to put file into place.
 	dir := filepath.Dir(key)
 	if dir != "" {
@@ -94,7 +125,7 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 			return fmt.Errorf("ensuring directories for %q: %v", key, err)
 		}
 	}
-	flag := os.O_CREATE | os.O_WRONLY | os.O_SYNC | 0600
+	flag := os.O_CREATE | os.O_WRONLY | os.O_SYNC | os.O_TRUNC
 	if exclusive {
 		flag |= os.O_EXCL
 	}
@@ -123,6 +154,7 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 }
 
 func (l *localFS) Delete(ctx context.Context, key string) error {
+	// unlink is atomic: no need to lock the in-memory object for that
 	if err := l.fs.Remove(key); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing %q: %v", key, err)
 	}
@@ -130,6 +162,10 @@ func (l *localFS) Delete(ctx context.Context, key string) error {
 }
 
 func (l *localFS) Keys(ctx context.Context) ([]string, error) {
+	if l.lock {
+		l.rw.RLock()
+		defer l.rw.RUnlock()
+	}
 	const root = "."
 	var res []string
 	e := afero.Walk(l.fs, root, func(path string, info os.FileInfo, err error) error {
@@ -139,11 +175,7 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 		if path == root {
 			return nil
 		}
-		fileInfo, err := l.fs.Stat(path)
-		if err != nil {
-			return err
-		}
-		if fileInfo.IsDir() {
+		if info.IsDir() {
 			return nil
 		}
 		res = append(res, path)
@@ -155,9 +187,99 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 	return res, nil
 }
 
-//TODO discuss the implementation with @Ivan & @Ritesh
-func (l *localFS) KeysPrefix(ctx context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
-	return nil, "", storagestatus.ErrNotImplemented
+// KeyPrefix provides a paginated key iterator using "pageToken" as the next starting point
+//
+// NOTE: this cursory implementation is at the moment only used by mocks in test. A more thorough approach
+// is required to make KeyPrefix a first class citizen for localfs.
+//
+// TODO(known limitations):
+//   * this implementation does not really scale up, but it is quite workable for our testcases using localfs.
+//   * this implementation is not meant for parallel use with mutable FS.
+func (l *localFS) KeysPrefix(_ context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
+	l.exclusive.Lock()
+	defer l.exclusive.Unlock()
+
+	noRoot := !strings.HasPrefix(prefix, "/")
+	prefix = path.Clean("/" + prefix)
+
+	// we cache the result for the duration of the fetch loop: during this period, localfs updates are not seen
+	search, ok := l.glob[prefix]
+	if !ok {
+		// NOTE: Glob is not workable, fall back to Walk
+		matches := make([]string, 0, 50)
+		err := afero.Walk(l.fs, path.Dir(prefix), func(pth string, info os.FileInfo, err error) error {
+			if info.IsDir() || err != nil {
+				return nil
+			}
+			if strings.HasPrefix(pth, prefix) {
+				if delimiter != "" && len(pth) > len(prefix) {
+					if cut := strings.Index(pth[len(prefix):], delimiter); cut > -1 {
+						pth = pth[0 : len(prefix)+cut+1]
+					}
+				}
+				if noRoot {
+					pth = strings.TrimPrefix(pth, "/")
+				}
+				matches = append(matches, pth)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, "", err
+		}
+		if delimiter != "" {
+			// dedupe truncated matches
+			deduped := make([]string, 0, len(matches))
+			for _, match := range matches {
+				dupe := false
+				for _, lookup := range deduped {
+					if match == lookup {
+						dupe = true
+						break
+					}
+				}
+				if !dupe {
+					deduped = append(deduped, match)
+				}
+			}
+			matches = deduped
+		}
+		l.glob[prefix], search = matches, matches
+	}
+
+	var (
+		start, end int
+		next       string
+	)
+
+	if token == "" {
+		start = 0
+	} else {
+		found := false
+		for i, lookup := range search {
+			if token != lookup {
+				continue
+			}
+			found = true
+			start = i
+			break
+		}
+		if !found {
+			delete(l.glob, prefix)
+			return []string{}, "", nil
+		}
+	}
+
+	if len(search) > start+count {
+		next = search[start+count]
+		end = start + count
+	} else {
+		next = ""
+		end = len(search)
+		delete(l.glob, prefix)
+	}
+
+	return search[start:end], next, nil
 }
 
 func (l *localFS) Clear(ctx context.Context) error {
