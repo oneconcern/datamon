@@ -5,7 +5,7 @@ executors:
     working_directory: ~/project
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
-    resource_class: 'large'
+    resource_class: 'medium+'
     docker:
       - image: circleci/golang
       - image: minio/minio
@@ -23,7 +23,7 @@ executors:
   # TODO(frederic): add builder for alpine and compare
   docker_builder:
     working_directory: ~/project
-    resource_class: 'small'
+    resource_class: 'medium' # linter breaks on "small" instances
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
@@ -31,7 +31,7 @@ executors:
 
   fuse_tester:
     working_directory: ~/project
-    resource_class: 'large'
+    resource_class: 'medium+'
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOROOT: /usr/local/go
@@ -44,7 +44,7 @@ executors:
     working_directory: ~/project
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
-    resource_class: 'large'
+    resource_class: 'medium+'
     docker:
       - image: circleci/golang
       - image: minio/minio
