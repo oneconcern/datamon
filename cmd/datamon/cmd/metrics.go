@@ -7,9 +7,11 @@ import (
 )
 
 type metricsFlags struct {
-	Enabled *bool  `json:"enabled,omitempty" yaml:"enabled,omitempty"` // pointer because we want to distinguish unset from false
-	URL     string `json:"url,omitempty" yaml:"url,omitempty"`
-	m       *M
+	Enabled  *bool  `json:"enabled,omitempty" yaml:"enabled,omitempty"`   // pointer because we want to distinguish unset from false
+	URL      string `json:"url,omitempty" yaml:"url,omitempty"`           // fully qualified metrics endpoint - may embed user/password
+	User     string `json:"user,omitempty" yaml:"user,omitempty"`         // overrides URL user, if any
+	Password string `json:"password,omitempty" yaml:"password,omitempty"` // overrides URL password, if any
+	m        *M
 }
 
 func (m metricsFlags) IsEnabled() bool {

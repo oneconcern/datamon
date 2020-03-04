@@ -351,7 +351,19 @@ func addMetricsFlag(cmd *cobra.Command) string {
 
 func addMetricsURLFlag(cmd *cobra.Command) string {
 	c := "metrics-url"
-	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Fully qualified URL to an influxdb metrics collector, with user and password`)
+	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Fully qualified URL to an influxdb metrics collector, with optional user and password`)
+	return c
+}
+
+func addMetricsUserFlag(cmd *cobra.Command) string {
+	c := "metrics-user"
+	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `User to connect to the metrics collector backend. Overrides any user set in URL`)
+	return c
+}
+
+func addMetricsPasswordFlag(cmd *cobra.Command) string {
+	c := "metrics-password"
+	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Password to connect to the metrics collector backend. Overrides any password set in URL`)
 	return c
 }
 

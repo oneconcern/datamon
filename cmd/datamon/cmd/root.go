@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -53,10 +54,32 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 		}
 
 		if datamonFlags.root.metrics.IsEnabled() {
+			// validate config for metrics
+			var (
+				u   *url.URL
+				err error
+			)
+			if metricsURL := datamonFlags.root.metrics.URL; metricsURL != "" {
+				u, err = url.Parse(metricsURL)
+				if err != nil {
+					wrapFatalln("the metrics URL should be a valid URL, e.g. https://[user:password@]host[:port]", err)
+				}
+			}
+			// override credentials for metrics backend
+			user := datamonFlags.root.metrics.User
+			password := datamonFlags.root.metrics.Password
+			if u.User != nil && user == "" {
+				user = u.User.Username()
+			}
+			if u.User != nil && password == "" {
+				password, _ = u.User.Password()
+			}
+			u.User = url.UserPassword(user, password)
+			datamonFlags.root.metrics.URL = u.String()
+
 			version := NewVersionInfo()
 			ip := getOutboundIP()
 
-			// sink, err := influxdb.NewStore()
 			sink, err := influxdb.NewStore(
 				influxdb.WithDatabase("datamon"),
 				influxdb.WithURL(datamonFlags.root.metrics.URL),
@@ -130,6 +153,8 @@ func init() {
 	addLogLevel(rootCmd)
 	addMetricsFlag(rootCmd)
 	addMetricsURLFlag(rootCmd)
+	addMetricsUserFlag(rootCmd)
+	addMetricsPasswordFlag(rootCmd)
 }
 
 // readConfig reads in config file and ENV variables if set.
@@ -190,18 +215,35 @@ func initConfig() {
 	if config.Metrics.Enabled != nil && datamonFlags.root.metrics.Enabled == nil {
 		datamonFlags.root.metrics.Enabled = config.Metrics.Enabled
 	}
+
+	if config.Metrics.URL == "" {
+		config.Metrics.URL = viper.GetString("DATAMON_METRICS_URL")
+	}
 	if config.Metrics.URL != "" && datamonFlags.root.metrics.URL == "" {
 		datamonFlags.root.metrics.URL = config.Metrics.URL
+	}
+
+	if config.Metrics.User == "" {
+		config.Metrics.User = viper.GetString("DATAMON_METRICS_USER")
+	}
+	if config.Metrics.User != "" && datamonFlags.root.metrics.User == "" {
+		datamonFlags.root.metrics.User = config.Metrics.User
+	}
+
+	if config.Metrics.Password == "" {
+		config.Metrics.Password = viper.GetString("DATAMON_METRICS_PASSWORD")
+	}
+	if config.Metrics.Password != "" && datamonFlags.root.metrics.Password == "" {
+		datamonFlags.root.metrics.Password = config.Metrics.Password
 	}
 
 	datamonFlagsPtr := &datamonFlags
 	datamonFlagsPtr.setDefaultsFromConfig(config)
 
-	//	config.setDatamonParams(&datamonFlags)
-
 	if datamonFlags.context.Descriptor.Name == "" {
 		datamonFlags.context.Descriptor.Name = "datamon-dev"
 	}
+
 	//  do not require config to be set for all commands
 }
 
