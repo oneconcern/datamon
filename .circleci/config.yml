@@ -251,7 +251,7 @@ jobs:
       - run:
           name: Run golang tests (1)
           command: |
-            gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures -- \
+            gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format standard-verbose -- \
               -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/noncafs/c_non_cafs.out \
               $(go list ./...|grep -v cafs)
