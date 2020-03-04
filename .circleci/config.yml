@@ -23,7 +23,7 @@ executors:
   # TODO(frederic): add builder for alpine and compare
   docker_builder:
     working_directory: ~/project
-    resource_class: 'medium' # linter breaks on "small" instances
+    resource_class: 'medium+' # linter breaks on "small" instances and sometimes even on "medium" ones
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
     docker:
