@@ -55,36 +55,36 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 
 		if datamonFlags.root.metrics.IsEnabled() {
 			// validate config for metrics
-			var (
-				u   *url.URL
-				err error
-			)
+			var err error
+
 			if metricsURL := datamonFlags.root.metrics.URL; metricsURL != "" {
-				u, err = url.Parse(metricsURL)
+				_, err = url.Parse(metricsURL)
 				if err != nil {
 					wrapFatalln("the metrics URL should be a valid URL, e.g. https://[user:password@]host[:port]", err)
 				}
 			}
-			// override credentials for metrics backend
-			user := datamonFlags.root.metrics.User
-			password := datamonFlags.root.metrics.Password
-			if u.User != nil && user == "" {
-				user = u.User.Username()
-			}
-			if u.User != nil && password == "" {
-				password, _ = u.User.Password()
-			}
-			u.User = url.UserPassword(user, password)
-			datamonFlags.root.metrics.URL = u.String()
 
 			version := NewVersionInfo()
 			ip := getOutboundIP()
 
-			sink, err := influxdb.NewStore(
+			opts := []influxdb.StoreOption{
 				influxdb.WithDatabase("datamon"),
 				influxdb.WithURL(datamonFlags.root.metrics.URL),
 				influxdb.WithNameAsTag("metrics"), // use metric name as an influxdb tag, with unique time series "metrics"
-			)
+			}
+
+			// override credentials for metrics backend
+			user := datamonFlags.root.metrics.User
+			if user != "" {
+				opts = append(opts, influxdb.WithUser(user))
+			}
+
+			password := datamonFlags.root.metrics.Password
+			if password != "" {
+				opts = append(opts, influxdb.WithPassword(password))
+			}
+
+			sink, err := influxdb.NewStore(opts...)
 			if err != nil {
 				wrapFatalln("cannot register metrics store", err)
 			}
@@ -216,24 +216,24 @@ func initConfig() {
 		datamonFlags.root.metrics.Enabled = config.Metrics.Enabled
 	}
 
-	if config.Metrics.URL == "" {
-		config.Metrics.URL = viper.GetString("DATAMON_METRICS_URL")
+	if datamonFlags.root.metrics.URL == "" {
+		datamonFlags.root.metrics.URL = viper.GetString("DATAMON_METRICS_URL")
 	}
-	if config.Metrics.URL != "" && datamonFlags.root.metrics.URL == "" {
+	if datamonFlags.root.metrics.URL == "" {
 		datamonFlags.root.metrics.URL = config.Metrics.URL
 	}
 
-	if config.Metrics.User == "" {
-		config.Metrics.User = viper.GetString("DATAMON_METRICS_USER")
+	if datamonFlags.root.metrics.User == "" {
+		datamonFlags.root.metrics.User = viper.GetString("DATAMON_METRICS_USER")
 	}
-	if config.Metrics.User != "" && datamonFlags.root.metrics.User == "" {
+	if datamonFlags.root.metrics.User == "" {
 		datamonFlags.root.metrics.User = config.Metrics.User
 	}
 
-	if config.Metrics.Password == "" {
-		config.Metrics.Password = viper.GetString("DATAMON_METRICS_PASSWORD")
+	if datamonFlags.root.metrics.Password == "" {
+		datamonFlags.root.metrics.Password = viper.GetString("DATAMON_METRICS_PASSWORD")
 	}
-	if config.Metrics.Password != "" && datamonFlags.root.metrics.Password == "" {
+	if datamonFlags.root.metrics.Password == "" {
 		datamonFlags.root.metrics.Password = config.Metrics.Password
 	}
 

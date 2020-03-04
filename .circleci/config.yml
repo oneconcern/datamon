@@ -292,7 +292,7 @@ jobs:
       - run:
           name: Run golang tests with metrics (1)
           command: |
-            gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format short-with-failures -- \
+            gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format standard-verbose -- \
               -tags influxdbintegration \
               -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/metrics/c_metrics.out \
