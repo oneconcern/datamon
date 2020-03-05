@@ -98,11 +98,13 @@ my-pod
 			core.SplitKeyIterator(iterator),
 			core.SplitKeyFilter(filter),
 			core.SplitLogger(logger),
-			//core.SplitMustExist(datamonFlags.split.splitID != ""),
+			core.SplitWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 
 		split, err := core.CreateSplit(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, remoteStores,
 			core.SplitDescriptor(&s.SplitDescriptor),
+			core.SplitLogger(logger),
+			core.SplitWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 		if err != nil {
 			wrapFatalln("split create", err)

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"time"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/errors"
@@ -18,19 +19,29 @@ func GetDiamondStore(stores context2.Stores) storage.Store {
 }
 
 // GetDiamond retrieves a diamond
-func GetDiamond(repo, diamondID string, stores context2.Stores) (model.DiamondDescriptor, error) {
-	if err := RepoExists(repo, stores); err != nil {
-		return model.DiamondDescriptor{}, err
-	}
+func GetDiamond(repo, diamondID string, stores context2.Stores, opts ...DiamondOption) (model.DiamondDescriptor, error) {
+	var err error
 
-	d := NewDiamond(repo, stores,
+	getOpts := []DiamondOption{
 		DiamondDescriptor(
 			model.NewDiamondDescriptor(model.DiamondID(diamondID)),
 		),
-	)
+	}
+	getOpts = append(getOpts, opts...)
 
-	err := d.downloadDescriptor()
-	if err != nil {
+	d := NewDiamond(repo, stores, getOpts...)
+
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "GetDiamond")(err)
+		}
+	}(time.Now())
+
+	if err = RepoExists(repo, stores); err != nil {
+		return model.DiamondDescriptor{}, err
+	}
+
+	if err = d.downloadDescriptor(); err != nil {
 		return model.DiamondDescriptor{}, err
 	}
 	return d.DiamondDescriptor, nil
@@ -72,16 +83,24 @@ func diamondReady(repo, diamondID string, stores context2.Stores) error {
 
 // CreateDiamond persists an initialized diamond with a repo descriptor
 func CreateDiamond(repo string, stores context2.Stores, opts ...DiamondOption) (model.DiamondDescriptor, error) {
-	if err := RepoExists(repo, stores); err != nil {
-		return model.DiamondDescriptor{}, err
-	}
-
+	var err error
 	d := NewDiamond(repo, stores, opts...)
+
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "CreateDiamond")(err)
+		}
+	}(time.Now())
+
 	if d.DiamondDescriptor.DiamondID == "" {
 		return model.DiamondDescriptor{}, errors.New("a diamond must have a diamondID")
 	}
 
-	err := d.uploadDescriptor()
+	if err = RepoExists(repo, stores); err != nil {
+		return model.DiamondDescriptor{}, err
+	}
+
+	err = d.uploadDescriptor()
 	if err != nil {
 		return model.DiamondDescriptor{},
 			errors.New("cannot update diamond descriptor").Wrap(err)

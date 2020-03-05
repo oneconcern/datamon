@@ -8,6 +8,7 @@ import (
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/errors"
+	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
@@ -29,6 +30,9 @@ type Split struct {
 	uploadIndexer *fileIndex
 	//downloadIndexer *fileIndex
 	mustExist bool // used to check replayed splits with splitID forced
+
+	metrics.Enable
+	m *M
 }
 
 func defaultSplit(repo, diamondID string, stores context2.Stores) *Split {
@@ -75,6 +79,10 @@ func NewSplit(repo, diamondID string, stores context2.Stores, opts ...SplitOptio
 		s.l = s.l.With(zap.String("tag", s.SplitDescriptor.Tag))
 		s.Bundle.l = s.l
 	}
+
+	if s.MetricsEnabled() {
+		s.m = s.EnsureMetrics("core", &M{}).(*M)
+	}
 	return s
 }
 
@@ -84,6 +92,13 @@ func (s *Split) Upload(opts ...Option) error {
 }
 
 func (s *Split) implUpload(opts ...Option) error {
+	var err error
+	defer func(t0 time.Time) {
+		if s.MetricsEnabled() {
+			s.m.Usage.UsedAll(t0, "SplitUpload")(err)
+		}
+	}(time.Now())
+
 	if s.SplitDescriptor.SplitID == "" || s.DiamondID == "" {
 		return fmt.Errorf("invalid split descriptor: requires diamond and split ID to be set")
 	}
@@ -108,7 +123,7 @@ func (s *Split) implUpload(opts ...Option) error {
 
 	s.uploadIndexer = newFileIndex(
 		s.contextStores,
-		fileIndexMeta(s.contextStores.VMetadata()), // file indices live on vmetadata for splits
+		fileIndexMeta(GetDiamondStore(s.contextStores)), // file indices live on vmetadata for splits
 		fileIndexPather(newUploadSplitIterator( // iterates over any number of index files for this split
 			s.RepoID,
 			s.DiamondID,
@@ -127,6 +142,7 @@ func (s *Split) implUpload(opts ...Option) error {
 		cafs.ConcurrentFlushes(s.concurrentFileUploads/fileUploadsPerFlush),
 		cafs.LeafTruncation(s.BundleDescriptor.Version < 1),
 		cafs.Logger(s.l),
+		cafs.WithMetrics(s.MetricsEnabled()),
 	)
 	if err != nil {
 		return err

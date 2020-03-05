@@ -25,8 +25,14 @@ func (d *Diamond) Commit(opts ...Option) error {
 }
 
 // Cancel a diamond
-func (d *Diamond) Cancel() error {
-	err := d.downloadDescriptor()
+func (d *Diamond) Cancel() (err error) {
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "DiamondCancel")(err)
+		}
+	}(time.Now())
+
+	err = d.downloadDescriptor()
 	if err != nil {
 		return err
 	}
@@ -108,6 +114,12 @@ func (d *Diamond) checkBundleID() error {
 }
 
 func (d *Diamond) implCommit(opts ...Option) (err error) {
+	defer func(t0 time.Time) {
+		if d.MetricsEnabled() {
+			d.m.Usage.UsedAll(t0, "DiamondCommit")(err)
+		}
+	}(time.Now())
+
 	// check if repo exists
 	if err = RepoExists(d.RepoID, d.contextStores); err != nil {
 		return err
@@ -368,7 +380,7 @@ func mergeEntryToFilePacked(in mergeEntry) filePacked {
 func (d *Diamond) makeDownloadIndexer() *fileIndex {
 	return newFileIndex(
 		d.contextStores,
-		fileIndexMeta(d.contextStores.VMetadata()),
+		fileIndexMeta(GetDiamondStore(d.contextStores)),
 		fileIndexPather(
 			newDownloadAllSplitsIterator(
 				d.RepoID,

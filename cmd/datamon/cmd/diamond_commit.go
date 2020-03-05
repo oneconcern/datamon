@@ -31,7 +31,9 @@ var CommitDiamondCmd = &cobra.Command{
 			return
 		}
 
-		diamond, err := core.GetDiamond(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, remoteStores)
+		diamond, err := core.GetDiamond(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, remoteStores,
+			core.DiamondLogger(logger),
+			core.DiamondWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		if err != nil {
 			wrapFatalln("error retrieving diamond", err)
 			return
@@ -52,6 +54,7 @@ var CommitDiamondCmd = &cobra.Command{
 			core.DiamondConcurrentFileUploads(getConcurrencyFactor(fileUploadsByConcurrencyFactor)),
 			core.DiamondLogger(logger),
 			core.DiamondBundleID(datamonFlags.bundle.ID),
+			core.DiamondWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 
 		err = d.Commit()

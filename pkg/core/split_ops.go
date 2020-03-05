@@ -1,6 +1,8 @@
 package core
 
 import (
+	"time"
+
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/errors"
@@ -19,14 +21,24 @@ func GetSplitStore(stores context2.Stores) storage.Store {
 }
 
 // GetSplit retrieves a split
-func GetSplit(repo, diamondID, splitID string, stores context2.Stores) (model.SplitDescriptor, error) {
-	s := NewSplit(repo, diamondID, stores,
+func GetSplit(repo, diamondID, splitID string, stores context2.Stores, opts ...SplitOption) (model.SplitDescriptor, error) {
+	getOpts := []SplitOption{
 		SplitDescriptor(
 			model.NewSplitDescriptor(model.SplitID(splitID)),
 		),
-	)
-	err := s.downloadDescriptor()
-	if err != nil {
+	}
+	getOpts = append(getOpts, opts...)
+
+	s := NewSplit(repo, diamondID, stores, getOpts...)
+
+	var err error
+	defer func(t0 time.Time) {
+		if s.MetricsEnabled() {
+			s.m.Usage.UsedAll(t0, "GetSplit")(err)
+		}
+	}(time.Now())
+
+	if err = s.downloadDescriptor(); err != nil {
 		return model.SplitDescriptor{}, err
 	}
 	return s.SplitDescriptor, nil
@@ -34,21 +46,28 @@ func GetSplit(repo, diamondID, splitID string, stores context2.Stores) (model.Sp
 
 // CreateSplit persists a new split for some initialized diamond for a repo
 func CreateSplit(repo, diamondID string, stores context2.Stores, opts ...SplitOption) (model.SplitDescriptor, error) {
-	if err := RepoExists(repo, stores); err != nil {
-		return model.SplitDescriptor{}, errors.New("cannot create split on inexistant repo").Wrap(err)
-	}
+	var err error
+	s := NewSplit(repo, diamondID, stores, opts...)
+
+	defer func(t0 time.Time) {
+		if s.MetricsEnabled() {
+			s.m.Usage.UsedAll(t0, "CreateSplit")(err)
+		}
+	}(time.Now())
 
 	if diamondID == "" {
 		return model.SplitDescriptor{}, errors.New("diamondID is required to create a split")
 	}
 
-	if err := diamondReady(repo, diamondID, stores); err != nil {
+	if err = RepoExists(repo, stores); err != nil {
+		return model.SplitDescriptor{}, errors.New("cannot create split on inexistant repo").Wrap(err)
+	}
+
+	if err = diamondReady(repo, diamondID, stores); err != nil {
 		return model.SplitDescriptor{}, errors.New("cannot create split").Wrap(err)
 	}
 
-	s := NewSplit(repo, diamondID, stores, opts...)
-
-	err := s.downloadDescriptor()
+	err = s.downloadDescriptor()
 	if err == nil {
 		// split already exists:
 		// this occur when the user explicitly replays the same splitID
