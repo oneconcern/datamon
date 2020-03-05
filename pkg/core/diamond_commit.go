@@ -264,6 +264,7 @@ func (d *Diamond) mergeSplits(filePackedC chan<- filePacked, errorC chan<- error
 				}
 
 				if file.Timestamp.IsZero() {
+					d.l.Error("dev error: expecting files processed by diamond commit to have a timestamp", zap.Any("file", file))
 					panic("dev error: files should have a timing") // internal safeguard
 				}
 				if file.Timestamp.After(existing.Timestamp) {
