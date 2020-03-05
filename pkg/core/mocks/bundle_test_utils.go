@@ -3,6 +3,7 @@ package mocks
 import (
 	"bytes"
 	"context"
+	"crypto/md5" // #nosec
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/model"
@@ -17,6 +19,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
@@ -91,6 +94,18 @@ func FakeContext(meta, blob string) context2.Stores {
 	ctx := context2.New()
 	ctx.SetMetadata(metaStore)
 	ctx.SetBlob(blobStore)
+	return ctx
+}
+
+// FakeContext2 builds a datamon context with blob, metastore and vmetadata.
+func FakeContext2(meta, vmeta, blob string) context2.Stores {
+	var vmetaStore storage.Store
+
+	ctx := FakeContext(meta, blob)
+	if vmeta != "" {
+		vmetaStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), vmeta), localfs.WithLock(true))
+	}
+	ctx.SetVMetadata(vmetaStore)
 	return ctx
 }
 
@@ -176,30 +191,79 @@ func FakeDataFile(t testing.TB, store storage.Store, ev TestEnv) model.BundleEnt
 	}
 }
 
-// ValidateDataFiles is a simplistic folder diff-er.
-//
-// TODO: make this a general purpose diff 2 folders or reuse a package
+// ValidateDataFiles is a folder differ
 func ValidateDataFiles(t testing.TB, expectedDir, actualDir string) bool {
-	fileListExpected, err := ioutil.ReadDir(expectedDir)
-	require.NoError(t, err)
-
-	fileListActual, err := ioutil.ReadDir(actualDir)
-	require.NoError(t, err)
-
-	require.Equal(t, len(fileListExpected), len(fileListActual))
-	for _, fileExpected := range fileListExpected {
-		found := false
-		for _, fileActual := range fileListActual {
-			if fileExpected.Name() == fileActual.Name() {
-				found = true
-				require.Equal(t, fileExpected.Size(), fileActual.Size())
-				// TODO: Issue #35
-				// require.Equal(t, fileExpected.Mode(), fileActual.Mode())
-			}
-		}
-		require.True(t, found)
+	type indexEntry struct {
+		hash         [16]byte
+		found, equal bool
 	}
-	return true
+	outcome := true
+	expectedFS := afero.NewBasePathFs(afero.NewOsFs(), expectedDir)
+	actualFS := afero.NewBasePathFs(afero.NewOsFs(), expectedDir)
+
+	expected := iradix.New()
+	require.NoError(t, afero.Walk(expectedFS, "/", func(pth string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		rpth, _ := expectedFS.(*afero.BasePathFs).RealPath(pth)
+		data, err := ioutil.ReadFile(rpth)
+		require.NoError(t, err)
+
+		expected, _, _ = expected.Insert([]byte(pth), &indexEntry{
+			// #nosec
+			hash: md5.Sum(data),
+		})
+		return nil
+	}))
+
+	actual := iradix.New()
+	require.NoError(t, afero.Walk(actualFS, "/", func(pth string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || model.IsGeneratedFile(pth) {
+			return nil
+		}
+		rpth, _ := expectedFS.(*afero.BasePathFs).RealPath(pth)
+		data, err := ioutil.ReadFile(rpth)
+		require.NoError(t, err)
+
+		hash := md5.Sum(data) //#nosec
+		obj, found := expected.Get([]byte(pth))
+		var reference *indexEntry
+
+		var equal bool
+		if found {
+			reference = obj.(*indexEntry)
+			reference.found = found
+			equal = hash == reference.hash
+		}
+		actual, _, _ = actual.Insert([]byte(pth), &indexEntry{
+			hash:  hash, //#nosec
+			found: found,
+			equal: equal,
+		})
+		return nil
+	}))
+
+	it := expected.Root().Iterator()
+	for k, obj, ok := it.Next(); ok; k, obj, ok = it.Next() {
+		reference := obj.(*indexEntry)
+		if !assert.Truef(t, reference.found, "file %s in reference not found in destination", string(k)) {
+			outcome = false
+		}
+	}
+
+	it = actual.Root().Iterator()
+	for k, obj, ok := it.Next(); ok; k, obj, ok = it.Next() {
+		data := obj.(*indexEntry)
+		if !assert.Truef(t, data.found, "file %s in destination not found in reference", string(k)) {
+			outcome = false
+		}
+		if !assert.Truef(t, data.equal, "file %s differ between destination and reference", string(k)) {
+			outcome = false
+		}
+	}
+
+	return outcome
 }
 
 // SetupFakeDataBundle prepares some metadata for a fake bundle and returns a cleanup function

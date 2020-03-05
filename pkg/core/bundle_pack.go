@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -31,6 +32,7 @@ type filePacked struct {
 	size      uint64
 	duplicate bool
 	idx       int
+	snapshot  time.Time
 }
 
 func filePacked2BundleEntry(packedFile filePacked) model.BundleEntry {
@@ -39,6 +41,7 @@ func filePacked2BundleEntry(packedFile filePacked) model.BundleEntry {
 		NameWithPath: packedFile.name,
 		FileMode:     0, // #TODO: #35 file mode support
 		Size:         packedFile.size,
+		Timestamp:    packedFile.snapshot,
 	}
 }
 
