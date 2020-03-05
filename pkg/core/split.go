@@ -35,7 +35,7 @@ func defaultSplit(repo, diamondID string, stores context2.Stores) *Split {
 	empty := NewBundle(Repo(repo), ContextStores(stores))
 	split := model.NewSplitDescriptor()
 	return &Split{
-		metaObject:      defaultMetaObject(stores.VMetadata()), // splits live on vmetadata
+		metaObject:      defaultMetaObject(GetDiamondStore(stores)), // splits live on vmetadata
 		Bundle:          empty,
 		SplitDescriptor: *split,
 		DiamondID:       diamondID,

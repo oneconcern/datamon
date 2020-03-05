@@ -52,7 +52,10 @@ func NewDiamond(repo string, stores context2.Stores, opts ...DiamondOption) *Dia
 		case model.EnableCheckpoints:
 			diamond.deconflicter = model.GenerateCheckpointPath
 		case model.ForbidConflicts:
-			diamond.deconflicter = func(_, _ string) string { panic("dev error: must not call deconflicter") }
+			diamond.deconflicter = func(a, b string) string {
+				diamond.l.Error("dev error: deconflicter called in inadequate context", zap.String("arg", a), zap.String("arg", b))
+				panic("dev error: must not call deconflicter")
+			}
 		case model.EnableConflicts:
 			fallthrough
 		default:
