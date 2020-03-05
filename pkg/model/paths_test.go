@@ -67,6 +67,19 @@ func archivePathTestCases() []archivePathFixture {
 				LabelName:       "test.label",
 			},
 		},
+		{
+			name: "another context descriptor",
+			path: "contexts/prod/context.yaml",
+			expected: ArchivePathComponents{
+				ArchiveFileName: "context.yaml",
+				Context:         "prod",
+			},
+		},
+		{
+			name:       "wrong context path",
+			path:       "contexts/context.yaml",
+			wantsError: true,
+		},
 		// error cases
 		{
 			name:       "invalid path (no parts)",
@@ -132,6 +145,110 @@ func archivePathTestCases() []archivePathFixture {
 			name:       "invalid bundles (wrong index file, bis)",
 			path:       "bundles/test-repo/{ID}/bundle-files-abc.yml",
 			wantsError: true,
+		},
+		{
+			name: "diamond descriptor",
+			path: "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/diamond-done.yaml",
+			expected: ArchivePathComponents{
+				Repo:            "test-repo",
+				DiamondID:       "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				ArchiveFileName: "diamond-done.yaml",
+				IsFinalState:    true,
+			},
+		},
+		{
+			name: "diamond descriptor",
+			path: "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/diamond-running.yaml",
+			expected: ArchivePathComponents{
+				Repo:            "test-repo",
+				DiamondID:       "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				ArchiveFileName: "diamond-running.yaml",
+			},
+		},
+		{
+			name: "split descriptor",
+			path: "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/1Jbb3SicFGoKB7JQJZdCCwdBQwE/split-done.yaml",
+			expected: ArchivePathComponents{
+				Repo:            "test-repo",
+				DiamondID:       "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				SplitID:         "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				ArchiveFileName: "split-done.yaml",
+				IsFinalState:    true,
+			},
+		},
+		{
+			name: "split file index",
+			path: "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/1Jbb3SicFGoKB7JQJZdCCwdBQwE/1Jbb3SicFGoKB7JQJZdCCwdBQwE/bundle-files-001.yaml",
+			expected: ArchivePathComponents{
+				Repo:            "test-repo",
+				DiamondID:       "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				SplitID:         "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				GenerationID:    "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				ArchiveFileName: "bundle-files-001.yaml",
+			},
+		},
+		{
+			name:       "diamond ID is not a ksuid",
+			path:       "diamonds/test-repo/notAKSUID/diamond-done.yaml",
+			wantsError: true,
+		},
+		{
+			name:       "invalid diamond descriptor",
+			path:       "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/diamond-gone.yaml",
+			wantsError: true,
+		},
+		{
+			name:       "invalid split descriptor",
+			path:       "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/split-gone.yaml",
+			wantsError: true,
+		},
+		{
+			name:       "invalid path with some split descriptor",
+			path:       "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/split-done.yaml/somemore.yaml",
+			wantsError: true,
+		},
+		{
+			name:       "invalid path to split index file descriptor",
+			path:       "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/1Jbb3SicFGoKB7JQJZdCCwdBQwE/notAKSUID/bundle-files-001.yaml",
+			wantsError: true,
+		},
+		{
+			name:       "invalid split index file descriptor",
+			path:       "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/1Jbb3SicFGoKB7JQJZdCCwdBQwE/1Jbb3SicFGoKB7JQJZdCCwdBQwE/some-files-001.yaml",
+			wantsError: true,
+		},
+		{
+			name:       "invalid diamond path",
+			path:       "diamonds/test-repo/",
+			wantsError: true,
+		},
+		{
+			name: "empty diamond path",
+			path: "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/",
+			expected: ArchivePathComponents{
+				Repo:            "test-repo",
+				DiamondID:       "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				ArchiveFileName: "",
+			},
+		},
+		{
+			name: "empty split path",
+			path: "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/",
+			expected: ArchivePathComponents{
+				Repo:            "test-repo",
+				DiamondID:       "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				ArchiveFileName: "",
+			},
+		},
+		{
+			name: "empty split contents path",
+			path: "diamonds/test-repo/1Jbb3SicFGoKB7JQJZdCCwdBQwE/splits/1Jbb3SicFGoKB7JQJZdCCwdBQwE/",
+			expected: ArchivePathComponents{
+				Repo:            "test-repo",
+				DiamondID:       "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				SplitID:         "1Jbb3SicFGoKB7JQJZdCCwdBQwE",
+				ArchiveFileName: "",
+			},
 		},
 	}
 }

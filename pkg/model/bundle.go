@@ -15,11 +15,6 @@ import (
 	"github.com/oneconcern/datamon/pkg/cafs"
 )
 
-const (
-	// CurrentBundleVersion indicates the version of the bundle model
-	CurrentBundleVersion = 1.0
-)
-
 // BundleDescriptor represents a commit which is a file tree with the changes to the repository.
 type BundleDescriptor struct {
 	LeafSize               uint32        `json:"leafSize" yaml:"leafSize"`                               // Bundles blobs are independently generated
@@ -28,9 +23,9 @@ type BundleDescriptor struct {
 	Parents                []string      `json:"parents,omitempty" yaml:"parents,omitempty"`             // Bundles with parent child relation
 	Timestamp              time.Time     `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`         // Local wall clock time
 	Contributors           []Contributor `json:"contributors" yaml:"contributors"`                       // Contributor for the bundle
-	BundleEntriesFileCount uint64        `json:"count" yaml:"count"`                                     // Number of files which have BundleDescriptor Entries
-	Version                uint64        `json:"version,omitempty" yaml:"version,omitempty"`             // Version for the bundle
-	Deduplication          string        `json:"deduplication,omitempty" yaml:"deduplication,omitempty"` // Type of deduplication used
+	BundleEntriesFileCount uint64        `json:"count" yaml:"count"`                                     // Number of file index files in this bundle
+	Version                uint64        `json:"version,omitempty" yaml:"version,omitempty"`             // Version for the metadata model used for this bundle
+	Deduplication          string        `json:"deduplication,omitempty" yaml:"deduplication,omitempty"` // Deduplication scheme used
 	RunStage               string        `json:"runstage,omitempty" yaml:"runstage,omitempty"`           // Path to the run stage
 	_                      struct{}
 }
@@ -83,6 +78,7 @@ type BundleEntry struct {
 	NameWithPath string      `json:"name" yaml:"name"`
 	FileMode     os.FileMode `json:"mode" yaml:"mode"`
 	Size         uint64      `json:"size" yaml:"size"`
+	Timestamp    time.Time   `json:"timestamp,omitempty" yaml:"timestamp,omitempty"` // time the file was uploaded. Only serialized with entries uploaded by splits (not bundles)
 	_            struct{}
 }
 
@@ -206,6 +202,8 @@ func GetBundleTimeStamp() time.Time {
 }
 
 // IsGeneratedFile indicates if some file comes from auto-generation (e.g. .datamon files)
+//
+// More generally, it indicates any special path on a consumable store not to be uploaded with a bundle.
 func IsGeneratedFile(file string) bool {
 	// TODO: Need to find a way for afero.Fs to convert to abs patch while honoring the fake root
 	//path, err := filepath.Abs(file)
@@ -215,5 +213,5 @@ func IsGeneratedFile(file string) bool {
 func init() {
 	metaRe = regexp.MustCompile(`^\.datamon/(.*)\.yaml$`)
 	flRe = regexp.MustCompile(`^(.*)-` + bundleFilesIndexPrefix + `(.*)$`)
-	genFileRe = regexp.MustCompile("^.datamon/*|^/.datamon/*|^/.datamon$|^.datamon$|^./.datamon/*|^./.datamon$")
+	genFileRe = regexp.MustCompile(`^\.datamon/.*|^/\.datamon/.*|^/\.datamon$|^\.datamon$|^\./\.datamon/.*|^\./\.datamon$|^\.?/?\.conflicts(/.*|$)|^\.?/?\.checkpoints(/.*|$)`)
 }

@@ -1,4 +1,6 @@
-// Package model exposes the base objects manipulated by datamon.
+// Package model describes the base objects manipulated by datamon.
+//
+// The package exposes a model for metadata.
 //
 // The object model for datamon is composed of:
 //
