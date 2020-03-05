@@ -3,12 +3,14 @@
 package cmd
 
 import (
+	"crypto/tls"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
 	"sync/atomic"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -71,6 +73,11 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 				influxdb.WithDatabase("datamon"),
 				influxdb.WithURL(datamonFlags.root.metrics.URL),
 				influxdb.WithNameAsTag("metrics"), // use metric name as an influxdb tag, with unique time series "metrics"
+				influxdb.WithTimeout(30 * time.Second),
+				influxdb.WithTLSConfig(&tls.Config{
+					NextProtos: []string{"h2", "http/1.1"},
+				}),
+				influxdb.WithInsecureSkipVerify(true),
 			}
 
 			// override credentials for metrics backend

@@ -47,6 +47,8 @@ type settings struct {
 	// a map of all registered modules
 	modules   map[string]interface{}
 	exclusive sync.Mutex
+
+	d time.Duration
 }
 
 // defaultSettings define an exporter to a local influxDB backend store
@@ -54,6 +56,7 @@ func defaultSettings() *settings {
 	return &settings{
 		modules:   make(map[string]interface{}),
 		contexter: context.Background,
+		// default reporting period is left to the default from opencensus exporter (10s)
 	}
 }
 
@@ -126,6 +129,9 @@ func (s *settings) Flush() {
 func (s *settings) RegisterExporter() {
 	if s.exporter != nil {
 		view.RegisterExporter(s.exporter)
+		if s.d >= time.Second {
+			view.SetReportingPeriod(s.d)
+		}
 	}
 }
 
