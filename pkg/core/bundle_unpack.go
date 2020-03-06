@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
 	"github.com/oneconcern/datamon/pkg/core/status"
@@ -326,7 +327,7 @@ func downloadBundleEntrySyncMaybeOverwrite(ctx context.Context, bundleEntry mode
 		zap.String("name", bundleEntry.NameWithPath))
 
 	if bundle.MetricsEnabled() {
-		bundle.m.Volume.Bundles.Inc("download")
+		bundle.m.Volume.Bundles.Inc("Download")
 	}
 	key, err := cafs.KeyFromString(bundleEntry.Hash)
 	if err != nil {
@@ -445,14 +446,26 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 	bundleDest *Bundle,
 	fs cafs.Fs,
 	chans downloadBundleChans) {
-	var diff BundleDiff
-	var err error
+	var (
+		diff           BundleDiff
+		err            error
+		files, indices int64
+		totalSize      uint64
+	)
 	reportError := func(err error) {
 		chans.error <- errorHit{
 			err,
 			"",
 		}
 	}
+	t0 := time.Now()
+	defer func() {
+		if bundle.MetricsEnabled() {
+			bundle.m.Volume.IO.BundleFiles(files, indices, "Download")
+			bundle.m.Volume.IO.IORecord(t0, "Download")(int64(totalSize), err)
+		}
+	}()
+
 	if bundleDest != nil {
 		diff, err = diffBundles(bundleDest, bundle)
 		if err != nil {
@@ -467,6 +480,7 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 	concurrencyControl := make(chan struct{}, concurrentFileDownloads)
 	chans.concurrencyControl = concurrencyControl
 	if bundleDest == nil {
+		indices = int64(len(bundle.BundleEntries))
 		bundle.l.Info("downloading bundle entries",
 			zap.Int("num", len(bundle.BundleEntries)))
 		for _, b := range bundle.BundleEntries {
@@ -480,10 +494,13 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 			}
 			if selectionPredicate == nil || selectionPredicateOk {
 				concurrencyControl <- struct{}{}
+				files++
+				totalSize += b.Size
 				go downloadBundleEntry(ctx, b, bundle, fs, chans)
 			}
 		}
 	} else {
+		indices = int64(len(diff.Entries))
 		bundle.l.Info("downloading diff entries",
 			zap.Int("num", len(diff.Entries)))
 		for _, de := range diff.Entries {
@@ -506,6 +523,8 @@ func downloadBundleEntries(ctx context.Context, bundle *Bundle,
 					zap.String("name Additional", de.Additional.NameWithPath),
 					zap.String("name Existing", de.Existing.NameWithPath),
 				)
+				files++
+				totalSize += de.Additional.Size
 				go downloadBundleEntryOverwrite(ctx, de.Additional, bundleDest, fs, chans)
 			default:
 				reportError(fmt.Errorf("programming error: unknown diff entry type"))
