@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -112,4 +114,150 @@ func setupStore(t testing.TB) (storage.Store, func()) {
 	ff.Close()
 
 	return New(fs), func() {}
+}
+
+func fakeFile(t testing.TB, fs afero.Fs, file string) {
+	f, err := fs.Create(file)
+	require.NoError(t, err)
+	_, err = f.WriteString("this is the text")
+	require.NoError(t, err)
+	err = f.Close()
+	require.NoError(t, err)
+}
+
+const aSearch = "/a"
+
+func TestKeysPrefix(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	err := fs.MkdirAll("/a/b/c", 0777)
+	require.NoError(t, err)
+	err = fs.MkdirAll("/a/d", 0777)
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		fakeFile(t, fs, "/a/b/c/e"+strconv.Itoa(i))
+		fakeFile(t, fs, "/a/d/f"+strconv.Itoa(i))
+	}
+
+	store := New(fs)
+
+	var (
+		keys []string
+		next string
+	)
+
+	i := 0
+	search := aSearch
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 3); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 3) {
+		require.NoError(t, err)
+		assert.Len(t, keys, 3)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 2)
+	assert.Equal(t, i, 6)
+
+	i = 0
+	search = "/a/d/f"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 4); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 4) {
+		require.NoError(t, err)
+		assert.Len(t, keys, 4)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 2)
+	assert.Equal(t, i, 2)
+
+	i = 0
+	search = "a"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 3); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 3) {
+		require.NoError(t, err)
+		assert.Len(t, keys, 3)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 2)
+	assert.Equal(t, i, 6)
+
+	i = 0
+	search = "a/d"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 100); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "", 100) {
+		i++
+		t.Fail()
+	}
+	require.NoError(t, err)
+	assert.Len(t, keys, 10)
+	assert.Equal(t, i, 0)
+}
+
+func TestKeysPrefixWithDelimiter(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	err := fs.MkdirAll("/a/b-1/c", 0777)
+	require.NoError(t, err)
+	err = fs.MkdirAll("/a/d", 0777)
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		fakeFile(t, fs, "/a/b-1/c/e-"+strconv.Itoa(i)+"@z")
+		fakeFile(t, fs, "/a/d/f-"+strconv.Itoa(i)+"@z")
+		fakeFile(t, fs, "/a/b/g@"+strconv.Itoa(i))
+	}
+
+	store := New(fs)
+
+	var (
+		keys []string
+		next string
+	)
+
+	// with unsuccessful search
+	search := "/z"
+	keys, next, err = store.KeysPrefix(context.Background(), "", search, "", 5)
+	assert.Len(t, keys, 0)
+	assert.Empty(t, next)
+	assert.NoError(t, err)
+
+	// with invalid next
+	search = aSearch
+	_, next, err = store.KeysPrefix(context.Background(), "", search, "", 5)
+	require.NotEmpty(t, next)
+	assert.NoError(t, err)
+	keys, next, err = store.KeysPrefix(context.Background(), "nowhere", search, "", 5)
+	assert.Len(t, keys, 0)
+	assert.Empty(t, next)
+	assert.NoError(t, err)
+
+	// with delimiters and deduplication
+	i := 0
+	search = aSearch
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "-", 5); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "-", 5) {
+		require.NoError(t, err)
+		assert.Lenf(t, keys, 5, "got keys %v", keys)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Lenf(t, keys, 2, "got keys %v", keys)
+	assert.Equal(t, i, 2)
+
+	i = 0
+	search = "/a/b"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "@", 5); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "@", 5) {
+		require.NoError(t, err)
+		assert.Lenf(t, keys, 5, "got keys %v", keys)
+		i++
+	}
+	require.NoError(t, err)
+	assert.Equal(t, i, 2)
+
+	i = 0
+	search = "a/b"
+	for keys, next, err = store.KeysPrefix(context.Background(), "", search, "@", 5); next != ""; keys, next, err = store.KeysPrefix(context.Background(), next, search, "@", 5) {
+		require.NoError(t, err)
+		assert.Lenf(t, keys, 5, "got keys %v", keys)
+		for _, key := range keys {
+			assert.False(t, strings.HasPrefix(key, "/"))
+		}
+		i++
+	}
+	require.NoError(t, err)
+	assert.Lenf(t, keys, 1, "got keys %v", keys)
+	assert.Equal(t, i, 2)
 }

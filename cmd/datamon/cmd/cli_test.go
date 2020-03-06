@@ -42,6 +42,10 @@ type uploadTree struct {
 	size int
 }
 
+func (u uploadTree) Root() string {
+	return filepath.SplitList(filepath.FromSlash(u.path))[0]
+}
+
 var testUploadTrees = [][]uploadTree{{
 	{
 		path: "/small/1k",
@@ -1429,7 +1433,7 @@ func deleteBucket(ctx context.Context, t *testing.T, client *gcsStorage.Client, 
  * a string to a slice of lines, each of which can be parsed into a struct.
  * TODO: Refactor using bufio and bufio.Scanner. See examples in cli_fuse_test.go
  */
-func getDataLogLines(t *testing.T, ls string, ignorePatterns []string) []string {
+func getDataLogLines(t testing.TB, ls string, ignorePatterns []string) []string {
 	ll := strings.Split(strings.TrimSpace(ls), "\n")
 	if len(ll) == 0 {
 		return ll

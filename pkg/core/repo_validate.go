@@ -16,7 +16,7 @@ import (
 func RepoExists(repo string, stores context2.Stores) error {
 	exists, err := GetRepoStore(stores).Has(context.Background(), model.GetArchivePathToRepoDescriptor(repo))
 	if err != nil {
-		return fmt.Errorf("repo validation failed: Hit err:%s", err)
+		return fmt.Errorf("repo validation failed: Hit err: %v", err)
 	}
 	if !exists {
 		return fmt.Errorf("repo validation: Repo:%s does not exist", repo)
