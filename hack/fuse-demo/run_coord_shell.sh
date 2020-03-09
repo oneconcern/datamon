@@ -15,7 +15,7 @@ dbg_print() {
 
 
 container_name=demo-app
-
+NS=datamon-ci
 while getopts s opt; do
     case $opt in
         (s)
@@ -30,7 +30,7 @@ done
 (( OPTIND > 1 )) && shift $(( OPTIND - 1 ))
 
 
-pod_name=$(kubectl get pods -l app=datamon-coord-demo | grep Running | sed 's/ .*//')
+pod_name=$(kubectl -n $NS get pods -l app=datamon-coord-demo | grep Running | sed 's/ .*//')
 
 if [[ -z $pod_name ]]; then
 	echo 'coord demo pod not found' 1>&2
@@ -42,6 +42,6 @@ fi
 #   and log $RES_DEF where <unspecified>
 dbg_print 'starting "'"$container_name"'" from <unspecified> yaml'
 
-kubectl exec -it "$pod_name" \
+kubectl -n $NS exec -it "$pod_name" \
         -c "$container_name" \
         -- "/bin/zsh"

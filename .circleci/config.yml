@@ -2,12 +2,16 @@ version: 2.1
 
 executors:
   docker_minio:
+    # An executor to run S3 compatibility unit tests
     working_directory: ~/project
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
     resource_class: 'medium+'
     docker:
-      - image: circleci/golang
+      - image: gcr.io/onec-co/datamon-builder:latest
+        auth:
+          username: _json_key
+          password: $GCLOUD_SERVICE_KEY
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: access-key
@@ -19,34 +23,53 @@ executors:
           - server
           - data
 
-  # This provides a glibc build
-  # TODO(frederic): add builder for alpine and compare
+  base_builder:
+    # An executor to run ordinary tasks.
+    # TODO(fred): when circleci eventually produces a "latest" tag, switch to that
+    working_directory: ~/project
+    environment:
+      GOOGLE_COMPUTE_ZONE: us-west2-c
+      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
+    docker:
+      - image: cimg/go:1.14
+
   docker_builder:
+    # An executor to run and build: it is based on the base_builder, with some
+    # extras to support google cloud.
     working_directory: ~/project
     resource_class: 'medium+' # linter breaks on "small" instances and sometimes even on "medium" ones
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
+      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
     docker:
-      - image: circleci/golang
+      - image: gcr.io/onec-co/datamon-builder:latest
+        auth:
+          username: _json_key
+          password: $GCLOUD_SERVICE_KEY
 
   fuse_tester:
+    # A virtual machine executor to run fuse tests, with privileges n fuse
     working_directory: ~/project
-    resource_class: 'medium+'
+    resource_class: 'medium'
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOROOT: /usr/local/go
-      GOPATH: /go
-      PATH: /go/bin:/usr/local/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+      GOPATH: /home/circleci/go
+      PATH: /usr/local/go/bin:/home/circleci/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
     machine:
       image: ubuntu-1604:201903-01
 
   metrics_tester:
+    # An executor to run tests with a local instance of influxdb, to test metrics collection
     working_directory: ~/project
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
     resource_class: 'medium+'
     docker:
-      - image: circleci/golang
+      - image: gcr.io/onec-co/datamon-builder:latest
+        auth:
+          username: _json_key
+          password: $GCLOUD_SERVICE_KEY
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: access-key
@@ -70,20 +93,30 @@ commands:
           name: Install packages with gcloud SDK installed locally
           command: |
             sudo apt-get update -y --quiet
-            sudo apt-get install --quiet lsb-release upx
+            sudo apt-get install --quiet lsb-release
             export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
             echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
             curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
             sudo apt-get update -y -qq
             sudo apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh
 
+            # install upx version that supports osx binaries (>=3.96)
+            UPX_VERSION=3.96
+            ARCH=amd64_linux
+            curl -sSL -O https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-${ARCH}.tar.xz
+            tar xf upx-${UPX_VERSION}-${ARCH}.tar.xz
+            sudo install upx-${UPX_VERSION}-${ARCH}/upx /usr/bin
+            rm -rf upx-*
+
   install_golang:
     steps:
       - run:
           name: install latest golang
           command: |
-            export GOPATH=${GOPATH:-/usr/local/go}
-            export GOROOT=${GOROOT:-/go}
+            export GOPATH=${GOPATH:-/home/circleci/go}
+            export GOROOT=${GOROOT:-/usr/local/go}
+            ARCH=linux-amd64
+            CI_USER=$(id -u)
             pushd /tmp
 
             git init empty-go && cd empty-go && git remote add upstream	https://go.googlesource.com/go
@@ -93,24 +126,22 @@ commands:
               exit 1
             fi
 
-            CI_USER=$(id -u)
-            wget --no-verbose https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz
+            wget --no-verbose https://dl.google.com/go/go${GO_VERSION}.${ARCH}.tar.gz
             if [[ $? -ne 0 ]] ; then
               echo "Unable to fetch latest golang binary release from https://dl.google.com"
               exit 1
             fi
 
-            CI_USER=$(id -u)
-            ARTIFACT="go${GO_VERSION}.linux-amd64.tar.gz"
+            ARTIFACT="go${GO_VERSION}.${ARCH}.tar.gz"
             sudo tar -xf ${ARTIFACT}
 
             # clean up preinstalled golang on circleci image
-            sudo mv /usr/local/go /usr/local/go.old || true
-            sudo mv go /usr/local
+            sudo mv ${GOROOT} /usr/local/go.old || true
+            sudo mv go ${GOROOT}
             sudo mkdir -p ${GOPATH}/pkg ${GOPATH}/bin
             sudo chown -R ${CI_USER} ${GOPATH}
-            rm -f ${ARTIFACT}
 
+            rm -f ${ARTIFACT}
             export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
             go version
 
@@ -153,15 +184,10 @@ commands:
     steps:
       - run:
           name: Install go tools for testing
-          # update tools to latest release but clear the module cache after install
-          # to avoid conflicts with the main go dependencies.
           environment:
             GO111MODULE: 'on'
           command: |
-            go get -u gotest.tools/gotestsum@latest
-            go get -u github.com/matryer/moq@latest
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
-            go clean -modcache
+            make ensure-gotools
 
   login_to_google:
     steps:
@@ -179,8 +205,8 @@ commands:
     steps:
       - restore_cache:
           keys:
-           - pkg-cache-{{ checksum "go.sum" }}
-           - pkg-cache-
+            - pkg-cache-{{ checksum "go.sum" }}
+            - pkg-cache-
 
   put_cache:
     description: save golang modules cache
@@ -188,7 +214,7 @@ commands:
       - save_cache:
           key: pkg-cache-{{ checksum "go.sum" }}
           paths:
-            - "/go/pkg"
+            - "/home/circleci/go/pkg"
 
   google_app_credentials:
     steps:
@@ -214,7 +240,6 @@ jobs:
   go_lint:
     executor: docker_builder
     steps:
-      - install_base
       - checkout
       - get_cache
       - install_test_tools
@@ -227,14 +252,20 @@ jobs:
       - run:
           name: Lint shell scripts
           command: |
-            # scans all shells in repo, excluding zsh which is not linted
-            find . -name \*.sh|\
-            while read -r arg ;do shell=$(head -1q "${arg}");if [[ ! $shell =~ "zsh" ]] ; then echo "${arg}"; fi;done|\
-            xargs shellcheck
+            make lint-scripts
+
+  go_cross_compile:
+    executor: docker_builder
+    steps:
+      - checkout
+      - get_cache
       - run:
-          name: Ensure metrics
+          name: Ensure cross-compilation # <- make sure all binaries and release assets will build for linux and darwin
+          # TODO(fred): asserts binaries are statically linked and not corrupted
+          # TODO(fred): assert macOS binaries work
           command: |
-            go build -o datamon.metrics ./cmd/metrics
+            go mod download
+            make cross-compile-binaries
 
   go_test:
     executor: docker_minio
@@ -242,7 +273,6 @@ jobs:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       GO111MODULE: 'on'
     steps:
-      - install_base
       - checkout
       - get_cache
       - install_test_tools
@@ -279,7 +309,6 @@ jobs:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       GO111MODULE: 'on'
     steps:
-      - install_base
       - checkout
       - get_cache
       - install_test_tools
@@ -341,37 +370,34 @@ jobs:
           at: /tmp/test-coverage
       - checkout
       - run:
+          name: Coverage tools
+          command: |
+            go get -u github.com/wadey/gocovmerge
+            go get -u github.com/axw/gocov/gocov
+            go get -u github.com/matm/gocov-html
+      - run:
           name: Merge raw coverage results and produce coverage reports
           command: |
             mkdir -p coverage-results
             # Merge results from multiple test jobs
-            go get -u github.com/wadey/gocovmerge
 
             collected="$(find /tmp/test-coverage -type f -name \*.out)"
             echo "INFO: collected profiles: ${collected}"
             gocovmerge $collected > merged_coverprofile.out
 
-            #mkdir -p coverage-results/debug
-            #cp ${collected} merged_coverprofile.out coverage-results/debug
-
             # Fully detailed report with go tool cover
             go tool cover -html=merged_coverprofile.out -o coverage-results/coverage_datamon_ci.html
 
             # Alternative report with gocov
-            go get -u github.com/axw/gocov/gocov
-            go get -u github.com/matm/gocov-html
             gocov convert merged_coverprofile.out | gocov-html > coverage-results/coverage_summary_datamon_ci.html
       - store_artifacts:
           path: coverage-results
 
   fuse_sidecar_test:
     executor: docker_builder
-    environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
       - get_cache
       - login_to_google
@@ -380,61 +406,57 @@ jobs:
       - run:
           name: Run fuse sidecar demo
           command: |
-            make build-datamon-local
-            DATAMON_GLOBAL_CONFIG=datamon-config-test-sdjfhga ./cmd/datamon/datamon config create
-            hack/fuse-demo/demo_coord.sh -b
+            make build-datamon-local && sudo install out/datamon /usr/bin
+            hack/fuse-demo/demo_coord.sh
+      - run:
+          when: always
+          name: Delete k8s resources for sidecar demo
+          command: |
+            make clean-fuse-demo
+
+  pg_sidecar_test:
+    executor: docker_builder
+    steps:
+      - setup_remote_docker:
+          version: 18.09.3
+      - checkout
+      - login_to_google
+      - install_kubectl
+      - google_app_credentials
+      - run:
+          name: Run pg sidecar demo
+          command: |
+            hack/fuse-demo/demo_pg_coord.sh
+      - run:
+          when: always
+          name: Delete k8s resources for sidecar demo
+          command: |
+            make clean-pg-demo
 
   build_images:
     executor: docker_builder
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
-      - get_cache
       - login_to_google
       - run:
-          name: Build datamon image (local registry)
+          name: Build docker artifacts
           command: |
-            make build-datamon
-      - run:
-          name: Build datamon fuse sidecar image
-          command: |
-            make build-and-push-fuse-sidecar
-      - run:
-          name: Build datamon pg sidecar image
-          command: |
-            make build-and-push-pg-sidecar
-      - run:
-          name: Build datamon datamover image
-          command: |
-            make build-and-push-datamover
+            make build-datamon-binaries
+            make release-all-docker
 
   build_demo_images:
     executor: docker_builder
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
-      - get_cache
       - login_to_google
       - run:
-          name: DEMO - Build datamon fuse demo image
-          command: |
-            make fuse-demo-build-shell
-      - run:
-          name: DEMO - Build datamon fuse demo sidecar
-          command: |
-            make fuse-demo-build-sidecar
-      - run:
-          name: DEMO - Build datamon fuse demo app
+          name: DEMO - Build datamon fuse demo images
           command: |
             make fuse-demo-coord-build-app
-      - run:
-          name: DEMO - Build datamon fuse demo datamon
-          command: |
-            make fuse-demo-coord-build-datamon
       - run:
           name: DEMO - Build datamon pg demo app
           command: |
@@ -450,7 +472,6 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - checkout
       - get_cache
       - login_to_google
@@ -478,6 +499,25 @@ jobs:
             echo "Preparing release ${CIRCLE_TAG}"
             goreleaser ${opts} 2>&1
 
+  push_base:
+    executor: base_builder
+    steps:
+      - setup_remote_docker:
+          version: 18.09.3
+      - install_base
+      - checkout
+      - login_to_google
+      - run:
+          name: push prebuilt images with all dependencies to build sidecars
+          command: |
+            make build-and-push-sidecar-base
+      - run:
+          name: push prebuilt golang image to run CI
+          # NOTE(fred): this is based on top of the cimg/go:1.14 convenience image.
+          # Building it from circleci/golang or pure debian doesn't result in a significantly smaller image.
+          command: |
+            make build-and-push-datamon-builder
+
 workflows:
   version: 2
   build_and_test:
@@ -490,8 +530,20 @@ workflows:
             branches:
               only: /.*/
 
+      - go_cross_compile:
+          context: "OC Common"
+          requires:
+            - go_lint
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
       - go_test:
           context: "OC Common"
+          requires:
+            - go_lint
           filters:
             tags:
               only: /.*/
@@ -500,6 +552,8 @@ workflows:
 
       - go_test_fuse:
           context: "OC Common"
+          requires:
+            - go_lint
           filters:
             tags:
               only: /.*/
@@ -508,6 +562,8 @@ workflows:
 
       - go_test_metrics:
           context: "OC Common"
+          requires:
+            - go_lint
           filters:
             tags:
               only: /.*/
@@ -517,18 +573,9 @@ workflows:
       - test_coverage:
           context: "OC Common"
           requires:
-            - go_lint
             - go_test
             - go_test_fuse
             - go_test_metrics
-          filters:
-            tags:
-              only: /.*/
-            branches:
-              only: /.*/
-
-      - fuse_sidecar_test:
-          context: "OC Common"
           filters:
             tags:
               only: /.*/
@@ -539,7 +586,6 @@ workflows:
           context: "OC Common"
           requires:
             - go_lint
-            - go_test
           filters:
             tags:
               only: /.*/
@@ -549,8 +595,27 @@ workflows:
       - build_demo_images:
           context: "OC Common"
           requires:
-            - go_lint
-            - go_test
+            - build_images
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
+      - fuse_sidecar_test:
+          context: "OC Common"
+          requires:
+            - build_demo_images
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
+      - pg_sidecar_test:
+          context: "OC Common"
+          requires:
+            - build_demo_images
           filters:
             tags:
               only: /.*/
@@ -560,12 +625,24 @@ workflows:
       - publish_release:
           context: "OC Common"
           requires:
-            - go_lint
             - go_test
             - go_test_fuse
+            - go_test_metrics
             - build_images
           filters:
             tags:
               only: /^v.*/
             branches:
               ignore: /.*/
+
+  weekly:
+    triggers:
+      - schedule:
+          cron: "5 4 * * 6"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - push_base:
+          context: "OC Common"

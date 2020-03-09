@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: datamon-datamover-lister
+  namespace: datamon-ci
 spec:
   template:
     metadata:

@@ -208,6 +208,7 @@ func initConfig() {
 	if datamonFlags.context.Descriptor.Name == "" {
 		datamonFlags.context.Descriptor.Name = viper.GetString("DATAMON_CONTEXT")
 	}
+
 	if datamonFlags.core.Config == "" {
 		datamonFlags.core.Config = viper.GetString("DATAMON_GLOBAL_CONFIG")
 	}
@@ -241,7 +242,7 @@ func initConfig() {
 	datamonFlagsPtr.setDefaultsFromConfig(config)
 
 	if datamonFlags.context.Descriptor.Name == "" {
-		datamonFlags.context.Descriptor.Name = "datamon-dev"
+		datamonFlags.context.Descriptor.Name = "dev"
 	}
 
 	//  do not require config to be set for all commands
