@@ -76,7 +76,7 @@ SIDECAR_TAG=$(go run ./hack/release_tag.go)
 dbg_print "running demo built with image TAG: $SIDECAR_TAG"
 
 DEPLOYMENT_NAME="datamon-fuse-demo-${SIDECAR_TAG}"
-RES_DEF=${proj_root_dir}/hack/k8s/gen/${TEMPLATE_NAME}.yaml
+RES_DEF="/tmp/${TEMPLATE_NAME}.yaml"
 dbg_print "### templating k8s api server yaml for kubectl -n $NS cmd to ${RES_DEF}"
 
 PULL_POLICY=$pull_policy \

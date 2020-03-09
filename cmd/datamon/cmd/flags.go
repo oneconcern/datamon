@@ -188,7 +188,7 @@ func addCoreConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) st
 
 func addContextFlag(cmd *cobra.Command) string {
 	c := "context"
-	cmd.PersistentFlags().StringVar(&datamonFlags.context.Descriptor.Name, c, "", `Set the context for datamon (defaults to "dev")`)
+	cmd.PersistentFlags().StringVar(&datamonFlags.context.Descriptor.Name, c, "", `Set the context for datamon (default "dev")`)
 	return c
 }
 
