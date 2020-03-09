@@ -40,7 +40,7 @@ output/new data that is generated from the existing data.
 
 #### Coming soon...
 
-* [ ] Diamond workflow: several collaborating nodes produce a versioned dataset in parallel
+* [X] Diamond workflow: several collaborating nodes produce a versioned dataset in parallel
 * [ ] Python bindings
 * [ ] Write Ahead / Read Ahead logs
 
