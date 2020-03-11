@@ -1,6 +1,9 @@
 package gcs
 
-import "go.uber.org/zap"
+import (
+	"github.com/oneconcern/datamon/pkg/storage"
+	"go.uber.org/zap"
+)
 
 // Option is a functor to pass optional parameters to the gcs store
 type Option func(*gcs)
@@ -11,5 +14,11 @@ func Logger(logger *zap.Logger) Option {
 		if logger != nil {
 			g.l = logger
 		}
+	}
+}
+
+func WithVersion(version storage.Version) Option {
+	return func(g *gcs) {
+		g.s.Version = version
 	}
 }
