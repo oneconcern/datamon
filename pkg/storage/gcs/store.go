@@ -13,6 +13,7 @@ import (
 	gcsStorage "cloud.google.com/go/storage"
 
 	"github.com/oneconcern/datamon/pkg/dlogger"
+	"github.com/oneconcern/datamon/pkg/errors"
 	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"google.golang.org/api/option"
@@ -24,6 +25,7 @@ type gcs struct {
 	bucket         string
 	ctx            context.Context
 	l              *zap.Logger
+	s              storage.Settings
 }
 
 func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
@@ -39,11 +41,20 @@ func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
 	return opts
 }
 
-// New builds a new storage object from a bucket string
-func New(ctx context.Context, bucket string, credentialFile string, opts ...Option) (storage.Store, error) {
+// implNew provides stricter typing than New for package internal tests.
+// Akin to the impl* functions in pkg/core/bundle.go, this function is in place
+// in order to be extended with additional parameters and/or return values
+// independently of the public interface provided by New.
+func implNew(ctx context.Context, bucket string, credentialFile string, opts ...Option) (*gcs, error) {
 	googleStore := new(gcs)
 	for _, apply := range opts {
 		apply(googleStore)
+	}
+	{
+		generationNumber := googleStore.s.Version.GcsVersion()
+		if generationNumber < 0 && generationNumber != storage.GcsSentinelVersion {
+			return nil, errors.New("invalid version")
+		}
 	}
 	if googleStore.l == nil {
 		googleStore.l, _ = dlogger.GetLogger("info")
@@ -62,6 +73,11 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 		return nil, toSentinelErrors(err)
 	}
 	return googleStore, nil
+}
+
+// New builds a new storage object from a bucket string
+func New(ctx context.Context, bucket string, credentialFile string, opts ...Option) (storage.Store, error) {
+	return implNew(ctx, bucket, credentialFile, opts...)
 }
 
 func (g *gcs) String() string {
@@ -110,8 +126,8 @@ func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 	defer func() {
 		r.l.Debug("End ReadAt", zap.Int("chunk size", len(p)), zap.Int64("offset", offset), zap.Int("bytes read", n), zap.Error(err))
 	}()
-	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.objectName).NewRangeReader(
-		r.g.ctx, offset, int64(len(p)))
+	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.objectName).
+		NewRangeReader(r.g.ctx, offset, int64(len(p)))
 	if err != nil {
 		return 0, toSentinelErrors(err)
 	}
@@ -156,7 +172,8 @@ func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error)
 
 func (g *gcs) Touch(ctx context.Context, objectName string) error {
 	g.l.Debug("Start Touch", zap.String("objectName", objectName))
-	_, err := g.client.Bucket(g.bucket).Object(objectName).Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
+	_, err := g.client.Bucket(g.bucket).Object(objectName).
+		Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
 	g.l.Debug("End touch", zap.String("objectName", objectName), zap.Error(err))
 	return toSentinelErrors(err)
 }
@@ -228,7 +245,11 @@ func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, d
 
 func (g *gcs) Delete(ctx context.Context, objectName string) (err error) {
 	g.l.Debug("Start Delete", zap.String("objectName", objectName))
-	err = toSentinelErrors(g.client.Bucket(g.bucket).Object(objectName).Delete(ctx))
+	obj := g.client.Bucket(g.bucket).Object(objectName)
+	if ver := g.s.Version.GcsVersion(); ver != storage.GcsSentinelVersion {
+		obj = obj.Generation(ver)
+	}
+	err = toSentinelErrors(obj.Delete(ctx))
 	g.l.Debug("End Delete", zap.String("objectName", objectName), zap.Error(err))
 	return
 }
@@ -257,21 +278,31 @@ func (g *gcs) Keys(ctx context.Context) (keys []string, err error) {
 	return keys, nil
 }
 
-func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, delimiter string, count int) (keys []string, next string, err error) {
-	g.l.Debug("Start KeysPrefix", zap.String("start", pageToken), zap.String("prefix", prefix))
+func (g *gcs) KeysPrefix(
+	ctx context.Context,
+	pageToken string,
+	prefix string,
+	delimiter string,
+	count int,
+) (keys []string, next string, err error) {
+	logger := g.l.With(
+		zap.String("start", pageToken),
+		zap.String("prefix", prefix),
+		zap.Int("keys", len(keys)),
+		zap.Error(err))
+	logger.Debug("Start KeysPrefix")
 	defer func() {
-		g.l.Debug("End KeysPrefix", zap.String("start", pageToken), zap.String("prefix", prefix), zap.Int("keys", len(keys)), zap.Error(err))
+		logger.Debug("End KeysPrefix")
 	}()
+
 	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})
-
 	var objects []*gcsStorage.ObjectAttrs
-
-	keys = make([]string, 0, count)
 	next, err = iterator.NewPager(itr, count, pageToken).NextPage(&objects)
 	if err != nil {
 		return nil, "", toSentinelErrors(err)
 	}
 
+	keys = make([]string, 0, count)
 	for _, objAttrs := range objects {
 		if objAttrs.Prefix != "" {
 			keys = append(keys, objAttrs.Prefix)
@@ -280,6 +311,42 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 		}
 	}
 	return
+}
+
+func (g *gcs) KeyVersions(ctx context.Context, key string) ([]storage.Version, error) {
+	//	var err error
+	logger := g.l.With(zap.String("key", key))
+	logger.Debug("start KeyVersions")
+
+	versionsPrefix := func(pageToken string) ([]storage.Version, string, error) {
+		const versionsPerPage = 100
+		itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: key, Versions: true})
+		var objects []*gcsStorage.ObjectAttrs
+		nextPageToken, err := iterator.NewPager(itr, versionsPerPage, pageToken).NextPage(&objects)
+		if err != nil {
+			return nil, "", toSentinelErrors(err)
+		}
+		versions := make([]storage.Version, 0, versionsPerPage)
+		for _, objAttrs := range objects {
+			versions = append(versions, storage.NewVersionGcs(objAttrs.Generation))
+		}
+		return versions, nextPageToken, nil
+	}
+
+	pageToken := ""
+	versions := make([]storage.Version, 0)
+	for {
+		versionsCurr, pageToken, err := versionsPrefix(pageToken)
+		if err != nil {
+			return nil, toSentinelErrors(err)
+		}
+		versions = append(versions, versionsCurr...)
+		if pageToken == "" {
+			break
+		}
+	}
+
+	return versions, nil
 }
 
 func (g *gcs) Clear(context.Context) error {
