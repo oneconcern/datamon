@@ -29,10 +29,21 @@ output/new data that is generated from the existing data.
 * Versions ("bundles") may be uploaded then downloaded on local storage
 * Versions may be accessed directly on a mounted file system (fuse)
 * CLI management tool
+* Metrics collection
+
+### Added value
+
+* Leverages low-cost frozen storage (e.g. S3, GCS)
+* Optimized billed operations for storage: no fancy billable backend store options are used (like concurrency control, etc)
+* Optimized for speed: parallel I/Os together with deduplication vastly outperform usual tools like `gsutil`
+* A well-defined and tested immutable metadata model ensures that no data is ever lost or unrecoverable. Datamon is an effective substitute to many bespoke gsutil scripting utilities.
+* Versioning & tagging occur on whole data sets and not individual files. This makes it easy to restore consistent inputs to some reproducible computation
+* Less storage bucket administration: datamon uses only a few buckets, defined according to IAM policies (i.e. a datamon context)
+* Repositories make up a convenient abstration for datasets, and share the same underlying cloud storage bucket configuration (abstracted as a "context")
 
 #### Extra tools
 
-* scripted interface to use in a sidecar container (e.g. for ARGO workflows)
+* Scripted interface to use as a sidecar container (e.g. for ARGO workflows)
 
 #### Experimental
 
