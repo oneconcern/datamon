@@ -10,6 +10,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/core/status"
 
 	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 const (
@@ -36,11 +37,23 @@ func ListLabels(repo string, stores context2.Stores, prefix string, opts ...Opti
 type ApplyLabelFunc func(model.LabelDescriptor) error
 
 // ListLabelsApply applies some function to the retrieved labels, in lexicographic order of keys.
-func ListLabelsApply(repo string, store context2.Stores, prefix string, apply ApplyLabelFunc, opts ...Option) error {
+func ListLabelsApply(repo string, store context2.Stores, apply ApplyLabelFunc, opts ...Option) error {
 	var (
 		err, applyErr error
 		once          sync.Once
+		prefix        string
 	)
+
+	{
+		settings := defaultSettings()
+		for _, bApply := range opts {
+			bApply(&settings)
+		}
+		if settings.label == "" && settings.prefix == "" || settings.label != "" && settings.prefix != "" {
+
+		}
+		prefix = settings.prefix
+	}
 
 	labelChan := make(chan model.LabelDescriptor)
 	doneChan := make(chan struct{}, 1)
@@ -112,6 +125,10 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 		bApply(&settings)
 	}
 
+	// todo: validation method on settings (specificify settings type per use-case).
+
+	// settings.label
+
 	batchChan := make(chan labelsEvent, 1) // buffered to 1 to avoid blocking on early errors
 
 	if err := RepoExists(repo, stores); err != nil {
@@ -133,7 +150,23 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 	keysChan := make(chan keyBatchEvent, 1)
 
 	iterator := func(next string) ([]string, string, error) {
-		return GetLabelStore(stores).KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToLabels(repo, prefix), "", settings.batchSize)
+		if settings.label != "" {
+			return GetLabelStore(stores).KeysPrefix(context.Background(), next,
+				model.GetArchivePathPrefixToLabels(repo, prefix),
+				"", settings.batchSize)
+		} else {
+			// tbd: sandbox o.(type).method() type assert fail compared to o.(type).method() error
+			versionedStore := GetLabelStore(stores).(storage.StoreVersioned)
+			versions, versionsErr := versionedStore.KeyVersions(context.Background(), settings.label)
+			if versionsErr != nil {
+				return nil, "", versionsErr
+			}
+			versionStrings := make([]string, len(versions))
+			for _, ver := range versions {
+				versionStrings = append(versionStrings, ver.String())
+			}
+			return versionStrings, "", nil
+		}
 	}
 	// starting keys retrieval
 	wg.Add(1)

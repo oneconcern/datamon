@@ -17,6 +17,9 @@ type Settings struct {
 	profilingEnabled bool
 	memProfDir       string
 
+	prefix string
+	label  string
+
 	metrics.Enable
 	//m *M // TODO(fred): enable metrics for list operations
 }
@@ -73,6 +76,22 @@ func WithMemProf(memProfDir string) Option {
 func WithMetrics(enabled bool) Option {
 	return func(s *Settings) {
 		s.EnableMetrics(enabled)
+	}
+}
+
+// WithLabel is an option for ListLabelsApply along with WithPrefix.
+// Precisely one of these options is expected to be applied.
+func WithLabel(label string) Option {
+	return func(s *Settings) {
+		s.label = label
+	}
+}
+
+// WithPrefix is an option for ListLabelsApply along with WithLabel.
+// Precisely one of these options is expected to be applied.
+func WithPrefix(prefix string) Option {
+	return func(s *Settings) {
+		s.prefix = prefix
 	}
 }
 
