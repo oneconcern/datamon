@@ -236,6 +236,22 @@ commands:
             hack/go-generate.sh
             go mod download
 
+  whitelist_ip:
+    steps:
+      - run:
+          name: Add CircleCI IP to whitelist
+          command: |
+            CIRCLE_CI_IP=$(curl -sSL https://checkip.amazonaws.com)
+            gcloud container clusters update --zone ${GOOGLE_COMPUTE_ZONE} ${CLUSTER} --enable-master-authorized-networks --master-authorized-networks ${ALLOWED_NETWORKS},$CIRCLE_CI_IP/32
+
+  remove_whitelist_ip:
+    steps:
+      - run:
+          when: always
+          name: Remove CircleCI IP from whitelist
+          command: |
+            gcloud container clusters update --zone ${GOOGLE_COMPUTE_ZONE} ${CLUSTER} --enable-master-authorized-networks --master-authorized-networks ${ALLOWED_NETWORKS}
+
 jobs:
   go_lint:
     executor: docker_builder
@@ -403,6 +419,7 @@ jobs:
       - login_to_google
       - install_kubectl
       - google_app_credentials
+      - whitelist_ip
       - run:
           name: Run fuse sidecar demo
           command: |
@@ -413,6 +430,7 @@ jobs:
           name: Delete k8s resources for sidecar demo
           command: |
             make clean-fuse-demo
+      - remove_whitelist_ip
 
   pg_sidecar_test:
     executor: docker_builder
@@ -423,6 +441,7 @@ jobs:
       - login_to_google
       - install_kubectl
       - google_app_credentials
+      - whitelist_ip
       - run:
           name: Run pg sidecar demo
           command: |
@@ -432,6 +451,7 @@ jobs:
           name: Delete k8s resources for sidecar demo
           command: |
             make clean-pg-demo
+      - remove_whitelist_ip
 
   build_images:
     executor: docker_builder
