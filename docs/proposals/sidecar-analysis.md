@@ -1,4 +1,4 @@
-# Sidecar analyss 
+# Sidecar analysis
 
 ## Primer
 
@@ -10,7 +10,7 @@ Any of the implemented sidecars:
 * Only supports one linear workflow: load, update, save
 * Has most of its code and complexity for parameters handling
 * Is a zsh daemon shell script.
-  There is not real justification for using this uncommon shell. 
+  There is not real justification for using this uncommon shell.
   This seemed to boil down to the use of associative arrays, which also work in bash.
 * Relies on a central bourne shell script (wrapper) to operate the load/save workflow with datamon
 
@@ -39,7 +39,7 @@ Current fuse sicar:
 
 ## Short term corrective actions
 
-We cannot afford a full rewrite in the short term. 
+We cannot afford a full rewrite in the short term.
 We want to avoid altering the fuse sidecar as much as possible since that one is allegedly working.
 
 I want to alleviate much of our CI issues that come from the sidecar demos (long runs, CI credits consumption, unstable behavior)
@@ -50,11 +50,12 @@ Here are the many minor fixes brought by PR#428.
 * CI:
   * Overhauled Dockerfiles and image tagging: CI can build faster
   * All images are debian based, with same version ; postgres is installed locally from a debian package, not a docker image
-  * Convenience builder images are updated on a weekly basis
   * Removed redundant builds during CI jobs
   * Added trailing CI tasks to ensure k8s resources are relinquished
   * Changed the layout of the CI workflow to avoid starting the k8 jobs too early
   * Every CI run creates kubernetes resources which are unique to this run
+  * ~~Convenience builder images are updated on a weekly basis~~ (removed)
+  * added IP whitelisting to deploy k8s demos on 1C cluster
 
 * pg k8 demo
   * Replaced env-based parameterization by k8s configmap objects and YAML parsing inside the sidecar
@@ -76,9 +77,6 @@ Here are the many minor fixes brought by PR#428.
 * fuse sidecar
   * Adapted k8 template to use dedicated namespace and create k8 resources that are unique to a CI run
   * Phased out demo-specific sidecar image: demo runs on regular builds
-
-TODOs:
-  * [ ] Weekly builds should run the entire test suite to detect incompatible upgrades
 
 ## Longer term corrective actionss
 

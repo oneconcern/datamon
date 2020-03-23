@@ -9,10 +9,12 @@ This document describes the current design of datamon sidecars.
 The current design favors the sidecar container approach, with bespoke signaling between containers,
 over the CSI driver approach. Therefore,  datamon is not available as a kubernetes persistent volume plugin.
 
-This design choice stems from the current inability by Kubernetes CSI API to handle ephemeral volumes.
+This design choice stems from the current inability on GKE to handle Kubernetes ephemeral volumes
+([v1.16 feature](https://kubernetes.io/docs/concepts/storage/volumes/#csi-ephemeral-volumes)).
 Managing many short lived kubernetes volumes is at the moment not practical.
+When GKE eventually makes Kubernetes v1.16 available, we may revive our attempt to make a CSI driver for datamon.
 
-Signaling is implemented with files on a shared volume.
+The sidecar approach requires a coordination between containers. Signaling is implemented with files on a shared volume.
 
 ## Sidecar signaling
 
