@@ -247,10 +247,23 @@ commands:
   remove_whitelist_ip:
     steps:
       - run:
-          when: always
-          name: Remove CircleCI IP from whitelist
+          name: Remove previously added CircleCI IP from whitelist
           command: |
-            gcloud container clusters update --zone ${GOOGLE_COMPUTE_ZONE} ${CLUSTER} --enable-master-authorized-networks --master-authorized-networks ${ALLOWED_NETWORKS}
+            set -x -o pipefail
+            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
+            PREVIOUS="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. != "'"${CIRCLE_CI_IP}"'/32"))|tostring|sub("[\"\\[\\]]";"";"g")')"
+            gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "$(eval echo "${PREVIOUS}")"
+
+  remove_whitelist_ip_on_fail:
+    steps:
+      - run:
+          when: on_fail
+          name: Remove previously added CircleCI IP from whitelist (when failed)
+          command: |
+            set -x -o pipefail
+            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
+            PREVIOUS="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. != "'"${CIRCLE_CI_IP}"'/32"))|tostring|sub("[\"\\[\\]]";"";"g")')"
+            gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "$(eval echo "${PREVIOUS}")"
 
 jobs:
   go_lint:
@@ -430,7 +443,7 @@ jobs:
           name: Delete k8s resources for sidecar demo
           command: |
             make clean-fuse-demo
-      - remove_whitelist_ip
+      - remove_whitelist_ip_on_fail
 
   pg_sidecar_test:
     executor: docker_builder
@@ -451,7 +464,7 @@ jobs:
           name: Delete k8s resources for sidecar demo
           command: |
             make clean-pg-demo
-      - remove_whitelist_ip
+      - remove_whitelist_ip_on_fail
 
   build_images:
     executor: docker_builder
@@ -537,6 +550,15 @@ jobs:
           # Building it from circleci/golang or pure debian doesn't result in a significantly smaller image.
           command: |
             make build-and-push-datamon-builder
+
+  k8s_remove_whitelist:
+    executor: docker_builder
+    steps:
+      - setup_remote_docker:
+          version: 18.09.3
+      - install_base
+      - login_to_google
+      - remove_whitelist_ip
 
 workflows:
   version: 2
@@ -650,6 +672,18 @@ workflows:
               only: /.*/
             branches:
               only: /.*/
+
+      - k8s_remove_whitelist:
+          context: "OC Common"
+          requires:
+            - fuse_sidecar_test
+            - pg_sidecar_test
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
 
       - publish_release:
           context: "OC Common"
