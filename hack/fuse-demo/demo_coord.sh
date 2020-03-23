@@ -27,9 +27,8 @@ known_k8s_ctxs=(${(v)known_k8s_tags_to_ctxs})
 k8s_ctx_opt=remote
 build_sidecar_base=false
 #
-build_demo_sidecar=true
-build_demo_app=true
-build_local=true
+build_demo_app=false
+build_local=false
 #
 shell_only=false
 
@@ -40,9 +39,8 @@ while getopts osbS opt; do
             k8s_ctx_opt=local
             ;;
         (s)
-            build_demo_sidecar=false
-            build_demo_app=false
-            build_local=false
+            build_demo_app=true
+            build_local=true
             ;;
         (b)
             build_sidecar_base=true
@@ -61,28 +59,6 @@ done
 
 dbg_print 'demo_coord.sh getopts end'
 
-k8s_ctx=
-if [[ ${known_k8s_ctxs[(ie)$k8s_ctx_opt]} -le ${#known_k8s_ctxs} ]]; then
-    k8s_ctx=$k8s_ctx_opt
-else
-    k8s_ctx=${known_k8s_tags_to_ctxs[$k8s_ctx_opt]}
-fi
-if [[ -z $k8s_ctx ]]; then
-    print 'kubernetes context not set' 1>&2
-    exit 1
-fi
-if [[ -z $GCLOUD_SERVICE_KEY ]]; then
-    # not in ci
-    kubectx $k8s_ctx
-fi
-
-##
-
-dbg_print '### using golang api to write serialized input file'
-
-
-##
-
 dbg_print '### building images'
 
 run_docker_make_cmd() {
@@ -95,49 +71,41 @@ run_docker_make_cmd() {
 }
 
 
-if $build_sidecar_base; then
+if [[ $build_sidecar_base == "true" ]] ; then
     dbg_print '##### building sidecar image'
     run_docker_make_cmd build-and-push-fuse-sidecar
 else
     dbg_print '##### skipping sidecar image build'
 fi
-dbg_print '##### building coord app image'
-if $build_demo_app; then
+if [[ $build_demo_app == "true" ]] ; then
+    dbg_print '##### building coord app image'
     run_docker_make_cmd fuse-demo-coord-build-app
+else
+    dbg_print '##### skipping coord app image build'
 fi
-dbg_print '##### building demo sidecar image'
-if $build_demo_sidecar; then
-    run_docker_make_cmd fuse-demo-coord-build-datamon
-fi
-dbg_print '##### building datamon local image'
-dbg_print 'in order to verify uploaded bundle locally'
-if $build_local; then
+if [[  $build_local == "true" ]] ; then
+    dbg_print '##### building datamon local binary'
+    dbg_print 'in order to verify uploaded bundle locally'
     make build-datamon-local
+    sudo install out/datamon /usr/bin
+else
+    dbg_print '##### skipping local datamon build'
 fi
 
 dbg_print '### starting demo in k8s'
 
-dbg_print '##### placed timestamp aot for verification'
-date '+%s' > /tmp/datamon_fuse_demo_coord_start_timestamp
-
-dbg_print '##### creating coordiation pod'
+dbg_print '##### creating coordination pod'
 typeset -a create_coord_pod_opts
-if $shell_only; then
+if [[ $shell_only == "true" ]] ; then
     create_coord_pod_opts=('-S' $create_coord_pod_opts)
 fi
 if [[ $k8s_ctx_opt = 'local' ]]; then
-    dbg_print 'creating coordiation pod for local docker-desktop'
+    dbg_print 'creating coordination pod for local docker-desktop'
     create_coord_pod_opts=('-o' $create_coord_pod_opts)
 fi
 ./hack/fuse-demo/create_coord_pod.sh $create_coord_pod_opts
 
-if ! $shell_only; then
-    dbg_print '##### following coodination pod logs until demo finished'
-    ./hack/fuse-demo/follow_coord_logs.sh
-    dbg_print '##### following coord logs ended'
-    dbg_print '### verifying locally'
-    ./hack/fuse-demo/verify_coord_bundle.sh
-else
+if [[ $shell_only == "true" ]] ; then
     dbg_print '### running coordination shell'
     dbg_print '##### dumb timeout on start'
     for i in $(seq 35); do
@@ -149,4 +117,53 @@ else
     dbg_print '> ./hack/fuse-demo/run_coord_shell.sh -s'
     dbg_print 'to start sidecar shell'
     ./hack/fuse-demo/run_coord_shell.sh
+    exit 0
 fi
+
+POLL_INTERVAL=1
+NS=datamon-ci
+pod_name=
+SIDECAR_TAG=$(go run ./hack/release_tag.go)
+
+dbg_print 'waiting on pod start'
+dbg_print "##### pod with api server metadata app=datamon-coord-fuse-demo-pods,instance=${SIDECAR_TAG}"
+while [[ -z $pod_name ]]; do
+    sleep "$POLL_INTERVAL"
+
+    k=$(kubectl -n "${NS}" get pods -l app=datamon-coord-fuse-demo,instance="${SIDECAR_TAG}" --output custom-columns=NAME:.metadata.name,STATUS:.status.phase)
+    pod_name=$(echo "${k}" | grep Running | cut -d' ' -f1) || true
+    check=$(echo "${k}"|grep -iE '(BackOff)|(Error)') || true
+    if [[ -n "${check}" ]] ; then
+      dbg_print "pod won't start. Exiting..."
+      dbg_print "${k}"
+      exit 1
+    fi
+done
+
+dbg_print '##### placed timestamp aot for verification'
+pod_time="$(kubectl -n "${NS}" get pod "${pod_name}" --template '{{ range .status.conditions }}{{ printf "%v\n" .lastTransitionTime }}{{ end }}'|sort|head -1)"
+timestamp="$(go run ./hack/fuse-demo/parse_timestamp.go "${pod_time}")"
+echo "${timestamp}" > /tmp/datamon_fuse_demo_coord_start_timestamp
+echo "measured pod local time: ${pod_time} => ${timestamp}"
+
+LOG_FILE=/tmp/datamon-coord-demo.log
+
+dbg_print "pod started, following logs from $pod_name"
+rm -f "${LOG_FILE}" && touch "${LOG_FILE}"
+(sleep 600 && echo "timed out on waiting" && kill -15 $$ || exit 1) & # stops waiting after 10m
+(kubectl -n "${NS}" logs -f --all-containers=true "${pod_name}"|tee -a "${LOG_FILE}" || true) &
+# now wait for the demo to complete
+(tail -f "${LOG_FILE}" || true)|while read -r line ; do
+  if [[ "${line}" =~ "application exited with non-zero-status" ]] ; then
+    dbg_print "error detecting in a container"
+    exit 1
+  fi
+  if [[ "${line}" =~ "wrap_application sleeping indefinitely" ]] ; then
+    break
+  fi
+done
+dbg_print "success: wrapper ended successfully"
+
+dbg_print '##### following coord logs ended'
+dbg_print '### verifying locally'
+./hack/fuse-demo/verify_coord_bundle.sh

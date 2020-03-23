@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: datamon-datamover-nfs-access
+  namespace: datamon-ci
 spec:
   selector:
     matchLabels:

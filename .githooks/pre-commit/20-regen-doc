@@ -1,8 +1,8 @@
 #! /bin/bash
 set -e -o pipefail
-cd $(git rev-parse --show-toplevel)
-TEMP=$(mktemp -d)
-go build -a -o ${TEMP}/datamon-dev ./cmd/datamon
-DATAMON_GLOBAL_CONFIG=x ${TEMP}/datamon-dev usage --target-dir ./docs/usage
+cd "$(git rev-parse --show-toplevel)"
+TEMP="$(mktemp -d)"
+go build -a -o "${TEMP}/datamon-dev" ./cmd/datamon
+DATAMON_GLOBAL_CONFIG=x "${TEMP}/datamon-dev" usage --target-dir ./docs/usage
 git add docs
 

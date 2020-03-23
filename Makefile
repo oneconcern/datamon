@@ -10,21 +10,41 @@ TARGET_MAX_CHAR_NUM=30
 
 # Version and repo
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+GIT_HOME = $(shell git rev-parse --show-toplevel)
 VERSION=$(shell git describe --tags)
 COMMIT=$(shell git rev-parse HEAD)
 RELEASE_TAG=$(shell go run ./hack/release_tag.go)
+RELEASE_TAG_LATEST := $(shell go run ./hack/release_tag.go -l)
 GITDIRTY=$(shell git diff --quiet || echo 'dirty')
+
+# Version of pre-built base image to use. Increment manually only.
+SIDECAR_BASE_VERSION ?= 20200307
+
+UPX_VERSION=$(shell type upx>/dev/null && upx --version|head -1|cut -d' ' -f2)
+UPX_MAJOR=$(shell echo $(UPX_VERSION)|cut -d'.' -f1)
+UPX_MINOR=$(shell echo $(UPX_VERSION)|cut -d'.' -f2)
+# upx >=3.96 supports osx 64bit binaries
+UPX_FOR_OSX=$(shell if [[ -n "$(UPX_MAJOR)" && -n $(UPX_MINOR) && "$(UPX_MAJOR)" -ge 3 && "$(UPX_MINOR)" -ge 96 ]] ; then echo "1"; else echo "" ;fi)
+
+# go-gettable tools used for build and test
+# NOTE: we don't put packr2 in that list, to stick to the version in go.mod (no automatic upgrade)
+TOOLS ?= github.com/mitchellh/gox \
+	github.com/golangci/golangci-lint/cmd/golangci-lint \
+	gotest.tools/gotestsum@latest \
+	github.com/matryer/moq@latest \
+	golang.org/x/tools/cmd/goimports
 
 # Build tagging parameters
 VERSION_INFO_IMPORT_PATH ?= github.com/oneconcern/datamon/cmd/datamon/cmd.
-BASE_LD_FLAGS ?= -s -w -linkmode external
+BASE_LD_FLAGS ?= -s -w
 VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)Version=$(VERSION)'
 VERSION_LD_FLAG_DATE ?= -X '$(VERSION_INFO_IMPORT_PATH)BuildDate=$(shell date -u -R)'
 VERSION_LD_FLAG_COMMIT ?= -X '$(VERSION_INFO_IMPORT_PATH)GitCommit=$(COMMIT)'
-VERSION_LD_FLAG_VERSION ?= -X '$(VERSION_INFO_IMPORT_PATH)GitState=$(GITDIRTY)'
-VERSION_LD_FLAGS ?= $(VERSION_LD_FLAG_VERSION) $(VERSION_LD_FLAG_DATE) $(VERSION_LD_FLAG_COMMIT) $(VERSION_LD_FLAG_VERSION)
+VERSION_LD_FLAG_STATE ?= -X '$(VERSION_INFO_IMPORT_PATH)GitState=$(GITDIRTY)'
+VERSION_LD_FLAGS ?= $(VERSION_LD_FLAG_VERSION) $(VERSION_LD_FLAG_DATE) $(VERSION_LD_FLAG_COMMIT) $(VERSION_LD_FLAG_STATE)
 
 REPOSITORY ?= gcr.io/onec-co
+LOCALREPO ?= reg.onec.co
 VERSION_ARGS := --build-arg version_import_path=$(VERSION_INFO_IMPORT_PATH) --build-arg version=$(VERSION) --build-arg commit=$(COMMIT) --build-arg dirty=$(GITDIRTY)
 BUILD_USER := $(subst @,_,$(GITHUB_USER))
 USER_TAG := $(shell if [[ -n "$(BUILD_USER)" && "$(BUILD_USER)" != "onecrobot" ]] ; then echo $(BUILD_USER)-$$(date '+%Y%m%d') ; fi)
@@ -41,14 +61,23 @@ help:
 	@echo ''
 	@echo 'Targets:'
 	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
-		helpMessage = match(lastLine, /^## (.*)/); \
+		helpMessage = match(lastLine, /^##\s*(.*)/); \
 		if (helpMessage) { \
 			helpCommand = substr($$1, 0, index($$1, ":")-1); \
 			helpMessage = substr(lastLine, RSTART + 3, RLENGTH); \
+			helpTopic = match(helpMessage, /^([A-Z]+):\s+/); \
+			if (helpTopic != "") { \
+				helpTopic = substr(helpMessage, RSTART,RLENGTH-1); \
+				helpMessage = substr(helpMessage,RLENGTH+1) ; \
+				if (helpTopic != previousTopic) { \
+				  printf "\nTopic ${GREEN}%s${RESET}\n", helpTopic; \
+					previousTopic = helpTopic; \
+				} \
+			} \
 			printf "  ${YELLOW}%-$(TARGET_MAX_CHAR_NUM)s${RESET} ${GREEN}%s${RESET}\n", helpCommand, helpMessage; \
 		} \
 	} \
-	{ lastLine = $$0 }' $(MAKEFILE_LIST)
+	{ lastLine = $$0 }' < $(MAKEFILE_LIST)
 
 .PHONY: build-target
 build-target:
@@ -63,103 +92,133 @@ push-target:
 	docker push $(BUILD_TARGET)
 
 .PHONY: build-datamon-binaries
-build-datamon-binaries:
-	$(MAKE) build-target \
-		BUILD_TARGET=datamon-binaries \
-		DOCKERFILE=binaries.Dockerfile BUILD_ARGS="--pull $(VERSION_ARGS)" TAGS=""
+## SIDECAR: Build container with all datamon binaries for sidecars
+build-datamon-binaries: export BUILD_TARGET=$(LOCALREPO)/datamon-binaries
+build-datamon-binaries: export DOCKERFILE=dockerfiles/binaries.Dockerfile
+build-datamon-binaries: export BUILD_ARGS=$(VERSION_ARGS)
+build-datamon-binaries: export TAGS=
+build-datamon-binaries: build-alpine-base
+	$(MAKE) build-target
 
 .PHONY: build-and-push-fuse-sidecar
-## build FUSE sidecar container used in Argo workflows
+## SIDECAR: Build FUSE sidecar container used in Argo workflows
 build-and-push-fuse-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-sidecar
-build-and-push-fuse-sidecar: export DOCKERFILE=sidecar.Dockerfile
-build-and-push-fuse-sidecar: export BUILD_ARGS=
-build-and-push-fuse-sidecar: export RELEASE_TAG_LATEST=$(shell go run ./hack/release_tag.go -l)
+build-and-push-fuse-sidecar: export DOCKERFILE=dockerfiles/sidecar.Dockerfile
+build-and-push-fuse-sidecar: export BUILD_ARGS=--build-arg VERSION=$(SIDECAR_BASE_VERSION)
 build-and-push-fuse-sidecar: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
 build-and-push-fuse-sidecar: build-datamon-binaries
 	$(MAKE) build-target
 	$(MAKE) push-target
 
 .PHONY: build-and-push-pg-sidecar
-## build postgres sidecar container used in Argo workflows
+## SIDECAR: Build postgres sidecar container used in Argo workflows
 build-and-push-pg-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-pg-sidecar
-build-and-push-pg-sidecar: export DOCKERFILE=sidecar-pg.Dockerfile
-build-and-push-pg-sidecar: export BUILD_ARGS=
+build-and-push-pg-sidecar: export DOCKERFILE=dockerfiles/sidecar-pg.Dockerfile
+build-and-push-pg-sidecar: export BUILD_ARGS=--build-arg VERSION=$(SIDECAR_BASE_VERSION)
 build-and-push-pg-sidecar: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
 build-and-push-pg-sidecar: build-datamon-binaries
 	$(MAKE) build-target
 	$(MAKE) push-target
 
 .PHONY: build-and-push-datamover
-## build sidecar container used in Argo workflows
+## SIDECAR: Build sidecar datamover container used in Argo workflows
 build-and-push-datamover: export BUILD_TARGET=$(REPOSITORY)/datamon-datamover
-build-and-push-datamover: export DOCKERFILE=datamover.Dockerfile
-build-and-push-datamover: export BUILD_ARGS=
+build-and-push-datamover: export DOCKERFILE=dockerfiles/datamover.Dockerfile
+build-and-push-datamover: export BUILD_ARGS=--build-arg VERSION=$(SIDECAR_BASE_VERSION)
 build-and-push-datamover: export RELEASE_TAG_LATEST=$(shell go run ./hack/release_tag.go -l -i gcr.io/onec-co/datamon-datamover)
 build-and-push-datamover: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
 build-and-push-datamover: build-datamon-binaries
 	$(MAKE) build-target
 	$(MAKE) push-target
 
-.PHONY: build-and-push-release-images
-## build all docker images associated with a release
-build-and-push-release-images: build-and-push-fuse-sidecar build-and-push-datamover
+.PHONY: ensure-gotools
+## BUILD: Install all go-gettable tools
+ensure-gotools:
+	@mkdir -p ${GOPATH}/bin && \
+	pushd ${GOPATH}/bin 1>/dev/null 2>&1 && \
+	for tool in $(TOOLS) ; do \
+	  echo "$(GREEN)INFO: ensuring $(YELLOW)$${tool}$(GREEN) is up to date$(RESET)" && \
+		go get -u $${tool} 1>/dev/null 2>&1; \
+	done && \
+	popd 2>/dev/null
 
-.PHONY: build-datamon
-## Build datamon docker container on local registry
-build-datamon: export BUILD_TARGET=reg.onec.co/datamon
-build-datamon: export DOCKERFILE=Dockerfile
-build-datamon: export BUILD_ARGS=--pull
-build-datamon: export TAGS=$(USER_TAG) $(BRANCH_TAG)
-build-datamon:
-	$(MAKE) build-target
+.PHONY: gofmt
+## BUILD: Run gofmt on the cmd and pkg packages (ships with go)
+gofmt:
+	@gofmt -s -w .
+
+.PHONY: goimports
+## BUILD: Run goimports on the cmd and pkg packages
+goimports:
+	@TOOLS=golang.org/x/tools/cmd/goimports $(MAKE) ensure-gotools
+	@goimports -w .
 
 .PHONY: build-assets
-## Prepare static assets for embedding in compiled binary
+## BUILD: Prepare static assets for embedding in compiled binary
 build-assets:
-	go get -u github.com/gobuffalo/packr/v2/packr2
+	go get github.com/gobuffalo/packr/v2/packr2
 	(cd pkg/web && packr2 clean && packr2)
 
 .PHONY: compile-datamon
-## Build datamon executable on local OS
 compile-datamon: export LDFLAGS=${BASE_LD_FLAGS} ${VERSION_LD_FLAGS}
 compile-datamon: build-assets
-	@echo 'building ${YELLOW}datamon${RESET} executable'
-	@echo "${VERSION_LD_FLAGS}"
-	@echo "${LDFLAGS}"
-	go build -o $(TARGET) --ldflags "${LDFLAGS}" ./cmd/datamon
+	@echo '$(GREEN)INFO: building ${YELLOW}datamon${GREEN} executable$(RESET)'
+	@if [[ -z "$(TARGET)" ]] ; then echo "You must specify a TARGET" && exit 1; fi
+	go build -o $(TARGET) -ldflags "${LDFLAGS}" ./cmd/datamon
 
 .PHONY: build-datamon-local
-## DEMO: Build datamon executable in-place for local os.  Goes with internal operationalization demos.
-build-datamon-local: export TARGET=cmd/datamon/datamon
+## BUILD: Build datamon executable for local os
+build-datamon-local: export TARGET=out/datamon
 build-datamon-local:
+	@mkdir -p out
 	$(MAKE) compile-datamon
 
+
 .PHONY: build-datamon-mac
-## Build datamon executable for mac os x (on mac os x)
+## BUILD: Build local datamon executable for mac os x in ./out directory (on mac os x)
 build-datamon-mac: export TARGET=out/datamon.mac
 build-datamon-mac:
 	@mkdir -p out
 	$(MAKE) compile-datamon
 
-.PHONY: build-all
-## Build all the containers
-build-all: clean build-datamon build-migrate
+.PHONY: cross-compile-binaries
+## BUILD: Build all binaries with cross compilation for linux and darwin platforms
+cross-compile-binaries: export TARGET=out/bin
+cross-compile-binaries: export OS=linux darwin
+cross-compile-binaries: export ARCH=amd64
+cross-compile-binaries: export LDFLAGS=${BASE_LD_FLAGS} ${VERSION_LD_FLAGS}
+cross-compile-binaries: build-assets
+	@TOOLS=github.com/mitchellh/gox $(MAKE) ensure-gotools
+	@mkdir -p ${TARGET}
 
-.PHONY: build-migrate
-## Build migrate tool
-build-migrate: export BUILD_TARGET=reg.onec.co/migrate
-build-migrate: export DOCKERFILE=migrate.Dockerfile
-build-migrate: export BUILD_ARGS=--pull
-build-migrate: export TAGS=$(USER_TAG) $(BRANCH_TAG)
-build-migrate:
-	$(MAKE) build-target
+	# Ref: https://github.com/mitchellh/gox/issues/55 for CGO_ENABLED=0
+	CGO_ENABLED=0 gox -os "${OS}" -arch "${ARCH}" -tags netgo -output "${TARGET}/{{.Dir}}_{{.OS}}_{{.Arch}}" -ldflags "${LDFLAGS}" ./...
+
+	@if [[ -n "${UPX_FOR_OSX}" ]]; then \
+		echo "INFO: compressing all binaries" && \
+		upx ${TARGET}/* ; \
+	elif [[ -n "${UPX_VERSION}" ]] ; then \
+	  echo "INFO: compressing linux binaries only. Install upx >=3.96 to compress darwin binaries" && \
+		upx ${TARGET}/*_linux_* ; \
+	else \
+	  echo "WARN:: upx not available in this environment. Binaries not compressed." ; \
+	fi
+
+.PHONY: build-and-push-datamon-builder
+## BUILD: Build new base builder image for CI jobs
+build-and-push-datamon-builder:
+	$(BUILDER) -t $(REPOSITORY)/datamon-builder:${BASEVERSION} - < dockerfiles/builder.Dockerfile
+	docker tag $(REPOSITORY)/datamon-builder:${BASEVERSION} $(REPOSITORY)/datamon-builder:latest
+
+	docker push $(REPOSITORY)/datamon-builder:${BASEVERSION}
+	docker push $(REPOSITORY)/datamon-builder:latest
 
 .PHONY: setup
-## Setup for testing
+## TEST: Setup for local testing (install minio container)
 setup: install-minio
 
 .PHONY: install-minio
-## Run minio locally for tests
+## TEST: Run minio locally for tests
 install-minio:
 	@docker run --name minio-test -d \
 	-p 9000:9000  \
@@ -171,47 +230,64 @@ install-minio:
 	minio/minio server /data > /dev/null
 
 .PHONY: install-minio-k8s
-## Install minio in local kubernetes
+## TEST: Install minio in local kubernetes
 install-minio-k8s:
 	kubectl --context $(LOCAL_KUBECTX) create -f ./k8s/minio.yaml
 
 .SILENT: clean
-## Clean up post running tests
+## TEST: Clean up post running tests
 clean:
-	-rm -rf testdata 2>&1 | true
+	-rm -rf testdata out
 	-docker stop minio-test 2>&1 | true
 	-docker rm minio-test 2>&1 | true
 
+CI_NS=datamon-ci
+
+.PHONY: clean-pg-demo
+## TEST: Ensure k8s pg sidecar demo resources are relinquished (used by CI)
+clean-pg-demo:
+	kubectl -n $(CI_NS) delete deployment datamon-pg-demo-$(RELEASE_TAG) || true
+	kubectl -n $(CI_NS) get configmaps -l app=datamon-coord-pg-demo --output custom-columns=NAME:.metadata.name|\
+	grep $(RELEASE_TAG)|while read -r config ; do kubectl -n $(CI_NS) delete configmap $${config} ; done
+
+# TODO(fred): there are some secrets etc to be removed too
+
+.PHONY: clean-fuse-demo
+## TEST: Ensure k8s fuse sidecar demo resources are relinquished (used by CI)
+clean-fuse-demo:
+	kubectl -n $(CI_NS) delete deployment datamon-fuse-demo-$(RELEASE_TAG) || true
+	kubectl -n $(CI_NS) get configmaps -l app=datamon-coord-fuse-demo --output custom-columns=NAME:.metadata.name|\
+	grep $(RELEASE_TAG)|while read -r config ; do kubectl -n $(CI_NS) delete configmap $${config} ; done
+
+.PHONY: clean-all-demo
+## TEST: Ensure all k8s sidecar demo resources are relinquished (manual use)
+clean-all-demo:
+	kubectl -n $(CI_NS) delete deployments --all
+	kubectl -n $(CI_NS) delete configmaps --all
+
 .PHONY: test
-## Setup, run all tests and clean
+## TEST: Setup, run all tests and clean
 test: clean setup runtests clean
 
 .PHONY: mocks
-## Generate mocks for unit testing
+## TEST: Generate mocks for unit testing
 mocks:
+	@TOOLS=github.com/matryer/moq@latest $(MAKE) ensure-gotools
 	@hack/go-generate.sh
 
 .PHONY: runtests
 runtests: mocks
-	@go test ./...
+	@TOOLS=gotest.tools/gotestsum@latest $(MAKE) ensure-gotools
+	@gotestsum --format short-with-failures -- -timeout 15m -cover -covermode atomic ./...
 
-.PHONY: gofmt
-## Run gofmt on the cmd and pkg packages
-gofmt:
-	@gofmt -s -w ./cmd ./pkg ./internal ./hack/fuse-demo
-
-.PHONY: goimports
-## Run goimports on the cmd and pkg packages
-goimports:
-	@goimports -w ./cmd ./pkg ./hack/fuse-demo
-
-.PHONY: check
-## Runs static code analysis checks (golangci-lint)
-check: gofmt goimports
-	@golangci-lint run --build-tags fuse_cli --max-same-issues 0 --verbose
+.PHONY: lint
+## TEST: Runs static code analysis checks (golangci-lint)
+lint: gofmt goimports
+	TOOLS=github.com/golangci/golangci-lint/cmd/golangci-lint $(MAKE) ensure-gotools
+	@golangci-lint run --verbose
 
 .PHONY: profile-metrics
-## Build the metrics collection binary and write output
+## TEST: Build the metrics collection binary and write output
 profile-metrics:
 	@mkdir -p out/metrics
 	@go build -o out/metrics/metrics.out ./cmd/metrics
@@ -228,74 +304,134 @@ profile-metrics:
 		out/metrics/mem.prof \
 		out/metrics
 
+.PHONY: lint-scripts
+## TEST: Scan all shells in repo, excluding zsh which is not linted
+lint-scripts:
+	@(cd $(GIT_HOME) && find . -name \*.sh|\
+		while read -r arg ;do script=$$(head -1q "$${arg}"); \
+		  if [[ ! $${script} =~ "zsh" ]] ; then echo "$${arg}"; fi; \
+		done|\
+		xargs shellcheck && \
+	echo "INFO: shell scripts linted ok (zsh not scanned)")
+
+.PHONY: lint-zsh
+## TEST: Experimental shell linting: shellcheck v0.7 evaluates zsh as bash, using --shell=bash: informative output only for now
+lint-zsh:
+	@(cd $(GIT_HOME) && \
+	docker run -v $$(pwd):/mnt koalaman/shellcheck:latest --shell=bash $$(find . -name \*.sh))
+
+.PHONY: build-and-push-sidecar-base
+## SIDECAR: Build new base images for sidecars and upload them to gcr.io repository
+BASEVERSION=$(shell date +%Y%m%d)
+build-and-push-sidecar-base:
+	$(BUILDER) --build-arg VERSION=${BASEVERSION} -t $(REPOSITORY)/datamon-sidecar-base:${BASEVERSION} - < dockerfiles/sidecar-base.Dockerfile
+	docker tag $(REPOSITORY)/datamon-sidecar-base:${BASEVERSION} $(REPOSITORY)/datamon-sidecar-base:latest
+
+	$(BUILDER) --build-arg VERSION=${BASEVERSION} -t $(REPOSITORY)/datamon-pgsidecar-base:${BASEVERSION} - < dockerfiles/pgsidecar-base.Dockerfile
+	docker tag $(REPOSITORY)/datamon-pgsidecar-base:${BASEVERSION} $(REPOSITORY)/datamon-pgsidecar-base:latest
+
+	docker push $(REPOSITORY)/datamon-sidecar-base:${BASEVERSION}
+	docker push $(REPOSITORY)/datamon-sidecar-base:latest
+	docker push $(REPOSITORY)/datamon-pgsidecar-base:${BASEVERSION}
+	docker push $(REPOSITORY)/datamon-pgsidecar-base:latest
+
 ### k8s demos
-
-# todo: scripts to datamon-fuse-sidecar Docker img, lint to CI
-.PHONY: lint-init-scripts
-## DEMO: build shell container used in fuse demo
-fuse-demo-lint-init-scripts:
-	shellcheck hack/fuse-demo/wrap_application.sh
-
-.PHONY: fuse-demo-build-shell
-## DEMO: build shell container used in fuse demo
-fuse-demo-build-shell: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-shell
-fuse-demo-build-shell: export DOCKERFILE=hack/fuse-demo/shell.Dockerfile
-fuse-demo-build-shell: export BUILD_ARGS=
-fuse-demo-build-shell: export TAGS=latest
-fuse-demo-build-shell:
-	$(MAKE) build-target
-	$(MAKE) push-target
-
-.PHONY: fuse-demo-build-sidecar
-## DEMO: build sidecar container used in fuse demo
-fuse-demo-build-sidecar: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-sidecar
-fuse-demo-build-sidecar: export DOCKERFILE=hack/fuse-demo/sidecar.Dockerfile
-fuse-demo-build-sidecar: export BUILD_ARGS=
-fuse-demo-build-sidecar: export TAGS=latest
-fuse-demo-build-sidecar: build-and-push-fuse-sidecar
-	$(MAKE) build-target
-	$(MAKE) push-target
-
 .PHONY: fuse-demo-ro
-## DEMO: demonstrate a fuse read-only filesystem
+## DEMO: Demonstrate a fuse read-only filesystem on kubernetes
 fuse-demo-ro: fuse-demo-build-shell fuse-demo-build-sidecar
 	@./hack/fuse-demo/create_ro_pod.sh
 	@./hack/fuse-demo/run_shell.sh
 
+.PHONY: fuse-demo-build-shell
+## DEMO: Build shell container used in fuse demo
+fuse-demo-build-shell: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-shell
+fuse-demo-build-shell: export DOCKERFILE=hack/fuse-demo/shell.Dockerfile
+fuse-demo-build-shell: export BUILD_ARGS=--build-arg VERSION=$(SIDECAR_BASE_VERSION)
+fuse-demo-build-shell: export TAGS=latest $(RELEASE_TAG) $(USER_TAG) $(BRANCH_TAG)
+fuse-demo-build-shell:
+	$(MAKE) build-target
+	$(MAKE) push-target
+
 .PHONY: fuse-demo-coord-build-app
-## DEMO: build shell container used in fuse demo
+## DEMO: Build shell container used in fuse demo: mock application using fuse mount
 fuse-demo-coord-build-app: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-coord-app
 fuse-demo-coord-build-app: export DOCKERFILE=hack/fuse-demo/coord-app.Dockerfile
-fuse-demo-coord-build-app: export BUILD_ARGS=
-fuse-demo-coord-build-app: export TAGS=latest
+fuse-demo-coord-build-app: export BUILD_ARGS=--build-arg VERSION=$(SIDECAR_BASE_VERSION)
+fuse-demo-coord-build-app: export TAGS=latest $(RELEASE_TAG) $(USER_TAG) $(BRANCH_TAG)
 fuse-demo-coord-build-app:
 	$(MAKE) build-target
 	$(MAKE) push-target
 
-.PHONY: fuse-demo-coord-build-datamon
-## DEMO: build shell container used in fuse demo
-fuse-demo-coord-build-datamon: export BUILD_TARGET=$(REPOSITORY)/datamon-fuse-demo-coord-datamon
-fuse-demo-coord-build-datamon: export DOCKERFILE=hack/fuse-demo/coord-datamon.Dockerfile
-fuse-demo-coord-build-datamon: export BUILD_ARGS=
-fuse-demo-coord-build-datamon: export TAGS=latest
-fuse-demo-coord-build-datamon: export SERIALIZED_INPUT_FILE=hack/fuse-demo/gen/fuse-params.yaml
-fuse-demo-coord-build-datamon:
-	@go run hack/fuse-demo/write_fuse_params.go
-	$(MAKE) build-target
-	$(MAKE) push-target
-
 .PHONY: pg-demo-coord-build-app
-## DEMO: build shell container used in fuse demo
+## DEMO: Build shell container used in postgres demo: mock application using postgres
 pg-demo-coord-build-app: export BUILD_TARGET=$(REPOSITORY)/datamon-pg-demo-coord-app
 pg-demo-coord-build-app: export DOCKERFILE=hack/fuse-demo/coord-app-pg.Dockerfile
-pg-demo-coord-build-app: export BUILD_ARGS=
-pg-demo-coord-build-app: export TAGS=latest
+pg-demo-coord-build-app: export BUILD_ARGS=--build-arg VERSION=$(SIDECAR_BASE_VERSION)
+pg-demo-coord-build-app: export TAGS=latest $(RELEASE_TAG) $(USER_TAG) $(BRANCH_TAG)
 pg-demo-coord-build-app:
 	$(MAKE) build-target
 	$(MAKE) push-target
 
+.PHONY: release-all-docker
+## RELEASE: Push all containers to be released
+release-all-docker: build-datamon build-migrate build-wrapper push-datamon push-migrate push-wrapper build-and-push-fuse-sidecar build-and-push-pg-sidecar build-and-push-datamover
+
+.PHONY: build-alpine-base
+## RELEASE: Build local base datamon container on alpine linux
+build-alpine-base: export BUILD_TARGET=$(LOCALREPO)/datamon-alpine-base
+build-alpine-base: export DOCKERFILE=dockerfiles/alpine-base.Dockerfile
+build-alpine-base: export BUILD_ARGS=$(VERSION_ARGS)
+build-alpine-base: export TAGS=
+build-alpine-base:
+	$(MAKE) build-target
+
+.PHONY: build-datamon
+## RELEASE: Build datamon docker container to be released
+build-datamon: export BUILD_TARGET=$(REPOSITORY)/datamon
+build-datamon: export DOCKERFILE=dockerfiles/datamon.Dockerfile
+build-datamon: export BUILD_ARGS=$(VERSION_ARGS)
+build-datamon: export TAGS=latest $(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
+build-datamon: build-alpine-base
+	$(MAKE) build-target
+
+.PHONY: push-datamon
+## RELEASE: Push released datamon container
+push-datamon:
+	docker push $(REPOSITORY)/datamon:${RELEASE_TAG}
+	docker push $(REPOSITORY)/datamon:latest
+
+.PHONY: build-migrate
+## RELEASE: Build container for the migrate tool
+build-migrate: export BUILD_TARGET=$(REPOSITORY)/migrate
+build-migrate: export DOCKERFILE=dockerfiles/migrate.Dockerfile
+build-migrate: export BUILD_ARGS=$(VERSION_ARGS)
+build-migrate: export TAGS=latest $(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
+build-migrate: build-alpine-base
+	$(MAKE) build-target
+
+.PHONY: push-migrate
+## RELEASE: Push released migrate container
+push-migrate:
+	docker push $(REPOSITORY)/migrate:${RELEASE_TAG}
+	docker push $(REPOSITORY)/migrate:latest
+
+.PHONY: build-wrapper
+## RELEASE: Build application wrapper for ARGO workflows
+build-wrapper: export BUILD_TARGET=$(REPOSITORY)/datamon-wrapper
+build-wrapper: export DOCKERFILE=dockerfiles/wrapper.Dockerfile
+build-wrapper: export BUILD_ARGS=
+build-wrapper: export TAGS=latest $(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
+build-wrapper:
+	$(MAKE) build-target
+
+.PHONY: push-wrapper
+## RELEASE: Push released wrapper container
+push-wrapper:
+	docker push $(REPOSITORY)/datamon-wrapper:${RELEASE_TAG}
+	docker push $(REPOSITORY)/datamon-wrapper:latest
+
 .PHONY: release
-## Cut a new release. Example: make release TAG=v1.0.6
+## RELEASE: Cut a new release. Example: make release TAG=v1.0.6
 release:
 	@if [[ -z "$(TAG)" ]] ; then echo "Must have arg: TAG=vX.Y.Z" && exit 1 ;fi
 	@git tag -a -m "datamon release ${TAG}" ${TAG}
@@ -305,3 +441,4 @@ release:
 # * atm git tags are not signed
 # TODO:
 # * [ ] bind this with git-chglog or similar
+# * [ ] release dry-run on alternate upstream

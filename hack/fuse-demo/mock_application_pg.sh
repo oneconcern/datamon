@@ -1,103 +1,94 @@
-#! /bin/zsh
-
-setopt ERR_EXIT
-setopt PIPE_FAIL
-
-### data-science application placeholder/mock
-# this program is a stand-in for a data-science application
+#! /bin/bash
 #
-# todo: sandbox poc python (sqla/pandas) use rather than psql
+# mocked up application interacting with many databases run by sidecar datamon containers
+#
+# Scenario:
+# - db1:5430: a fresh database is initialized, the app writes in it, then it is uploaded to datamon
+# - db2:5429: an existing database is retrieved and spun up, the app reads in it, carries out some changes, then it is uploaded to datamon
+# - db3:5428: a existing database is retrieved and spun, the app reads in it, then it is thrown away
+#
+# This program is a stand-in for a data-science application interacting with postgres db
 
-OUTPUT_PG_PORT="$1"
-INPUT_PG_PORT="$2"
-SOME_CONST="$3"
-IS_INIT="$4"
+set -e -o pipefail
 
-usage() {
-    print -- 'usage: ' \
-          './mock_application_pg.sh input-pg-port ouput-pg-port some-const is-init' \
-          1>&2
-    exit 1
+trim () {
+  local var="$*"
+  # remove leading whitespace characters
+  var="${var#"${var%%[![:space:]]*}"}"
+  # remove trailing whitespace characters
+  var="${var%"${var##*[![:space:]]}"}"
+  echo -n "$var"
 }
 
-if [ -z "$OUTPUT_PG_PORT" ]; then
-    usage
-fi
-if [ -z "$INPUT_PG_PORT" ]; then
-    usage
-fi
-if [ -z "$SOME_CONST" ]; then
-    usage
-fi
-if [[ ! $IS_INIT = true && ! $IS_INIT = false  ]]; then
-    usage
-fi
-
-# convention from sidecar is to create provide initial postgres su
-PG_SU=postgres
-
+# convention from sidecar is to create provide initial postgres user.
 # other pg users and setup are the responsibility of the application
-PG_U=testpguser
-PG_DB=testdb
+PG_SU=postgres
+PG_OWNER=dbuser
+ds1=(5430 "${PG_SU}") # access server with postgres user
+ds11=(5430 "${PG_OWNER}") # access server with db owner user
+ds2=(5429 "${PG_SU}")
+ds3=(5428 "${PG_SU}")
+
+# with some db names
+db1=("${ds11[@]}" scratch)
+db2=("${ds2[@]}" updatable)
+db22=("${ds2[@]}" alternative)  # 2 databases on same server
+db3=("${ds3[@]}" readonly)
 
 run_sql() {
-    sql_str=$1
-    my_pg_port=$2
-    if [[ -z $my_pg_port ]]; then
-        my_pg_port=$OUTPUT_PG_PORT
-    fi
-    print -- "$sql_str" | psql -h localhost -p $my_pg_port -U ${PG_U} ${PG_DB}
+  sql_str=$1
+  pg_port=$2
+  pg_u=$3
+  pg_db=$4 # opt-in
+  psql -c "${sql_str}" -h localhost --tuples-only -p "${pg_port}" -U "${pg_u}" "${pg_db}"
 }
 
-# aside: postgres defaults to UNIX (filesystem)
-# socket at /var/run/postgresql/*,
-# not IP (network) socket, so it's the client's responsibility
-# to ensure that the conn is opened at the network location
+#
+# When the app starts, all sidecars have finished their startup phase: all db are available
+# let's verify that
+pg_isready -h localhost -p "${ds1[0]}"
+pg_isready -h localhost -p "${ds2[0]}"
+pg_isready -h localhost -p "${ds3[0]}"
 
-print -- '*** setting up role'
+# Carry out some updates on db1
+echo "*** 1. Setting up a database (superuser: ${PG_SU}, db owner: ${PG_OWNER})"
+run_sql "CREATE DATABASE scratch WITH OWNER ${PG_OWNER};" "${ds1[@]}"
 
-print -- "CREATE ROLE ${PG_U} WITH LOGIN CREATEDB;
-CREATE DATABASE ${PG_DB} WITH OWNER ${PG_U};" | \
-    psql -h localhost -p $OUTPUT_PG_PORT -U $PG_SU
+echo "*** 2. Creating some schema objects in database \"scratch\""
+run_sql 'CREATE TABLE tabla_e (id serial PRIMARY KEY, an_idx integer);' "${db1[@]}"
+for idx in $(seq 1 2 9); do
+  run_sql "INSERT INTO tabla_e (an_idx) VALUES (${idx});" "${db1[@]}"
+done
 
-print -- '*** creating schema'
-
-run_sql 'CREATE TABLE tabla_e (
-  id serial PRIMARY KEY,
-  an_idx integer
-);'
-
-get_tabla_idx_vals_with_const() {
-    print 'select an_idx from tabla_e;' | \
-        psql -h localhost -p $INPUT_PG_PORT -U $PG_U $PG_DB | \
-        awk '
-BEGIN { on_row = 0 }
-$0 ~ /^\(/ {if(on_row) {on_row = 0}}
-{if(on_row) {print $1;}}
-$0 ~ /^----/ { on_row = 1 }
-' | \
-        awk "{print "'$1'" + $SOME_CONST }"
-}
-
-initdb() {
-    print -- "initializing database"
-    for idx in $(seq 1 2 9); do
-        run_sql "INSERT INTO tabla_e (an_idx) VALUES (${idx}) RETURNING id;"
-    done
-}
-
-updatedb() {
-    print -- "updating database"
-    for idx in $(get_tabla_idx_vals_with_const); do
-        print -- "adding index $idx to output table"
-        run_sql "INSERT INTO tabla_e (an_idx) VALUES (${idx}) RETURNING id;"
-    done
-}
-
-print -- '*** adding values to db'
-
-if $IS_INIT; then
-    initdb
-else
-    updatedb
+echo "*** 3. Carry out some queries against db2.updatable (already populated from bundle frozen in this state)"
+rows=$(run_sql 'SELECT count(*) FROM tabla_f;' "${db2[@]}")  # this table doesn't change over runs
+if [[ "$(trim "${rows}")" != "3" ]] ; then
+  echo "expected 3 rows in db2.tabla_f but got: $(trim "${rows}")"
+  exit 1
 fi
+
+echo "*** 4. Carry out some queries against alternate database on db2.alternative (already populated from bundle frozen in this state)"
+rows=$(run_sql 'SELECT count(*) FROM tabla_g;' "${db22[@]}")  # this table doesn't change over runs
+if [[ "$(trim "${rows}")" != "4" ]] ; then
+  echo "expected 4 rows in db22.tabla_g but got: $(trim "${rows}")"
+  exit 1
+fi
+
+echo "*** 5. Now updating db2.updatable: this change is going to be saved in a new bundle"
+for idx in $(seq 1 2 9); do
+  run_sql "INSERT INTO tabla_e (an_idx) VALUES (${idx});" "${db2[@]}"
+done
+
+echo "*** 6. Carry out some queries against db3 (already populated from bundle frozen in this state)"
+rows=$(run_sql 'SELECT count(*) FROM tabla_f;' "${db3[@]}")  # this table doesn't change over runs
+if [[ "$(trim "${rows}")" != "3" ]] ; then
+  echo "expected 3 rows in db3.tabla_f but got: $(trim "${rows}")"
+  exit 1
+fi
+
+echo "*** 7. Now updating db3: this change is going to be thrown away"
+for idx in $(seq 1 2 9); do
+  run_sql "INSERT INTO tabla_f (msg) VALUES ('message ""${idx}""');" "${db3[@]}"
+done
+
+echo "*** 8. Now exiting: the application wrapper takes over and saves all databases but db3"

@@ -14,31 +14,24 @@ dbg_print() {
 }
 
 ### verify the result of the simulated Argo container coordination
-# this is a programmatic test on the results of running the container coordiation demo
+# this is a programmatic test on the results of running the container coordination demo
 
-DATAMON_EXEC=./cmd/datamon/datamon
+DATAMON_EXEC=/usr/bin/datamon
 COORD_VERIFY_PATH=/tmp/coordverify
 DATAMON_REPO=ransom-datamon-test-repo
+NS=datamon-ci
 
+# this is a timing taken on the pod, not locally
 start_timestamp=$(cat /tmp/datamon_fuse_demo_coord_start_timestamp)
 
 verify_datamon_timestamp() {
     timestamp="$1"
-    timestamp_to_parse=$(echo "$timestamp" | sed 's/\.[^ ]*//g' | sed 's/ *[^ ]*$//')
-
-    print -- "timestamp_to_parse $timestamp_to_parse"
-
-    if [[ -z $GCLOUD_SERVICE_KEY ]]; then
-        # not in ci.  use freebsd date (default on os x).
-        epoch_timestamp=$(date -jf '%Y-%m-%d %H:%M:%S %z' "$timestamp_to_parse" '+%s')
-    else
-        # in ci.  use gnu date.
-        epoch_timestamp=$(date --date="$timestamp_to_parse" '+%s')
-    fi
+    epoch_timestamp="$(go run ./hack/fuse-demo/parse_timestamp.go "${timestamp}")"
     sec_from_start=$((${epoch_timestamp} - ${start_timestamp}))
     #
-    dbg_print "timestamp ${timestamp}"
-    dbg_print "timestamp_to_parse $timestamp_to_parse epoch_timestamp $epoch_timestamp sec_from_start ${sec_from_start}"
+    dbg_print "timestamp ${timestamp} => ${epoch_timestamp}"
+    dbg_print "start_timestamp ${start_timestamp}"
+    dbg_print "timestamp_to_parse $timestamp_to_parse epoch_timestamp $epoch_timestamp -- sec_from_start ${sec_from_start}"
     if [ ! "$sec_from_start" -gt 0 ]; then
         print -- ${sec_from_start}
         echo 'label timestamp not after demo start' 1>&2
@@ -93,8 +86,9 @@ if [[ -e $BUNDLE_ID_FILE ]]; then
     print 'removing stale bundleid file'
     rm $BUNDLE_ID_FILE
 fi
-pod_name=$(kubectl get pods -l app=datamon-coord-demo | grep Running | sed 's/ .*//')
-kubectl cp $pod_name:/tmp/bundleid.txt $BUNDLE_ID_FILE -c datamon-sidecar
+SIDECAR_TAG=$(go run ./hack/release_tag.go)
+pod_name=$(kubectl -n $NS  get pods -l app=datamon-coord-fuse-demo,instance="${SIDECAR_TAG}" | grep Running | sed 's/ .*//')
+kubectl -n $NS cp $pod_name:/tmp/bundleid.txt $BUNDLE_ID_FILE -c datamon-sidecar
 HASH_FROM_SIDECAR_OUTPUT=$(cat $BUNDLE_ID_FILE | tr -d ' ')
 rm $BUNDLE_ID_FILE
 

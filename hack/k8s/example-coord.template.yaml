@@ -1,66 +1,113 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datamon-fuse-local-config-$SIDECAR_TAG
+  labels:
+    app: datamon-coord-fuse-demo
+data:
+  # the buckets configuration (context) for datamon
+  datamon.yaml: |
+    config: datamon-config-test-sdjfhga
+    context: datamon-sidecar-test
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datamon-fuse-params-$SIDECAR_TAG
+  labels:
+    app: datamon-coord-fuse-demo
+data:
+  fuse-params.yaml: |
+    globalOpts:
+      sleepInsteadOfExit: true
+      coordPoint: /tmp/coord
+      # The ones below are no more used (see datamon.yaml above) but kept because of sidecar_param requirements
+      configBucketName: datamon-config-test-sdjfhga
+      contextName: datamon-sidecar-test
+    bundles:
+      - name: src
+        srcPath: /tmp/mount
+        srcRepo: ransom-datamon-test-repo
+        srcLabel: testlabel
+        srcBundle: ""
+        destPath: ""
+        destRepo: ""
+        destMessage: ""
+        destLabel: ""
+        destBundleID: ""
+      - name: dest
+        srcPath: ""
+        srcRepo: ""
+        srcLabel: ""
+        srcBundle: ""
+        destPath: /tmp/upload
+        destRepo: ransom-datamon-test-repo
+        destMessage: result of container coordination demo
+        destLabel: coordemo
+        destBundleID: /tmp/bundleid.txt
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: datamon-coord-demo
+  name: $DEPLOYMENT_NAME
+  namespace: $NS
 spec:
   selector:
     matchLabels:
-      app: datamon-coord-demo
+      app: datamon-coord-fuse-demo
+      instance: $SIDECAR_TAG
   replicas: 1
   template:
     metadata:
       labels:
-        app: datamon-coord-demo
+        app: datamon-coord-fuse-demo
+        instance: $SIDECAR_TAG
     spec:
       initContainers:
       - name: init-application-wrap
-        image: gcr.io/onec-co/datamon-fuse-demo-coord-datamon:latest
+        image: "gcr.io/onec-co/datamon-wrapper:$SIDECAR_TAG"
         imagePullPolicy: "$PULL_POLICY"
-
-        command: ["sh", "-c",
-        "mkdir /tmp/coord/.scripts; cp wrap_application.sh /tmp/coord/.scripts/wrap_application.sh; chmod a+x /tmp/coord/.scripts/wrap_application.sh; echo 'placed application wrapper'"]
-
-        stdin: true
-        tty: true
+        command: ["sh", "-c", "cp -a /.scripts/* /scripts"]
         volumeMounts:
-        - mountPath: /tmp/coord
-          name: container-coord
+        - mountPath: /scripts
+          name: application-wrapper
+
       containers:
       - name: demo-app
-        image: gcr.io/onec-co/datamon-fuse-demo-coord-app:latest
+        image: "gcr.io/onec-co/datamon-fuse-demo-coord-app:$SIDECAR_TAG"
         imagePullPolicy: "$PULL_POLICY"
-
-        # command: ["/bin/tini"]
-        # args: ["--", "/bin/zsh"]
-
-        command: ["/tmp/coord/.scripts/wrap_application.sh"]
-        args: ["-s", "-c", "/tmp/coord", "-b", "fuse", "--",
-        "./mock_application.sh",
-        "/tmp/mount",
-        "/tmp/upload"]
-        stdin: true
-        tty: true
+        command: ["/scripts/wrap_application.sh"]
+        args:
+        - "-s"  # this flag is for debug only: it makes the wrapper sleep forever
+        - "-c"  # specifies the location for coordination messages
+        - "/tmp/coord"
+        - "-b"  # specifies the coordination type used (fuse|postgres), each type following a specific coordination scheme
+        - "fuse"
+        - "--"
+        - "mock_application.sh"
+        - "/tmp/mount"   # volume where the database is mounted
+        - "/tmp/upload"  # staging area to upload
         volumeMounts:
-        - mountPath: /tmp/upload
-          name: upload-source
+        - mountPath: /scripts
+          name: application-wrapper
         - mountPath: /tmp/coord
           name: container-coord
+        - mountPath: /tmp/upload
+          name: upload-source
         - mountPath: /tmp/mount
           name: fuse-mountpoint
           mountPropagation: "HostToContainer"
+
       - name: datamon-sidecar
-        image: gcr.io/onec-co/datamon-fuse-demo-coord-datamon:latest
+        image: "gcr.io/onec-co/datamon-fuse-sidecar:$SIDECAR_TAG"
         imagePullPolicy: "$PULL_POLICY"
-
-        # command: ["/bin/tini"]
-        # args: ["--", "/bin/zsh"]
-
-        command: ["./wrap_datamon.sh"]
+        command: ["wrap_datamon.sh"]
         args: []
         securityContext:
           privileged: true
-        stdin: true
-        tty: true
         volumeMounts:
         - mountPath: /tmp/upload
           name: upload-source
@@ -71,22 +118,34 @@ spec:
           mountPropagation: "Bidirectional"
         - mountPath: /tmp/gac
           name: google-application-credentials
+        - mountPath: /config
+          name: fuse-params
+        - mountPath: /home/developer/.datamon2
+          name: datamon-config
         env:
-
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /tmp/gac/google-application-credentials.json
-
         - name: dm_fuse_params
-          value: /fuse-params.yaml
+          value: /config/fuse-params.yaml
 
 
       volumes:
       - name: fuse-mountpoint
         emptyDir: {}
+      - name: application-wrapper
+        emptyDir: {}
       - name: container-coord
         emptyDir: {}
       - name: upload-source
         emptyDir: {}
+      - name: fuse-params
+        configMap:
+          name: datamon-fuse-params-$SIDECAR_TAG
+          defaultMode: 0555
+      - name: datamon-config
+        configMap:
+          name: datamon-fuse-local-config-$SIDECAR_TAG
+          defaultMode: 0555
       - name: google-application-credentials
         secret:
           secretName: google-application-credentials

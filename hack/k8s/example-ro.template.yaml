@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: datamon-ro-demo
+  namespace: datamon-ci
 spec:
   selector:
     matchLabels:
