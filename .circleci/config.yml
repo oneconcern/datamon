@@ -606,6 +606,15 @@ workflows:
           context: "OC Common"
           requires:
             - go_lint
+            - push_base
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+
+      - push_base:
+          context: "OC Common"
           filters:
             tags:
               only: /.*/
