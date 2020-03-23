@@ -39,7 +39,9 @@ Only contains the coordination wrapper script to use with datamon sidecars (Bour
 
 ## Base images
 
-Base images updated every week. Notice that these updates are not picked automatically to build released images.
+Base images updated at every PR run (when PRs are more frequent, consider moving this back to a weekly CI cronjob).
+
+Notice that these updates are not picked automatically to build released images.
 This is on purpose: we don't want to propagate dependency updates untested (e.g. new postgres releases).
 
 Sidecar building base:
@@ -52,7 +54,7 @@ pg sidecar building base:
 ## CI builder image
 
 Our CI is largely using a pre-baked docker executor based on circle convenience image `cimg/go`.
-This is updated every week and CI always runs on the latest image.
+This is updated at every PR run. CI always runs on the latest image (when PRs are more frequent, consider moving this back to a weekly CI cronjob).
 
 Notice that at the moment `cimgo/go` doesn't have a `latest` tag, so we are left with specifying the go version
 explicitly (now `1.14`).
