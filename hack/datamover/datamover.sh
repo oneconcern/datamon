@@ -101,9 +101,8 @@ fi
 dir_path_abs=$(cd $dir_path_param && pwd)
 
 if [[ ! -f $HOME/.datamon/datamon.yaml ]]; then
-    datamon config create \
-            --name 'ransom' \
-            --email 'rwilliams@oneconcern.com'
+    # TODO: set proper context
+    datamon config create --context dev
 fi
 
 sed_param='s@\(.*\)@'"${dir_path_abs}"'\/\1@'

@@ -1,7 +1,7 @@
 #! /bin/zsh
 
 container_name=demo-shell
-
+NS=datamon-ci
 while getopts s opt; do
     case $opt in
         (s)
@@ -22,9 +22,9 @@ print -- "waiting on pod start"
 
 while [[ -z $pod_name ]]; do
     sleep "$STARTUP_POLL_INTERVAL"
-    pod_name=$(kubectl get pods -l app=datamon-ro-demo | grep Running | sed 's/ .*//')
+    pod_name=$(kubectl -n $NS get pods -l app=datamon-ro-demo | grep Running | sed 's/ .*//')
 done
 
-kubectl exec -it "$pod_name" \
+kubectl -n $NS exec -it "$pod_name" \
         -c "$container_name" \
         -- "/bin/zsh"

@@ -24,16 +24,14 @@ dbg_print() {
 ### datamon wrapper (demo)
 # half of the container coordination sketch, a script like this one
 # is meant to wrap datamon in the sidecar container of an Argo DAG node
-# and communciate with a script like wrap_application.sh.
+# and communicate with a script like wrap_application.sh.
 
 POLL_INTERVAL=1 # sec
+SIDECAR_PARAM_EXEC="/usr/bin/sidecar_param"
 
 #####
 
 typeset COORD_POINT
-
-typeset CONTEXT_BUCKET_NAME
-typeset CONTEXT_NAME
 
 SLEEP_INSTEAD_OF_EXIT=
 
@@ -52,7 +50,7 @@ if [[ -n $dm_fuse_params ]]; then
         dm_fuse_params_val=$dm_fuse_params
     fi
     print -- $dm_fuse_params_val | \
-        datamon_sidecar_param parse fuse > $env_vars_file
+        "$SIDECAR_PARAM_EXEC" parse fuse > $env_vars_file
     . $env_vars_file
 fi
 
@@ -82,10 +80,10 @@ deserialize_dict() {
     item_sep=$(print -- $input_str |sed 's/^\(.\).*$/\1/')
     kv_sep=$(print -- $input_str |sed 's/^.\(.\).*$/\1/')
     if [[ $item_sep = '.' ]]; then
-        terminate "'.' is not a valid parameter seperator"
+        terminate "'.' is not a valid parameter separator"
     fi
     if [[ $kv_sep = '.' ]]; then
-        terminate "'.' is not a valid parameter seperator"
+        terminate "'.' is not a valid parameter separator"
     fi
     input_val=$(print -- $input_str |sed 's/^..\(.*\)$/\1/')
     items=(${(ps.$item_sep.)input_val})
@@ -143,15 +141,6 @@ if [[ -n $opts_global_dict[c] ]]; then
 fi
 if [[ -n $opts_global_dict[S] ]]; then
     SLEEP_INSTEAD_OF_EXIT=true
-fi
-
-CONTEXT_BUCKET_NAME=$opts_global_dict[b]
-if [[ -z $CONTEXT_BUCKET_NAME ]]; then
-    terminate "config bucket not set"
-fi
-CONTEXT_NAME=$opts_global_dict[a]
-if [[ -z $CONTEXT_NAME ]]; then
-    terminate "context not set"
 fi
 
 typeset -a SIDECAR_VERTEX_IDS
@@ -294,9 +283,6 @@ emit_event() {
 }
 
 dbg_print "have zsh version $ZSH_VERSION"
-# todo: review use of this env variable in golang binary
-export DATAMON_GLOBAL_CONFIG=$CONTEXT_BUCKET_NAME
-dbg_print "set DATAMON_GLOBAL_CONFIG to '${DATAMON_GLOBAL_CONFIG}' for datamon binary"
 
 run_datamon_cmd() {
     typeset params_param
@@ -311,7 +297,6 @@ run_datamon_cmd() {
     print -l -- $params
     print -- '===='
 
-    params=($params --context $CONTEXT_NAME)
     print -- 'running datamon with params'
     print -- '===='
     print -l -- $params
@@ -320,20 +305,6 @@ run_datamon_cmd() {
     datamon $params
     return $?
 }
-
-unsetopt ERR_EXIT
-run_datamon_cmd 'context get'
-datamon_status=$?
-setopt ERR_EXIT
-if [[ $datamon_status -eq 2 ]]; then
-    1>&2 print -- "didn't find $CONTEXT_NAME in bucket $CONTEXT_BUCKET_NAME"
-    exit 1
-fi
-if [[ ! $datamon_status -eq 0 ]]; then
-    1>&2 print -- "context get failed for unknown reason"
-fi
-
-run_datamon_cmd 'config create'
 
 ## COORDINATION BEGINS by starting a datamon FUSE mount
 print -- "starting sources"
@@ -348,7 +319,7 @@ else
 fi
 
 typeset -a mount_points
-typeset -i mount_idxp
+typeset -i mount_idx
 typeset -a datamon_pids
 
 for dm_v_id in $SIDECAR_VERTEX_IDS; do
@@ -375,19 +346,10 @@ for dm_v_id in $SIDECAR_VERTEX_IDS; do
 
     dbg_print "running mount command '${mount_cmd_params}' (${mount_idx})"
     log_file_mount="/tmp/datamon_mount.${mount_idx}.log"
-    unsetopt ERR_EXIT
     run_datamon_cmd "$mount_cmd_params" 2>&1 > >(tee -a "$log_file_mount") 2>&1 &
-    datamon_status=$?
     datamon_pid=$!
-    setopt ERR_EXIT
     echo "started datamon '${mount_cmd_params}' with pid ${datamon_pid}"
 
-    if [[ ! $datamon_status -eq 0 ]]; then
-        print -- "error starting datamon ${mount_cmd}, try shell" 2>&1
-        cat "$log_file_mount" 2>&1
-        sleep 3600
-        exit 1
-    fi
     dbg_print "datamon status checks out okay"
     ((mount_idx++)) || true
     dbg_print "mount idx incremented"

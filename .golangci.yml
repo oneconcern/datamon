@@ -1,5 +1,7 @@
 run:
-  build-tags: fuse_cli
+  build-tags:
+  - fuse_cli
+  - fsintegration
 
 linters-settings:
   govet:

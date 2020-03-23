@@ -1,7 +1,7 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  namespace: dev
+  namespace: datamon-ci
   name: flood-pipeline
   labels:
     name: flood-pipeline

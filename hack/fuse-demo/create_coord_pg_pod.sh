@@ -1,66 +1,87 @@
-#! /bin/zsh
+#! /bin/bash
+#
+# A utility script to create a k8 pod with the pg demo app
+#
+# This script takes some parameters as env vars and expands this to create a k8 template
+# (e.g. a very simplified templating mechanism).
+#
+# Requires:
+#  - git
+#  - go
+#  - ncurses
+#  - kubectl
+#  - env GOOGLE_APPLICATION_CREDENTIALS set
 
-setopt ERR_EXIT
+set -e -o pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "${ROOT}/hack/fuse-demo" || exit 1
+# shellcheck disable=SC1091
+. ./consts_demo_pg.sh
+# shellcheck disable=SC1091
+. ./funcs_demo_pg.sh
 
-SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+EXPAND_CMD=(go run "${ROOT}/hack/envexpand.go")
+POD_TEMPLATE="${ROOT}/hack/k8s/example-coord-pg.template.yaml"
 
-OUTPUT_LABEL=pg-coord-example
-IS_INIT=false
-IGNORE_VERSION_MISMATCH=false
+if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
+	error_print "GOOGLE_APPLICATION_CREDENTIALS env variable not set" 1>&2
+  exit 1
+fi
 
-proj_root_dir="$(dirname "$(dirname "$SCRIPT_DIR")")"
-
-pull_policy=Always
-
-typeset -i SOME_CONST
-
-while getopts ioc: opt; do
+while getopts ot: opt; do
     case $opt in
-        (i)
-            OUTPUT_LABEL=pg-coord-example-input
-            IS_INIT=true
-            IGNORE_VERSION_MISMATCH=true
-            ;;
-        (o)
+        o)
             # local deploy
-            pull_policy=IfNotPresent
+            PULL_POLICY=IfNotPresent
             ;;
-        (c)
-            SOME_CONST="$OPTARG"
+        t)
+            SIDECAR_TAG="$OPTARG"
             ;;
-        (\?)
-            print Bad option, aborting.
+        *)
+            echo "Usage: create_coord_pg_pod.sh [-o][-t {tag}]"
+            echo
+            echo "-o               set image pull policy to IfNotPresent (e.g. for local cluster not authenticated to gcr.io registry)"
+            echo "-t               set image tag to deploy"
             exit 1
             ;;
     esac
 done
 (( OPTIND > 1 )) && shift $(( OPTIND - 1 ))
 
-if [[ -z $GOOGLE_APPLICATION_CREDENTIALS ]]; then
-	echo 'GOOGLE_APPLICATION_CREDENTIALS env variable not set' 1>&2
-	exit 1
+info_print "building k8s demo with tag: $SIDECAR_TAG"
+
+if kubectl -n "${NS}" get deployment "${DEPLOYMENT_NAME}-${SIDECAR_TAG}" &> /dev/null; then
+	kubectl -n "${NS}" delete deployment "${DEPLOYMENT_NAME}-${SIDECAR_TAG}"
+fi
+for i in "1" "2" "3"; do
+  if kubectl -n "${NS}" get configmap "${BASE_CONFIG_NAME}-${i}-${SIDECAR_TAG}" &> /dev/null; then
+	  kubectl -n "${NS}" delete configmap "${BASE_CONFIG_NAME}-${i}-${SIDECAR_TAG}"
+  fi
+done
+# TODO(fred): I don't think this is needed
+if kubectl -n "${NS}" get secret google-application-credentials &> /dev/null; then
+	kubectl -n "${NS}" delete secret google-application-credentials
 fi
 
-if kubectl get secret google-application-credentials &> /dev/null; then
-	kubectl delete secret google-application-credentials
-fi
-
-# https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform#step_4_import_credentials_as_a_secret
-kubectl create secret generic \
+kubectl -n "${NS}" create secret generic \
 	google-application-credentials \
-	--from-file=google-application-credentials.json=$GOOGLE_APPLICATION_CREDENTIALS
+	--from-file=google-application-credentials.json="${GOOGLE_APPLICATION_CREDENTIALS}"
 
-RES_DEF="$proj_root_dir"/hack/k8s/gen/example-coord-pg.yaml
+# resolve template
+RES_DEF="/tmp/example-coord-pg.yaml"
 
-IGNORE_VERSION_MISMATCH=$IGNORE_VERSION_MISMATCH \
-IS_INIT=$IS_INIT \
-PULL_POLICY=$pull_policy \
-OUTPUT_LABEL=$OUTPUT_LABEL \
-SOME_CONST=$SOME_CONST \
-	"$proj_root_dir"/hack/envexpand "$proj_root_dir"/hack/k8s/example-coord-pg.template.yaml > "$RES_DEF"
+export PULL_POLICY OUTPUT_LABEL EXAMPLE_DATAMON_REPO SIDECAR_TAG NS INPUT_LABEL_2 INPUT_LABEL_3
+export DEPLOYMENT_NAME="${BASE_DEPLOYMENT_NAME}-${SIDECAR_TAG}"
+export CONFIG_NAME_1="${BASE_CONFIG_NAME}-1-${SIDECAR_TAG}"
+export CONFIG_NAME_2="${BASE_CONFIG_NAME}-2-${SIDECAR_TAG}"
+export CONFIG_NAME_3="${BASE_CONFIG_NAME}-3-${SIDECAR_TAG}"
+"${EXPAND_CMD[@]}" "${POD_TEMPLATE}" > "${RES_DEF}"
 
-if kubectl get deployment datamon-coord-pg-demo &> /dev/null; then
-	kubectl delete -f "$RES_DEF"
+dbg_print "pod template $(cat "${RES_DEF}")"
+
+# deploy demo pod
+if ! kubectl -n "${NS}" create -f "${RES_DEF}" ; then
+  error_print "failed to create demo pod"
+  exit 1
 fi
-
-kubectl create -f "$RES_DEF"
+info_print "pod created"
