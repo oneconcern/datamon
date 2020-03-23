@@ -655,14 +655,14 @@ workflows:
             branches:
               ignore: /.*/
 
-  weekly:
-    triggers:
-      - schedule:
-          cron: "5 4 * * 6"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - push_base:
-          context: "OC Common"
+#  weekly:
+#    triggers:
+#      - schedule:
+#          cron: "5 4 * * 6"
+#          filters:
+#            branches:
+#              only:
+#                - master
+#    jobs:
+#      - push_base:
+#          context: "OC Common"
