@@ -17,6 +17,9 @@ type Settings struct {
 	profilingEnabled bool
 	memProfDir       string
 
+	labelPrefix   string
+	labelVersions bool
+
 	metrics.Enable
 	//m *M // TODO(fred): enable metrics for list operations
 }
@@ -59,7 +62,6 @@ func WithDoneChan(done chan struct{}) Option {
 }
 
 // WithMemProf enables profiling and sets the memory profile directory (defaults to the current working directory).
-// Currently, extra
 func WithMemProf(memProfDir string) Option {
 	return func(s *Settings) {
 		s.profilingEnabled = true
@@ -73,6 +75,20 @@ func WithMemProf(memProfDir string) Option {
 func WithMetrics(enabled bool) Option {
 	return func(s *Settings) {
 		s.EnableMetrics(enabled)
+	}
+}
+
+// WithLabelVersions makes ListLabels list all versions of labels (requires the vmedata bucket to enable versioning)
+func WithLabelVersions(enabled bool) Option {
+	return func(s *Settings) {
+		s.labelVersions = enabled
+	}
+}
+
+// WithLabelPrefix is an option for ListLabelsApply, to filter on labels with some given prefix
+func WithLabelPrefix(prefix string) Option {
+	return func(s *Settings) {
+		s.labelPrefix = prefix
 	}
 }
 

@@ -18,6 +18,11 @@ import (
 	"google.golang.org/api/option"
 )
 
+var (
+	_ storage.Store    = &gcs{}
+	_ storage.StoreCRC = &gcs{}
+)
+
 type gcs struct {
 	client         *gcsStorage.Client
 	readOnlyClient *gcsStorage.Client

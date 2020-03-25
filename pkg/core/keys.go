@@ -1,10 +1,12 @@
 package core
 
 import (
+	"context"
 	"sync"
 
 	"github.com/oneconcern/datamon/pkg/core/status"
 	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/storage"
 )
 
 // keyBatchEvent catches a collection of keys with possible retrieval error
@@ -134,6 +136,33 @@ func mergeKeys(inputChan <-chan keyBatchEvent, outputChan chan<- keyBatchEvent, 
 		}
 		outputChan <- keyBatchEvent{
 			keys: filtered,
+			err:  err,
+		}
+	}
+}
+
+func versionedKeys(vstore storage.VersionedStore, inputChan <-chan keyBatchEvent, outputChan chan<- keyBatchEvent, settings Settings, wg *sync.WaitGroup) {
+	defer func() {
+		close(outputChan)
+		wg.Done()
+	}()
+
+	for batch := range inputChan {
+		var err error
+		expanded := make([]string, 0, len(batch.keys)*10)
+		for _, key := range batch.keys {
+			versions, erv := vstore.KeyVersions(context.Background(), key)
+			if erv != nil {
+				err = erv
+				continue // drain chan
+			}
+			for _, v := range versions {
+				// internally, we follow the {key}#{version} convention
+				expanded = append(expanded, key+"#"+v)
+			}
+		}
+		outputChan <- keyBatchEvent{
+			keys: expanded,
 			err:  err,
 		}
 	}

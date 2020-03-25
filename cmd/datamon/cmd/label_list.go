@@ -46,10 +46,12 @@ init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT`,
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		err = core.ListLabelsApply(datamonFlags.repo.RepoName, remoteStores, datamonFlags.label.Prefix, applyLabelTemplate,
+		err = core.ListLabelsApply(datamonFlags.repo.RepoName, remoteStores, applyLabelTemplate,
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
 			core.BatchSize(datamonFlags.core.BatchSize),
 			core.WithMetrics(datamonFlags.root.metrics.IsEnabled()),
+			core.WithLabelPrefix(datamonFlags.label.Prefix),
+			core.WithLabelVersions(datamonFlags.core.WithLabelVersions),
 		)
 
 		if err != nil {
@@ -72,6 +74,7 @@ func init() {
 	addLabelPrefixFlag(LabelListCommand)
 	addCoreConcurrencyFactorFlag(LabelListCommand, 500)
 	addBatchSizeFlag(LabelListCommand)
+	addLabelVersionsFlag(LabelListCommand)
 
 	labelCmd.AddCommand(LabelListCommand)
 }

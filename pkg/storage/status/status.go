@@ -42,4 +42,10 @@ var (
 
 	// ErrNotImplemented tells that this feature has not been implemented yet
 	ErrNotImplemented = errors.New("not implemented")
+
+	// ErrVersioningDisabled tells that this store doesn't support versioning
+	ErrVersioningDisabled = errors.New("versioning disabled")
+
+	// ErrInvalidVersion tells that the provided version is not valid
+	ErrInvalidVersion = errors.New("invalid version")
 )
