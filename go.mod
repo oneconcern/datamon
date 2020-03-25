@@ -4,17 +4,13 @@ require (
 	cloud.google.com/go v0.55.0 // indirect
 	cloud.google.com/go/storage v1.6.0
 	github.com/PuerkitoBio/goquery v1.5.1
-	github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 // indirect
 	github.com/aws/aws-sdk-go v1.29.32
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.4.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-chi/chi v4.0.4+incompatible
-	github.com/go-openapi/errors v0.19.4 // indirect
 	github.com/go-openapi/runtime v0.19.14
-	github.com/go-openapi/strfmt v0.19.5 // indirect
-	github.com/go-openapi/swag v0.19.8 // indirect
 	github.com/gobuffalo/packd v1.0.0
 	github.com/gobuffalo/packr/v2 v2.8.0
 	github.com/hashicorp/go-immutable-radix v1.2.0
@@ -25,7 +21,6 @@ require (
 	github.com/jmespath/go-jmespath v0.3.0 // indirect
 	github.com/karrick/godirwalk v1.15.5
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/mitchellh/mapstructure v1.2.2 // indirect
 	github.com/nightlyone/lockfile v1.0.0
@@ -44,7 +39,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.5.1
-	go.mongodb.org/mongo-driver v1.3.1 // indirect
 	go.opencensus.io v0.22.3
 	go.uber.org/goleak v1.0.0
 	go.uber.org/zap v1.14.1
