@@ -53,7 +53,7 @@ config file created in /Users/ritesh/.config/.datamon/config.yaml
 
 ```
       --config string             Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context string            Set the context for datamon (default "dev")
+      --context string            Set the context for datamon (defaults to "dev")
       --loglevel string           The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
       --metrics                   Toggle telemetry and metrics collection
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
