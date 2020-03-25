@@ -205,14 +205,14 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - pkg-cache-{{ checksum "go.sum" }}
-            - pkg-cache-
+            - go-mod-v1-{{ checksum "go.mod" }}
+            - go-mod-v1-
 
   put_cache:
     description: save golang modules cache
     steps:
       - save_cache:
-          key: pkg-cache-{{ checksum "go.sum" }}
+          key: go-mod-v1-{{ checksum "go.mod" }}
           paths:
             - "/home/circleci/go/pkg"
 
