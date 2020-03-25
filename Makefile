@@ -120,17 +120,6 @@ build-and-push-pg-sidecar: build-datamon-binaries
 	$(MAKE) build-target
 	$(MAKE) push-target
 
-.PHONY: build-and-push-datamover
-## SIDECAR: Build sidecar datamover container used in Argo workflows
-build-and-push-datamover: export BUILD_TARGET=$(REPOSITORY)/datamon-datamover
-build-and-push-datamover: export DOCKERFILE=dockerfiles/datamover.Dockerfile
-build-and-push-datamover: export BUILD_ARGS=--build-arg VERSION=$(SIDECAR_BASE_VERSION)
-build-and-push-datamover: export RELEASE_TAG_LATEST=$(shell go run ./hack/release_tag.go -l -i gcr.io/onec-co/datamon-datamover)
-build-and-push-datamover: export TAGS=$(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
-build-and-push-datamover: build-datamon-binaries
-	$(MAKE) build-target
-	$(MAKE) push-target
-
 .PHONY: ensure-gotools
 ## BUILD: Install all go-gettable tools
 ensure-gotools:
@@ -374,7 +363,7 @@ pg-demo-coord-build-app:
 
 .PHONY: release-all-docker
 ## RELEASE: Push all containers to be released
-release-all-docker: build-datamon build-migrate build-wrapper push-datamon push-migrate push-wrapper build-and-push-fuse-sidecar build-and-push-pg-sidecar build-and-push-datamover
+release-all-docker: build-datamon build-migrate build-wrapper push-datamon push-migrate push-wrapper build-and-push-fuse-sidecar build-and-push-pg-sidecar
 
 .PHONY: build-alpine-base
 ## RELEASE: Build local base datamon container on alpine linux
