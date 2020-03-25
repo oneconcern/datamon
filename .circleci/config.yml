@@ -241,8 +241,11 @@ commands:
       - run:
           name: Add CircleCI IP to whitelist
           command: |
-            CIRCLE_CI_IP=$(curl -sSL https://checkip.amazonaws.com)
-            gcloud container clusters update --zone ${GOOGLE_COMPUTE_ZONE} ${CLUSTER} --enable-master-authorized-networks --master-authorized-networks ${ALLOWED_NETWORKS},$CIRCLE_CI_IP/32
+            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
+            ALREADY="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. == "'"${CIRCLE_CI_IP}"'/32"))|.[]')"
+            if [ -z "${ALREADY}" ] ; then
+              gcloud container clusters update --zone ${GOOGLE_COMPUTE_ZONE} ${CLUSTER} --enable-master-authorized-networks --master-authorized-networks ${ALLOWED_NETWORKS},$CIRCLE_CI_IP/32
+            fi
 
   remove_whitelist_ip:
     steps:
@@ -250,20 +253,7 @@ commands:
           name: Remove previously added CircleCI IP from whitelist
           command: |
             set -x -o pipefail
-            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
-            PREVIOUS="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. != "'"${CIRCLE_CI_IP}"'/32"))|tostring|sub("[\"\\[\\]]";"";"g")')"
-            gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "$(eval echo "${PREVIOUS}")"
-
-  remove_whitelist_ip_on_fail:
-    steps:
-      - run:
-          when: on_fail
-          name: Remove previously added CircleCI IP from whitelist (when failed)
-          command: |
-            set -x -o pipefail
-            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
-            PREVIOUS="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. != "'"${CIRCLE_CI_IP}"'/32"))|tostring|sub("[\"\\[\\]]";"";"g")')"
-            gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "$(eval echo "${PREVIOUS}")"
+            gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${ALLOWED_NETWORKS}"
 
 jobs:
   go_lint:
@@ -443,7 +433,6 @@ jobs:
           name: Delete k8s resources for sidecar demo
           command: |
             make clean-fuse-demo
-      - remove_whitelist_ip_on_fail
 
   pg_sidecar_test:
     executor: docker_builder
@@ -464,7 +453,6 @@ jobs:
           name: Delete k8s resources for sidecar demo
           command: |
             make clean-pg-demo
-      - remove_whitelist_ip_on_fail
 
   build_images:
     executor: docker_builder
@@ -556,7 +544,6 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 18.09.3
-      - install_base
       - login_to_google
       - remove_whitelist_ip
 
