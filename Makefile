@@ -391,7 +391,7 @@ push-datamon:
 
 .PHONY: build-migrate
 ## RELEASE: Build container for the migrate tool
-build-migrate: export BUILD_TARGET=$(REPOSITORY)/migrate
+build-migrate: export BUILD_TARGET=$(REPOSITORY)/datamon-migrate
 build-migrate: export DOCKERFILE=dockerfiles/migrate.Dockerfile
 build-migrate: export BUILD_ARGS=$(VERSION_ARGS)
 build-migrate: export TAGS=latest $(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
@@ -401,8 +401,8 @@ build-migrate: build-alpine-base
 .PHONY: push-migrate
 ## RELEASE: Push released migrate container
 push-migrate:
-	docker push $(REPOSITORY)/migrate:${RELEASE_TAG}
-	docker push $(REPOSITORY)/migrate:latest
+	docker push $(REPOSITORY)/datamon-migrate:${RELEASE_TAG}
+	docker push $(REPOSITORY)/datamon-migrate:latest
 
 .PHONY: build-wrapper
 ## RELEASE: Build application wrapper for ARGO workflows
