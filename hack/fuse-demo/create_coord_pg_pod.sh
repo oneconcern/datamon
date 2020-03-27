@@ -58,14 +58,12 @@ for i in "1" "2" "3"; do
 	  kubectl -n "${NS}" delete configmap "${BASE_CONFIG_NAME}-${i}-${SIDECAR_TAG}"
   fi
 done
-# TODO(fred): I don't think this is needed
-if kubectl -n "${NS}" get secret google-application-credentials &> /dev/null; then
-	kubectl -n "${NS}" delete secret google-application-credentials
-fi
 
-kubectl -n "${NS}" create secret generic \
-	google-application-credentials \
-	--from-file=google-application-credentials.json="${GOOGLE_APPLICATION_CREDENTIALS}"
+if ! kubectl -n "${NS}" get secret google-application-credentials &> /dev/null; then
+  kubectl -n "${NS}" create secret generic \
+	  google-application-credentials \
+	  --from-file=google-application-credentials.json="${GOOGLE_APPLICATION_CREDENTIALS}"
+fi
 
 # resolve template
 RES_DEF="/tmp/example-coord-pg.yaml"
