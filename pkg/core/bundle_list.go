@@ -185,7 +185,11 @@ func listBundlesChan(repo string, stores context2.Stores, opts ...Option) (chan 
 	}
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	fetchKeysChans := fetchKeysChans{
+		keysChan:         keysChan,
+		doneWithKeysChan: doneWithKeysChan,
+	}
+	go fetchKeys(iterator, fetchKeysChans, &wg) // scan for key batches
 
 	// start bundle metadata retrieval
 	wg.Add(1)

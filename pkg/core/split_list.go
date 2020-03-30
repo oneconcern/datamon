@@ -181,7 +181,11 @@ func listSplitsChan(repo, diamondID string, stores context2.Stores, opts ...Opti
 
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(iterator, unfilteredKeysChan, doneWithKeysChan, &wg) // scan for key batches
+	fetchKeysChans := fetchKeysChans{
+		keysChan:         unfilteredKeysChan,
+		doneWithKeysChan: doneWithKeysChan,
+	}
+	go fetchKeys(iterator, fetchKeysChans, &wg) // scan for key batches
 
 	// keys state filtering & merging
 	wg.Add(1)

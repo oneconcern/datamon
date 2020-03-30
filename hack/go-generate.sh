@@ -7,6 +7,4 @@ cd "$(git rev-parse --show-toplevel)"
 mockDir="pkg/storage/mockstorage"
 mkdir -p ${mockDir}
 echo "package mockstorage" > ${mockDir}/store.go
-# moq -out pkg/storage/mockstorage/store.go -pkg mockstorage pkg/storage Store
-# moq -out pkg/storage/mockstorage/store_versioned.go -pkg mockstorage pkg/storage StoreVersioned Store
 moq -out pkg/storage/mockstorage/store_versioned.go -pkg mockstorage pkg/storage Store StoreVersioned

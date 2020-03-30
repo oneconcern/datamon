@@ -8,7 +8,7 @@ import (
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core/status"
-
+	"github.com/oneconcern/datamon/pkg/errors"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 )
@@ -21,7 +21,7 @@ const (
 func ListLabels(repo string, stores context2.Stores, prefix string, opts ...Option) ([]model.LabelDescriptor, error) {
 	labels := make(model.LabelDescriptors, 0, typicalLabelsNum)
 
-	labelsChan, workers := listLabelsChan(repo, stores, prefix, opts...)
+	labelsChan, workers := listLabelsChan(repo, stores, append(opts, WithPrefix(prefix))...)
 
 	// consume batches of ordered labels
 	err := doSelectLabels(labelsChan, func(labelBatch model.LabelDescriptors) {
@@ -52,17 +52,20 @@ func ListLabelsApply(repo string, store context2.Stores, apply ApplyLabelFunc, o
 		isVersionsList bool
 	)
 
+	if !apply.valid() {
+		return errors.New("invalid ApplyLabelFunc")
+	}
+
 	{
 		settings := defaultSettings()
 		for _, bApply := range opts {
 			bApply(&settings)
 		}
-		if settings.label == "" && settings.prefix == "" || settings.label != "" && settings.prefix != "" {
-			// ???
-			//			return errors.New("either prefix or label must be supplied")
+		if !settings.listLabelsValid() {
+			return errors.New("options translate to invalid settings")
 		}
 		prefix = settings.prefix
-		isVersionsList = settings.label != ""
+		isVersionsList = settings.vLabel != ""
 	}
 
 	labelChan := make(chan model.LabelDescriptor)
@@ -82,7 +85,8 @@ func ListLabelsApply(repo string, store context2.Stores, apply ApplyLabelFunc, o
 		defer close(labelChan)
 		defer close(versionChan)
 
-		labelsChan, workers := listLabelsChan(repo, store, prefix, append(opts, WithDoneChan(doneChan))...)
+		labelsChan, workers := listLabelsChan(repo, store,
+			append(opts, WithDoneChan(doneChan), WithPrefix(prefix))...)
 
 		if !isVersionsList {
 			err = doSelectLabels(labelsChan, func(labelBatch model.LabelDescriptors) {
@@ -164,17 +168,26 @@ type labelsEvent struct {
 	err      error
 }
 
-func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...Option) (chan labelsEvent, *sync.WaitGroup) {
-	var wg sync.WaitGroup
+type fetchChans struct {
+	keysChan         <-chan keyBatchEvent
+	batchChan        chan<- labelsEvent
+	doneWithKeysChan chan<- struct{}
+	doneChan         <-chan struct{}
+}
+
+func listLabelsChan(repo string, stores context2.Stores, opts ...Option) (chan labelsEvent, *sync.WaitGroup) {
+	var (
+		wg             sync.WaitGroup
+		prefix         string
+		isVersionsList bool
+	)
 
 	settings := defaultSettings()
 	for _, bApply := range opts {
 		bApply(&settings)
 	}
-
-	// todo: validation method on settings (specificify settings type per use-case).
-
-	// settings.label
+	prefix = settings.prefix
+	isVersionsList = settings.vLabel != ""
 
 	batchChan := make(chan labelsEvent, 1) // buffered to 1 to avoid blocking on early errors
 
@@ -197,15 +210,22 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 	keysChan := make(chan keyBatchEvent, 1)
 
 	iterator := func(next string) ([]string, string, error) {
-		if settings.label == "" {
+		if !isVersionsList {
 			return GetLabelStore(stores).KeysPrefix(context.Background(), next,
 				model.GetArchivePathPrefixToLabels(repo, prefix),
 				"", settings.batchSize)
 		} else {
-			versionedStore := GetLabelStore(stores).(storage.StoreVersioned)
-			versions, versionsErr := versionedStore.KeyVersions(context.Background(), settings.label)
+			versionedStore, versionedStoreSupported := GetLabelStore(stores).(storage.StoreVersioned)
+			if !versionedStoreSupported {
+				return nil, "", errors.New(
+					"a backend store that supports versioning is required when using this option",
+				)
+			}
+			versions, versionsErr := versionedStore.KeyVersions(context.Background(), settings.vLabel)
 			if versionsErr != nil {
-				return nil, "", versionsErr
+				return nil, "", errors.New("versioned stored couldn't list keys").
+					WrapMessage("for label %q", settings.vLabel).
+					Wrap(versionsErr)
 			}
 			versionStrings := make([]string, 0, len(versions))
 			for _, ver := range versions {
@@ -214,16 +234,29 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 			return versionStrings, "", nil
 		}
 	}
+
+	fetchKeysChans := fetchKeysChans{
+		keysChan:         keysChan,
+		doneWithKeysChan: doneWithKeysChan,
+	}
+
 	// starting keys retrieval
 	wg.Add(1)
-	go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	go fetchKeys(iterator, fetchKeysChans, &wg) // scan for key batches
+
+	allFetchChans := fetchChans{
+		keysChan:         keysChan,
+		batchChan:        batchChan,
+		doneWithKeysChan: doneWithKeysChan,
+		doneChan:         doneWithBundlesChan,
+	}
 
 	// start repo metadata retrieval
 	wg.Add(1)
-	if settings.label == "" {
-		go fetchLabels(repo, stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+	if !isVersionsList {
+		go fetchLabels(repo, stores, settings, allFetchChans, &wg)
 	} else {
-		go fetchLabelVersions(repo, stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+		go fetchLabelVersions(repo, stores, settings, allFetchChans, &wg)
 	}
 
 	// let the gc clean up internal signaling channels left open after wg goroutines are done.
@@ -255,8 +288,12 @@ func doSelectVersions(labelsChan <-chan labelsEvent, do func([]string)) error {
 
 // fetchLabels waits on a channel of key batches and outputs batches of descriptors corresponding to these keys
 func fetchLabels(repo string, stores context2.Stores, settings Settings,
-	keysChan <-chan keyBatchEvent, batchChan chan<- labelsEvent,
-	doneWithKeysChan chan<- struct{}, doneChan <-chan struct{}, wg *sync.WaitGroup) {
+	fetchChans fetchChans, wg *sync.WaitGroup) {
+	keysChan := fetchChans.keysChan
+	batchChan := fetchChans.batchChan
+	doneWithKeysChan := fetchChans.doneWithKeysChan
+	doneChan := fetchChans.doneChan
+
 	defer func() {
 		close(batchChan)
 		wg.Done()
@@ -288,8 +325,11 @@ func fetchLabels(repo string, stores context2.Stores, settings Settings,
 }
 
 func fetchLabelVersions(repo string, stores context2.Stores, settings Settings,
-	keysChan <-chan keyBatchEvent, batchChan chan<- labelsEvent,
-	doneWithKeysChan chan<- struct{}, doneChan <-chan struct{}, wg *sync.WaitGroup) {
+	fetchChans fetchChans, wg *sync.WaitGroup) {
+	keysChan := fetchChans.keysChan
+	batchChan := fetchChans.batchChan
+	doneChan := fetchChans.doneChan
+
 	defer func() {
 		close(batchChan)
 		wg.Done()

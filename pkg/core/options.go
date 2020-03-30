@@ -17,11 +17,17 @@ type Settings struct {
 	profilingEnabled bool
 	memProfDir       string
 
-	prefix string
-	label  string
+	prefixIsSet bool
+	prefix      string
+	vLabel      string
 
 	metrics.Enable
 	//m *M // TODO(fred): enable metrics for list operations
+}
+
+func (settings *Settings) listLabelsValid() bool {
+	prefixOrLabel := (settings.vLabel == "" && settings.prefixIsSet) || (settings.vLabel != "" && !settings.prefixIsSet)
+	return prefixOrLabel
 }
 
 const (
@@ -83,7 +89,7 @@ func WithMetrics(enabled bool) Option {
 // Precisely one of these options is expected to be applied.
 func WithLabel(label string) Option {
 	return func(s *Settings) {
-		s.label = label
+		s.vLabel = label
 	}
 }
 
@@ -91,6 +97,7 @@ func WithLabel(label string) Option {
 // Precisely one of these options is expected to be applied.
 func WithPrefix(prefix string) Option {
 	return func(s *Settings) {
+		s.prefixIsSet = true
 		s.prefix = prefix
 	}
 }

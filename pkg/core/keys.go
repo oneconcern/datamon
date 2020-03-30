@@ -7,15 +7,24 @@ import (
 	"github.com/oneconcern/datamon/pkg/model"
 )
 
+type fetchKeysIterator func(string) ([]string, string, error)
+
 // keyBatchEvent catches a collection of keys with possible retrieval error
 type keyBatchEvent struct {
 	keys []string
 	err  error
 }
 
+type fetchKeysChans struct {
+	keysChan         chan<- keyBatchEvent
+	doneWithKeysChan <-chan struct{}
+}
+
 // fetchKeys fetches keys for repos in batches, then close the keyBatchChan channel upon completion or error.
-func fetchKeys(iterator func(string) ([]string, string, error), keyBatchChan chan<- keyBatchEvent,
-	doneChan <-chan struct{}, wg *sync.WaitGroup) {
+func fetchKeys(iterator fetchKeysIterator, fetchKeysChans fetchKeysChans, wg *sync.WaitGroup) {
+	keyBatchChan := fetchKeysChans.keysChan
+	doneChan := fetchKeysChans.doneWithKeysChan
+
 	defer func() {
 		close(keyBatchChan)
 		wg.Done()
