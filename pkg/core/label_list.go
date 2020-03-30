@@ -207,7 +207,7 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 			if versionsErr != nil {
 				return nil, "", versionsErr
 			}
-			versionStrings := make([]string, len(versions))
+			versionStrings := make([]string, 0, len(versions))
 			for _, ver := range versions {
 				versionStrings = append(versionStrings, ver.String())
 			}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -160,11 +161,10 @@ func TestListLabels(t *testing.T) {
 
 ///
 
-/*
 type labelVersionedFixture struct {
-	name          string
-	repo          string
-	expected      []storage.Version
+	name     string
+	repo     string
+	expected []storage.Version
 }
 
 func labelVersionedTestCases() []labelVersionedFixture {
@@ -180,16 +180,31 @@ func labelVersionedTestCases() []labelVersionedFixture {
 func mockedLabelVersionsStore(testcase string) storage.Store {
 	switch testcase {
 	case happyPath:
-		return &mockstorage.StoreVersionedMock{
+		// to mock a type that implements multiple interfaces such as the gcs store,
+		// mock each interface seperately and rely on promoted methods of embedded fields
+		// of an anonymous struct.
+		storeMock := &mockstorage.StoreMock{
 			HasFunc: goodHasFunc,
 			KeysPrefixFunc: func(_ context.Context, _ string, _ string, _ string, _ int) ([]string, string, error) {
 				return []string{fakeLabelPath("myRepo", "myLabel")}, "", nil
 			},
 			KeysFunc: goodKeysFunc,
 			GetFunc:  goodGetLabelFunc,
+		}
+		storeVersionedMock := &mockstorage.StoreVersionedMock{
 			KeyVersionsFunc: func(_ context.Context, _ string) ([]storage.Version, error) {
-				return []storage.Version{}
+				return []storage.Version{
+					storage.NewVersionGcs(1),
+					storage.NewVersionGcs(2),
+				}, nil
 			},
+		}
+		return struct {
+			*mockstorage.StoreMock
+			*mockstorage.StoreVersionedMock
+		}{
+			StoreMock:          storeMock,
+			StoreVersionedMock: storeVersionedMock,
 		}
 	default:
 		return nil
@@ -209,19 +224,35 @@ func testListLabelVersions(t *testing.T, concurrency int, i int) {
 
 		t.Run(fmt.Sprintf("ListLabelsApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			//t.Parallel()
-			versions := make(string, 0, typicalReposNum)
+			versions := make([]storage.Version, 0, typicalReposNum)
 			err := ListLabelsApply(testcase.repo, mockedLabelVersionsContextStores(testcase.name),
 				ApplyLabelFunc{ToVersion: func(version string) error {
-					versions = append(versions, version)
+					// the core package currently uses string typing to express versions, while
+					// this test demonstrates how to back a storage.Version type out of the strings.
+					gcsGeneration, err := strconv.ParseInt(version, 10, 64)
+					require.NoError(t, err, "parse version string")
+					versions = append(versions,
+						storage.NewVersionGcs(gcsGeneration))
 					return nil
-				}}, WithPrefix(""), ConcurrentList(concurrency), BatchSize(testBatchSize))
-			assertLabels(t, testcase, labels, err)
+				}}, WithLabel("myLabel"), ConcurrentList(concurrency), BatchSize(testBatchSize))
+			assertVersions(t, testcase, versions, err)
 		})
 
 	}
 }
-*/
+
+func assertVersions(t *testing.T, testcase labelVersionedFixture, versions []storage.Version, err error) {
+	require.NoError(t, err)
+	require.ElementsMatch(t,
+		testcase.expected, versions,
+		"expected returned versions to match expected descriptors")
+}
 
 func TestListLabelVersions(t *testing.T) {
-	t.Skip("tbd")
+	for i := 0; i < 10; i++ {
+		for _, concurrency := range []int{0, 1, 50, 100, 400} {
+			t.Logf("simulating ListLabels with concurrency-factor=%d, iteration=%d", concurrency, i)
+			testListLabelVersions(t, concurrency, i)
+		}
+	}
 }
