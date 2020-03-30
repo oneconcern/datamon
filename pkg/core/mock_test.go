@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/oneconcern/datamon/pkg/model"
+	"github.com/oneconcern/datamon/pkg/storage"
 	"gopkg.in/yaml.v2"
 )
 
@@ -95,6 +96,10 @@ func fakeLD(label string) model.LabelDescriptor {
 			{Email: "test2@example.com"},
 		},
 	}
+}
+
+func fakeLV(gcsGeneration int64) storage.Version {
+	return storage.NewVersionGcs(gcsGeneration)
 }
 
 func buildBundleYaml(id string) string {

@@ -33,15 +33,23 @@ func ListLabels(repo string, stores context2.Stores, prefix string, opts ...Opti
 	return labels, err // we may have some batches resolved before the error occurred
 }
 
-// ApplyLabelFunc is a function to be applied on a label
-type ApplyLabelFunc func(model.LabelDescriptor) error
+// ApplyLabelFunc is a function to be applied on a label or label version
+type ApplyLabelFunc struct {
+	ToLabel   func(model.LabelDescriptor) error
+	ToVersion func(string) error
+}
+
+func (alf ApplyLabelFunc) valid() bool {
+	return (alf.ToLabel != nil && alf.ToVersion == nil) || (alf.ToLabel == nil && alf.ToVersion != nil)
+}
 
 // ListLabelsApply applies some function to the retrieved labels, in lexicographic order of keys.
 func ListLabelsApply(repo string, store context2.Stores, apply ApplyLabelFunc, opts ...Option) error {
 	var (
-		err, applyErr error
-		once          sync.Once
-		prefix        string
+		err, applyErr  error
+		once           sync.Once
+		prefix         string
+		isVersionsList bool
 	)
 
 	{
@@ -50,12 +58,15 @@ func ListLabelsApply(repo string, store context2.Stores, apply ApplyLabelFunc, o
 			bApply(&settings)
 		}
 		if settings.label == "" && settings.prefix == "" || settings.label != "" && settings.prefix != "" {
-
+			// ???
+			//			return errors.New("either prefix or label must be supplied")
 		}
 		prefix = settings.prefix
+		isVersionsList = settings.label != ""
 	}
 
 	labelChan := make(chan model.LabelDescriptor)
+	versionChan := make(chan string)
 	doneChan := make(chan struct{}, 1)
 
 	clean := func() {
@@ -67,29 +78,50 @@ func ListLabelsApply(repo string, store context2.Stores, apply ApplyLabelFunc, o
 	}
 
 	// collect label metadata asynchronously
-	go func(labelChan chan<- model.LabelDescriptor, doneChan chan struct{}) {
+	go func(labelChan chan<- model.LabelDescriptor, versionChan chan<- string, doneChan chan struct{}) {
 		defer close(labelChan)
+		defer close(versionChan)
 
 		labelsChan, workers := listLabelsChan(repo, store, prefix, append(opts, WithDoneChan(doneChan))...)
 
-		err = doSelectLabels(labelsChan, func(labelBatch model.LabelDescriptors) {
-			for _, label := range labelBatch {
-				labelChan <- label // transfer a batch of metadata to the applied func
-			}
-		})
+		if !isVersionsList {
+			err = doSelectLabels(labelsChan, func(labelBatch model.LabelDescriptors) {
+				for _, label := range labelBatch {
+					labelChan <- label // transfer a batch of metadata to the applied func
+				}
+			})
+		} else {
+			err = doSelectVersions(labelsChan, func(versionBatch []string) {
+				for _, version := range versionBatch {
+					versionChan <- version
+				}
+			})
+		}
 		once.Do(clean)
 
 		workers.Wait()
-	}(labelChan, doneChan)
+	}(labelChan, versionChan, doneChan)
 
 	// apply function on collected metadata
-	for label := range labelChan {
-		if applyErr = apply(label); applyErr != nil {
-			// wind down goroutines, but when nothing is left to be interrupted
-			once.Do(interruptAndClean)
-			for range labelChan {
-			} // wait for close
-			break
+	if !isVersionsList {
+		for label := range labelChan {
+			if applyErr = apply.ToLabel(label); applyErr != nil {
+				// wind down goroutines, but when nothing is left to be interrupted
+				once.Do(interruptAndClean)
+				for range labelChan {
+				} // wait for close
+				break
+			}
+		}
+	} else {
+		for version := range versionChan {
+			if applyErr = apply.ToVersion(version); applyErr != nil {
+				// wind down goroutines, but when nothing is left to be interrupted
+				once.Do(interruptAndClean)
+				for range versionChan {
+				} // wait for close
+				break
+			}
 		}
 	}
 	// collect errors
@@ -114,7 +146,22 @@ type labelEvent struct {
 // labelsEvent catches a collection of labels with possible retrieval error
 type labelsEvent struct {
 	labels model.LabelDescriptors
-	err    error
+	// fallback to string typing pending decision-making re. type system design.
+	// ??? alternatives
+	// * use storage.Version directy
+	//	- advantages
+	//		> simplicity
+	//	- disadvantages
+	//		> tight coupling could result in vendor lock-in
+	// * add version information to pkg/model
+	//	- advantages
+	//		> [possible] easier interchange of storage types
+	//	- disadvantages
+	//		> complexity: existing pkg/model design always corresponds to
+	//		  serializable types, and this option introduces an exception to the rule
+	// * ??? third option
+	versions []string
+	err      error
 }
 
 func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...Option) (chan labelsEvent, *sync.WaitGroup) {
@@ -150,12 +197,11 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 	keysChan := make(chan keyBatchEvent, 1)
 
 	iterator := func(next string) ([]string, string, error) {
-		if settings.label != "" {
+		if settings.label == "" {
 			return GetLabelStore(stores).KeysPrefix(context.Background(), next,
 				model.GetArchivePathPrefixToLabels(repo, prefix),
 				"", settings.batchSize)
 		} else {
-			// tbd: sandbox o.(type).method() type assert fail compared to o.(type).method() error
 			versionedStore := GetLabelStore(stores).(storage.StoreVersioned)
 			versions, versionsErr := versionedStore.KeyVersions(context.Background(), settings.label)
 			if versionsErr != nil {
@@ -174,7 +220,11 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 
 	// start repo metadata retrieval
 	wg.Add(1)
-	go fetchLabels(repo, stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+	if settings.label == "" {
+		go fetchLabels(repo, stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+	} else {
+		go fetchLabelVersions(repo, stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
+	}
 
 	// let the gc clean up internal signaling channels left open after wg goroutines are done.
 
@@ -189,6 +239,16 @@ func doSelectLabels(labelsChan <-chan labelsEvent, do func(model.LabelDescriptor
 			return labelBatch.err
 		}
 		do(labelBatch.labels)
+	}
+	return nil
+}
+
+func doSelectVersions(labelsChan <-chan labelsEvent, do func([]string)) error {
+	for labelBatch := range labelsChan {
+		if labelBatch.err != nil {
+			return labelBatch.err
+		}
+		do(labelBatch.versions)
 	}
 	return nil
 }
@@ -223,6 +283,32 @@ func fetchLabels(repo string, stores context2.Stores, settings Settings,
 			}
 			// send out a single batch of (ordered) bundle descriptors
 			batchChan <- labelsEvent{labels: batch}
+		}
+	}
+}
+
+func fetchLabelVersions(repo string, stores context2.Stores, settings Settings,
+	keysChan <-chan keyBatchEvent, batchChan chan<- labelsEvent,
+	doneWithKeysChan chan<- struct{}, doneChan <-chan struct{}, wg *sync.WaitGroup) {
+	defer func() {
+		close(batchChan)
+		wg.Done()
+	}()
+
+	for {
+		select {
+		case <-doneChan:
+			batchChan <- labelsEvent{err: status.ErrInterrupted}
+			return
+		case keyBatch, isOpen := <-keysChan:
+			if !isOpen {
+				return
+			}
+			if keyBatch.err != nil {
+				batchChan <- labelsEvent{err: keyBatch.err}
+				return
+			}
+			batchChan <- labelsEvent{versions: keyBatch.keys}
 		}
 	}
 }

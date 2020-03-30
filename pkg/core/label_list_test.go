@@ -120,10 +120,10 @@ func testListLabels(t *testing.T, concurrency int, i int) {
 			//t.Parallel()
 			labels := make(model.LabelDescriptors, 0, typicalReposNum)
 			err := ListLabelsApply(testcase.repo, mockedLabelContextStores(testcase.name),
-				testcase.prefix, func(label model.LabelDescriptor) error {
+				ApplyLabelFunc{ToLabel: func(label model.LabelDescriptor) error {
 					labels = append(labels, label)
 					return nil
-				}, ConcurrentList(concurrency), BatchSize(testBatchSize))
+				}}, WithPrefix(testcase.prefix), ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertLabels(t, testcase, labels, err)
 		})
 	}
@@ -157,6 +157,70 @@ func TestListLabels(t *testing.T) {
 		}
 	}
 }
+
+///
+
+/*
+type labelVersionedFixture struct {
+	name          string
+	repo          string
+	expected      []storage.Version
+}
+
+func labelVersionedTestCases() []labelVersionedFixture {
+	return []labelVersionedFixture{
+		{
+			name:     happyPath,
+			repo:     "myRepo",
+			expected: []storage.Version{fakeLV(1), fakeLV(2)},
+		},
+	}
+}
+
+func mockedLabelVersionsStore(testcase string) storage.Store {
+	switch testcase {
+	case happyPath:
+		return &mockstorage.StoreVersionedMock{
+			HasFunc: goodHasFunc,
+			KeysPrefixFunc: func(_ context.Context, _ string, _ string, _ string, _ int) ([]string, string, error) {
+				return []string{fakeLabelPath("myRepo", "myLabel")}, "", nil
+			},
+			KeysFunc: goodKeysFunc,
+			GetFunc:  goodGetLabelFunc,
+			KeyVersionsFunc: func(_ context.Context, _ string) ([]storage.Version, error) {
+				return []storage.Version{}
+			},
+		}
+	default:
+		return nil
+	}
+}
+
+func mockedLabelVersionsContextStores(scenario string) context2.Stores {
+	mockStore := mockedLabelVersionsStore(scenario)
+	return context2.NewStores(nil, nil, nil, mockStore, mockStore)
+}
+
+func testListLabelVersions(t *testing.T, concurrency int, i int) {
+	defer goleak.VerifyNone(t,
+		// opencensus stats collection goroutine
+		goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
+	for _, testcase := range labelVersionedTestCases() {
+
+		t.Run(fmt.Sprintf("ListLabelsApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
+			//t.Parallel()
+			versions := make(string, 0, typicalReposNum)
+			err := ListLabelsApply(testcase.repo, mockedLabelVersionsContextStores(testcase.name),
+				ApplyLabelFunc{ToVersion: func(version string) error {
+					versions = append(versions, version)
+					return nil
+				}}, WithPrefix(""), ConcurrentList(concurrency), BatchSize(testBatchSize))
+			assertLabels(t, testcase, labels, err)
+		})
+
+	}
+}
+*/
 
 func TestListLabelVersions(t *testing.T) {
 	t.Skip("tbd")

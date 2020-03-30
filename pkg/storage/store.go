@@ -10,6 +10,7 @@ import (
 )
 
 //go:generate moq -out ./mockstorage/store.go -pkg mockstorage . Store
+//go:generate moq -out ./mockstorage/store_versioned.go -pkg mockstorage . StoreVersioned Store
 
 const (
 	// Adding these to make code more readable when looking at Put Call
