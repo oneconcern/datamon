@@ -79,3 +79,10 @@ func DiamondBundleID(bundleID string) DiamondOption {
 		}
 	}
 }
+
+// DiamondWithMetrics toggles metrics on a core Diamond object
+func DiamondWithMetrics(enabled bool) DiamondOption {
+	return func(b *Diamond) {
+		b.EnableMetrics(enabled)
+	}
+}

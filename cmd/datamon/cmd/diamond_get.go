@@ -29,8 +29,15 @@ exits with ENOENT status otherwise.`,
 			wrapFatalln("create remote stores", err)
 			return
 		}
+		logger, err := optionInputs.getLogger()
+		if err != nil {
+			wrapFatalln("get logger", err)
+			return
+		}
 
-		diamond, err := core.GetDiamond(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, remoteStores)
+		diamond, err := core.GetDiamond(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, remoteStores,
+			core.DiamondLogger(logger),
+			core.DiamondWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		if err != nil {
 			if errors.Is(err, status.ErrNotFound) {
 				wrapFatalWithCodef(int(unix.ENOENT), "didn't find diamond %q", datamonFlags.diamond.diamondID)

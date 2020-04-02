@@ -80,3 +80,10 @@ func SplitKeyIterator(iterator KeyIterator) SplitOption {
 		}
 	}
 }
+
+// SplitWithMetrics toggles metrics on a core Split object
+func SplitWithMetrics(enabled bool) SplitOption {
+	return func(s *Split) {
+		s.EnableMetrics(enabled)
+	}
+}

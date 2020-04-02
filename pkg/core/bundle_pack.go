@@ -182,7 +182,7 @@ func uploadBundleFiles(
 			zap.Int("idx", fileIdx),
 		)
 		if bundle.MetricsEnabled() {
-			bundle.m.Volume.Bundles.Inc("upload")
+			bundle.m.Volume.Bundles.Inc("Upload")
 		}
 		go uploadBundleFile(ctx, file, cafsArchive, fileReader, chans,
 			fileIdx, bundle.l)
@@ -253,9 +253,22 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		}
 	}
 
-	var numFilePackedRes int
-	var numFileListUploads int
+	var (
+		numFilePackedRes   int
+		numFileListUploads int
+		totalSize          uint64
+	)
+
 	fileList := make([]model.BundleEntry, 0, bundleEntriesPerFile)
+
+	t0 := time.Now()
+	defer func() {
+		if bundle.MetricsEnabled() {
+			bundle.m.Volume.IO.BundleFiles(int64(numFilePackedRes), int64(numFileListUploads), "Upload")
+			bundle.m.Volume.IO.IORecord(t0, "Upload")(int64(totalSize), err)
+		}
+	}()
+
 	for {
 		var gotDoneSignal bool
 		select {
@@ -268,6 +281,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 				zap.Int("num keys", len(f.keys)),
 				zap.Int("idx", f.idx),
 			)
+			totalSize += f.size
 			fileList = append(fileList, filePacked2BundleEntry(f))
 			// Write the bundle entry file if reached max or the last one
 			if len(fileList) == int(bundleEntriesPerFile) {
@@ -311,6 +325,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		zap.Int("actual number uploads attempted", numFileListUploads),
 		zap.Int("approx expected number of uploads", maxInt(numFilePackedRes/int(bundleEntriesPerFile), 1)),
 	)
+
 	err = uploadBundleDescriptor(ctx, bundle)
 	if err != nil {
 		return err

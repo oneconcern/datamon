@@ -28,8 +28,15 @@ datamon diamond initialize --repo my-repo
 			wrapFatalln("create remote stores", err)
 			return
 		}
+		logger, err := optionInputs.getLogger()
+		if err != nil {
+			wrapFatalln("get logger", err)
+			return
+		}
 
-		diamond, err := core.CreateDiamond(datamonFlags.repo.RepoName, remoteStores)
+		diamond, err := core.CreateDiamond(datamonFlags.repo.RepoName, remoteStores,
+			core.DiamondLogger(logger),
+			core.DiamondWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		if err != nil {
 			wrapFatalln("error creating diamond", err)
 			return
