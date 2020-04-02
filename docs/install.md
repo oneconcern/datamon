@@ -5,8 +5,18 @@
 Docker releases are available from Oneconcern Google private registry only:
 
 ```
-docker pull gcr.io/onec-co/datamon
+docker pull gcr.io/onec-co/datamon:v2.1.0
 ```
+
+Other released images:
+```
+gcr.io/onec-co/datamon-fuse-sidecar     # a fuse-mount sidecar to mount a datamon bundle on a pod
+gcr.io/onec-co/datamon-pg-sidecar       # a postgres-enabled sidecar to spin up databases from a datamon bundle
+gcr.io/onec-co/datamon-wrapper          # a wrapper script to use with datamon sidecars
+gcr.io/onec-co/migrate                  # a standalone data copy tool
+```
+
+Detail about the contents of these images are available [here](../dockerfiles/README.md)
 
 ## From binary release
 
