@@ -29,8 +29,15 @@ exits with ENOENT status otherwise.`,
 			wrapFatalln("create remote stores", err)
 			return
 		}
+		logger, err := optionInputs.getLogger()
+		if err != nil {
+			wrapFatalln("get logger", err)
+			return
+		}
 
-		split, err := core.GetSplit(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, datamonFlags.split.splitID, remoteStores)
+		split, err := core.GetSplit(datamonFlags.repo.RepoName, datamonFlags.diamond.diamondID, datamonFlags.split.splitID, remoteStores,
+			core.SplitLogger(logger),
+			core.SplitWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		if err != nil {
 			if errors.Is(err, status.ErrNotFound) {
 				wrapFatalWithCodef(int(unix.ENOENT), "didn't find split %q", datamonFlags.split.splitID)

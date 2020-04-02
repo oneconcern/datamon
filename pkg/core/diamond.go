@@ -6,6 +6,7 @@ import (
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/errors"
+	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
@@ -23,12 +24,16 @@ type Diamond struct {
 	splitIndexer  *fileIndex                  // downloads split index files
 	bundleIndexer *fileIndex                  // uploads bundle index files
 	deconflicter  func(string, string) string // a renaming func to move conflicting files
-	_             struct{}
+
+	metrics.Enable
+	m *M
+
+	_ struct{}
 }
 
 func defaultDiamond(repo string, stores context2.Stores) *Diamond {
 	return &Diamond{
-		metaObject:        defaultMetaObject(stores.VMetadata()),
+		metaObject:        defaultMetaObject(GetDiamondStore(stores)),
 		Bundle:            NewBundle(Repo(repo), ContextStores(stores)),
 		DiamondDescriptor: *model.NewDiamondDescriptor(),
 	}
@@ -68,6 +73,9 @@ func NewDiamond(repo string, stores context2.Stores, opts ...DiamondOption) *Dia
 		diamond.Bundle.l = diamond.l
 	}
 
+	if diamond.MetricsEnabled() {
+		diamond.m = diamond.EnsureMetrics("core", &M{}).(*M)
+	}
 	return diamond
 }
 

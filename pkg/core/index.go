@@ -32,7 +32,7 @@ type fileIndex struct {
 
 func defaultFileIndex(stores context2.Stores) *fileIndex {
 	return &fileIndex{
-		metaObject:     defaultMetaObject(stores.VMetadata()), // TODO(fred): nice - when generalizing this to other objects, default may change
+		metaObject:     defaultMetaObject(GetDiamondStore(stores)), // TODO(fred): nice - when generalizing this to other objects, default may change
 		output:         make(chan bundleEntriesRes, bufferingFactor*defaultBundleEntriesPerFile),
 		concurrency:    100,
 		l:              dlogger.MustGetLogger("info"),

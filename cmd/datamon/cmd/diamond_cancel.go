@@ -40,6 +40,7 @@ var CancelDiamondCmd = &cobra.Command{
 				model.DiamondClone(diamond),
 			)),
 			core.DiamondLogger(logger),
+			core.DiamondWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 
 		err = d.Cancel()
