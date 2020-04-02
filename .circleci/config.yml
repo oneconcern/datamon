@@ -70,19 +70,10 @@ executors:
         auth:
           username: _json_key
           password: $GCLOUD_SERVICE_KEY
-      - image: minio/minio
-        environment:
-          MINIO_ACCESS_KEY: access-key
-          MINIO_SECRET_KEY: secret-key-thing
-          MINIO_BROWSER: "off"
-          MINIO_DOMAIN: s3.local
-          MINIO_HTTP_TRACE: /tmp/minio.log
-        command:
-          - server
-          - data
       - image: influxdb:1.7-alpine
         environment:
           INFLUXDB_DB: datamon
+          INFLUXDB_LOGGING_LEVEL: error
         command:
           - influxd
 
@@ -336,9 +327,10 @@ jobs:
       - run:
          name: Create influxdb test db
          command: |
-           curl --get http://localhost:8086/query --data-urlencode "q=CREATE DATABASE test"
+           curl http://localhost:8086/query --data-urlencode "q=CREATE DATABASE test"
       - run:
           name: Run golang tests with metrics (1)
+          no_output_timeout: 20m
           command: |
             gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format standard-verbose -- \
               -tags influxdbintegration \

@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"time"
 
 	"go.opencensus.io/stats/view"
 )
@@ -31,5 +32,13 @@ func WithExporter(exporter view.Exporter) Option {
 		if exporter != nil {
 			m.exporter = flusher(exporter)
 		}
+	}
+}
+
+// WithReportingPeriod configures how often the exporter is going to upload metrics.
+// Durations under 1 sec do not have any effect. The default is 10s.
+func WithReportingPeriod(d time.Duration) Option {
+	return func(m *settings) {
+		m.d = d
 	}
 }
