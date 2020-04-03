@@ -17,9 +17,10 @@ datamon label get [flags]
 ### Options
 
 ```
-  -h, --help           help for get
-      --label string   The human-readable name of a label
-      --repo string    The name of this repository
+  -h, --help            help for get
+      --label string    The human-readable name of a label
+      --repo string     The name of this repository
+      --with-versions   List all previous versions of labels
 ```
 
 ### Options inherited from parent commands

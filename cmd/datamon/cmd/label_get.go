@@ -50,7 +50,26 @@ exits with ENOENT status otherwise.`,
 				),
 			))
 
+		if datamonFlags.core.WithLabelVersions {
+			var versions []model.LabelDescriptor
+			versions, err = label.DownloadDescriptorVersions(ctx, bundle, true)
+			if errors.Is(err, status.ErrNotFound) {
+				wrapFatalWithCodef(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
+				return
+			}
+			for _, version := range versions {
+				var buf bytes.Buffer
+				err = labelDescriptorTemplate(datamonFlags).Execute(&buf, version)
+				if err != nil {
+					wrapFatalln("executing template", err)
+				}
+				log.Println(buf.String())
+			}
+			return
+		}
+
 		err = label.DownloadDescriptor(ctx, bundle, true)
+
 		if errors.Is(err, status.ErrNotFound) {
 			wrapFatalWithCodef(int(unix.ENOENT), "didn't find label %q", datamonFlags.label.Name)
 			return
@@ -87,6 +106,7 @@ func init() {
 			return
 		}
 	}
+	addLabelVersionsFlag(GetLabelCommand)
 
 	labelCmd.AddCommand(GetLabelCommand)
 }

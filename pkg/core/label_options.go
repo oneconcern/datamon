@@ -20,3 +20,10 @@ func LabelWithMetrics(enabled bool) LabelOption {
 		l.EnableMetrics(enabled)
 	}
 }
+
+// LabelWithVersion indicates we want to retrieve a specific version of this label object
+func LabelWithVersion(version string) LabelOption {
+	return func(l *Label) {
+		l.version = version
+	}
+}

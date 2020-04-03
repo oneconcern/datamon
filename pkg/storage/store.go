@@ -33,17 +33,34 @@ type Attributes struct {
 // Implementations of this interface are assumed to be fairly simple.
 type Store interface {
 	String() string
+
+	// Has this object in the store?
 	Has(context.Context, string) (bool, error)
+
+	// Get this object's backing bytes.
 	Get(context.Context, string) (io.ReadCloser, error)
+
+	// GetAttr looks up the Attributes of this object.
 	GetAttr(context.Context, string) (Attributes, error)
+
+	// Get this object's backing bytes.
 	GetAt(context.Context, string) (io.ReaderAt, error)
+
+	// Touch, like the usual *nix verb, touch(1), changes the object's modify time.
+	// Unlike touch(1), it does _not_ create an object if it doesn't exist.
 	Touch(context.Context, string) error
+
+	// Put writes bytes to a named object in the store.
 	Put(context.Context, string, io.Reader, bool) error
+
+	// Delete removes the specified object from the store.
 	Delete(context.Context, string) error
+
 	Clear(context.Context) error
 
 	// Keys returns all keys known to the store.
-	// Depending on the implementation, some limit may exist on the maximum number of such returned keys
+	// Depending on the implementation, some limit on the maximum number
+	// of such returned keys may exist.
 	Keys(context.Context) ([]string, error)
 
 	// KeyPrefix provides a paginated key iterator using "pageToken" as the next starting point
@@ -53,6 +70,17 @@ type Store interface {
 // StoreCRC knows how to update an object with a computed CRC checksum
 type StoreCRC interface {
 	PutCRC(context.Context, string, io.Reader, bool, uint32) error
+}
+
+// VersionedStore knows how to retrieve versions of object keys and objects
+type VersionedStore interface {
+	IsVersioned(context.Context) (bool, error)
+
+	// KeyVersions returns all versions of a given key
+	KeyVersions(context.Context, string) ([]string, error)
+
+	// GetVersion is like Get, but with a specific version of the object
+	GetVersion(context.Context, string, string) (io.ReadCloser, error)
 }
 
 // PipeIO copies data from a reader to a writer using io.Pipe

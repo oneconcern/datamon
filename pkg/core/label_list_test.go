@@ -113,17 +113,17 @@ func testListLabels(t *testing.T, concurrency int, i int) {
 		t.Run(fmt.Sprintf("ListLabels-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			//t.Parallel() // too much resource w/ -race on CI
 			labels, err := ListLabels(testcase.repo, mockedLabelContextStores(testcase.name),
-				testcase.prefix, ConcurrentList(concurrency), BatchSize(testBatchSize))
+				WithLabelPrefix(testcase.prefix), ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertLabels(t, testcase, labels, err)
 		})
 		t.Run(fmt.Sprintf("ListLabelsApply-%s-%d-%d", testcase.name, concurrency, i), func(t *testing.T) {
 			//t.Parallel()
 			labels := make(model.LabelDescriptors, 0, typicalReposNum)
 			err := ListLabelsApply(testcase.repo, mockedLabelContextStores(testcase.name),
-				testcase.prefix, func(label model.LabelDescriptor) error {
+				func(label model.LabelDescriptor) error {
 					labels = append(labels, label)
 					return nil
-				}, ConcurrentList(concurrency), BatchSize(testBatchSize))
+				}, WithLabelPrefix(testcase.prefix), ConcurrentList(concurrency), BatchSize(testBatchSize))
 			assertLabels(t, testcase, labels, err)
 		})
 	}
@@ -156,4 +156,8 @@ func TestListLabels(t *testing.T) {
 			testListLabels(t, concurrency, i)
 		}
 	}
+}
+
+func TestListLabelVersions(t *testing.T) {
+	t.Skip("tbd")
 }
