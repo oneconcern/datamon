@@ -232,19 +232,73 @@ commands:
       - run:
           name: Add CircleCI IP to whitelist
           command: |
+            set -o errexit
             CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
-            ALREADY="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. == "'"${CIRCLE_CI_IP}"'/32"))|.[]')"
-            if [ -z "${ALREADY}" ] ; then
-              gcloud container clusters update --zone ${GOOGLE_COMPUTE_ZONE} ${CLUSTER} --enable-master-authorized-networks --master-authorized-networks ${ALLOWED_NETWORKS},$CIRCLE_CI_IP/32
+            if [[ -z "${CIRCLE_CI_IP}" ]] ; then
+              echo "ERROR: could not retrieve external IP"
+              exit 1
             fi
+            echo "INFO: external IP address for the current job: ${CIRCLE_CI_IP}"
+
+            # Persist the whitelisted IP to be removed later on (actually a CIDR)
+            mkdir -p /tmp/whitelisted/ips && touch /tmp/whitelisted/ips/"${CIRCLE_CI_IP}"
+            ALREADY="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|\
+            jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. == "'"${CIRCLE_CI_IP}"'/32"))|.[]')"
+            if [ -n "${ALREADY}" ] ; then
+              exit 0
+            fi
+            typeset -i COUNT
+            COUNT=0
+            # cluster updates can't occur concurrently. Handle errors and retry during 10s.
+            while [[ "${COUNT}" -lt 10 ]] ; do
+              if gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${ALLOWED_NETWORKS},${CIRCLE_CI_IP}/32" ; then
+                exit 0
+              fi
+              COUNT=$((COUNT+1))
+              echo "WARN: could not update cluster [${COUNT}] - retrying..."
+              sleep 1
+            done
+            echo "ERROR: could not update cluster to whitelist ${CIRCLE_CI_IP}"
+            exit 1
+      - persist_to_workspace:
+          root: /tmp/whitelisted
+          paths:
+            - ips
+
 
   remove_whitelist_ip:
     steps:
+      - attach_workspace:
+          at: /tmp/whitelisted
       - run:
           name: Remove previously added CircleCI IP from whitelist
           command: |
-            set -x -o pipefail
-            gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${ALLOWED_NETWORKS}"
+            set -o errexit
+            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
+            echo "INFO: external IP address for the current job: ${CIRCLE_CI_IP}"
+            IPS_TO_REMOVE="$(find /tmp/whitelisted/ips -type f|awk '{for(i=1;i<NF;i++){printf("\"%s/32\"",$i);if ((NF>1) && (i<NF-1)){printf(",");}}}')"
+            PREVIOUS="${ALLOWED_NETWORKS}"
+            if [[ -z "${IPS_TO_REMOVE}" ]] ; then
+              echo "INFO: no previous IP found: resetting to pre-configured state"
+            else
+              echo "INFO: previously added IP to be removed: ${IPS_TO_REMOVE}"
+              PREVIOUS="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|\
+              jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(inside('"${IPS_TO_REMOVE}"')))')"
+            fi
+            echo "INFO: previously authorized networks: ${PREVIOUS}"
+            typeset -i COUNT
+            COUNT=0
+            # cluster updates can't occur concurrently. Handle errors and retry during 10s.
+            while [[ "${COUNT}" -lt 10 ]] ; do
+              if gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${PREVIOUS}" ; then
+                exit 0
+              fi
+              COUNT=$((COUNT+1))
+              echo "WARN: could not update cluster [${COUNT}] - retrying..."
+              sleep 1
+            done
+            echo "ERROR: could not remove whitelist IPs"
+            exit 1
 
 jobs:
   go_lint:

@@ -2,9 +2,6 @@
 
 ## demonstrate a fuse read-only filesystem
 
-# on the utility shell scripts v. makefile targets by use-case
-# https://stackoverflow.com/a/45003119
-
 setopt ERR_EXIT
 
 dbg_print() {
@@ -126,11 +123,22 @@ pod_name=
 SIDECAR_TAG=$(go run ./hack/release_tag.go)
 
 dbg_print 'waiting on pod start'
+typeset -i COUNT
+COUNT=0
 dbg_print "##### pod with api server metadata app=datamon-coord-fuse-demo-pods,instance=${SIDECAR_TAG}"
 while [[ -z $pod_name ]]; do
     sleep "$POLL_INTERVAL"
 
-    k=$(kubectl -n "${NS}" get pods -l app=datamon-coord-fuse-demo,instance="${SIDECAR_TAG}" --output custom-columns=NAME:.metadata.name,STATUS:.status.phase)
+    if ! k=$(kubectl -n "${NS}" get pods -l app=datamon-coord-fuse-demo,instance="${SIDECAR_TAG}" --output custom-columns=NAME:.metadata.name,STATUS:.status.phase) ; then
+      # sometimes, we lose connectivity from the circleCI container: handle failure and retry a couple times
+      error_print "cannot fetch pod logs. Retrying..."
+      COUNT=$((COUNT+1))
+      if [[ "${COUNT}" -gt 10 ]] ; then
+        error_print "cannot fetch pod logs. Giving up after ${COUNT} attempts."
+        exit 1
+      fi
+      continue
+    fi
     pod_name=$(echo "${k}" | grep Running | cut -d' ' -f1) || true
     check=$(echo "${k}"|grep -iE '(BackOff)|(Error)') || true
     if [[ -n "${check}" ]] ; then

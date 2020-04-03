@@ -238,6 +238,8 @@ clean-pg-demo:
 	kubectl -n $(CI_NS) delete deployment datamon-pg-demo-$(RELEASE_TAG) || true
 	kubectl -n $(CI_NS) get configmaps -l app=datamon-coord-pg-demo --output custom-columns=NAME:.metadata.name|\
 	grep $(RELEASE_TAG)|while read -r config ; do kubectl -n $(CI_NS) delete configmap $${config} ; done
+	kubectl -n $(CI_NS) get pods -l app=datamon-coord-pg-demo --output custom-columns=NAME:.metadata.name|tail +2|\
+	while read -r pod ; do kubectl -n $(CI_NS) delete pod $${pod} --grace-period 0 --force ; done
 
 # TODO(fred): there are some secrets etc to be removed too
 
@@ -247,12 +249,16 @@ clean-fuse-demo:
 	kubectl -n $(CI_NS) delete deployment datamon-fuse-demo-$(RELEASE_TAG) || true
 	kubectl -n $(CI_NS) get configmaps -l app=datamon-coord-fuse-demo --output custom-columns=NAME:.metadata.name|\
 	grep $(RELEASE_TAG)|while read -r config ; do kubectl -n $(CI_NS) delete configmap $${config} ; done
+	kubectl -n $(CI_NS) get pods -l app=datamon-coord-fuse-demo --output custom-columns=NAME:.metadata.name|tail +2|\
+	while read -r pod ; do kubectl -n $(CI_NS) delete pod $${pod} --grace-period 0 --force ; done
 
 .PHONY: clean-all-demo
 ## TEST: Ensure all k8s sidecar demo resources are relinquished (manual use)
 clean-all-demo:
 	kubectl -n $(CI_NS) delete deployments --all
 	kubectl -n $(CI_NS) delete configmaps --all
+	kubectl -n $(CI_NS) get pods --output custom-columns=NAME:.metadata.name|tail +2|\
+	while read -r pod ; do kubectl -n $(CI_NS) delete pod $${pod} --grace-period 0 --force ; done
 
 .PHONY: test
 ## TEST: Setup, run all tests and clean
