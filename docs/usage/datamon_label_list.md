@@ -29,6 +29,7 @@ init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT
   -h, --help                     help for list
       --prefix string            List labels starting with a prefix.
       --repo string              The name of this repository
+      --with-versions            List all previous versions of labels
 ```
 
 ### Options inherited from parent commands

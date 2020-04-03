@@ -75,6 +75,7 @@ type flagsT struct {
 		ConcurrencyFactor int
 		BatchSize         int
 		Template          string
+		WithLabelVersions bool
 	}
 	split struct {
 		splitID string
@@ -429,6 +430,14 @@ func addDiamondTagFlag(cmd *cobra.Command) string {
 	c := "diamond-tag"
 	if cmd != nil {
 		cmd.Flags().StringVar(&datamonFlags.diamond.tag, c, "", `A custom tag to identify your diamond in logs or datamon reports. Example: "coordinator-pod-A"`)
+	}
+	return c
+}
+
+func addLabelVersionsFlag(cmd *cobra.Command) string {
+	c := "with-versions"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.core.WithLabelVersions, c, false, `List all previous versions of labels`)
 	}
 	return c
 }

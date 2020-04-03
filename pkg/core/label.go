@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"hash/crc32"
+	"io"
 	"io/ioutil"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 // Examples: Latest, production.
 type Label struct {
 	Descriptor model.LabelDescriptor
+	version    string
 
 	metrics.Enable
 	m *M
@@ -82,6 +84,58 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) (err e
 	return nil
 }
 
+// DownloadDescriptorVersions retrieves all versions of a abel descriptor for a bundle
+func (label *Label) DownloadDescriptorVersions(ctx context.Context, bundle *Bundle, checkRepoExists bool) (lds []model.LabelDescriptor, err error) {
+	defer func(t0 time.Time) {
+		if label.MetricsEnabled() {
+			label.m.Usage.UsedAll(t0, "LabelDownloadVersions")(err)
+		}
+	}(time.Now())
+
+	if checkRepoExists {
+		err = RepoExists(bundle.RepoID, bundle.contextStores)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	archivePath := model.GetArchivePathToLabel(bundle.RepoID, label.Descriptor.Name)
+	has, err := getLabelStore(bundle.contextStores).Has(context.Background(), archivePath)
+	if err != nil {
+		return nil, err
+	}
+	if !has {
+		return nil, status.ErrNotFound
+	}
+
+	vstore, ok := getLabelStore(bundle.contextStores).(storage.VersionedStore)
+	if !ok {
+		return nil, status.ErrVersionedStoreRequired
+	}
+
+	versions, err := vstore.KeyVersions(context.Background(), archivePath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, version := range versions {
+		rdr, err := vstore.GetVersion(context.Background(), archivePath, version)
+		if err != nil {
+			return nil, err
+		}
+		o, err := ioutil.ReadAll(rdr)
+		if err != nil {
+			return nil, err
+		}
+		err = yaml.Unmarshal(o, &label.Descriptor)
+		if err != nil {
+			return nil, err
+		}
+		lds = append(lds, label.Descriptor)
+	}
+	return lds, nil
+}
+
 // DownloadDescriptor retrieves the label descriptor for a bundle
 func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, checkRepoExists bool) (err error) {
 	defer func(t0 time.Time) {
@@ -104,7 +158,17 @@ func (label *Label) DownloadDescriptor(ctx context.Context, bundle *Bundle, chec
 	if !has {
 		return status.ErrNotFound
 	}
-	rdr, err := getLabelStore(bundle.contextStores).Get(context.Background(), archivePath)
+
+	var rdr io.Reader
+	if label.version != "" {
+		vstore, ok := getLabelStore(bundle.contextStores).(storage.VersionedStore)
+		if !ok {
+			return status.ErrVersionedStoreRequired
+		}
+		rdr, err = vstore.GetVersion(context.Background(), archivePath, label.version)
+	} else {
+		rdr, err = getLabelStore(bundle.contextStores).Get(context.Background(), archivePath)
+	}
 	if err != nil {
 		return err
 	}

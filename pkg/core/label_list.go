@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core/status"
+	"github.com/oneconcern/datamon/pkg/storage"
 
 	"github.com/oneconcern/datamon/pkg/model"
 )
@@ -17,10 +19,10 @@ const (
 )
 
 // ListLabels returns all labels from a repo
-func ListLabels(repo string, stores context2.Stores, prefix string, opts ...Option) ([]model.LabelDescriptor, error) {
+func ListLabels(repo string, stores context2.Stores, opts ...Option) ([]model.LabelDescriptor, error) {
 	labels := make(model.LabelDescriptors, 0, typicalLabelsNum)
 
-	labelsChan, workers := listLabelsChan(repo, stores, prefix, opts...)
+	labelsChan, workers := listLabelsChan(repo, stores, opts...)
 
 	// consume batches of ordered labels
 	err := doSelectLabels(labelsChan, func(labelBatch model.LabelDescriptors) {
@@ -36,7 +38,7 @@ func ListLabels(repo string, stores context2.Stores, prefix string, opts ...Opti
 type ApplyLabelFunc func(model.LabelDescriptor) error
 
 // ListLabelsApply applies some function to the retrieved labels, in lexicographic order of keys.
-func ListLabelsApply(repo string, store context2.Stores, prefix string, apply ApplyLabelFunc, opts ...Option) error {
+func ListLabelsApply(repo string, store context2.Stores, apply ApplyLabelFunc, opts ...Option) error {
 	var (
 		err, applyErr error
 		once          sync.Once
@@ -57,7 +59,7 @@ func ListLabelsApply(repo string, store context2.Stores, prefix string, apply Ap
 	go func(labelChan chan<- model.LabelDescriptor, doneChan chan struct{}) {
 		defer close(labelChan)
 
-		labelsChan, workers := listLabelsChan(repo, store, prefix, append(opts, WithDoneChan(doneChan))...)
+		labelsChan, workers := listLabelsChan(repo, store, append(opts, WithDoneChan(doneChan))...)
 
 		err = doSelectLabels(labelsChan, func(labelBatch model.LabelDescriptors) {
 			for _, label := range labelBatch {
@@ -104,15 +106,30 @@ type labelsEvent struct {
 	err    error
 }
 
-func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...Option) (chan labelsEvent, *sync.WaitGroup) {
+func listLabelsChan(repo string, stores context2.Stores, opts ...Option) (chan labelsEvent, *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	settings := defaultSettings()
 	for _, bApply := range opts {
 		bApply(&settings)
 	}
+	prefix := settings.labelPrefix
 
 	batchChan := make(chan labelsEvent, 1) // buffered to 1 to avoid blocking on early errors
+
+	if settings.labelVersions {
+		vstore, ok := getLabelStore(stores).(storage.VersionedStore)
+		if !ok {
+			batchChan <- labelsEvent{err: status.ErrVersionedStoreRequired.WrapMessage("%T does not implement VersionedStore", vstore)}
+			close(batchChan)
+			return batchChan, &wg
+		}
+		if ok, err := vstore.IsVersioned(context.Background()); !ok || err != nil {
+			batchChan <- labelsEvent{err: status.ErrVersionedStoreRequired.WrapMessage("bucket does not enable versioning")}
+			close(batchChan)
+			return batchChan, &wg
+		}
+	}
 
 	if err := RepoExists(repo, stores); err != nil {
 		batchChan <- labelsEvent{err: err}
@@ -133,12 +150,24 @@ func listLabelsChan(repo string, stores context2.Stores, prefix string, opts ...
 	keysChan := make(chan keyBatchEvent, 1)
 
 	iterator := func(next string) ([]string, string, error) {
-		return GetLabelStore(stores).KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToLabels(repo, prefix), "", settings.batchSize)
+		return getLabelStore(stores).KeysPrefix(context.Background(), next, model.GetArchivePathPrefixToLabels(repo, prefix), "", settings.batchSize)
 	}
-	// starting keys retrieval
-	wg.Add(1)
-	go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
 
+	if settings.labelVersions {
+		unversionedKeysChan := make(chan keyBatchEvent, 1)
+
+		// starting keys retrieval
+		wg.Add(1)
+		go fetchKeys(iterator, unversionedKeysChan, doneWithKeysChan, &wg) // scan for key batches
+
+		// keys versions expansion
+		wg.Add(1)
+		go versionedKeys(getLabelStore(stores).(storage.VersionedStore), unversionedKeysChan, keysChan, settings, &wg)
+	} else {
+		// starting keys retrieval, no versioning
+		wg.Add(1)
+		go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+	}
 	// start repo metadata retrieval
 	wg.Add(1)
 	go fetchLabels(repo, stores, settings, keysChan, batchChan, doneWithKeysChan, doneWithBundlesChan, &wg)
@@ -210,7 +239,7 @@ func fetchLabelBatch(repo string, stores context2.Stores, settings Settings, key
 	// spin up workers pool
 	for i := 0; i < minInt(settings.concurrentList, len(keys)); i++ {
 		workers.Add(1)
-		go getLabelAsync(repo, stores, keyChan, labelChan, &workers)
+		go getLabelAsync(repo, stores, keyChan, labelChan, settings.labelVersions, &workers)
 	}
 
 	lbs := make(model.LabelDescriptors, 0, len(keys))
@@ -251,9 +280,20 @@ func fetchLabelBatch(repo string, stores context2.Stores, settings Settings, key
 }
 
 // getLabelAsync fetches and unmarshalls the label descriptor for each single key submitted as input
-func getLabelAsync(repo string, stores context2.Stores, input <-chan string, output chan<- labelEvent, wg *sync.WaitGroup) {
+func getLabelAsync(repo string, stores context2.Stores, input <-chan string, output chan<- labelEvent, withVersions bool, wg *sync.WaitGroup) {
 	defer wg.Done()
+	var version string
 	for k := range input {
+		if withVersions {
+			// internally, we follow the {key}#{version} convention. This applies to metadata keys holding labels,
+			// and is only part of the internal key fetching / versions expension pipeline (not exposed to caller).
+			parts := strings.Split(k, "#")
+			if len(parts) != 2 {
+				panic("dev error: unexpected internal format for versioned keys")
+			}
+			k = parts[0]
+			version = parts[1]
+		}
 		apc, err := model.GetArchivePathComponents(k)
 		if err != nil {
 			output <- labelEvent{err: err}
@@ -261,8 +301,9 @@ func getLabelAsync(repo string, stores context2.Stores, input <-chan string, out
 		}
 		bundle := NewBundle(Repo(repo), ContextStores(stores))
 		labelName := apc.LabelName
-		label := NewLabel(LabelDescriptor(model.NewLabelDescriptor(model.LabelName(labelName))))
-		if err = label.DownloadDescriptor(context.Background(), bundle, false); err != nil {
+		label := NewLabel(LabelDescriptor(model.NewLabelDescriptor(model.LabelName(labelName))), LabelWithVersion(version))
+		err = label.DownloadDescriptor(context.Background(), bundle, false)
+		if err != nil {
 			output <- labelEvent{err: err}
 			continue
 		}
