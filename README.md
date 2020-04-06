@@ -84,7 +84,7 @@ Please follow the [installation instructions](docs/install.md).
 
 v2 comes with breaking changes. The migration process replaces older repos by new ones.
 
-See the [migration guide](k8s/migatev2/README.md).
+See the [migration guide](https://github.com/oneconcern/datamon/tree/master/k8s/migratev2).
 
 ## CLI guide
 
