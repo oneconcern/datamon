@@ -38,7 +38,7 @@ func (g Auth) Principal(credFile string) (model.Contributor, error) {
 		return model.Contributor{}, status.ErrAuthService.Wrap(err)
 	}
 
-	var u *goauth.Userinfoplus
+	var u *goauth.Userinfo
 	u, err = svc.Userinfo.Get().Do()
 	if err != nil {
 		return model.Contributor{}, status.ErrUserinfo.Wrap(err)
