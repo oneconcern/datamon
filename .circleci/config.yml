@@ -700,6 +700,7 @@ workflows:
           context: "OC Common"
           requires:
             - build_demo_images
+            - fuse_sidecar_test
           filters:
             tags:
               only: /.*/

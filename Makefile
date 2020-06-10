@@ -29,7 +29,7 @@ UPX_FOR_OSX=$(shell if [[ -n "$(UPX_MAJOR)" && -n $(UPX_MINOR) && "$(UPX_MAJOR)"
 # go-gettable tools used for build and test
 # NOTE: we don't put packr2 in that list, to stick to the version in go.mod (no automatic upgrade)
 TOOLS ?= github.com/mitchellh/gox \
-	github.com/golangci/golangci-lint/cmd/golangci-lint \
+	github.com/golangci/golangci-lint/cmd/golangci-lint@v1.24.0 \
 	gotest.tools/gotestsum@latest \
 	github.com/matryer/moq@latest \
 	golang.org/x/tools/cmd/goimports
@@ -185,10 +185,16 @@ cross-compile-binaries: build-assets
 
 	@if [[ -n "${UPX_FOR_OSX}" ]]; then \
 		echo "INFO: compressing all binaries" && \
-		upx ${TARGET}/* ; \
+		upx ${TARGET}/* ; res=$$? || true ; \
+		if [[ $${res} -ne 0 && $${res} -ne 2 ]] ; then \
+		  echo "ERROR: upx failed" && exit 1 ; \
+		fi ; \
 	elif [[ -n "${UPX_VERSION}" ]] ; then \
 	  echo "INFO: compressing linux binaries only. Install upx >=3.96 to compress darwin binaries" && \
-		upx ${TARGET}/*_linux_* ; \
+		upx ${TARGET}/*_linux_* ; res=$$? || true ; \
+		if [[ $${res} -ne 0 && $${res} -ne 2 ]] ; then \
+		  echo "ERROR: upx failed" && exit 1 ; \
+		fi ; \
 	else \
 	  echo "WARN:: upx not available in this environment. Binaries not compressed." ; \
 	fi
