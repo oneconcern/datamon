@@ -1,8 +1,8 @@
 module github.com/oneconcern/datamon
 
 require (
-	cloud.google.com/go v0.55.0 // indirect
-	cloud.google.com/go/storage v1.6.0
+	cloud.google.com/go v0.58.0 // indirect
+	cloud.google.com/go/storage v1.9.0
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/aws/aws-sdk-go v1.29.32
 	github.com/blang/semver v3.5.1+incompatible
@@ -43,12 +43,12 @@ require (
 	go.uber.org/goleak v1.0.0
 	go.uber.org/zap v1.14.1
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59 // indirect
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
+	golang.org/x/net v0.0.0-20200602114024-627f9648deb9 // indirect
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
-	golang.org/x/tools v0.0.0-20200325203130-f53864d0dba1 // indirect
-	google.golang.org/api v0.20.0
-	google.golang.org/genproto v0.0.0-20200325114520-5b2d0af7952b // indirect
+	golang.org/x/sys v0.0.0-20200610111108-226ff32320da
+	golang.org/x/tools v0.0.0-20200610160956-3e83d1e96d0e // indirect
+	google.golang.org/api v0.26.0
+	google.golang.org/genproto v0.0.0-20200610104632-a5b850bcf112 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.2.8
