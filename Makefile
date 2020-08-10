@@ -29,7 +29,7 @@ UPX_FOR_OSX=$(shell if [[ -n "$(UPX_MAJOR)" && -n $(UPX_MINOR) && "$(UPX_MAJOR)"
 # go-gettable tools used for build and test
 # NOTE: we don't put packr2 in that list, to stick to the version in go.mod (no automatic upgrade)
 TOOLS ?= github.com/mitchellh/gox \
-	github.com/golangci/golangci-lint/cmd/golangci-lint@v1.24.0 \
+	github.com/golangci/golangci-lint/cmd/golangci-lint \
 	gotest.tools/gotestsum@latest \
 	github.com/matryer/moq@latest \
 	golang.org/x/tools/cmd/goimports
@@ -127,7 +127,7 @@ ensure-gotools:
 	pushd ${GOPATH}/bin 1>/dev/null 2>&1 && \
 	for tool in $(TOOLS) ; do \
 	  echo "$(GREEN)INFO: ensuring $(YELLOW)$${tool}$(GREEN) is up to date$(RESET)" && \
-		go get -u $${tool} 1>/dev/null 2>&1; \
+		go get $${tool} 1>/dev/null 2>&1; \
 	done && \
 	popd 2>/dev/null
 
