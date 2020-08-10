@@ -4,6 +4,8 @@ jobs:
     working_directory: ~/project
     docker:
       - image: circleci/golang
+        environment:
+          GO111MODULE: 'on'
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: access-key
@@ -27,24 +29,26 @@ jobs:
             sudo apt-get install -y git build-essential
             sudo apt-get install -y google-cloud-sdk
             sudo apt-get install -y shellcheck
-      - run:
-          name: Install go tools
-          command: |
-            go get -u gotest.tools/gotestsum
-            go get -u github.com/matryer/moq
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
-            mkdir -p /tmp/test-results
-      - checkout
-      # Restore bundle cache
       - restore_cache:
           keys:
            - pkg-cache-{{ checksum "go.sum" }}
            - pkg-cache-
       - run:
+          name: Install go tools
+          command: |
+            mkdir -p ${GOPATH}/bin
+            pushd ${GOPATH}/bin
+            go get -u gotest.tools/gotestsum
+            go get -u github.com/matryer/moq
+            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+            popd
+            mkdir -p /tmp/test-results
+      - checkout
+      - run:
           name: Run golang linter
           command: |
             hack/go-generate.sh
-            golangci-lint run --verbose
+            golangci-lint run --new-from-rev v1.0.1
       - run:
           name: Lint shell scripts
           command: |
@@ -58,6 +62,8 @@ jobs:
     working_directory: ~/project
     docker:
       - image: circleci/golang
+        environment:
+          GO111MODULE: 'on'
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: access-key
@@ -80,18 +86,20 @@ jobs:
             sudo apt-get update -y
             sudo apt-get install -y git build-essential
             sudo apt-get install -y google-cloud-sdk
-      - run:
-          name: Install go tools
-          command: |
-            go get -u gotest.tools/gotestsum
-            go get -u github.com/matryer/moq
-            mkdir -p /tmp/test-results
-      - checkout
-      # Restore bundle cache
       - restore_cache:
           keys:
             - pkg-cache-{{ checksum "go.sum" }}
             - pkg-cache-
+      - run:
+          name: Install go tools
+          command: |
+            mkdir -p ${GOPATH}/bin
+            pushd ${GOPATH}/bin
+            go get -u gotest.tools/gotestsum
+            go get -u github.com/matryer/moq
+            popd
+            mkdir -p /tmp/test-results
+      - checkout
       - run:
           name: Run golang tests
           command: |

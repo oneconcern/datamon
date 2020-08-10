@@ -35,5 +35,13 @@ linters:
     - gocognit
     - gomnd
     - goprintffuncname
+    - gci
+    - gofumpt
+    - nlreturn
+    - testpackage
+    - goerr113
+    - exhaustive
+    - godot
+    - nestif
 
 max-same-issues: 0
