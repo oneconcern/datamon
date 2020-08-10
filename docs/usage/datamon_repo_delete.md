@@ -1,24 +1,31 @@
 **Version: dev**
 
-## datamon repo
+## datamon repo delete
 
-Commands to manage repos
+Delete a named repo
 
 ### Synopsis
 
-Commands to manage repos.
+Delete an existing datamon repository.
 
-A datamon repository is analogous to a git repository.
+This command MUST NOT BE RUN concurrently.
 
-Repos are datasets with a unified lifecycle.
-They are versioned and managed via bundles.
 
+```
+datamon repo delete [flags]
+```
+
+### Examples
+
+```
+% datamon repo delete --repo ritesh-datamon-test-repo
+```
 
 ### Options
 
 ```
-      --format string   Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
-  -h, --help            help for repo
+  -h, --help          help for delete
+      --repo string   The name of this repository
 ```
 
 ### Options inherited from parent commands
@@ -26,6 +33,7 @@ They are versioned and managed via bundles.
 ```
       --config string             Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
       --context string            Set the context for datamon (default "dev")
+      --format string             Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
       --loglevel string           The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
       --metrics                   Toggle telemetry and metrics collection
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
@@ -36,9 +44,6 @@ They are versioned and managed via bundles.
 
 ### SEE ALSO
 
-* [datamon](datamon.md)	 - Datamon helps build ML pipelines
-* [datamon repo create](datamon_repo_create.md)	 - Create a named repo
-* [datamon repo delete](datamon_repo_delete.md)	 - Delete a named repo
-* [datamon repo get](datamon_repo_get.md)	 - Get repo info by name
-* [datamon repo list](datamon_repo_list.md)	 - List repos
+* [datamon repo](datamon_repo.md)	 - Commands to manage repos
+* [datamon repo delete files](datamon_repo_delete_files.md)	 - Deletes files from a named repo, altering all bundles
 
