@@ -42,5 +42,6 @@ linters:
     - goerr113
     - exhaustive
     - godot
+    - nestif
 
 max-same-issues: 0

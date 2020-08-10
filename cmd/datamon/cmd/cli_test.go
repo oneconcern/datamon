@@ -19,10 +19,11 @@ import (
 	"github.com/oneconcern/datamon/pkg/cafs"
 
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
-	"github.com/spf13/afero"
 
 	gcsStorage "cloud.google.com/go/storage"
 	"github.com/oneconcern/datamon/internal"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 	"google.golang.org/api/iterator"
@@ -1296,4 +1297,138 @@ func deleteBucket(ctx context.Context, t *testing.T, client *gcsStorage.Client, 
 	if err := mb.Delete(ctx); err != nil {
 		t.Errorf("error deleting bucket %v", err)
 	}
+}
+
+func TestDeleteRepo(t *testing.T) {
+	cleanup := setupTests(t)
+	defer cleanup()
+	const (
+		repo  = "repoToDelete"
+		label = "labelToDelete"
+	)
+
+	runCmd(t, []string{"repo",
+		"create",
+		"--description", "testing",
+		"--repo", repo,
+	}, "create test repo to delete", false)
+
+	for i, tree := range testUploadTrees {
+		runCmd(t, []string{"bundle",
+			"upload",
+			"--path", dirPathStr(t, tree[0]),
+			"--message", "The initial commit for the repo",
+			"--repo", repo,
+			"--label", label + strconv.Itoa(i),
+			"--concurrency-factor", concurrencyFactor,
+		}, "upload bundle at "+dirPathStr(t, tree[0]), false)
+	}
+
+	runCmd(t, []string{"repo",
+		"delete",
+		"files",
+		"--file",
+		"leafsize",
+		"--repo", repo,
+	}, "delete file from test repo", false)
+
+	for i := range testUploadTrees {
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
+		runCmd(t, []string{"bundle",
+			"list",
+			"files",
+			"--repo", repo,
+			"--label", label + strconv.Itoa(i),
+		}, "list files after single file delete", false)
+
+		log.SetOutput(w)
+		log.SetOutput(os.Stdout)
+		w.Close()
+
+		lb, err := ioutil.ReadAll(r)
+		require.NoError(t, err, "i/o error reading patched log from pipe")
+		for _, line := range getDataLogLines(t, string(lb), []string{}) {
+			assert.NotContains(t, line, "name:leafsize")
+		}
+	}
+
+	filelist, filelistCleanup := getTempFile(t, "to_delete.txt")
+	defer filelistCleanup()
+	_, err := filelist.WriteString("/1/2/3/4/5/6/7/deeper\n")
+	require.NoError(t, err)
+	_, err = filelist.WriteString("/1/2/3/4/5/6/deep\n")
+	require.NoError(t, err)
+
+	runCmd(t, []string{"repo",
+		"delete",
+		"files",
+		"--files",
+		filelist.Name(),
+		"--repo", repo,
+	}, "delete files from test repo", false)
+
+	for i := range testUploadTrees {
+		r, w, e := os.Pipe()
+		require.NoError(t, e)
+		runCmd(t, []string{"bundle",
+			"list",
+			"files",
+			"--repo", repo,
+			"--label", label + strconv.Itoa(i),
+		}, "list files after single file delete", false)
+
+		log.SetOutput(w)
+		log.SetOutput(os.Stdout)
+		w.Close()
+
+		lb, e := ioutil.ReadAll(r)
+		require.NoError(t, e, "i/o error reading patched log from pipe")
+		for _, line := range getDataLogLines(t, string(lb), []string{}) {
+			assert.NotContains(t, line, "name:/1/2/3/4/5/6/7/deeper")
+			assert.NotContains(t, line, "name:/1/2/3/4/5/6/deep")
+		}
+	}
+
+	runCmd(t, []string{"repo",
+		"delete",
+		"--repo", repo,
+	}, "delete test repo", false)
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	runCmd(t, []string{"repo",
+		"list",
+	}, "verify repo is deleted", false)
+
+	log.SetOutput(w)
+	log.SetOutput(os.Stdout)
+	w.Close()
+	lb, err := ioutil.ReadAll(r)
+	require.NoError(t, err, "i/o error reading patched log from pipe")
+	for _, line := range getDataLogLines(t, string(lb), []string{}) {
+		assert.NotContains(t, line, repo)
+	}
+
+	runCmd(t, []string{"label",
+		"list",
+		"--repo", repo,
+	}, "verify labels are deleted", true)
+}
+
+func getTempFile(t *testing.T, filename string) (*os.File, func()) {
+	if filename == "" {
+		filename = "datamon_test_temp_file"
+	}
+	tempDirPath, err := ioutil.TempDir("", "datamon-TestUploadBundleFilelist")
+	require.NoError(t, err, "create temp dir")
+	tempPath := filepath.Join(tempDirPath, filename)
+	tempFile, err := os.Create(tempPath)
+	require.NoError(t, err, "create temp file")
+	cleanup := func() {
+		err := os.RemoveAll(tempDirPath)
+		require.NoError(t, err, "rm temp dir")
+	}
+	return tempFile, cleanup
 }
