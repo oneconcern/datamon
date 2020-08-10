@@ -49,7 +49,13 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		destinationStore, err := optionInputs.destStore(destTEmpty, "")
+		var destStatus DestT
+		if datamonFlags.bundle.ForceDest {
+			destStatus = destTMaybeNonEmpty
+		} else {
+			destStatus = destTEmpty
+		}
+		destinationStore, err := optionInputs.destStore(destStatus, "")
 		if err != nil {
 			wrapFatalln("create destination store", err)
 			return
@@ -128,6 +134,7 @@ func init() {
 	addConcurrencyFactorFlag(BundleDownloadCmd, 100)
 
 	addNameFilterFlag(BundleDownloadCmd)
+	addForceDestFlag(BundleDownloadCmd)
 
 	bundleCmd.AddCommand(BundleDownloadCmd)
 }

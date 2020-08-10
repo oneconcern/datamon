@@ -37,6 +37,7 @@ type flagsT struct {
 		SkipOnError       bool
 		ConcurrencyFactor int
 		NameFilter        string
+		ForceDest         bool
 	}
 	fs struct {
 		MountPath      string
@@ -438,6 +439,14 @@ func addLabelVersionsFlag(cmd *cobra.Command) string {
 	c := "with-versions"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.core.WithLabelVersions, c, false, `List all previous versions of labels`)
+	}
+	return c
+}
+
+func addForceDestFlag(cmd *cobra.Command) string {
+	c := "force-dest"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.bundle.ForceDest, c, false, `Override destination path is empty check`)
 	}
 	return c
 }
