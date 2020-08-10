@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/storage"
@@ -156,7 +155,6 @@ func DeleteEntriesFromRepo(repo string, stores context2.Stores, toDelete []strin
 			}
 			if listModified {
 				// 4. overwrite updated file list
-				fmt.Fprintf(os.Stderr, "want to update %s for bundle %s in repo %s", archivePathToBundleFileList, bundleID, repo)
 				buffer, erm := yaml.Marshal(newBundleEntry)
 				if erm != nil {
 					return fmt.Errorf("cannot marshal file list index %d for bundle %s in repo %s: %v", i, bundleID, repo, erm)
