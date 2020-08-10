@@ -35,5 +35,12 @@ linters:
     - gocognit
     - gomnd
     - goprintffuncname
+    - gci
+    - gofumpt
+    - nlreturn
+    - testpackage
+    - goerr113
+    - exhaustive
+    - godot
 
 max-same-issues: 0

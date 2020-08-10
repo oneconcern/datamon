@@ -30,9 +30,9 @@ jobs:
       - run:
           name: Install go tools
           command: |
-            go get -u gotest.tools/gotestsum
-            go get -u github.com/matryer/moq
-            go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+            go get gotest.tools/gotestsum
+            go get github.com/matryer/moq
+            go get github.com/golangci/golangci-lint/cmd/golangci-lint
             mkdir -p /tmp/test-results
       - checkout
       # Restore bundle cache
@@ -44,7 +44,7 @@ jobs:
           name: Run golang linter
           command: |
             hack/go-generate.sh
-            golangci-lint run --verbose
+            golangci-lint run --verbose --new-from-rev v1
       - run:
           name: Lint shell scripts
           command: |
