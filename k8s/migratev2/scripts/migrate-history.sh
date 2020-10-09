@@ -10,12 +10,12 @@ sanity
 
 # CLI input sanitization (assuming ${REPO} does not contain any blank space)
 srcBundle=""
-if [[ ! -z ${SOURCEBUNDLE} ]] ; then
+if [[ -n ${SOURCEBUNDLE} ]] ; then
   srcBundle=${SOURCEBUNDLE}
 fi
 
 # resolve starting bundle when specified by label
-if [[ ! -z ${SOURCELABEL} ]] ; then
+if [[ -n ${SOURCELABEL} ]] ; then
   srcLabel="--label \"${SOURCELABEL}\""
   if ! res=$(eval "datamon1 bundle get --repo ${REPO} ${srcLabel}" 2>&1|tail -1|cut -d, -f1) ; then
     echo "ERROR: failed to retrieve bundle for label ${SOURCELABEL} in repo: ${REPO}"
@@ -53,7 +53,7 @@ while read -r b ;do
       continue
     fi
   fi
-  if [[ ! -z ${start} ]] ; then
+  if [[ -n ${start} ]] ; then
     # tells the unitary migration job to skip params & repo checks
     echo "INFO: migrating bundle ${bundle} for repo ${REPO}"
     SOURCEBUNDLE=${bundle} SOURCELABEL="" /bin/bash /scripts/migrate.sh ${firstDone} --sane 2>&1

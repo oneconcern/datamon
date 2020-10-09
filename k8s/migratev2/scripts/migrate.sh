@@ -28,14 +28,14 @@ fi
 
 # CLI input sanitization (assuming ${REPO} does not contain any blank space)
 srcBundle=""
-if [[ ! -z ${SOURCEBUNDLE} ]] ; then
+if [[ -n ${SOURCEBUNDLE} ]] ; then
   srcBundle="--bundle \"${SOURCEBUNDLE}\""
 fi
-if [[ ! -z ${SOURCELABEL} ]] ; then
+if [[ -n ${SOURCELABEL} ]] ; then
   srcBundle="--label \"${SOURCELABEL}\""
 fi
 targetContext=""
-if [[ ! -z ${DESTCONTEXT} ]] ; then
+if [[ -n ${DESTCONTEXT} ]] ; then
   targetContext="--context \"${DESTCONTEXT}\""
 fi
 
@@ -86,14 +86,14 @@ function setLabels {
   datamon1 label list --repo "${REPO}" 2>&1|grep -v '{level:"'|grep "${bundleID}"|cut -d, -f1|\
   while read -r l ; do
     label=$(trim "${l}")
-    if [[ ! -z ${label} && ${label} != "${DESTLABEL}" ]] ; then
+    if [[ -n ${label} && ${label} != "${DESTLABEL}" ]] ; then
       echo "INFO: adding label \"${label}\" to new bundle ID: ${REPO}"
       if ! eval "datamon2 label set --repo \"${REPO}\" --bundle \"${bundleID}\" --label \"${label}\" $targetContext" ; then
         echo "ERROR: Failed to migrate existing labels into V2 repo ${REPO} for V1 bundle ${bundleID}"
       fi
     fi
   done
-  if [[ ! -z ${DESTLABEL} ]] ; then
+  if [[ -n ${DESTLABEL} ]] ; then
     echo "INFO: setting additional label ${DESTLABEL} for repo: ${REPO}"
     if ! eval "datamon2 label set --repo \"${REPO}\" --bundle \"${bundleID}\" --label \"${DESTLABEL}\" $targetContext" ; then
       echo "ERROR: Failed to apply new label o V2 repo ${REPO} for bundle ${bundleID}"
