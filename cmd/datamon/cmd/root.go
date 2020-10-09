@@ -162,6 +162,7 @@ func init() {
 	addMetricsURLFlag(rootCmd)
 	addMetricsUserFlag(rootCmd)
 	addMetricsPasswordFlag(rootCmd)
+	addSkipAuthFlag(rootCmd)
 }
 
 // readConfig reads in config file and ENV variables if set.

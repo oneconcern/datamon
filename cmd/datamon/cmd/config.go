@@ -49,8 +49,9 @@ func configFileLocation(expandEnv bool) string {
 
 // CLIConfig describes the CLI local configuration file.
 type CLIConfig struct {
-	// bug in viper? Need to keep names of fields the same as the serialized names..
 	Credential string `json:"credential" yaml:"credential"` // Credentials to use for GCS
+	Email      string `json:"email" yaml:"email"`           // User email when auth is skipped (non required)
+	Name       string `json:"name" yaml:"name"`             // User name when auth is skipped (non required)
 	Config     string `json:"config" yaml:"config"`         // Config bucket for datamon contexts and metadata
 	Context    string `json:"context" yaml:"context"`       // Current context for datamon
 	logger     *zap.Logger
