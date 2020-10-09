@@ -5,10 +5,7 @@ FROM cimg/go:1.14
 #FROM circleci/golang
 WORKDIR /tmp
 USER root
-RUN apt-get update -y --quiet &&\
-    apt-get install --quiet lsb-release
-RUN lsb_release -c -s
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk-$(lsb_release -c -s) main" | \
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | \
     tee -a /etc/apt/sources.list.d/google-cloud-sdk.list &&\
     curl -sSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add  &&\
     apt-get update -y -qq &&\

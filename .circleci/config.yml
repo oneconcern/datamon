@@ -83,10 +83,7 @@ commands:
       - run:
           name: Install packages with gcloud SDK installed locally
           command: |
-            sudo apt-get update -y --quiet
-            sudo apt-get install --quiet lsb-release
-            export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
-            echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+            echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
             curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
             sudo apt-get update -y -qq
             sudo apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh
