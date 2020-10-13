@@ -67,6 +67,7 @@ type flagsT struct {
 		cpuProf  bool
 		upgrade  bool
 		metrics  metricsFlags
+		skipAuth bool
 	}
 	doc struct {
 		docTarget string
@@ -451,6 +452,14 @@ func addForceDestFlag(cmd *cobra.Command) string {
 	return c
 }
 
+func addSkipAuthFlag(cmd *cobra.Command) string {
+	c := "skip-auth"
+	if cmd != nil {
+		cmd.PersistentFlags().BoolVar(&datamonFlags.root.skipAuth, c, false, `Skip authentication against google (gcs credentials remains required)`)
+	}
+	return c
+}
+
 /** parameters struct from other formats */
 
 // apply config file + env vars to structure used to parse cli flags
@@ -664,6 +673,13 @@ func (in *cliOptionInputs) populateRemoteConfig() error {
 
 func (in *cliOptionInputs) contributor() (model.Contributor, error) {
 	flags := in.params
+
+	if flags.root.skipAuth {
+		return model.Contributor{
+			Email: config.Email,
+			Name:  config.Name,
+		}, nil
+	}
 	var credentials string
 	switch {
 	case flags.root.credFile != "":
@@ -671,6 +687,7 @@ func (in *cliOptionInputs) contributor() (model.Contributor, error) {
 	case config.Credential != "":
 		credentials = config.Credential
 	}
+
 	contributor, err := authorizer.Principal(credentials)
 	if err != nil {
 		return model.Contributor{},

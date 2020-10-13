@@ -43,6 +43,7 @@ init , 1INzQ5TV4vAAfU2PbRFgPfnzEwR , 2019-03-12 22:10:24.159704 -0700 PDT
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
+      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

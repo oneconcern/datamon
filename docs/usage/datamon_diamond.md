@@ -25,6 +25,7 @@ A diamond is a parallel data upload operation, which ends up in a single bundle 
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
+      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 
