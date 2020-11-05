@@ -683,21 +683,21 @@ workflows:
             branches:
               only: /.*/
 
-      - fuse_sidecar_test:
-          context: "OC Common"
-          requires:
-            - build_demo_images
-          filters:
-            tags:
-              only: /.*/
-            branches:
-              only: /.*/
+      # - fuse_sidecar_test:
+      #    context: "OC Common"
+      #    requires:
+      #      - build_demo_images
+      #    filters:
+      #      tags:
+      #        only: /.*/
+      #      branches:
+      #        only: /.*/
 
       - pg_sidecar_test:
           context: "OC Common"
           requires:
             - build_demo_images
-            - fuse_sidecar_test
+            #- fuse_sidecar_test
           filters:
             tags:
               only: /.*/
@@ -707,7 +707,7 @@ workflows:
       - k8s_remove_whitelist:
           context: "OC Common"
           requires:
-            - fuse_sidecar_test
+            #- fuse_sidecar_test
             - pg_sidecar_test
           filters:
             tags:

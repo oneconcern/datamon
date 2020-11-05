@@ -36,6 +36,7 @@ func DeleteRepo(repo string, stores context2.Stores) error {
 	if err := store.Delete(context.Background(), pth); err != nil {
 		return fmt.Errorf("cannot delete repo: %s: %v", repo, err)
 	}
+
 	return nil
 }
 
