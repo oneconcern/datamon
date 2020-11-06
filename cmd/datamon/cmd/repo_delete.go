@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -36,6 +38,12 @@ This command MUST NOT BE RUN concurrently.
 			return
 		}
 		logger, err := optionInputs.getLogger()
+
+		if !datamonFlags.root.forceYes && !userConfirm("delete") {
+			wrapFatalln("user aborted", nil)
+			return
+		}
+
 		logger.Info("deleting repo", zap.String("repo", datamonFlags.repo.RepoName))
 		err = core.DeleteRepo(datamonFlags.repo.RepoName, remoteStores)
 		if err != nil {
@@ -48,4 +56,12 @@ This command MUST NOT BE RUN concurrently.
 			wrapFatalln("populate remote config", err)
 		}
 	},
+}
+
+func userConfirm(action string) bool {
+	log.Printf("Are you sure you want to %s from repo medata for %q [y|n]", action, datamonFlags.repo.RepoName)
+	var answer string
+	fmt.Scanln(&answer)
+	yesno := strings.ToLower(answer)
+	return yesno == "y" || yesno == "yes"
 }

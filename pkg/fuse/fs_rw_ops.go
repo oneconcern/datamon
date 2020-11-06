@@ -270,7 +270,7 @@ func (fs *fsMutable) ForgetInode(
 
 	del = shouldDelete(n)
 
-	//Explicitly release lock.
+	// Explicitly release lock.
 	n.lock.Unlock()
 
 	if del {
@@ -706,7 +706,7 @@ func (fs *fsMutable) createNode(lk []byte, parentINode fuseops.InodeID, childNam
 		Gid:    defaultUID,
 	}
 
-	//iNode Store
+	// iNode Store
 	fs.iNodeStore, _, _ = fs.iNodeStore.Insert(formKey(iNodeID), &nodeEntry{
 		lock:              sync.Mutex{},
 		refCount:          1, // As per spec CreateFileOp

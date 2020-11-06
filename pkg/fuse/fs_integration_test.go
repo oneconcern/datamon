@@ -188,7 +188,7 @@ func TestMutableMount(t *testing.T) {
 		require.NoError(t, fs.Unmount(ev.PathToMount))
 	}()
 
-	err = ioutil.WriteFile(filepath.Join(ev.PathToMount, "test"), []byte(`test data`), 0644)
+	err = ioutil.WriteFile(filepath.Join(ev.PathToMount, "test"), []byte(`test data`), 0600)
 	require.NoError(t, err)
 
 	// uncomment to manually try out the FS

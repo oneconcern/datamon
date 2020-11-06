@@ -71,7 +71,9 @@ func getContext() {
 }
 
 func init() {
-	requireFlags(ContextGetCommand) //addContextFlag(nil),
+	requireFlags(ContextGetCommand,
+		addContextFlag(ContextGetCommand),
+	)
 
 	ContextCmd.AddCommand(ContextGetCommand)
 }

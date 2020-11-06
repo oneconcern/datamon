@@ -99,7 +99,7 @@ func setupConfig(t *testing.T, flags flagsT) func() {
 		flags.context.Descriptor.Metadata,
 		"--read-log",
 		flags.context.Descriptor.ReadLog,
-		//"--loglevel", "debug",
+		// "--loglevel", "debug",
 	}, "test and create context", false)
 	err = os.Setenv("DATAMON_GLOBAL_CONFIG", bucketConfig)
 	require.NoError(t, err)

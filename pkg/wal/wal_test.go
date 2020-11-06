@@ -43,7 +43,7 @@ func constStringWithIndex(i int) string {
 	return longPath + fmt.Sprint(i)
 }
 func randSleep() {
-	r := rand.Intn(200)
+	r := rand.Intn(200)                               //#nosec
 	time.Sleep(time.Duration(r)*time.Millisecond + 1) // min 1 ms
 }
 

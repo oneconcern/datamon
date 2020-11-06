@@ -56,7 +56,7 @@ func (r *byteFuncReaderAt) ReadAt(p []byte, off int64) (int, error) {
 }
 
 func randByteFunc(max int64) byteFunc {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) //#nosec
 	return func(off int64) (byte, error) {
 		if off > max {
 			return 0, io.EOF
@@ -178,7 +178,6 @@ func newGenStoreHBuildKeyset(keys []string) map[string]bool {
 	return ks
 }
 
-// nolint:deadcode,unused
 func newGenStoreRand(keys []string, max int64) storage.Store {
 	return genStore{
 		keyset:  newGenStoreHBuildKeyset(keys),
@@ -187,7 +186,6 @@ func newGenStoreRand(keys []string, max int64) storage.Store {
 	}
 }
 
-// nolint:deadcode,unused
 func newGenStoreZeroOneChunks(keys []string, max int64, chunkBytes int64) storage.Store {
 	return genStore{
 		keyset:     newGenStoreHBuildKeyset(keys),

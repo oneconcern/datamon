@@ -75,6 +75,7 @@ your data buckets are organized in repositories of versioned and tagged bundles 
 				influxdb.WithNameAsTag("metrics"), // use metric name as an influxdb tag, with unique time series "metrics"
 				influxdb.WithTimeout(30 * time.Second),
 				influxdb.WithTLSConfig(&tls.Config{
+					MinVersion: tls.VersionTLS13,
 					NextProtos: []string{"h2", "http/1.1"},
 				}),
 				influxdb.WithInsecureSkipVerify(true),
@@ -171,18 +172,21 @@ func init() {
 		addRepoNameOptionFlag(repoDelete),
 		addContextFlag(repoDelete),
 	)
+	addForceYesFlag(repoDelete)
 
 	repoCmd.AddCommand(repoRename)
 	requireFlags(repoRename,
 		addRepoNameOptionFlag(repoRename),
 		addContextFlag(repoRename),
 	)
+	addForceYesFlag(repoRename)
 
 	repoDelete.AddCommand(repoDeleteFiles)
 	requireFlags(repoDeleteFiles,
 		addRepoNameOptionFlag(repoDeleteFiles),
 		addContextFlag(repoDeleteFiles),
 	)
+	addForceYesFlag(repoDeleteFiles)
 	addFileListFlag(repoDeleteFiles)
 	addBundleFileFlag(repoDeleteFiles)
 }

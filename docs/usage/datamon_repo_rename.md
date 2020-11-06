@@ -27,6 +27,7 @@ datamon repo rename {new repo name} [flags]
 ### Options
 
 ```
+      --force-yes         Bypass confirmation step
   -h, --help              help for rename
       --repo (*) string   The name of this repository
 ```

@@ -50,7 +50,7 @@ var writeSeq = []writeTest{
 			},
 		},
 	},
-	{ //Extend the write
+	{ // Extend the write
 		write:  ioRange{0, 10},
 		keyLen: 2,
 		tests: []test{

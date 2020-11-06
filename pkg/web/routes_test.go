@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -163,7 +164,7 @@ func (page *fileListPage) filenames(t *testing.T) map[string]bool {
 }
 
 func getPageDocument(t *testing.T, routes http.Handler, relURLPath string) *goquery.Document {
-	req, err := http.NewRequest("GET", relURLPath, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", relURLPath, nil)
 	require.NoError(t, err, "create mock request")
 	rr := httptest.NewRecorder()
 	routes.ServeHTTP(rr, req)

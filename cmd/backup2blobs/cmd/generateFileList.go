@@ -289,7 +289,6 @@ var generateFileListCmd = &cobra.Command{
 					return godirwalk.SkipNode
 				},
 				PostChildrenCallback: func(dir string, de *godirwalk.Dirent) error {
-					//log.Printf("Finished process dir:%s count:%d", dir, count)
 					return nil
 				},
 				ScratchBuffer:       make([]byte, 2*1024*1024),

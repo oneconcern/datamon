@@ -228,7 +228,6 @@ func testUploadBundle(t *testing.T, file uploadTree) {
 		"--path", dirPathStr(t, file),
 		"--message", "The initial commit for the repo",
 		"--repo", repo1,
-		//"--concurrency-factor", concurrencyFactor,
 		"--concurrency-factor", "1",
 	}, "upload bundle at "+dirPathStr(t, file), false)
 	//
@@ -1498,6 +1497,8 @@ func TestDeleteRepo(t *testing.T) {
 		"--file",
 		"leafsize",
 		"--repo", repo,
+		"--force-yes", "true",
+		"--context", testContext(),
 	}, "delete file from test repo", false)
 
 	for i := range testUploadTrees {
@@ -1534,6 +1535,8 @@ func TestDeleteRepo(t *testing.T) {
 		"--files",
 		filelist.Name(),
 		"--repo", repo,
+		"--force-yes", "true",
+		"--context", testContext(),
 	}, "delete files from test repo", false)
 
 	for i := range testUploadTrees {
@@ -1561,6 +1564,8 @@ func TestDeleteRepo(t *testing.T) {
 	runCmd(t, []string{"repo",
 		"delete",
 		"--repo", repo,
+		"--force-yes", "true",
+		"--context", testContext(),
 	}, "delete test repo", false)
 
 	r, w, err := os.Pipe()

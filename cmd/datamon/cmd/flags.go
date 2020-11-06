@@ -68,6 +68,7 @@ type flagsT struct {
 		upgrade  bool
 		metrics  metricsFlags
 		skipAuth bool
+		forceYes bool
 	}
 	doc struct {
 		docTarget string
@@ -539,6 +540,14 @@ func addSkipAuthFlag(cmd *cobra.Command, inherit ...bool) string {
 		cmd.PersistentFlags().BoolVar(&datamonFlags.root.skipAuth, c, false, `Skip authentication against google (gcs credentials remains required)`)
 	} else {
 		cmd.Flags().BoolVar(&datamonFlags.root.skipAuth, c, false, `Skip authentication against google (gcs credentials remains required)`)
+	}
+	return c
+}
+
+func addForceYesFlag(cmd *cobra.Command) string {
+	const c = "force-yes"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.root.forceYes, c, false, `Bypass confirmation step`)
 	}
 	return c
 }

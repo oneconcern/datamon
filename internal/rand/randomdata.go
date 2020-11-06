@@ -67,7 +67,7 @@ var (
 
 func seed() {
 	src := rand.NewSource(time.Now().UnixNano())
-	rgen = rand.New(src)
+	rgen = rand.New(src) // #nosec
 }
 
 func randBytes(n int) []byte {

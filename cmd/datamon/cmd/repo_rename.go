@@ -38,6 +38,12 @@ This command MUST NOT BE RUN concurrently.
 			return
 		}
 		logger, err := optionInputs.getLogger()
+
+		if !datamonFlags.root.forceYes && !userConfirm("rename") {
+			wrapFatalln("user aborted", nil)
+			return
+		}
+
 		logger.Info("renaming repo", zap.String("repo", datamonFlags.repo.RepoName), zap.String("new repo", newName))
 		err = core.RenameRepo(datamonFlags.repo.RepoName, newName, remoteStores)
 		if err != nil {

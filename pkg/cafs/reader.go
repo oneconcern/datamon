@@ -220,7 +220,7 @@ func (r *chunkReader) WriteTo(writer io.Writer) (n int64, err error) {
 	// WriteAt
 	w, ok := writer.(io.WriterAt)
 	if !ok {
-		sR := &serialReader{ //Wrap reader to avoid io.Copy from calling WriteTo in a loop.
+		sR := &serialReader{ // Wrap reader to avoid io.Copy from calling WriteTo in a loop.
 			reader: r,
 		}
 		// TODO(fred): nice - io.CopyBuffer is probably better to get the copy working buffer aligned to leaf buffers

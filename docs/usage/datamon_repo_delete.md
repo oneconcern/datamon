@@ -27,6 +27,7 @@ datamon repo delete [flags]
 ### Options
 
 ```
+      --force-yes         Bypass confirmation step
   -h, --help              help for delete
       --repo (*) string   The name of this repository
 ```

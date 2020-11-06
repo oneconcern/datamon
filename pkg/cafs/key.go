@@ -53,7 +53,7 @@ func (k Key) StringWithPrefix(prefix string) string {
 	return prefix + k.String()
 }
 
-//TODO(fred): nice - refactor key collections as []byte with this new type
+// TODO(fred): nice - refactor key collections as []byte with this new type
 
 // BadKeySize is an error that's returned when the key to create has an invalid size.
 type BadKeySize struct {

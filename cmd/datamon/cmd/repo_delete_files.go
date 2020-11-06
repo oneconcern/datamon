@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
 )
@@ -36,6 +37,8 @@ This command MUST NOT BE RUN concurrently.
 
 		ctx := context.Background()
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		logger, err := optionInputs.getLogger()
+
 		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
@@ -58,6 +61,12 @@ This command MUST NOT BE RUN concurrently.
 			return
 		}
 
+		if !datamonFlags.root.forceYes && !userConfirm("delete repo files") {
+			wrapFatalln("user aborted", nil)
+			return
+		}
+
+		logger.Info("deleting files from repo", zap.String("repo", datamonFlags.repo.RepoName))
 		err = core.DeleteEntriesFromRepo(datamonFlags.repo.RepoName, remoteStores, files)
 		if err != nil {
 			wrapFatalln("delete repo", err)

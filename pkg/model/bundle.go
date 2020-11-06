@@ -206,7 +206,7 @@ func GetBundleTimeStamp() time.Time {
 // More generally, it indicates any special path on a consumable store not to be uploaded with a bundle.
 func IsGeneratedFile(file string) bool {
 	// TODO: Need to find a way for afero.Fs to convert to abs patch while honoring the fake root
-	//path, err := filepath.Abs(file)
+	// path, err := filepath.Abs(file)
 	return genFileRe.MatchString(file)
 }
 

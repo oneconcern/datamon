@@ -375,6 +375,7 @@ func TestWorkshop(t *testing.T) {
 	waiter(logger, pipe)
 	logger.Info("web process ready")
 
+	// nolint:noctx
 	resp, err := http.Get("http://localhost:" + port + "/")
 	require.NoError(t, err, "curl web service")
 	// notdo: replete test of entire http api

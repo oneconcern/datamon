@@ -33,6 +33,7 @@ datamon repo delete files [flags]
 ```
       --file string       The file to download from the bundle
       --files string      Text file containing list of files separated by newline.
+      --force-yes         Bypass confirmation step
   -h, --help              help for files
       --repo (*) string   The name of this repository
 ```

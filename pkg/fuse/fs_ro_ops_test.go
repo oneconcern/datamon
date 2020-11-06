@@ -87,14 +87,14 @@ func testBadOverwriteFile(action, pth string, isDir bool, e chan<- error) {
 	if isDir {
 		return
 	}
-	err := ioutil.WriteFile(pth, []byte("sample"), 0644)
+	err := ioutil.WriteFile(pth, []byte("sample"), 0600)
 	if err == nil {
 		e <- fmt.Errorf("%s:expected RO mount but could overwrite file: %s", action, pth)
 	}
 }
 
 func testBadCreateFile(action, pth string, _ bool, e chan<- error) {
-	err := ioutil.WriteFile(sibling(pth, "test"), []byte("sample"), 0644)
+	err := ioutil.WriteFile(sibling(pth, "test"), []byte("sample"), 0600)
 	if err == nil {
 		e <- fmt.Errorf("%s:expected RO mount but could create and write file", action)
 	}
