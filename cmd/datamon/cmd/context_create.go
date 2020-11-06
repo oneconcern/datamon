@@ -55,7 +55,7 @@ func init() {
 		addBlobBucket(ContextCreateCommand),
 		addWALBucket(ContextCreateCommand),
 		addReadLogBucket(ContextCreateCommand),
-		addContextFlag(ContextCreateCommand),
+		//addContextFlag(nil),
 	)
 
 	ContextCmd.AddCommand(ContextCreateCommand)

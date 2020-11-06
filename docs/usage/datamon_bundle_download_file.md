@@ -25,12 +25,12 @@ datamon bundle download file [flags]
 ### Options
 
 ```
-      --bundle string        The hash id for the bundle, if not specified the latest bundle will be used
-      --destination string   The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
-      --file string          The file to download from the bundle
-  -h, --help                 help for file
-      --label string         The human-readable name of a label
-      --repo string          The name of this repository
+      --bundle string            The hash id for the bundle, if not specified the latest bundle will be used
+      --destination (*) string   The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
+      --file (*) string          The file to download from the bundle
+  -h, --help                     help for file
+      --label string             The human-readable name of a label
+      --repo (*) string          The name of this repository
 ```
 
 ### Options inherited from parent commands
@@ -44,6 +44,7 @@ datamon bundle download file [flags]
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
+      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

@@ -17,14 +17,15 @@ var repoDeleteFiles = &cobra.Command{
 	Short: "Deletes files from a named repo, altering all bundles",
 	Long: `Deletes files in a file list from all bundles in an existing datamon repository.
 
-You must authenticated to perform this operation.
+You must authenticate to perform this operation (can't --skip-auth).
+You must specify the context with --context.
 
 This command MUST NOT BE RUN concurrently.
 `,
 	Example: `
-% datamon repo delete files --repo ritesh-datamon-test-repo --files file-list.txt
+% datamon repo delete files --repo ritesh-datamon-test-repo --files file-list.txt --context dev
 
-% datamon repo delete files --repo ritesh-datamon-test-repo --file path/file-to-delete
+% datamon repo delete files --repo ritesh-datamon-test-repo --file path/file-to-delete --context dev
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
@@ -53,7 +54,7 @@ This command MUST NOT BE RUN concurrently.
 			}
 		}
 		if len(files) == 0 {
-			wrapFatalln("must specify at list a file or file list", nil)
+			wrapFatalln("must specify at least one file or file list", nil)
 			return
 		}
 
@@ -68,16 +69,6 @@ This command MUST NOT BE RUN concurrently.
 			wrapFatalln("populate remote config", err)
 		}
 	},
-}
-
-func init() {
-	requireFlags(repoDeleteFiles,
-		addRepoNameOptionFlag(repoDeleteFiles),
-	)
-	addFileListFlag(repoDeleteFiles)
-	addBundleFileFlag(repoDeleteFiles)
-
-	repoDelete.AddCommand(repoDeleteFiles)
 }
 
 func fileList(index string) ([]string, error) {

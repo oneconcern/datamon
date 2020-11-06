@@ -1,5 +1,7 @@
 module github.com/oneconcern/datamon
 
+replace github.com/spf13/pflag => github.com/fredbi/pflag v1.0.6-0.20201106154427-e6824c13371a
+
 require (
 	cloud.google.com/go v0.58.0 // indirect
 	cloud.google.com/go/storage v1.9.0
@@ -34,10 +36,10 @@ require (
 	github.com/sirupsen/logrus v1.5.0 // indirect
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cast v1.3.1 // indirect
-	github.com/spf13/cobra v0.0.6
+	github.com/spf13/cobra v1.1.1
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/spf13/viper v1.6.2
+	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.5.1
 	go.opencensus.io v0.22.3
 	go.uber.org/goleak v1.0.0

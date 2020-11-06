@@ -162,7 +162,29 @@ func init() {
 	addMetricsURLFlag(rootCmd)
 	addMetricsUserFlag(rootCmd)
 	addMetricsPasswordFlag(rootCmd)
-	addSkipAuthFlag(rootCmd)
+
+	addTemplateFlag(repoCmd)
+	rootCmd.AddCommand(repoCmd)
+
+	repoCmd.AddCommand(repoDelete)
+	requireFlags(repoDelete,
+		addRepoNameOptionFlag(repoDelete),
+		addContextFlag(repoDelete),
+	)
+
+	repoCmd.AddCommand(repoRename)
+	requireFlags(repoRename,
+		addRepoNameOptionFlag(repoRename),
+		addContextFlag(repoRename),
+	)
+
+	repoDelete.AddCommand(repoDeleteFiles)
+	requireFlags(repoDeleteFiles,
+		addRepoNameOptionFlag(repoDeleteFiles),
+		addContextFlag(repoDeleteFiles),
+	)
+	addFileListFlag(repoDeleteFiles)
+	addBundleFileFlag(repoDeleteFiles)
 }
 
 // readConfig reads in config file and ENV variables if set.

@@ -15,11 +15,12 @@ var repoDelete = &cobra.Command{
 	Short: "Delete a named repo",
 	Long: `Delete an existing datamon repository.
 
-You must authenticated to perform this operation.
+You must authenticate to perform this operation (can't --skip-auth).
+You must specify the context with --context.
 
 This command MUST NOT BE RUN concurrently.
 `,
-	Example: `% datamon repo delete --repo ritesh-datamon-test-repo`,
+	Example: `% datamon repo delete --repo ritesh-datamon-test-repo --context dev`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 
@@ -47,11 +48,4 @@ This command MUST NOT BE RUN concurrently.
 			wrapFatalln("populate remote config", err)
 		}
 	},
-}
-
-func init() {
-	requireFlags(repoDelete,
-		addRepoNameOptionFlag(repoDelete),
-	)
-	repoCmd.AddCommand(repoDelete)
 }

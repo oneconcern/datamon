@@ -17,9 +17,9 @@ datamon repo get [flags]
 ### Options
 
 ```
-  -h, --help          help for get
-      --repo string   The name of this repository
-      --skip-auth     Skip authentication against google (gcs credentials remains required)
+  -h, --help              help for get
+      --repo (*) string   The name of this repository
+      --skip-auth         Skip authentication against google (gcs credentials remains required)
 ```
 
 ### Options inherited from parent commands

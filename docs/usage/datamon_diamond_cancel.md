@@ -15,10 +15,10 @@ datamon diamond cancel [flags]
 ### Options
 
 ```
-      --diamond string       The diamond to use
+      --diamond (*) string   The diamond to use
       --diamond-tag string   A custom tag to identify your diamond in logs or datamon reports. Example: "coordinator-pod-A"
   -h, --help                 help for cancel
-      --repo string          The name of this repository
+      --repo (*) string      The name of this repository
 ```
 
 ### Options inherited from parent commands
@@ -32,6 +32,7 @@ datamon diamond cancel [flags]
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
+      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

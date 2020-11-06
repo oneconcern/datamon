@@ -25,7 +25,7 @@ var DiamondCmd = &cobra.Command{
 
 func init() {
 	addTemplateFlag(DiamondCmd)
-	addSkipAuthFlag(DiamondCmd)
+	addSkipAuthFlag(DiamondCmd, true)
 
 	rootCmd.AddCommand(DiamondCmd)
 }

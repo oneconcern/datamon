@@ -29,9 +29,6 @@ They are versioned and managed via bundles.
 var repoDescriptorTemplate func(flagsT) *template.Template
 
 func init() {
-	addTemplateFlag(repoCmd)
-	rootCmd.AddCommand(repoCmd)
-
 	repoDescriptorTemplate = func(opts flagsT) *template.Template {
 		if opts.core.Template != "" {
 			t, err := template.New("list line").Parse(datamonFlags.core.Template)

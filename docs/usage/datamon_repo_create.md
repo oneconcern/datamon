@@ -26,10 +26,10 @@ datamon repo create [flags]
 ### Options
 
 ```
-      --description string   The description for the repo
-  -h, --help                 help for create
-      --repo string          The name of this repository
-      --skip-auth            Skip authentication against google (gcs credentials remains required)
+      --description (*) string   The description for the repo
+  -h, --help                     help for create
+      --repo (*) string          The name of this repository
+      --skip-auth                Skip authentication against google (gcs credentials remains required)
 ```
 
 ### Options inherited from parent commands

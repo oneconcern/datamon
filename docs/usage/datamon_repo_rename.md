@@ -8,7 +8,8 @@ Rename a repo
 
 Rename an existing datamon repository.
 
-You must authenticated to perform this operation.
+You must authenticate to perform this operation (can't --skip-auth).
+You must specify the context with --context.
 
 This command MUST NOT BE RUN concurrently.
 
@@ -20,14 +21,14 @@ datamon repo rename {new repo name} [flags]
 ### Examples
 
 ```
-% datamon repo rename --repo ritesh-datamon-test-repo ritesh-datamon-new-repo
+% datamon repo rename --context dev --repo ritesh-datamon-test-repo ritesh-datamon-new-repo
 ```
 
 ### Options
 
 ```
-  -h, --help          help for rename
-      --repo string   The name of this repository
+  -h, --help              help for rename
+      --repo (*) string   The name of this repository
 ```
 
 ### Options inherited from parent commands

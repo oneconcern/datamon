@@ -18,10 +18,10 @@ datamon bundle get [flags]
 ### Options
 
 ```
-      --bundle string   The hash id for the bundle, if not specified the latest bundle will be used
-  -h, --help            help for get
-      --label string    The human-readable name of a label
-      --repo string     The name of this repository
+      --bundle string     The hash id for the bundle, if not specified the latest bundle will be used
+  -h, --help              help for get
+      --label string      The human-readable name of a label
+      --repo (*) string   The name of this repository
 ```
 
 ### Options inherited from parent commands
@@ -35,6 +35,7 @@ datamon bundle get [flags]
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
+      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

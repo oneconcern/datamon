@@ -33,9 +33,9 @@ set label 'init'
       --files string             Text file containing list of files separated by newline.
   -h, --help                     help for upload
       --label string             The human-readable name of a label
-      --message string           The message describing the new bundle
-      --path string              The path to the folder or bucket (gs://<bucket>) for the data
-      --repo string              The name of this repository
+      --message (*) string       The message describing the new bundle
+      --path (*) string          The path to the folder or bucket (gs://<bucket>) for the data
+      --repo (*) string          The name of this repository
       --skip-on-error            Skip files encounter errors while reading.The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false
 ```
 
@@ -50,6 +50,7 @@ set label 'init'
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
+      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

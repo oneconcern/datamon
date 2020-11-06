@@ -97,7 +97,7 @@ type flagsT struct {
 var datamonFlags = flagsT{}
 
 func addBundleFlag(cmd *cobra.Command) string {
-	bundleID := "bundle"
+	const bundleID = "bundle"
 	if cmd != nil {
 		cmd.Flags().StringVar(&datamonFlags.bundle.ID, bundleID, "", "The hash id for the bundle, if not specified the latest bundle will be used")
 	}
@@ -105,51 +105,65 @@ func addBundleFlag(cmd *cobra.Command) string {
 }
 
 func addDataPathFlag(cmd *cobra.Command) string {
-	destination := "destination"
-	cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, destination, "",
-		"The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}")
+	const destination = "destination"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, destination, "",
+			"The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}")
+	}
 	return destination
 }
 
 func addNameFilterFlag(cmd *cobra.Command) string {
-	nameFilter := "name-filter"
-	cmd.Flags().StringVar(&datamonFlags.bundle.NameFilter, nameFilter, "",
-		"A regular expression (RE2) to match names of bundle entries.")
+	const nameFilter = "name-filter"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.bundle.NameFilter, nameFilter, "",
+			"A regular expression (RE2) to match names of bundle entries.")
+	}
 	return nameFilter
 }
 
 func addMountPathFlag(cmd *cobra.Command) string {
-	mount := "mount"
-	cmd.Flags().StringVar(&datamonFlags.fs.MountPath, mount, "", "The path to the mount dir")
+	const mount = "mount"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.fs.MountPath, mount, "", "The path to the mount dir")
+	}
 	return mount
 }
 
 func addPathFlag(cmd *cobra.Command) string {
-	path := "path"
-	cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
+	const path = "path"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
+	}
 	return path
 }
 
 func addCommitMessageFlag(cmd *cobra.Command) string {
-	message := "message"
-	cmd.Flags().StringVar(&datamonFlags.bundle.Message, message, "", "The message describing the new bundle")
+	const message = "message"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.bundle.Message, message, "", "The message describing the new bundle")
+	}
 	return message
 }
 
 func addFileListFlag(cmd *cobra.Command) string {
-	fileList := "files"
-	cmd.Flags().StringVar(&datamonFlags.bundle.FileList, fileList, "", "Text file containing list of files separated by newline.")
+	const fileList = "files"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.bundle.FileList, fileList, "", "Text file containing list of files separated by newline.")
+	}
 	return fileList
 }
 
 func addBundleFileFlag(cmd *cobra.Command) string {
-	file := "file"
-	cmd.Flags().StringVar(&datamonFlags.bundle.File, file, "", "The file to download from the bundle")
+	const file = "file"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.bundle.File, file, "", "The file to download from the bundle")
+	}
 	return file
 }
 
 func addDaemonizeFlag(cmd *cobra.Command) string {
-	daemonize := "daemonize"
+	const daemonize = "daemonize"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.bundle.Daemonize, daemonize, false, "Whether to run the command as a daemonized process")
 	}
@@ -157,15 +171,19 @@ func addDaemonizeFlag(cmd *cobra.Command) string {
 }
 
 func addStreamFlag(cmd *cobra.Command) string {
-	stream := "stream"
-	cmd.Flags().BoolVar(&datamonFlags.fs.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
+	const stream = "stream"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.fs.Stream, stream, true, "Stream in the FS view of the bundle, do not download all files. Default to true.")
+	}
 	return stream
 }
 
 func addSkipMissingFlag(cmd *cobra.Command) string {
-	skipOnError := "skip-on-error"
-	cmd.Flags().BoolVar(&datamonFlags.bundle.SkipOnError, skipOnError, false, "Skip files encounter errors while reading."+
-		"The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false")
+	const skipOnError = "skip-on-error"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.bundle.SkipOnError, skipOnError, false, "Skip files encounter errors while reading."+
+			"The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false")
+	}
 	return skipOnError
 }
 
@@ -173,205 +191,265 @@ const concurrencyFactorFlag = "concurrency-factor"
 
 func addConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) string {
 	concurrencyFactor := concurrencyFactorFlag
-	cmd.Flags().IntVar(&datamonFlags.bundle.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
-		"Heuristic on the amount of concurrency used by various operations.  "+
-			"Turn this value down to use less memory, increase for faster operations.")
+	if cmd != nil {
+		cmd.Flags().IntVar(&datamonFlags.bundle.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
+			"Heuristic on the amount of concurrency used by various operations.  "+
+				"Turn this value down to use less memory, increase for faster operations.")
+	}
 	return concurrencyFactor
 }
 
 func addCoreConcurrencyFactorFlag(cmd *cobra.Command, defaultConcurrency int) string {
 	// this takes the usual "concurrency-factor" flag, but sets non-object specific settings
 	concurrencyFactor := concurrencyFactorFlag
-	cmd.Flags().IntVar(&datamonFlags.core.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
-		"Heuristic on the amount of concurrency used by core operations. "+
-			"Concurrent retrieval of metadata is capped by the 'batch-size' parameter. "+
-			"Turn this value down to use less memory, increase for faster operations.")
+	if cmd != nil {
+		cmd.Flags().IntVar(&datamonFlags.core.ConcurrencyFactor, concurrencyFactor, defaultConcurrency,
+			"Heuristic on the amount of concurrency used by core operations. "+
+				"Concurrent retrieval of metadata is capped by the 'batch-size' parameter. "+
+				"Turn this value down to use less memory, increase for faster operations.")
+	}
 	return concurrencyFactor
 }
 
 func addContextFlag(cmd *cobra.Command) string {
-	c := "context"
-	cmd.PersistentFlags().StringVar(&datamonFlags.context.Descriptor.Name, c, "", `Set the context for datamon (default "dev")`)
+	const c = "context"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.context.Descriptor.Name, c, "", `Set the context for datamon (default "dev")`)
+	}
 	return c
 }
 
 func addConfigFlag(cmd *cobra.Command) string {
-	config := "config"
-	cmd.PersistentFlags().StringVar(&datamonFlags.core.Config, config, "", "Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')")
+	const config = "config"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.core.Config, config, "", "Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')")
+	}
 	return config
 }
 
 func addBatchSizeFlag(cmd *cobra.Command) string {
-	batchSize := "batch-size"
-	cmd.Flags().IntVar(&datamonFlags.core.BatchSize, batchSize, 1024,
-		"Number of bundles streamed together as a batch. This can be tuned for performance based on network connectivity")
+	const batchSize = "batch-size"
+	if cmd != nil {
+		cmd.Flags().IntVar(&datamonFlags.core.BatchSize, batchSize, 1024,
+			"Number of bundles streamed together as a batch. This can be tuned for performance based on network connectivity")
+	}
 	return batchSize
 }
 
 func addWebPortFlag(cmd *cobra.Command) string {
-	webPort := "port"
-	cmd.Flags().IntVar(&datamonFlags.web.port, webPort, 0, "Port number for the web server (defaults to random port)")
+	const webPort = "port"
+	if cmd != nil {
+		cmd.Flags().IntVar(&datamonFlags.web.port, webPort, 0, "Port number for the web server (defaults to random port)")
+	}
 	return webPort
 }
 
 func addWebNoBrowserFlag(cmd *cobra.Command) string {
-	c := "no-browser"
-	cmd.Flags().BoolVar(&datamonFlags.web.noBrowser, c, false, "Disable automatic launch of a browser")
+	const c = "no-browser"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.web.noBrowser, c, false, "Disable automatic launch of a browser")
+	}
 	return c
 }
 
 func addLabelNameFlag(cmd *cobra.Command) string {
-	labelName := "label"
-	if cmd != nil { // TODO(fred): quickfix - the actual remedy should be to avoid calling this with nil input
+	const labelName = "label"
+	if cmd != nil {
 		cmd.Flags().StringVar(&datamonFlags.label.Name, labelName, "", "The human-readable name of a label")
 	}
 	return labelName
 }
 
 func addLabelPrefixFlag(cmd *cobra.Command) string {
-	prefixString := "prefix"
-	cmd.Flags().StringVar(&datamonFlags.label.Prefix, prefixString, "", "List labels starting with a prefix.")
+	const prefixString = "prefix"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.label.Prefix, prefixString, "", "List labels starting with a prefix.")
+	}
 	return prefixString
 }
 
 func addRepoNameOptionFlag(cmd *cobra.Command) string {
-	repo := "repo"
-	cmd.Flags().StringVar(&datamonFlags.repo.RepoName, repo, "", "The name of this repository")
+	const repo = "repo"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.repo.RepoName, repo, "", "The name of this repository")
+	}
 	return repo
 }
 
 func addRepoDescription(cmd *cobra.Command) string {
-	description := "description"
-	cmd.Flags().StringVar(&datamonFlags.repo.Description, description, "", "The description for the repo")
+	const description = "description"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.repo.Description, description, "", "The description for the repo")
+	}
 	return description
 }
 
 func addBlobBucket(cmd *cobra.Command) string {
-	blob := "blob"
-	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Blob, blob, "", "The name of the bucket hosting the datamon blobs")
+	const blob = "blob"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Blob, blob, "", "The name of the bucket hosting the datamon blobs")
+	}
 	return blob
 }
 
 func addMetadataBucket(cmd *cobra.Command) string {
-	meta := "meta"
-	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Metadata, meta, "", "The name of the bucket used by datamon metadata")
+	const meta = "meta"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.context.Descriptor.Metadata, meta, "", "The name of the bucket used by datamon metadata")
+	}
 	return meta
 }
 
 func addVMetadataBucket(cmd *cobra.Command) string {
-	vm := "vmeta"
-	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.VMetadata, vm, "", "The name of the bucket hosting the versioned metadata")
+	const vm = "vmeta"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.context.Descriptor.VMetadata, vm, "", "The name of the bucket hosting the versioned metadata")
+	}
 	return vm
 }
 
 func addWALBucket(cmd *cobra.Command) string {
-	b := "wal"
-	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.WAL, b, "", "The name of the bucket hosting the WAL")
+	const b = "wal"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.context.Descriptor.WAL, b, "", "The name of the bucket hosting the WAL")
+	}
 	return b
 }
 
 func addReadLogBucket(cmd *cobra.Command) string {
-	b := "read-log"
-	cmd.Flags().StringVar(&datamonFlags.context.Descriptor.ReadLog, b, "", "The name of the bucket hosting the read log")
+	const b = "read-log"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.context.Descriptor.ReadLog, b, "", "The name of the bucket hosting the read log")
+	}
 	return b
 }
 
 func addCredentialFile(cmd *cobra.Command) string {
-	credential := "credential"
-	cmd.Flags().StringVar(&datamonFlags.root.credFile, credential, "", "The path to the credential file")
+	const credential = "credential"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.root.credFile, credential, "", "The path to the credential file")
+	}
 	return credential
 }
 
 func addLogLevel(cmd *cobra.Command) string {
-	loglevel := "loglevel"
-	cmd.PersistentFlags().StringVar(&datamonFlags.root.logLevel, loglevel, "info", "The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug")
+	const loglevel = "loglevel"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.root.logLevel, loglevel, "info", "The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug")
+	}
 	return loglevel
 }
 
 func addCPUProfFlag(cmd *cobra.Command) string {
-	c := "cpuprof"
-	cmd.Flags().BoolVar(&datamonFlags.root.cpuProf, c, false, "Toggle runtime profiling")
+	const c = "cpuprof"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.root.cpuProf, c, false, "Toggle runtime profiling")
+	}
 	return c
 }
 
 func addUpgradeCheckOnlyFlag(cmd *cobra.Command) string {
-	c := "check-version"
-	cmd.Flags().BoolVar(&datamonFlags.upgrade.checkOnly, c, false, "Checks if a new version is available but does not upgrade")
+	const c = "check-version"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.upgrade.checkOnly, c, false, "Checks if a new version is available but does not upgrade")
+	}
 	return c
 }
 
 func addUpgradeForceFlag(cmd *cobra.Command) string {
-	c := "force"
-	cmd.Flags().BoolVar(&datamonFlags.upgrade.forceUgrade, c, false, "Forces upgrade even if the current version is not a released version")
+	const c = "force"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.upgrade.forceUgrade, c, false, "Forces upgrade even if the current version is not a released version")
+	}
 	return c
 }
 
 const upgradeFlag = "upgrade"
 
 func addUpgradeFlag(cmd *cobra.Command) string {
-	cmd.PersistentFlags().BoolVar(&datamonFlags.root.upgrade, upgradeFlag, false, "Upgrades the current version then carries on with the specified command")
+	if cmd != nil {
+		cmd.PersistentFlags().BoolVar(&datamonFlags.root.upgrade, upgradeFlag, false, "Upgrades the current version then carries on with the specified command")
+	}
 	return upgradeFlag
 }
 
 func addTargetFlag(cmd *cobra.Command) string {
-	c := "target-dir"
-	cmd.Flags().StringVar(&datamonFlags.doc.docTarget, c, ".", "The target directory where to generate the markdown documentation")
+	const c = "target-dir"
+	if cmd != nil {
+		cmd.Flags().StringVar(&datamonFlags.doc.docTarget, c, ".", "The target directory where to generate the markdown documentation")
+	}
 	return c
 }
 
 func addCacheSizeFlag(cmd *cobra.Command) string {
-	c := "cache-size"
-	datamonFlags.fs.CacheSize = flagext.ByteSize(50 * units.MB)
-	cmd.Flags().Var(&datamonFlags.fs.CacheSize, c, "The desired size of the memory cache used (in KB, MB, GB, ...) when streaming is enabled")
+	const c = "cache-size"
+	if cmd != nil {
+		datamonFlags.fs.CacheSize = flagext.ByteSize(50 * units.MB)
+		cmd.Flags().Var(&datamonFlags.fs.CacheSize, c, "The desired size of the memory cache used (in KB, MB, GB, ...) when streaming is enabled")
+	}
 	return c
 }
 
 func addPrefetchFlag(cmd *cobra.Command) string {
-	c := "prefetch"
-	cmd.Flags().IntVar(&datamonFlags.fs.WithPrefetch, c, 1, "When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled)")
+	const c = "prefetch"
+	if cmd != nil {
+		cmd.Flags().IntVar(&datamonFlags.fs.WithPrefetch, c, 1, "When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled)")
+	}
 	return c
 }
 
 func addVerifyHashFlag(cmd *cobra.Command) string {
-	c := "verify-hash"
-	cmd.Flags().BoolVar(&datamonFlags.fs.WithVerifyHash, c, true, "Enables hash verification on read blobs (requires Stream enabled)")
+	const c = "verify-hash"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.fs.WithVerifyHash, c, true, "Enables hash verification on read blobs (requires Stream enabled)")
+	}
 	return c
 }
 
 func addTemplateFlag(cmd *cobra.Command) string {
-	c := "format"
-	cmd.PersistentFlags().StringVar(&datamonFlags.core.Template, c, "", `Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields`)
+	const c = "format"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.core.Template, c, "", `Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields`)
+	}
 	return c
 }
 
 func addMetricsFlag(cmd *cobra.Command) string {
-	c := "metrics"
-	defaultMetrics := false // TODO(fred): once our concern about metrics backend security is addressed, move back the default to true
-	datamonFlags.root.metrics.Enabled = &defaultMetrics
-	cmd.PersistentFlags().BoolVar(datamonFlags.root.metrics.Enabled, c, defaultMetrics, `Toggle telemetry and metrics collection`)
+	const c = "metrics"
+	if cmd != nil {
+		defaultMetrics := false // TODO(fred): once our concern about metrics backend security is addressed, move back the default to true
+		datamonFlags.root.metrics.Enabled = &defaultMetrics
+		cmd.PersistentFlags().BoolVar(datamonFlags.root.metrics.Enabled, c, defaultMetrics, `Toggle telemetry and metrics collection`)
+	}
 	return c
 }
 
 func addMetricsURLFlag(cmd *cobra.Command) string {
-	c := "metrics-url"
-	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Fully qualified URL to an influxdb metrics collector, with optional user and password`)
+	const c = "metrics-url"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Fully qualified URL to an influxdb metrics collector, with optional user and password`)
+	}
 	return c
 }
 
 func addMetricsUserFlag(cmd *cobra.Command) string {
-	c := "metrics-user"
-	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `User to connect to the metrics collector backend. Overrides any user set in URL`)
+	const c = "metrics-user"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `User to connect to the metrics collector backend. Overrides any user set in URL`)
+	}
 	return c
 }
 
 func addMetricsPasswordFlag(cmd *cobra.Command) string {
-	c := "metrics-password"
-	cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Password to connect to the metrics collector backend. Overrides any password set in URL`)
+	const c = "metrics-password"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.root.metrics.URL, c, "", `Password to connect to the metrics collector backend. Overrides any password set in URL`)
+	}
 	return c
 }
 
 func addDiamondFlag(cmd *cobra.Command) string {
-	c := "diamond"
+	const c = "diamond"
 	if cmd != nil {
 		cmd.Flags().StringVar(&datamonFlags.diamond.diamondID, c, "", `The diamond to use`)
 	}
@@ -379,7 +457,7 @@ func addDiamondFlag(cmd *cobra.Command) string {
 }
 
 func addSplitFlag(cmd *cobra.Command) string {
-	c := "split"
+	const c = "split"
 	if cmd != nil {
 		cmd.Flags().StringVar(&datamonFlags.split.splitID, c, "", `The split to use`)
 	}
@@ -387,7 +465,7 @@ func addSplitFlag(cmd *cobra.Command) string {
 }
 
 func addWithConflictsFlag(cmd *cobra.Command) string {
-	c := "with-conflicts"
+	const c = "with-conflicts"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.diamond.withConflicts, c, true, `Diamond commit handles conflicts and keeps them in store`+
 			` Conflicting versions of your uploaded files are located in the .conflicts folder`)
@@ -396,7 +474,7 @@ func addWithConflictsFlag(cmd *cobra.Command) string {
 }
 
 func addNoConflictsFlag(cmd *cobra.Command) string {
-	c := "no-conflicts"
+	const c = "no-conflicts"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.diamond.noConflicts, c, false, `Diamond commit fails if any conflict is detected`)
 	}
@@ -404,7 +482,7 @@ func addNoConflictsFlag(cmd *cobra.Command) string {
 }
 
 func addIgnoreConflictsFlag(cmd *cobra.Command) string {
-	c := "ignore-conflicts"
+	const c = "ignore-conflicts"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.diamond.ignoreConflicts, c, false, `Diamond commit ignores conflicts and does not report about them`)
 	}
@@ -412,7 +490,7 @@ func addIgnoreConflictsFlag(cmd *cobra.Command) string {
 }
 
 func addWithCheckpointFlag(cmd *cobra.Command) string {
-	c := "with-checkpoints"
+	const c = "with-checkpoints"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.diamond.withCheckpoints, c, false, `Diamond commit handles conflicts and keeps them as intermediate checkpoints rather than conflicts.`+
 			` Intermediate versions of your uploaded files are located in the .checkpoints folder`)
@@ -421,7 +499,7 @@ func addWithCheckpointFlag(cmd *cobra.Command) string {
 }
 
 func addSplitTagFlag(cmd *cobra.Command) string {
-	c := "split-tag"
+	const c = "split-tag"
 	if cmd != nil {
 		cmd.Flags().StringVar(&datamonFlags.split.tag, c, "", `A custom tag to identify your split in logs or datamon reports. Example: "pod-1"`)
 	}
@@ -429,7 +507,7 @@ func addSplitTagFlag(cmd *cobra.Command) string {
 }
 
 func addDiamondTagFlag(cmd *cobra.Command) string {
-	c := "diamond-tag"
+	const c = "diamond-tag"
 	if cmd != nil {
 		cmd.Flags().StringVar(&datamonFlags.diamond.tag, c, "", `A custom tag to identify your diamond in logs or datamon reports. Example: "coordinator-pod-A"`)
 	}
@@ -437,7 +515,7 @@ func addDiamondTagFlag(cmd *cobra.Command) string {
 }
 
 func addLabelVersionsFlag(cmd *cobra.Command) string {
-	c := "with-versions"
+	const c = "with-versions"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.core.WithLabelVersions, c, false, `List all previous versions of labels`)
 	}
@@ -445,16 +523,21 @@ func addLabelVersionsFlag(cmd *cobra.Command) string {
 }
 
 func addForceDestFlag(cmd *cobra.Command) string {
-	c := "force-dest"
+	const c = "force-dest"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.bundle.ForceDest, c, false, `Override destination path is empty check`)
 	}
 	return c
 }
 
-func addSkipAuthFlag(cmd *cobra.Command) string {
-	c := "skip-auth"
-	if cmd != nil {
+func addSkipAuthFlag(cmd *cobra.Command, inherit ...bool) string {
+	const c = "skip-auth"
+	if cmd == nil {
+		return c
+	}
+	if len(inherit) > 0 && inherit[len(inherit)-1] {
+		cmd.PersistentFlags().BoolVar(&datamonFlags.root.skipAuth, c, false, `Skip authentication against google (gcs credentials remains required)`)
+	} else {
 		cmd.Flags().BoolVar(&datamonFlags.root.skipAuth, c, false, `Skip authentication against google (gcs credentials remains required)`)
 	}
 	return c
@@ -708,10 +791,10 @@ func requireFlags(cmd *cobra.Command, flags ...string) {
 		err := cmd.MarkFlagRequired(flag)
 		if err != nil {
 			err = cmd.MarkPersistentFlagRequired(flag)
-		}
-		if err != nil {
-			wrapFatalln(fmt.Sprintf("error attempting to mark the required flag %q", flag), err)
-			return
+			if err != nil {
+				wrapFatalln(fmt.Sprintf("error attempting to mark the required flag %q", flag), err)
+				return
+			}
 		}
 	}
 }

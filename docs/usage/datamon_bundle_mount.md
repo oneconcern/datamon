@@ -23,9 +23,9 @@ datamon bundle mount [flags]
       --destination string       The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
   -h, --help                     help for mount
       --label string             The human-readable name of a label
-      --mount string             The path to the mount dir
+      --mount (*) string         The path to the mount dir
       --prefetch int             When greater than 0, specifies the number of fetched-ahead blobs when reading a mounted file (requires Stream enabled) (default 1)
-      --repo string              The name of this repository
+      --repo (*) string          The name of this repository
       --stream                   Stream in the FS view of the bundle, do not download all files. Default to true. (default true)
       --verify-hash              Enables hash verification on read blobs (requires Stream enabled) (default true)
 ```
@@ -41,6 +41,7 @@ datamon bundle mount [flags]
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
+      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

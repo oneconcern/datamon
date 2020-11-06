@@ -24,10 +24,10 @@ datamon label set [flags]
 ### Options
 
 ```
-      --bundle string   The hash id for the bundle, if not specified the latest bundle will be used
-  -h, --help            help for set
-      --label string    The human-readable name of a label
-      --repo string     The name of this repository
+      --bundle (*) string   The hash id for the bundle, if not specified the latest bundle will be used
+  -h, --help                help for set
+      --label (*) string    The human-readable name of a label
+      --repo (*) string     The name of this repository
 ```
 
 ### Options inherited from parent commands
