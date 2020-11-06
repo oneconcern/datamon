@@ -15,6 +15,8 @@ var repoDelete = &cobra.Command{
 	Short: "Delete a named repo",
 	Long: `Delete an existing datamon repository.
 
+You must authenticated to perform this operation.
+
 This command MUST NOT BE RUN concurrently.
 `,
 	Example: `% datamon repo delete --repo ritesh-datamon-test-repo`,

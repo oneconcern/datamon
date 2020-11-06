@@ -455,7 +455,7 @@ func addForceDestFlag(cmd *cobra.Command) string {
 func addSkipAuthFlag(cmd *cobra.Command) string {
 	c := "skip-auth"
 	if cmd != nil {
-		cmd.PersistentFlags().BoolVar(&datamonFlags.root.skipAuth, c, false, `Skip authentication against google (gcs credentials remains required)`)
+		cmd.Flags().BoolVar(&datamonFlags.root.skipAuth, c, false, `Skip authentication against google (gcs credentials remains required)`)
 	}
 	return c
 }

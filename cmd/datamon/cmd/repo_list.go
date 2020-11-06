@@ -61,5 +61,6 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 func init() {
 	addCoreConcurrencyFactorFlag(repoList, 500)
 	addBatchSizeFlag(repoList)
+	addSkipAuthFlag(repoList)
 	repoCmd.AddCommand(repoList)
 }

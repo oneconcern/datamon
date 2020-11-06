@@ -65,6 +65,7 @@ func init() {
 	requireFlags(GetRepoCommand,
 		addRepoNameOptionFlag(GetRepoCommand),
 	)
+	addSkipAuthFlag(GetRepoCommand)
 
 	repoCmd.AddCommand(GetRepoCommand)
 }

@@ -69,6 +69,7 @@ func init() {
 
 	addContributorEmail(repoCreate)
 	addContributorName(repoCreate)
+	addSkipAuthFlag(repoCreate)
 
 	repoCmd.AddCommand(repoCreate)
 }

@@ -32,6 +32,7 @@ var labelDescriptorTemplate func(flagsT) *template.Template
 
 func init() {
 	addTemplateFlag(labelCmd)
+	addSkipAuthFlag(labelCmd)
 	rootCmd.AddCommand(labelCmd)
 
 	labelDescriptorTemplate = func(opts flagsT) *template.Template {

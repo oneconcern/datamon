@@ -169,10 +169,11 @@ var selfUpgradeCmd = &cobra.Command{
 
 func init() {
 	addTemplateFlag(selfUpgradeCmd)
-	rootCmd.AddCommand(selfUpgradeCmd)
 
 	addUpgradeCheckOnlyFlag(selfUpgradeCmd)
 	addUpgradeForceFlag(selfUpgradeCmd)
+
+	rootCmd.AddCommand(selfUpgradeCmd)
 }
 
 func doExecAfterUpgrade() error {

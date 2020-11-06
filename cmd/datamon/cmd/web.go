@@ -79,16 +79,13 @@ var webSrv = &cobra.Command{
 		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
 			wrapFatalln("populate remote config", err)
 		}
-	}, // https://github.com/spf13/cobra/issues/458
+	},
 }
 
 func init() {
-	/* web datamonFlags */
 	addWebPortFlag(webSrv)
 	addWebNoBrowserFlag(webSrv)
-
-	/* core datamonFlags */
-	//	addMetadataBucket(repoList)
+	addSkipAuthFlag(webSrv)
 
 	rootCmd.AddCommand(webSrv)
 }

@@ -15,6 +15,8 @@ var repoRename = &cobra.Command{
 	Short: "Rename a repo",
 	Long: `Rename an existing datamon repository.
 
+You must authenticated to perform this operation.
+
 This command MUST NOT BE RUN concurrently.
 `,
 	Example: `% datamon repo rename --repo ritesh-datamon-test-repo ritesh-datamon-new-repo`,

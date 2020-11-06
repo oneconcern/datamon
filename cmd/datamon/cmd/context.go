@@ -33,6 +33,7 @@ var contextTemplate func(flagsT) *template.Template
 
 func init() {
 	addTemplateFlag(ContextCmd)
+	addSkipAuthFlag(ContextCmd)
 	rootCmd.AddCommand(ContextCmd)
 
 	contextTemplate = func(opts flagsT) *template.Template {

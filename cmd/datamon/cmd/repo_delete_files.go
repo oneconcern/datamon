@@ -17,6 +17,8 @@ var repoDeleteFiles = &cobra.Command{
 	Short: "Deletes files from a named repo, altering all bundles",
 	Long: `Deletes files in a file list from all bundles in an existing datamon repository.
 
+You must authenticated to perform this operation.
+
 This command MUST NOT BE RUN concurrently.
 `,
 	Example: `

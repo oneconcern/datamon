@@ -28,6 +28,6 @@ var docCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(docCmd)
 	addTargetFlag(docCmd)
+	rootCmd.AddCommand(docCmd)
 }
