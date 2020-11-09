@@ -567,8 +567,9 @@ func (flags *flagsT) setDefaultsFromConfig(c *CLIConfig) {
 /** combined config (file + env var) and parameters (pflags) */
 
 type cliOptionInputs struct {
-	config *CLIConfig
-	params *flagsT
+	config      *CLIConfig
+	params      *flagsT
+	readOnlyCmd bool
 }
 
 func newCliOptionInputs(config *CLIConfig, params *flagsT) *cliOptionInputs {
@@ -647,16 +648,26 @@ func (in *cliOptionInputs) destStore(destT DestT,
 	return destStore, nil
 }
 
-func (in *cliOptionInputs) datamonContext(ctx context.Context) (context2.Stores, error) {
+func (in *cliOptionInputs) datamonContext(ctx context.Context, opts ...ContextOption) (context2.Stores, error) {
+	for _, apply := range opts {
+		apply(in)
+	}
+
 	logger, err := in.getLogger()
 	if err != nil {
 		return context2.New(), fmt.Errorf("get logger: %v", err)
+	}
+
+	gcsOpts := []gcs.Option{gcs.Logger(logger)}
+	if in.readOnlyCmd {
+		gcsOpts = append(gcsOpts, gcs.ReadOnly())
 	}
 	// here we select a 100% gcs backend strategy (more elaborate strategies could be defined by the context pkg)
 	return gcscontext.MakeContext(ctx,
 		in.params.context.Descriptor,
 		in.config.Credential,
-		gcs.Logger(logger))
+		gcsOpts...,
+	)
 }
 
 func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.Store, error) {
@@ -706,8 +717,8 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 	return sourceStore, nil
 }
 
-func (in *cliOptionInputs) bundleOpts(ctx context.Context) ([]core.BundleOption, error) {
-	stores, err := in.datamonContext(ctx)
+func (in *cliOptionInputs) bundleOpts(ctx context.Context, opts ...ContextOption) ([]core.BundleOption, error) {
+	stores, err := in.datamonContext(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -805,5 +816,15 @@ func requireFlags(cmd *cobra.Command, flags ...string) {
 				return
 			}
 		}
+	}
+}
+
+// ContextOption provides options to create a context for a command
+type ContextOption func(*cliOptionInputs)
+
+// ReadOnlyContext states that the context objects will only be accessed by read operations
+func ReadOnlyContext() ContextOption {
+	return func(cli *cliOptionInputs) {
+		cli.readOnlyCmd = true
 	}
 }

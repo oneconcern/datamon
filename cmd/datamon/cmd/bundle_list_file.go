@@ -36,7 +36,7 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
-		remoteStores, err := optionInputs.datamonContext(ctx)
+		remoteStores, err := optionInputs.datamonContext(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -46,7 +46,7 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 			wrapFatalln("determine bundle id", err)
 			return
 		}
-		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		bundleOpts, err := optionInputs.bundleOpts(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
 		}

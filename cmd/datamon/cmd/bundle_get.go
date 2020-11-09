@@ -31,7 +31,7 @@ exits with ENOENT status otherwise.`,
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
-		remoteStores, err := optionInputs.datamonContext(ctx)
+		remoteStores, err := optionInputs.datamonContext(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -47,7 +47,7 @@ exits with ENOENT status otherwise.`,
 			return
 		}
 
-		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		bundleOpts, err := optionInputs.bundleOpts(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
 		}
