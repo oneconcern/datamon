@@ -275,9 +275,9 @@ func (dfs *MutableFS) MountMutable(path string, opts ...MountOption) error {
 func (dfs *MutableFS) Unmount(path string) error {
 	// On unmount, walk the FS and create a bundle
 	_ = dfs.fsInternal.Commit()
-	//if err != nil {
+	// if err != nil {
 	// dump the metadata to the local FS to manually recover.
-	//}
+	// }
 	dfs.fsInternal.l.Info("unmounting", zap.String("mountpoint", path))
 	return jfuse.Unmount(path)
 }

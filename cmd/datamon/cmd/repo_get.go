@@ -30,7 +30,7 @@ exits with ENOENT status otherwise.`,
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
-		remoteStores, err := optionInputs.datamonContext(ctx)
+		remoteStores, err := optionInputs.datamonContext(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -65,6 +65,7 @@ func init() {
 	requireFlags(GetRepoCommand,
 		addRepoNameOptionFlag(GetRepoCommand),
 	)
+	addSkipAuthFlag(GetRepoCommand)
 
 	repoCmd.AddCommand(GetRepoCommand)
 }

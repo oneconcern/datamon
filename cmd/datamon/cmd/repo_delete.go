@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -15,9 +17,12 @@ var repoDelete = &cobra.Command{
 	Short: "Delete a named repo",
 	Long: `Delete an existing datamon repository.
 
+You must authenticate to perform this operation (can't --skip-auth).
+You must specify the context with --context.
+
 This command MUST NOT BE RUN concurrently.
 `,
-	Example: `% datamon repo delete --repo ritesh-datamon-test-repo`,
+	Example: `% datamon repo delete --repo ritesh-datamon-test-repo --context dev`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 
@@ -33,6 +38,12 @@ This command MUST NOT BE RUN concurrently.
 			return
 		}
 		logger, err := optionInputs.getLogger()
+
+		if !datamonFlags.root.forceYes && !userConfirm("delete") {
+			wrapFatalln("user aborted", nil)
+			return
+		}
+
 		logger.Info("deleting repo", zap.String("repo", datamonFlags.repo.RepoName))
 		err = core.DeleteRepo(datamonFlags.repo.RepoName, remoteStores)
 		if err != nil {
@@ -47,9 +58,10 @@ This command MUST NOT BE RUN concurrently.
 	},
 }
 
-func init() {
-	requireFlags(repoDelete,
-		addRepoNameOptionFlag(repoDelete),
-	)
-	repoCmd.AddCommand(repoDelete)
+func userConfirm(action string) bool {
+	log.Printf("Are you sure you want to %s from repo medata for %q [y|n]", action, datamonFlags.repo.RepoName)
+	var answer string
+	fmt.Scanln(&answer)
+	yesno := strings.ToLower(answer)
+	return yesno == "y" || yesno == "yes"
 }

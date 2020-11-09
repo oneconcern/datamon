@@ -20,9 +20,9 @@ datamon bundle mount new [flags]
       --destination string   The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
   -h, --help                 help for new
       --label string         The human-readable name of a label
-      --message string       The message describing the new bundle
-      --mount string         The path to the mount dir
-      --repo string          The name of this repository
+      --message (*) string   The message describing the new bundle
+      --mount (*) string     The path to the mount dir
+      --repo (*) string      The name of this repository
 ```
 
 ### Options inherited from parent commands

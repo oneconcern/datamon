@@ -182,7 +182,7 @@ func PopulateFSWithDirs(t testing.TB, mountPath string, withFile bool, fixtureBu
 		target := filepath.Join(mountPath, filepath.FromSlash(pth))
 		// BUG(fred): spotted in rw mount. If we put all files with same content, the deduplication ends up with an error on commit...
 		// => have to randomize for now
-		//data := []byte(`not empty`)
+		// data := []byte(`not empty`)
 		data := rand.Bytes(10)
 		require.NoError(t, ioutil.WriteFile(target, data, 0600))
 

@@ -24,6 +24,7 @@ var SplitCmd = &cobra.Command{
 }
 
 func init() {
+	addSkipAuthFlag(SplitCmd)
 	DiamondCmd.AddCommand(SplitCmd)
 }
 

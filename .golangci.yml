@@ -45,5 +45,10 @@ linters:
     - goerr113
     - exhaustive
     - godot
+    - wrapcheck
+    - exhaustivestruct
+    - errorlint
+    - tparallel
+    - nestif
 
 max-same-issues: 0

@@ -20,8 +20,8 @@ datamon diamond initialize [flags]
 ### Options
 
 ```
-  -h, --help          help for initialize
-      --repo string   The name of this repository
+  -h, --help              help for initialize
+      --repo (*) string   The name of this repository
 ```
 
 ### Options inherited from parent commands

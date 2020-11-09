@@ -36,7 +36,7 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 		ctx := context.Background()
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
-		remoteStores, err := optionInputs.datamonContext(ctx)
+		remoteStores, err := optionInputs.datamonContext(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -61,5 +61,6 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 func init() {
 	addCoreConcurrencyFactorFlag(repoList, 500)
 	addBatchSizeFlag(repoList)
+	addSkipAuthFlag(repoList)
 	repoCmd.AddCommand(repoList)
 }

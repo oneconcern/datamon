@@ -57,8 +57,8 @@ func setupVersions(t testing.TB, numOfObjects, numOfVersions int) (*gcs, func())
 	cleanup := func() {
 		delete := func(key string, wg *sync.WaitGroup) {
 			defer wg.Done()
-			versions, err := gcsV.KeyVersions(ctx, key)
-			require.NoError(t, err, "couldn't list versions:"+key)
+			versions, e := gcsV.KeyVersions(ctx, key)
+			require.NoError(t, e, "couldn't list versions:"+key)
 			t.Logf("have versions %v\n", versions)
 			for _, version := range versions {
 				t.Logf("deleting version %q\n", version)

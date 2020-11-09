@@ -29,6 +29,7 @@ type gcs struct {
 	bucket         string
 	ctx            context.Context
 	l              *zap.Logger
+	isReadOnly     bool
 }
 
 func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
@@ -51,6 +52,7 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 		apply(googleStore)
 	}
 	if googleStore.l == nil {
+		// default logger if none provided by options
 		googleStore.l, _ = dlogger.GetLogger("info")
 	}
 	googleStore.l = googleStore.l.With(zap.String("bucket", bucket))
@@ -62,9 +64,15 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 	if err != nil {
 		return nil, toSentinelErrors(err)
 	}
-	googleStore.client, err = gcsStorage.NewClient(ctx, clientOpts(false, credentialFile)...)
-	if err != nil {
-		return nil, toSentinelErrors(err)
+	if !googleStore.isReadOnly {
+		googleStore.client, err = gcsStorage.NewClient(ctx, clientOpts(false, credentialFile)...)
+		if err != nil {
+			return nil, toSentinelErrors(err)
+		}
+	} else {
+		// if ReadOnly option, the "write" client is gained with readOnly scope:
+		// write / delete operations will fail
+		googleStore.client = googleStore.readOnlyClient
 	}
 	return googleStore, nil
 }

@@ -18,10 +18,10 @@ datamon diamond split get [flags]
 ### Options
 
 ```
-      --diamond string   The diamond to use
-  -h, --help             help for get
-      --repo string      The name of this repository
-      --split string     The split to use
+      --diamond (*) string   The diamond to use
+  -h, --help                 help for get
+      --repo (*) string      The name of this repository
+      --split (*) string     The split to use
 ```
 
 ### Options inherited from parent commands

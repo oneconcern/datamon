@@ -28,7 +28,7 @@ type Split struct {
 	getKeys       KeyIterator
 	filter        KeyFilter
 	uploadIndexer *fileIndex
-	//downloadIndexer *fileIndex
+	// downloadIndexer *fileIndex
 	mustExist bool // used to check replayed splits with splitID forced
 
 	metrics.Enable

@@ -16,14 +16,14 @@ datamon diamond commit [flags]
 
 ```
       --concurrency-factor int   Heuristic on the amount of concurrency used by various operations.  Turn this value down to use less memory, increase for faster operations. (default 100)
-      --diamond string           The diamond to use
+      --diamond (*) string       The diamond to use
       --diamond-tag string       A custom tag to identify your diamond in logs or datamon reports. Example: "coordinator-pod-A"
   -h, --help                     help for commit
       --ignore-conflicts         Diamond commit ignores conflicts and does not report about them
       --label string             The human-readable name of a label
-      --message string           The message describing the new bundle
+      --message (*) string       The message describing the new bundle
       --no-conflicts             Diamond commit fails if any conflict is detected
-      --repo string              The name of this repository
+      --repo (*) string          The name of this repository
       --with-checkpoints         Diamond commit handles conflicts and keeps them as intermediate checkpoints rather than conflicts. Intermediate versions of your uploaded files are located in the .checkpoints folder
       --with-conflicts           Diamond commit handles conflicts and keeps them in store Conflicting versions of your uploaded files are located in the .conflicts folder (default true)
 ```

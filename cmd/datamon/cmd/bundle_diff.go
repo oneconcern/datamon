@@ -47,7 +47,7 @@ var bundleDiffCmd = &cobra.Command{
 
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
-		remoteStores, err := optionInputs.datamonContext(ctx)
+		remoteStores, err := optionInputs.datamonContext(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("failed to initialize remote stores", err)
 		}
@@ -70,7 +70,7 @@ var bundleDiffCmd = &cobra.Command{
 			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
 
-		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		bundleOpts, err := optionInputs.bundleOpts(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
 		}

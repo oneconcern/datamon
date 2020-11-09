@@ -17,8 +17,9 @@ datamon repo get [flags]
 ### Options
 
 ```
-  -h, --help          help for get
-      --repo string   The name of this repository
+  -h, --help              help for get
+      --repo (*) string   The name of this repository
+      --skip-auth         Skip authentication against google (gcs credentials remains required)
 ```
 
 ### Options inherited from parent commands
@@ -32,7 +33,6 @@ datamon repo get [flags]
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
-      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

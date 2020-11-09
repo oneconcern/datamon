@@ -13,3 +13,10 @@ func Logger(logger *zap.Logger) Option {
 		}
 	}
 }
+
+// ReadOnly indicates that only the read-only client is going to be used
+func ReadOnly() Option {
+	return func(g *gcs) {
+		g.isReadOnly = true
+	}
+}

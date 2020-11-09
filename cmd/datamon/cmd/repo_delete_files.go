@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
+	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
 )
@@ -17,12 +18,15 @@ var repoDeleteFiles = &cobra.Command{
 	Short: "Deletes files from a named repo, altering all bundles",
 	Long: `Deletes files in a file list from all bundles in an existing datamon repository.
 
+You must authenticate to perform this operation (can't --skip-auth).
+You must specify the context with --context.
+
 This command MUST NOT BE RUN concurrently.
 `,
 	Example: `
-% datamon repo delete files --repo ritesh-datamon-test-repo --files file-list.txt
+% datamon repo delete files --repo ritesh-datamon-test-repo --files file-list.txt --context dev
 
-% datamon repo delete files --repo ritesh-datamon-test-repo --file path/file-to-delete
+% datamon repo delete files --repo ritesh-datamon-test-repo --file path/file-to-delete --context dev
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
@@ -33,6 +37,8 @@ This command MUST NOT BE RUN concurrently.
 
 		ctx := context.Background()
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		logger, err := optionInputs.getLogger()
+
 		remoteStores, err := optionInputs.datamonContext(ctx)
 		if err != nil {
 			wrapFatalln("create remote stores", err)
@@ -51,10 +57,16 @@ This command MUST NOT BE RUN concurrently.
 			}
 		}
 		if len(files) == 0 {
-			wrapFatalln("must specify at list a file or file list", nil)
+			wrapFatalln("must specify at least one file or file list", nil)
 			return
 		}
 
+		if !datamonFlags.root.forceYes && !userConfirm("delete repo files") {
+			wrapFatalln("user aborted", nil)
+			return
+		}
+
+		logger.Info("deleting files from repo", zap.String("repo", datamonFlags.repo.RepoName))
 		err = core.DeleteEntriesFromRepo(datamonFlags.repo.RepoName, remoteStores, files)
 		if err != nil {
 			wrapFatalln("delete repo", err)
@@ -66,16 +78,6 @@ This command MUST NOT BE RUN concurrently.
 			wrapFatalln("populate remote config", err)
 		}
 	},
-}
-
-func init() {
-	requireFlags(repoDeleteFiles,
-		addRepoNameOptionFlag(repoDeleteFiles),
-	)
-	addFileListFlag(repoDeleteFiles)
-	addBundleFileFlag(repoDeleteFiles)
-
-	repoDelete.AddCommand(repoDeleteFiles)
 }
 
 func fileList(index string) ([]string, error) {

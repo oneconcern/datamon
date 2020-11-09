@@ -35,12 +35,12 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 ```
       --bundle string            The hash id for the bundle, if not specified the latest bundle will be used
       --concurrency-factor int   Heuristic on the amount of concurrency used by various operations.  Turn this value down to use less memory, increase for faster operations. (default 100)
-      --destination string       The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
+      --destination (*) string   The path to the download dir. Defaults to some random dir /tmp/datamon-mount-destination{xxxxx}
       --force-dest               Override destination path is empty check
   -h, --help                     help for download
       --label string             The human-readable name of a label
       --name-filter string       A regular expression (RE2) to match names of bundle entries.
-      --repo string              The name of this repository
+      --repo (*) string          The name of this repository
 ```
 
 ### Options inherited from parent commands

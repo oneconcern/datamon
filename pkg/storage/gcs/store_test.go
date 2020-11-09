@@ -265,7 +265,7 @@ func TestGcs_KeysPrefix(t *testing.T) {
 	require.Equal(t, count-fetch, len(keys))
 	require.Equal(t, "", next)
 
-	keys = *new([]string)
+	keys = []string(nil)
 	next = ""
 	for i := 0; i < count; i++ {
 		var k []string
@@ -321,7 +321,7 @@ func keysPrefix2000(b *testing.B, gcs storage.Store) {
 }
 func BenchmarkRun(b *testing.B) {
 	gcs, _ := setup(b, TotalObjects)
-	//defer cleanup()
+	// defer cleanup()
 	run := func(fn func(b2 *testing.B, gcs storage.Store)) {
 		fn(b, gcs)
 	}

@@ -27,7 +27,7 @@ var bundleUpdateCmd = &cobra.Command{
 
 		ctx := context.Background()
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
-		remoteStores, err := optionInputs.datamonContext(ctx)
+		remoteStores, err := optionInputs.datamonContext(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -80,7 +80,7 @@ var bundleUpdateCmd = &cobra.Command{
 			core.ConsumableStore(destinationStore),
 			core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()),
 		)
-		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		bundleOpts, err := optionInputs.bundleOpts(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
 		}

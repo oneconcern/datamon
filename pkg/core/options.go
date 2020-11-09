@@ -21,7 +21,7 @@ type Settings struct {
 	labelVersions bool
 
 	metrics.Enable
-	//m *M // TODO(fred): enable metrics for list operations
+	// m *M // TODO(fred): enable metrics for list operations
 }
 
 const (

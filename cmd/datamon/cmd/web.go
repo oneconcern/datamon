@@ -27,7 +27,7 @@ var webSrv = &cobra.Command{
 		infoLogger.Println("begin webserver")
 		datamonFlagsPtr := &datamonFlags
 		optionInputs := newCliOptionInputs(config, datamonFlagsPtr)
-		stores, err := optionInputs.datamonContext(context.Background())
+		stores, err := optionInputs.datamonContext(context.Background(), ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -79,16 +79,13 @@ var webSrv = &cobra.Command{
 		if err := newCliOptionInputs(config, &datamonFlags).populateRemoteConfig(); err != nil {
 			wrapFatalln("populate remote config", err)
 		}
-	}, // https://github.com/spf13/cobra/issues/458
+	},
 }
 
 func init() {
-	/* web datamonFlags */
 	addWebPortFlag(webSrv)
 	addWebNoBrowserFlag(webSrv)
-
-	/* core datamonFlags */
-	//	addMetadataBucket(repoList)
+	addSkipAuthFlag(webSrv)
 
 	rootCmd.AddCommand(webSrv)
 }

@@ -27,7 +27,7 @@ datamon bundle list [flags]
       --batch-size int           Number of bundles streamed together as a batch. This can be tuned for performance based on network connectivity (default 1024)
       --concurrency-factor int   Heuristic on the amount of concurrency used by core operations. Concurrent retrieval of metadata is capped by the 'batch-size' parameter. Turn this value down to use less memory, increase for faster operations. (default 500)
   -h, --help                     help for list
-      --repo string              The name of this repository
+      --repo (*) string          The name of this repository
 ```
 
 ### Options inherited from parent commands

@@ -27,7 +27,7 @@ You may use the "--label" flag as an alternate way to specify a particular bundl
 		ctx := context.Background()
 
 		optionInputs := newCliOptionInputs(config, &datamonFlags)
-		remoteStores, err := optionInputs.datamonContext(ctx)
+		remoteStores, err := optionInputs.datamonContext(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("create remote stores", err)
 			return
@@ -45,7 +45,7 @@ You may use the "--label" flag as an alternate way to specify a particular bundl
 			return
 		}
 
-		bundleOpts, err := optionInputs.bundleOpts(ctx)
+		bundleOpts, err := optionInputs.bundleOpts(ctx, ReadOnlyContext())
 		if err != nil {
 			wrapFatalln("failed to initialize bundle options", err)
 		}

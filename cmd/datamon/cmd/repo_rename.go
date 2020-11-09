@@ -15,9 +15,12 @@ var repoRename = &cobra.Command{
 	Short: "Rename a repo",
 	Long: `Rename an existing datamon repository.
 
+You must authenticate to perform this operation (can't --skip-auth).
+You must specify the context with --context.
+
 This command MUST NOT BE RUN concurrently.
 `,
-	Example: `% datamon repo rename --repo ritesh-datamon-test-repo ritesh-datamon-new-repo`,
+	Example: `% datamon repo rename --context dev --repo ritesh-datamon-test-repo ritesh-datamon-new-repo`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 
@@ -35,6 +38,12 @@ This command MUST NOT BE RUN concurrently.
 			return
 		}
 		logger, err := optionInputs.getLogger()
+
+		if !datamonFlags.root.forceYes && !userConfirm("rename") {
+			wrapFatalln("user aborted", nil)
+			return
+		}
+
 		logger.Info("renaming repo", zap.String("repo", datamonFlags.repo.RepoName), zap.String("new repo", newName))
 		err = core.RenameRepo(datamonFlags.repo.RepoName, newName, remoteStores)
 		if err != nil {
@@ -48,11 +57,4 @@ This command MUST NOT BE RUN concurrently.
 		}
 	},
 	Args: cobra.MinimumNArgs(1),
-}
-
-func init() {
-	requireFlags(repoRename,
-		addRepoNameOptionFlag(repoRename),
-	)
-	repoCmd.AddCommand(repoRename)
 }

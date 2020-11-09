@@ -135,7 +135,7 @@ func smallGenInput(p *genInputParam) {
 	p.maxFileSizeLeafFactor = 0.001
 }
 
-//makeDiamondInput produces a sample partitioned dataset to test diamonds
+// makeDiamondInput produces a sample partitioned dataset to test diamonds
 func makeDiamondInput(t testing.TB, dest string, leafSize uint32, p genInputParam) {
 	t0 := time.Now()
 	sampleSize := 0
@@ -555,7 +555,7 @@ func downloadBundleAndCheck(t testing.TB, bundleID string, ctx context2.Stores, 
 	require.NoError(t, unpackBundleDescriptor(backgroundContexter(), bundle, false))
 	assert.Len(t, bundle.BundleDescriptor.Contributors, len(sample.pods))
 	for _, c := range bundle.BundleDescriptor.Contributors {
-		//model.Contributor{Name: "service-user-" + pod, Email: "fred@" + pod + ".com"}),
+		// model.Contributor{Name: "service-user-" + pod, Email: "fred@" + pod + ".com"}),
 		matches := emailRex.FindStringSubmatch(c.Email)
 		require.Len(t, matches, 2)
 		assert.Contains(t, sample.pods, matches[1])
@@ -597,7 +597,8 @@ func injectConflicts(t testing.TB, root, target string, rate float64, alterData 
 		if info.IsDir() || err != nil {
 			return nil
 		}
-		if rand.Float64() < rate { // #nosec
+		//#nosec
+		if rand.Float64() < rate {
 			conflicts++
 
 			// copy file to a commonly uploaded location

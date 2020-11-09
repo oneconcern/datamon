@@ -40,6 +40,7 @@ var (
 
 func init() {
 	addTemplateFlag(bundleCmd)
+	addSkipAuthFlag(bundleCmd, true)
 	rootCmd.AddCommand(bundleCmd)
 
 	bundleDescriptorTemplate = func(opts flagsT) *template.Template {

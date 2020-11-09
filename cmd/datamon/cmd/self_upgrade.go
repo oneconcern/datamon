@@ -61,7 +61,7 @@ type upgradeFlags struct {
 }
 
 func updater() *selfupdate.Updater {
-	//asset filter
+	// asset filter
 	u, err := selfupdate.NewUpdater(selfupdate.Config{
 		Filters: []string{`^datamon\d*([^-]?.?)_`},
 	})
@@ -169,10 +169,11 @@ var selfUpgradeCmd = &cobra.Command{
 
 func init() {
 	addTemplateFlag(selfUpgradeCmd)
-	rootCmd.AddCommand(selfUpgradeCmd)
 
 	addUpgradeCheckOnlyFlag(selfUpgradeCmd)
 	addUpgradeForceFlag(selfUpgradeCmd)
+
+	rootCmd.AddCommand(selfUpgradeCmd)
 }
 
 func doExecAfterUpgrade() error {

@@ -292,7 +292,7 @@ func testListBundles(t *testing.T, concurrency int, i int) {
 			err := ListBundlesApply(testcase.repo,
 				mockedContextStores(testcase.name), func(bundle model.BundleDescriptor) error {
 					bundles = append(bundles, bundle)
-					fail = rand.Intn(2) > 0
+					fail = rand.Intn(2) > 0 //#nosec
 					if fail {
 						return errors.New("applied test func error")
 					}

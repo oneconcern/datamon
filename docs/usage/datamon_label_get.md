@@ -17,10 +17,10 @@ datamon label get [flags]
 ### Options
 
 ```
-  -h, --help            help for get
-      --label string    The human-readable name of a label
-      --repo string     The name of this repository
-      --with-versions   List all previous versions of labels
+  -h, --help               help for get
+      --label (*) string   The human-readable name of a label
+      --repo (*) string    The name of this repository
+      --with-versions      List all previous versions of labels
 ```
 
 ### Options inherited from parent commands
@@ -34,7 +34,6 @@ datamon label get [flags]
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
       --metrics-url string        Fully qualified URL to an influxdb metrics collector, with optional user and password
       --metrics-user string       User to connect to the metrics collector backend. Overrides any user set in URL
-      --skip-auth                 Skip authentication against google (gcs credentials remains required)
       --upgrade                   Upgrades the current version then carries on with the specified command
 ```
 

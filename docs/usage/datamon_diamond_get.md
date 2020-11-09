@@ -18,9 +18,9 @@ datamon diamond get [flags]
 ### Options
 
 ```
-      --diamond string   The diamond to use
-  -h, --help             help for get
-      --repo string      The name of this repository
+      --diamond (*) string   The diamond to use
+  -h, --help                 help for get
+      --repo (*) string      The name of this repository
 ```
 
 ### Options inherited from parent commands

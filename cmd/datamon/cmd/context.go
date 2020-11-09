@@ -33,6 +33,7 @@ var contextTemplate func(flagsT) *template.Template
 
 func init() {
 	addTemplateFlag(ContextCmd)
+	addSkipAuthFlag(ContextCmd, true)
 	rootCmd.AddCommand(ContextCmd)
 
 	contextTemplate = func(opts flagsT) *template.Template {
@@ -49,7 +50,7 @@ func init() {
 }
 
 func mustGetConfigStore() storage.Store {
-	configStore, err := gcs.New(context.Background(), datamonFlags.core.Config, config.Credential)
+	configStore, err := gcs.New(context.Background(), datamonFlags.core.Config, config.Credential, gcs.ReadOnly())
 	if err != nil {
 		wrapFatalln("failed to create config store", err)
 	}

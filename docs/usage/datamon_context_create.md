@@ -15,12 +15,12 @@ datamon context create [flags]
 ### Options
 
 ```
-      --blob string       The name of the bucket hosting the datamon blobs
-  -h, --help              help for create
-      --meta string       The name of the bucket used by datamon metadata
-      --read-log string   The name of the bucket hosting the read log
-      --vmeta string      The name of the bucket hosting the versioned metadata
-      --wal string        The name of the bucket hosting the WAL
+      --blob (*) string       The name of the bucket hosting the datamon blobs
+  -h, --help                  help for create
+      --meta (*) string       The name of the bucket used by datamon metadata
+      --read-log (*) string   The name of the bucket hosting the read log
+      --vmeta (*) string      The name of the bucket hosting the versioned metadata
+      --wal (*) string        The name of the bucket hosting the WAL
 ```
 
 ### Options inherited from parent commands

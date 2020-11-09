@@ -15,10 +15,10 @@ datamon diamond cancel [flags]
 ### Options
 
 ```
-      --diamond string       The diamond to use
+      --diamond (*) string   The diamond to use
       --diamond-tag string   A custom tag to identify your diamond in logs or datamon reports. Example: "coordinator-pod-A"
   -h, --help                 help for cancel
-      --repo string          The name of this repository
+      --repo (*) string      The name of this repository
 ```
 
 ### Options inherited from parent commands
