@@ -122,7 +122,7 @@ if [[ -z ${done} ]] ; then
 fi
 
 echo "INFO: checking for already existing bundle ${bundleID} in target store for repo: ${REPO}"
-if eval "datamon2 bundle get --repo \"${REPO}\" --bundle \"${bundleID}\"" ; then
+if eval "datamon2 bundle get --repo \"${REPO}\" --bundle \"${bundleID}\" $targetContext" ; then
   echo "WARNING: bundle ${bundleID} is already existing in the store with target repo: ${REPO}"
   echo "ensuring labels in target bundle ${bundleID}: ${REPO}"
   setLabels
