@@ -42,7 +42,7 @@ storageType: pd-ssd
 # time to live for k8 resources (in seconds)
 ttl: 86400
 # number of allowed job restarts upon failure (with restartPolicy: OnFailure)
-backoffs: 0
+backoffs: 50
 
 scripts:
   migrate: |
@@ -56,7 +56,7 @@ scripts:
 home: '/home/project'
 staging: '/data'
 
-restartPolicy: Never
+restartPolicy: OnFailure
 nameOverride: ""
 fullnameOverride: ""
 application: datamon-migrator-v2
