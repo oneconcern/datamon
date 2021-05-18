@@ -78,7 +78,6 @@ spec:
             name: config2
           - mountPath: {{ dir .Values.credentials }}
             name: creds-secret
-            key: {{ base .Values.credentials }}
           - mountPath: {{ .Values.staging }}
             name: staging-volume
 {{- if .Values.extraVolumeMounts }}
