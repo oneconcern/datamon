@@ -4,8 +4,6 @@ metadata:
   name: "{{.Release.Name}}-staging-claim"
 spec:
   storageClassName: {{ .Values.storageClassName }}
-  persistentVolumeReclaimPolicy: Delete
-  finalizers: []
   accessModes:
     - ReadWriteOnce
   resources:
