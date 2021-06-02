@@ -1,8 +1,7 @@
 # A base container to build datamon and run CI jobs
 #
 # This image is updated every week on our CI
-FROM cimg/go:1.14
-#FROM circleci/golang
+FROM golang:1.16
 WORKDIR /tmp
 USER root
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | \
@@ -19,4 +18,3 @@ RUN curl -sLL -O https://github.com/upx/upx/releases/download/v${UPX_VERSION}/up
     install upx-${UPX_VERSION}-${ARCH}/upx /usr/bin &&\
     rm -rf upx-*
 WORKDIR /go
-USER circleci
