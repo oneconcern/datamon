@@ -3,7 +3,7 @@ version: 2.1
 executors:
   docker_minio:
     # An executor to run S3 compatibility unit tests
-    working_directory: ~/project
+    working_directory: /home/circleci/project
     environment:
       SUDO: ''
     resource_class: 'medium+'
@@ -26,7 +26,7 @@ executors:
   base_builder:
     # An executor to run ordinary tasks.
     # TODO(fred): when circleci eventually produces a "latest" tag, switch to that
-    working_directory: ~/project
+    working_directory: /home/circleci/project
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       SUDO: ''
@@ -36,7 +36,7 @@ executors:
   docker_builder:
     # An executor to run and build: it is based on the base_builder, with some
     # extras to support google cloud.
-    working_directory: ~/project
+    working_directory: /home/circleci/project
     resource_class: 'medium+' # linter breaks on "small" instances and sometimes even on "medium" ones
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
@@ -49,7 +49,7 @@ executors:
 
   fuse_tester:
     # A virtual machine executor to run fuse tests, with privileges n fuse
-    working_directory: ~/project
+    working_directory: /home/circleci/project
     resource_class: 'medium'
     environment:
       GOROOT: /usr/local/go
@@ -57,11 +57,11 @@ executors:
       PATH: /usr/local/go/bin:/home/circleci/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
       SUDO: 'sudo'
     machine:
-      image: ubuntu-1604:201903-01
+      image: ubuntu-2004:202104-01
 
   metrics_tester:
     # An executor to run tests with a local instance of influxdb, to test metrics collection
-    working_directory: ~/project
+    working_directory: /home/circleci/project
     environment:
       SUDO: ''
     resource_class: 'medium+'
@@ -216,8 +216,8 @@ commands:
       - run:
           name: Prepare google app credentials
           command: |
-            mkdir -p ~/extra
-            echo $GCLOUD_SERVICE_KEY > ~/extra/appcredentials.json
+            mkdir -p /home/circleci/extra
+            echo $GCLOUD_SERVICE_KEY > /home/circleci/extra/appcredentials.json
 
   prepare_tests:
     steps:
