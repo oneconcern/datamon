@@ -53,11 +53,10 @@ pg sidecar building base:
 
 ## CI builder image
 
-Our CI is largely using a pre-baked docker executor based on circle convenience image `cimg/go`.
+Our CI is largely using a pre-baked docker executor based on a base debian golang image `golang:1.16`.
 This is updated at every PR run. CI always runs on the latest image (when PRs are more frequent, consider moving this back to a weekly CI cronjob).
 
-Notice that at the moment `cimgo/go` doesn't have a `latest` tag, so we are left with specifying the go version
-explicitly (now `1.14`).
+Notice: circleci convenience images have not proved to be much more efficient or downloaded significantly faster. These are mostly a pain: moving forward, use standard golang images.
 
 [Dockerfile](./builder.Dockerfile)
 

@@ -4,8 +4,9 @@
 ARG VERSION=20200307
 FROM gcr.io/onec-co/datamon-sidecar-base:${VERSION}
 
-RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-RUN echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" |sudo tee  /etc/apt/sources.list.d/pgdg.list
+ENV SUDO=
+RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | ${SUDO} apt-key add -
+RUN echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" |${SUDO} tee  /etc/apt/sources.list.d/pgdg.list
 RUN apt-get update &&\
     apt-get install -y --quiet --no-install-recommends  postgresql-12 postgresql-client-12 &&\
     apt-get autoremove -yqq &&\

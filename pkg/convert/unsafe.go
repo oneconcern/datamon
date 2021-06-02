@@ -13,7 +13,7 @@ const sizeOfUintPtr = unsafe.Sizeof(uintptr(0))
 // UnsafeStringToBytes converts strings to []byte without memcopy
 func UnsafeStringToBytes(s string) []byte {
 	ln := len(s)
-	/* #nosec */
+	// nolint:  govet
 	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Len:  ln,
 		Cap:  ln,
@@ -43,6 +43,6 @@ func BytesToInt64(b []byte) int64 {
 
 // UnsafeBytesToString converts []byte to string without a memcopy
 func UnsafeBytesToString(b []byte) string {
-	/* #nosec */
+	// nolint:  govet
 	return *(*string)(unsafe.Pointer(&reflect.StringHeader{Data: uintptr(unsafe.Pointer(&b[0])), Len: len(b)}))
 }
