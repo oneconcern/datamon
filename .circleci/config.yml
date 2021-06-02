@@ -352,18 +352,24 @@ jobs:
       - run:
           name: Run golang tests (1)
           command: |
+            DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
+
             gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures -- \
               -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/noncafs/c_non_cafs.out \
+              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')" \
               $(go list ./...|grep -v cafs)
       - run:
           name: 'Run golang tests (2): cafs'
           command: |
+            DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
+
             # cafs tests are memory intensive: best to run them separately
             # cafs tests have a lot of parallel testcases, using -race here would hog CI ressources
             gotestsum --junitfile /tmp/test-results/cafs/go-test-report-cafs.xml --format short-with-failures -- \
               -timeout 15m \
               -parallel 4 -covermode atomic -coverprofile /tmp/test-coverage/cafs/c_cafs_only.out \
+              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')" \
               ./pkg/cafs/...
       - put_cache
       - persist_to_workspace:
@@ -393,10 +399,13 @@ jobs:
           name: Run golang tests with metrics (1)
           no_output_timeout: 20m
           command: |
+            DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
+
             gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format standard-verbose -- \
               -tags influxdbintegration \
               -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/metrics/c_metrics.out \
+              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')" \
               ./cmd/datamon/cmd ./pkg/metrics
       - put_cache
       - persist_to_workspace:
@@ -422,6 +431,8 @@ jobs:
       - run:
           name: Run golang tests in integration environment
           command: |
+            DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
+
             gotestsum \
               --junitfile /tmp/test-results/fuse/go-test-report-fuse.xml --format standard-verbose -- \
               -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)' \
