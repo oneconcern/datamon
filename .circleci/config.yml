@@ -31,7 +31,7 @@ executors:
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
     docker:
-      - image: cimg/go:1.14
+      - image: golang:1.16
 
   docker_builder:
     # An executor to run and build: it is based on the base_builder, with some
@@ -463,7 +463,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 18.09.3
+          version: 20.10.2
       - checkout
       - get_cache
       - login_to_google
@@ -485,7 +485,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 18.09.3
+          version: 20.10.2
       - checkout
       - login_to_google
       - install_kubectl
@@ -505,7 +505,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 18.09.3
+          version: 20.10.2
       - checkout
       - login_to_google
       - run:
@@ -518,7 +518,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 18.09.3
+          version: 20.10.2
       - checkout
       - login_to_google
       - run:
@@ -539,7 +539,7 @@ jobs:
     # > Hence ssh key is not sufficient and GITHUB_TOKEN is required.
     steps:
       - setup_remote_docker:
-          version: 18.09.3
+          version: 20.10.2
       - checkout
       - get_cache
       - login_to_google
@@ -571,7 +571,7 @@ jobs:
     executor: base_builder
     steps:
       - setup_remote_docker:
-          version: 18.09.3
+          version: 20.10.2
       - install_base
       - checkout
       - login_to_google
@@ -590,7 +590,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 18.09.3
+          version: 20.10.2
       - login_to_google
       - remove_whitelist_ip
 
