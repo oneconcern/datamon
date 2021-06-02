@@ -5,7 +5,7 @@ executors:
     # An executor to run S3 compatibility unit tests
     working_directory: ~/project
     environment:
-      GOOGLE_COMPUTE_ZONE: us-west2-c
+      SUDO: ''
     resource_class: 'medium+'
     docker:
       - image: gcr.io/onec-co/datamon-builder:latest
@@ -28,7 +28,6 @@ executors:
     # TODO(fred): when circleci eventually produces a "latest" tag, switch to that
     working_directory: ~/project
     environment:
-      GOOGLE_COMPUTE_ZONE: us-west2-c
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       SUDO: ''
     docker:
@@ -40,7 +39,6 @@ executors:
     working_directory: ~/project
     resource_class: 'medium+' # linter breaks on "small" instances and sometimes even on "medium" ones
     environment:
-      GOOGLE_COMPUTE_ZONE: us-west2-c
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       SUDO: ''
     docker:
@@ -54,7 +52,6 @@ executors:
     working_directory: ~/project
     resource_class: 'medium'
     environment:
-      GOOGLE_COMPUTE_ZONE: us-west2-c
       GOROOT: /usr/local/go
       GOPATH: /home/circleci/go
       PATH: /usr/local/go/bin:/home/circleci/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
@@ -66,7 +63,6 @@ executors:
     # An executor to run tests with a local instance of influxdb, to test metrics collection
     working_directory: ~/project
     environment:
-      GOOGLE_COMPUTE_ZONE: us-west2-c
       SUDO: ''
     resource_class: 'medium+'
     docker:
@@ -89,8 +85,10 @@ commands:
           command: |
             echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | ${SUDO} tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
             curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | ${SUDO} apt-key add
+            curl -sSL https://download.docker.com/linux/debian/gpg | ${SUDO} apt-key add -
+            echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | ${SUDO} tee -a /etc/apt/sources.list.d/docker.list
             ${SUDO} apt-get update -y -qq
-            ${SUDO} apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh
+            ${SUDO} apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh docker-ce docker-ce-cli containerd.io
 
             # install upx version that supports osx binaries (>=3.96)
             UPX_VERSION=3.96
@@ -189,7 +187,7 @@ commands:
           command: |
             echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
             gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
-            gcloud --quiet config set compute/zone ${GOOGLE_COMPUTE_ZONE}
+            gcloud --quiet config set compute/region ${GOOGLE_COMPUTE_REGION}
             echo $GCLOUD_SERVICE_KEY | docker login -u _json_key --password-stdin https://gcr.io
 
   get_cache:
@@ -243,7 +241,7 @@ commands:
 
             # Persist the whitelisted IP to be removed later on (actually a CIDR)
             mkdir -p /tmp/whitelisted/ips && touch /tmp/whitelisted/ips/"${CIRCLE_CI_IP}"
-            ALREADY="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|\
+            ALREADY="$(gcloud container clusters describe --region "${GOOGLE_COMPUTE_REGION}" --format json "${CLUSTER}"|\
             jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. == "'"${CIRCLE_CI_IP}"'/32"))|.[]')"
             if [ -n "${ALREADY}" ] ; then
               exit 0
@@ -252,7 +250,7 @@ commands:
             COUNT=0
             # cluster updates can't occur concurrently. Handle errors and retry during 10s.
             while [[ "${COUNT}" -lt 10 ]] ; do
-              if gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${ALLOWED_NETWORKS},${CIRCLE_CI_IP}/32" ; then
+              if gcloud container clusters update --region "${GOOGLE_COMPUTE_REGION}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${ALLOWED_NETWORKS},${CIRCLE_CI_IP}/32" ; then
                 exit 0
               fi
               COUNT=$((COUNT+1))
@@ -283,7 +281,7 @@ commands:
               echo "INFO: no previous IP found: resetting to pre-configured state"
             else
               echo "INFO: previously added IP to be removed: ${IPS_TO_REMOVE}"
-              PREVIOUS="$(gcloud container clusters describe --zone "${GOOGLE_COMPUTE_ZONE}" --format json "${CLUSTER}"|\
+              PREVIOUS="$(gcloud container clusters describe --region "${GOOGLE_COMPUTE_REGION}" --format json "${CLUSTER}"|\
               jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(inside('"${IPS_TO_REMOVE}"')))')"
             fi
             echo "INFO: previously authorized networks: ${PREVIOUS}"
@@ -291,7 +289,7 @@ commands:
             COUNT=0
             # cluster updates can't occur concurrently. Handle errors and retry during 10s.
             while [[ "${COUNT}" -lt 10 ]] ; do
-              if gcloud container clusters update --zone "${GOOGLE_COMPUTE_ZONE}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${PREVIOUS}" ; then
+              if gcloud container clusters update --region "${GOOGLE_COMPUTE_REGION}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${PREVIOUS}" ; then
                 exit 0
               fi
               COUNT=$((COUNT+1))
@@ -604,7 +602,7 @@ workflows:
   build_and_test:
     jobs:
       - go_lint:
-          context: "OC Common"
+          context: "onec-dev"
           filters:
             tags:
               only: /.*/
@@ -612,7 +610,7 @@ workflows:
               only: /.*/
 
       - go_cross_compile:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - go_lint
           filters:
@@ -622,7 +620,7 @@ workflows:
               only: /.*/
 
       - go_test:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - go_lint
           filters:
@@ -632,7 +630,7 @@ workflows:
               only: /.*/
 
       - go_test_fuse:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - go_lint
           filters:
@@ -642,7 +640,7 @@ workflows:
               only: /.*/
 
       - go_test_metrics:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - go_lint
           filters:
@@ -652,7 +650,7 @@ workflows:
               only: /.*/
 
       - test_coverage:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - go_test
             - go_test_fuse
@@ -664,7 +662,7 @@ workflows:
               only: /.*/
 
       - build_images:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - go_lint
             - push_base
@@ -675,7 +673,7 @@ workflows:
               only: /.*/
 
       - push_base:
-          context: "OC Common"
+          context: "onec-dev"
           filters:
             tags:
               only: /.*/
@@ -683,7 +681,7 @@ workflows:
               only: /.*/
 
       - build_demo_images:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - build_images
           filters:
@@ -693,7 +691,7 @@ workflows:
               only: /.*/
 
       # - fuse_sidecar_test:
-      #    context: "OC Common"
+      #    context: "onec-dev"
       #    requires:
       #      - build_demo_images
       #    filters:
@@ -703,7 +701,7 @@ workflows:
       #        only: /.*/
 
       - pg_sidecar_test:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - build_demo_images
             #- fuse_sidecar_test
@@ -714,7 +712,7 @@ workflows:
               only: /.*/
 
       - k8s_remove_whitelist:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             #- fuse_sidecar_test
             - pg_sidecar_test
@@ -726,7 +724,7 @@ workflows:
 
 
       - publish_release:
-          context: "OC Common"
+          context: "onec-dev"
           requires:
             - go_test
             - go_test_fuse
@@ -748,4 +746,4 @@ workflows:
 #                - master
 #    jobs:
 #      - push_base:
-#          context: "OC Common"
+#          context: "onec-dev"
