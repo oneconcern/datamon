@@ -7,7 +7,7 @@ USER root
 ENV SUDO=
 RUN \
     ${SUDO} apt-get update -yqq &&\
-    ${SUDO} apt-get install -yqq curl ca-certificates git lsb-release apt-transport-https &&\
+    ${SUDO} apt-get install -yqq curl ca-certificates git lsb-release apt-transport-https jq &&\
     echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | ${SUDO} tee -a /etc/apt/sources.list.d/google-cloud-sdk.list &&\
     curl -sSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | ${SUDO} apt-key add  &&\
     curl -sSL https://download.docker.com/linux/debian/gpg | ${SUDO} apt-key add - &&\
