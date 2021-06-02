@@ -30,6 +30,7 @@ executors:
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
+      SUDO: ''
     docker:
       - image: golang:1.16
 
@@ -41,6 +42,7 @@ executors:
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
+      SUDO: ''
     docker:
       - image: gcr.io/onec-co/datamon-builder:latest
         auth:
@@ -56,6 +58,7 @@ executors:
       GOROOT: /usr/local/go
       GOPATH: /home/circleci/go
       PATH: /usr/local/go/bin:/home/circleci/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+      SUDO: 'sudo'
     machine:
       image: ubuntu-1604:201903-01
 
@@ -64,6 +67,7 @@ executors:
     working_directory: ~/project
     environment:
       GOOGLE_COMPUTE_ZONE: us-west2-c
+      SUDO: ''
     resource_class: 'medium+'
     docker:
       - image: gcr.io/onec-co/datamon-builder:latest
@@ -83,17 +87,17 @@ commands:
       - run:
           name: Install packages with gcloud SDK installed locally
           command: |
-            echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-            curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
-            sudo apt-get update -y -qq
-            sudo apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh
+            echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | ${SUDO} tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+            curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | ${SUDO} apt-key add
+            ${SUDO} apt-get update -y -qq
+            ${SUDO} apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh
 
             # install upx version that supports osx binaries (>=3.96)
             UPX_VERSION=3.96
             ARCH=amd64_linux
             curl -sSL -O https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-${ARCH}.tar.xz
             tar xf upx-${UPX_VERSION}-${ARCH}.tar.xz
-            sudo install upx-${UPX_VERSION}-${ARCH}/upx /usr/bin
+            ${SUDO} install upx-${UPX_VERSION}-${ARCH}/upx /usr/bin
             rm -rf upx-*
 
   install_golang:
@@ -121,13 +125,13 @@ commands:
             fi
 
             ARTIFACT="go${GO_VERSION}.${ARCH}.tar.gz"
-            sudo tar -xf ${ARTIFACT}
+            ${SUDO} tar -xf ${ARTIFACT}
 
             # clean up preinstalled golang on circleci image
-            sudo mv ${GOROOT} /usr/local/go.old || true
-            sudo mv go ${GOROOT}
-            sudo mkdir -p ${GOPATH}/pkg ${GOPATH}/bin
-            sudo chown -R ${CI_USER} ${GOPATH}
+            ${SUDO} mv ${GOROOT} /usr/local/go.old || true
+            ${SUDO} mv go ${GOROOT}
+            ${SUDO} mkdir -p ${GOPATH}/pkg ${GOPATH}/bin
+            ${SUDO} chown -R ${CI_USER} ${GOPATH}
 
             rm -f ${ARTIFACT}
             export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
@@ -140,7 +144,7 @@ commands:
       - run:
           name: install linuxbrew
           command: |
-            sudo apt-get install -qq -y build-essential curl file git linuxbrew-wrapper
+            ${SUDO} apt-get install -qq -y build-essential curl file git linuxbrew-wrapper
             # do it twice: a hack to work around https://stackoverflow.com/questions/38410020/homebrew-error-update-report-should-not-be-called-directly
             (brew update < /dev/null)||(brew update < /dev/null)
 
@@ -149,7 +153,7 @@ commands:
       - run:
           name: install fuse
           command: |
-            sudo apt-get install -qq -y fuse
+            ${SUDO} apt-get install -qq -y fuse
 
   install_machine:
     description: install VM dependencies
@@ -164,8 +168,8 @@ commands:
       - run:
           name: Install prerequisites to drive kubernetes from ci job
           command: |
-            sudo apt-get update -y --quiet
-            sudo apt-get install --quiet kubectl
+            ${SUDO} apt-get update -y --quiet
+            ${SUDO} apt-get install --quiet kubectl
             gcloud container clusters get-credentials ${CLUSTER}
 
   install_test_tools:
@@ -401,6 +405,7 @@ jobs:
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       GO111MODULE: 'on'
+      SUDO: 'sudo'
     steps:
       - install_machine
       - checkout
@@ -473,7 +478,7 @@ jobs:
       - run:
           name: Run fuse sidecar demo
           command: |
-            make build-datamon-local && sudo install out/datamon /usr/bin
+            make build-datamon-local && ${SUDO} install out/datamon /usr/bin
             hack/fuse-demo/demo_coord.sh
       - run:
           when: always
