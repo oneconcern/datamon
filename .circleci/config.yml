@@ -437,6 +437,7 @@ jobs:
             go get -u github.com/wadey/gocovmerge
             go get -u github.com/axw/gocov/gocov
             go get -u github.com/matm/gocov-html
+            go get github.com/mattn/goveralls
       - run:
           name: Merge raw coverage results and produce coverage reports
           command: |
@@ -452,6 +453,9 @@ jobs:
 
             # Alternative report with gocov
             gocov convert merged_coverprofile.out | gocov-html > coverage-results/coverage_summary_datamon_ci.html
+
+            echo "saving coverage to coveralls"
+            goveralls -coverprofile=merged_coverprofile.out -service=circle-ci -repotoken=$COVERALLS_REPO_TOKEN
       - store_artifacts:
           path: coverage-results
 
