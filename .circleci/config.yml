@@ -84,13 +84,13 @@ commands:
           name: Install packages with gcloud SDK installed locally
           command: |
             ${SUDO} apt-get update -y -qq
-            ${SUDO} apt-get install -yqq curl ca-certificates git lsb-release apt-transport-https
+            ${SUDO} apt-get install -yqq curl ca-certificates git apt-transport-https
 
             echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | ${SUDO} tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
             curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | ${SUDO} apt-key add
 
             curl -sSL https://download.docker.com/linux/debian/gpg | ${SUDO} apt-key add -
-            echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | ${SUDO} tee -a /etc/apt/sources.list.d/docker.list
+            echo "deb [arch=amd64] https://download.docker.com/linux/debian buster stable" | ${SUDO} tee -a /etc/apt/sources.list.d/docker.list
 
             ${SUDO} apt-get update -y -qq
             ${SUDO} apt-get install -y -qq git build-essential google-cloud-sdk shellcheck zsh docker-ce docker-ce-cli containerd.io
