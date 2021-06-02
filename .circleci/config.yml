@@ -54,7 +54,7 @@ executors:
     environment:
       GOROOT: /usr/local/go
       GOPATH: /home/circleci/go
-      PATH: /usr/local/go/bin:/home/circleci/go/bin:/home/circleci/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+      PATH: /usr/local/go/bin:/home/circleci/go/bin:/home/circleci/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
       SUDO: 'sudo'
     machine:
       image: ubuntu-2004:202104-01
@@ -147,7 +147,10 @@ commands:
       - run:
           name: install linuxbrew
           command: |
-            ${SUDO} apt-get install -qq -y build-essential curl file git linuxbrew-wrapper
+            ${SUDO} apt-get install -qq -y build-essential curl file git
+
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
             # do it twice: a hack to work around https://stackoverflow.com/questions/38410020/homebrew-error-update-report-should-not-be-called-directly
             (brew update < /dev/null)||(brew update < /dev/null)
 
