@@ -352,25 +352,29 @@ jobs:
       - run:
           name: Run golang tests (1)
           command: |
+            PKGS="$(go list ./...|grep -v cafs)"
             DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
 
-            gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures -- \
+            gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures \
+                      --packages "${PKGS}" \
+              -- \
               -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/noncafs/c_non_cafs.out \
-              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')" \
-              $(go list ./...|grep -v cafs)
+              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - run:
           name: 'Run golang tests (2): cafs'
           command: |
+            PKGS="./pkg/cafs/..."
             DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
 
             # cafs tests are memory intensive: best to run them separately
             # cafs tests have a lot of parallel testcases, using -race here would hog CI ressources
-            gotestsum --junitfile /tmp/test-results/cafs/go-test-report-cafs.xml --format short-with-failures -- \
+            gotestsum --junitfile /tmp/test-results/cafs/go-test-report-cafs.xml --format short-with-failures \
+                      --packages "${PKGS}" \
+               -- \
               -timeout 15m \
               -parallel 4 -covermode atomic -coverprofile /tmp/test-coverage/cafs/c_cafs_only.out \
-              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')" \
-              ./pkg/cafs/...
+              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - put_cache
       - persist_to_workspace:
           root: /tmp/test-coverage
@@ -399,14 +403,16 @@ jobs:
           name: Run golang tests with metrics (1)
           no_output_timeout: 20m
           command: |
+            PKGS="./cmd/datamon/cmd ./pkg/metrics"
             DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
 
-            gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format standard-verbose -- \
+            gotestsum --junitfile /tmp/test-results/metrics/go-test-report-metrics.xml --format standard-verbose \
+                      --packages "${PKGS}" \
+               -- \
               -tags influxdbintegration \
               -timeout 15m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/metrics/c_metrics.out \
-              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')" \
-              ./cmd/datamon/cmd ./pkg/metrics
+              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - put_cache
       - persist_to_workspace:
           root: /tmp/test-coverage
@@ -431,14 +437,16 @@ jobs:
       - run:
           name: Run golang tests in integration environment
           command: |
+            PKGS="./pkg/core ./cmd/datamon/cmd"
             DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
 
-            gotestsum \
-              --junitfile /tmp/test-results/fuse/go-test-report-fuse.xml --format standard-verbose -- \
+            gotestsum --junitfile /tmp/test-results/fuse/go-test-report-fuse.xml --format standard-verbose \
+                      --packages "${PKGS}" \
+              -- \
               -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)' \
               -timeout 15m \
               -covermode atomic -coverprofile /tmp/test-coverage/fuse/c_fuse_integration.out \
-              ./pkg/core ./cmd/datamon/cmd
+              -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - put_cache
       - persist_to_workspace:
           root: /tmp/test-coverage
