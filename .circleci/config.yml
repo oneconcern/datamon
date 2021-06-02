@@ -708,27 +708,27 @@ workflows:
       #      branches:
       #        only: /.*/
 
-      - pg_sidecar_test:
-          context: "onec-dev"
-          requires:
-            - build_demo_images
-            #- fuse_sidecar_test
-          filters:
-            tags:
-              only: /.*/
-            branches:
-              only: /.*/
+      #- pg_sidecar_test:
+      #    context: "onec-dev"
+      #    requires:
+      #      - build_demo_images
+      #      #- fuse_sidecar_test
+      #    filters:
+      #      tags:
+      #        only: /.*/
+      #      branches:
+      #        only: /.*/
 
-      - k8s_remove_whitelist:
-          context: "onec-dev"
-          requires:
-            #- fuse_sidecar_test
-            - pg_sidecar_test
-          filters:
-            tags:
-              only: /.*/
-            branches:
-              only: /.*/
+      #- k8s_remove_whitelist:
+      #    context: "onec-dev"
+      #    requires:
+      #      #- fuse_sidecar_test
+      #      - pg_sidecar_test
+      #    filters:
+      #      tags:
+      #        only: /.*/
+      #      branches:
+      #        only: /.*/
 
 
       - publish_release:
