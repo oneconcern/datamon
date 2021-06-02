@@ -210,6 +210,8 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
 				TolerateFailure: false,
 			},
 		}
+
+		//nolint: gocritic
 		buffer := append(keys, root[:]...) // the root key trails the sequence
 		err = storage.MultiPut(ctx, destinations, d.pather(root), buffer, storage.OverWrite)
 		if err != nil {
