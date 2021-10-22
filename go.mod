@@ -2,12 +2,15 @@ module github.com/oneconcern/datamon
 
 replace github.com/spf13/pflag => github.com/fredbi/pflag v1.0.6-0.20201106154427-e6824c13371a
 
+replace github.com/cenkalti/backoff v2.2.1+incompatible => github.com/cenkalti/backoff/v4 v4.1.1
+
 require (
 	cloud.google.com/go v0.58.0 // indirect
 	cloud.google.com/go/storage v1.9.0
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/aws/aws-sdk-go v1.29.32
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.4.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
@@ -38,7 +41,6 @@ require (
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.5.1
 	go.opencensus.io v0.22.3

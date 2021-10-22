@@ -20,3 +20,10 @@ func ReadOnly() Option {
 		g.isReadOnly = true
 	}
 }
+
+// ReadOnly indicates that only the read-only client is going to be used
+func WithRetry(enabled bool) Option {
+	return func(g *gcs) {
+		g.retry = enabled
+	}
+}

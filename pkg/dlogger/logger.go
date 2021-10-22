@@ -29,6 +29,7 @@ func GetLogger(logLevel string) (*zap.Logger, error) {
 		return nil, err
 	}
 	zapConfig.Level = zap.NewAtomicLevelAt(lvl)
+    zapConfig.OutputPaths = []string{"stdout"}
 	logger, err := zapConfig.Build()
 	if err != nil {
 		return nil, err

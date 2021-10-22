@@ -34,6 +34,7 @@ type Bundle struct {
 	BundleEntries               []model.BundleEntry
 	l                           *zap.Logger
 	SkipOnError                 bool // When uploading files
+	Retry                       bool // When uploading files
 	concurrentFileUploads       int
 	concurrentFileDownloads     int
 	concurrentFilelistDownloads int

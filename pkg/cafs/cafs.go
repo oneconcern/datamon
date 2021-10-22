@@ -154,6 +154,7 @@ type defaultFs struct {
 	deduplicationScheme         string
 	withPrefetch                int
 	withVerifyHash              bool
+    withRetry                   bool
 
 	metrics.Enable
 	m *M
