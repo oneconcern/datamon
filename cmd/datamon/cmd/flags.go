@@ -45,7 +45,7 @@ type flagsT struct {
 		CacheSize      flagext.ByteSize
 		WithPrefetch   int
 		WithVerifyHash bool
-        WithRetry      bool
+		WithRetry      bool
 	}
 	web struct {
 		port      int
@@ -659,9 +659,9 @@ func (in *cliOptionInputs) destStore(destT DestT,
 		return destStore, fmt.Errorf("get logger: %v", err)
 	}
 	destStore = localfs.New(fs,
-        localfs.WithRetry(in.params.fs.WithRetry),
-        localfs.WithLogger(logger),
-    )
+		localfs.WithRetry(in.params.fs.WithRetry),
+		localfs.WithLogger(logger),
+	)
 	return destStore, nil
 }
 
@@ -691,7 +691,7 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 	var (
 		err                 error
 		consumableStorePath string
-	    sourceStore         storage.Store
+		sourceStore         storage.Store
 	)
 	switch {
 	case in.params.bundle.DataPath == "":
@@ -724,8 +724,8 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 			consumableStorePath[5:],
 			in.config.Credential,
 			gcs.Logger(logger),
-            gcs.WithRetry(in.params.fs.WithRetry),
-        )
+			gcs.WithRetry(in.params.fs.WithRetry),
+		)
 		if err != nil {
 			return sourceStore, err
 		}
@@ -733,9 +733,9 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 		DieIfNotAccessible(consumableStorePath)
 		DieIfNotDirectory(consumableStorePath)
 		sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath),
-            localfs.WithRetry(in.params.fs.WithRetry),
-            localfs.WithLogger(logger),
-        )
+			localfs.WithRetry(in.params.fs.WithRetry),
+			localfs.WithLogger(logger),
+		)
 	}
 	return sourceStore, nil
 }

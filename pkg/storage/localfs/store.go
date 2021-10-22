@@ -28,20 +28,19 @@ func New(fs afero.Fs, opts ...Option) storage.Store {
 		fs = afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(".datamon", "objects"))
 	}
 	local := &localFS{
-		fs:   fs,
-		glob: make(map[string][]string),
-        retry: true,
+		fs:    fs,
+		glob:  make(map[string][]string),
+		retry: true,
 	}
 	for _, apply := range opts {
 		apply(local)
 	}
-    fmt.Printf("\n\n------------\nlocalfs.retry: %t\n--------------\n\n", local.retry)
+	fmt.Printf("\n\n------------\nlocalfs.retry: %t\n--------------\n\n", local.retry)
 	return local
 }
 
 // Option for the local FS store
 type Option func(*localFS)
-
 
 // WithLock prevents concurrent writes or concurrent read/writes on this local FS
 func WithLock(flag bool) Option {
@@ -53,14 +52,14 @@ func WithLock(flag bool) Option {
 // WithRetry enables exponential backoff retry logic to be enabled on put operations
 func WithRetry(enabled bool) Option {
 	return func(fs *localFS) {
-        fs.retry = enabled
+		fs.retry = enabled
 	}
 }
 
 // WithLogger adds a logger to the locafs object
 func WithLogger(logger *zap.Logger) Option {
 	return func(fs *localFS) {
-        fs.l = logger
+		fs.l = logger
 	}
 }
 
@@ -70,8 +69,8 @@ type localFS struct {
 	exclusive sync.Mutex          // mutex on glob access
 	lock      bool
 	rw        sync.RWMutex
-    retry     bool
-    l         *zap.Logger
+	retry     bool
+	l         *zap.Logger
 }
 
 func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
@@ -135,16 +134,16 @@ func (rc readCloser) Close() error {
 }
 
 func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
-    var retryPolicy backoff.BackOff
+	var retryPolicy backoff.BackOff
 
-    if l.retry {
-        r := backoff.NewExponentialBackOff()
-        r.MaxElapsedTime = 15 * time.Second
-        r.Reset()
-        retryPolicy = r
-    } else {
-        retryPolicy = &backoff.StopBackOff{}
-    }
+	if l.retry {
+		r := backoff.NewExponentialBackOff()
+		r.MaxElapsedTime = 15 * time.Second
+		r.Reset()
+		retryPolicy = r
+	} else {
+		retryPolicy = &backoff.StopBackOff{}
+	}
 
 	if l.lock {
 		l.rw.Lock()
@@ -168,32 +167,32 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	// If reader implements writeto use it.
 	wt, ok := source.(io.WriterTo)
 	if ok {
-        // wrapping WriteTo execution so it can be retried
-        operation := func() error {
-            _, err = wt.WriteTo(target)
-            if err != nil {
-                l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
-                    zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
-                )
-            }
-            return err
-        }
-        err = backoff.Retry(operation, retryPolicy)
+		// wrapping WriteTo execution so it can be retried
+		operation := func() error {
+			_, err = wt.WriteTo(target)
+			if err != nil {
+				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
+					zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+				)
+			}
+			return err
+		}
+		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
 			return fmt.Errorf("write record for %q: %v", key, err)
 		}
 	} else {
-        // wrapping PipeIO execution so it can be retried
-        operation := func() error {
-		    _, err = storage.PipeIO(target, readCloser{reader: source})
-            if err != nil {
-                l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
-                    zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
-                )
-            }
-            return err
-        }
-        err = backoff.Retry(operation, retryPolicy)
+		// wrapping PipeIO execution so it can be retried
+		operation := func() error {
+			_, err = storage.PipeIO(target, readCloser{reader: source})
+			if err != nil {
+				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
+					zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+				)
+			}
+			return err
+		}
+		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
 			return fmt.Errorf("write record for %q: %v", key, err)
 		}

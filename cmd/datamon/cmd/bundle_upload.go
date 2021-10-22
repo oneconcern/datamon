@@ -78,7 +78,7 @@ set label 'init'
 			wrapFatalln("get logger", err)
 			return
 		}
-        logger.Debug("RES-10456/gcs-retry-logic", zap.String("bundle.FileList", datamonFlags.bundle.FileList))
+		logger.Debug("RES-10456/gcs-retry-logic", zap.String("bundle.FileList", datamonFlags.bundle.FileList))
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		bundleOpts = append(bundleOpts, core.BundleWithRetry(datamonFlags.fs.WithRetry))
@@ -92,7 +92,7 @@ set label 'init'
 		)
 
 		if datamonFlags.bundle.FileList != "" {
-            logger.Debug("RES-10456/gcs-retry-logic - has filelist trying to upload specific keys")
+			logger.Debug("RES-10456/gcs-retry-logic - has filelist trying to upload specific keys")
 			getKeys := func() ([]string, error) {
 				var file afero.File
 				file, err = os.Open(datamonFlags.bundle.FileList)
@@ -112,7 +112,7 @@ set label 'init'
 				return
 			}
 		} else {
-            logger.Debug("RES-10456/gcs-retry-logic - does not have filelist, uploading full bundle")
+			logger.Debug("RES-10456/gcs-retry-logic - does not have filelist, uploading full bundle")
 			err = core.Upload(ctx, bundle)
 			if err != nil {
 				wrapFatalln("upload bundle", err)
@@ -167,6 +167,7 @@ func init() {
 	addLabelNameFlag(uploadBundleCmd)
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd, 100)
+	addRetryFlag(uploadBundleCmd)
 
 	// feature guard
 	if enableBundlePreserve {

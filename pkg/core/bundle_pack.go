@@ -224,12 +224,12 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Logger(bundle.l),
 		cafs.WithMetrics(bundle.MetricsEnabled()),
-        cafs.WithRetry(bundle.Retry),
+		cafs.WithRetry(bundle.Retry),
 	)
 	if err != nil {
 		return err
 	}
-    bundle.l.Debug("RES-10456/gcs-retry-logic", zap.String("BlobStore", bundle.BlobStore().String()))
+	bundle.l.Debug("RES-10456/gcs-retry-logic", zap.String("BlobStore", bundle.BlobStore().String()))
 
 	// Upload the files and the bundle list
 	if bundle.BundleID == "" {
@@ -276,7 +276,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		select {
 		case f := <-filePackedC:
 			numFilePackedRes++
-            bundle.l.Debug("RES-10456/gcs-retry-logic - file packed")
+			bundle.l.Debug("RES-10456/gcs-retry-logic - file packed")
 			bundle.l.Debug("Uploaded file",
 				zap.String("name", f.name),
 				zap.Bool("duplicate", f.duplicate),
@@ -300,14 +300,14 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 				fileList = fileList[:0]
 			}
 		case e := <-errorC:
-            bundle.l.Debug("RES-10456/gcs-retry-logic - upload failed")
+			bundle.l.Debug("RES-10456/gcs-retry-logic - upload failed")
 			bundle.l.Error("Bundle upload failed. Failed to upload file",
 				zap.Error(e.error),
 				zap.String("file", e.file),
 			)
 			return e.error
 		case <-doneOkC:
-            bundle.l.Debug("RES-10456/gcs-retry-logic - upload complete")
+			bundle.l.Debug("RES-10456/gcs-retry-logic - upload complete")
 			bundle.l.Debug("Got upload done signal")
 			gotDoneSignal = true
 		}

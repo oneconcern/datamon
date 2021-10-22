@@ -33,7 +33,7 @@ type gcs struct {
 	ctx            context.Context
 	l              *zap.Logger
 	isReadOnly     bool
-    retry          bool
+	retry          bool
 }
 
 func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
@@ -62,7 +62,7 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 	googleStore.l = googleStore.l.With(zap.String("bucket", bucket))
 	googleStore.ctx = ctx
 	googleStore.bucket = bucket
-    googleStore.retry = true
+	googleStore.retry = true
 
 	var err error
 	googleStore.readOnlyClient, err = gcsStorage.NewClient(ctx, clientOpts(true, credentialFile)...)
@@ -79,7 +79,7 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 		// write / delete operations will fail
 		googleStore.client = googleStore.readOnlyClient
 	}
-    fmt.Printf("\n\n------------\ngoogleStore.retry: %t\n--------------\n\n", googleStore.retry)
+	fmt.Printf("\n\n------------\ngoogleStore.retry: %t\n--------------\n\n", googleStore.retry)
 	return googleStore, nil
 }
 
@@ -193,32 +193,32 @@ func (rc readCloser) Close() error {
 }
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newObject bool) (err error) {
-    return g.putObject(ctx, objectName, reader, newObject, false, 0)
+	return g.putObject(ctx, objectName, reader, newObject, false, 0)
 }
 
 func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, newObject bool, crc uint32) (err error) {
-    return g.putObject(ctx, objectName, reader, newObject, true, crc)
+	return g.putObject(ctx, objectName, reader, newObject, true, crc)
 }
 
 func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader, newObject bool, isPutCRC bool, crc uint32) (err error) {
-    var (
-        retryPolicy backoff.BackOff
-	    writer *gcsStorage.Writer
-    )
+	var (
+		retryPolicy backoff.BackOff
+		writer      *gcsStorage.Writer
+	)
 
 	g.l.Debug("Start Put", zap.String("objectName", objectName))
 	defer func() {
 		g.l.Debug("End Put", zap.String("objectName", objectName), zap.Error(err))
 	}()
 
-    if g.retry {
-        r := backoff.NewExponentialBackOff()
-        r.MaxElapsedTime = 15 * time.Second
-        r.Reset()
-        retryPolicy = r
-    } else {
-        retryPolicy = &backoff.StopBackOff{}
-    }
+	if g.retry {
+		r := backoff.NewExponentialBackOff()
+		r.MaxElapsedTime = 15 * time.Second
+		r.Reset()
+		retryPolicy = r
+	} else {
+		retryPolicy = &backoff.StopBackOff{}
+	}
 
 	if newObject {
 		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
@@ -228,23 +228,23 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
 	}
 
-    if isPutCRC {
-        writer.CRC32C = crc
-    }
+	if isPutCRC {
+		writer.CRC32C = crc
+	}
 
-    // wrapping PipeIO execution so it can be retried
-    operation := func() error {
-	    g.l.Debug("Start Put PipeIO", zap.String("objectName", objectName))
-	    _, err = storage.PipeIO(writer, readCloser{reader: reader})
-	    g.l.Debug("End Put PipeIO", zap.String("objectName", objectName), zap.Error(err))
-        if err != nil {
-            g.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
-                zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
-            )
-        }
-        return err
-    }
-    err = backoff.Retry(operation, retryPolicy)
+	// wrapping PipeIO execution so it can be retried
+	operation := func() error {
+		g.l.Debug("Start Put PipeIO", zap.String("objectName", objectName))
+		_, err = storage.PipeIO(writer, readCloser{reader: reader})
+		g.l.Debug("End Put PipeIO", zap.String("objectName", objectName), zap.Error(err))
+		if err != nil {
+			g.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
+				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+			)
+		}
+		return err
+	}
+	err = backoff.Retry(operation, retryPolicy)
 	if err != nil {
 		return toSentinelErrors(err)
 	}

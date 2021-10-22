@@ -92,6 +92,6 @@ func BundleWithMetrics(enabled bool) BundleOption {
 // BundleWithRetry toggles exponential backoff retry logic on upload of core Bundle object
 func BundleWithRetry(enabled bool) BundleOption {
 	return func(b *Bundle) {
-        b.Retry = enabled
+		b.Retry = enabled
 	}
 }
