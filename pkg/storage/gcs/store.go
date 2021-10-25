@@ -206,49 +206,70 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 		writer      *gcsStorage.Writer
 	)
 
+	g.l.Warn("RES-10456/gcs-retry-logic - retry-setting", zap.Bool("retry", g.retry))
 	g.l.Debug("Start Put", zap.String("objectName", objectName))
 	defer func() {
 		g.l.Debug("End Put", zap.String("objectName", objectName), zap.Error(err))
 	}()
 
 	if g.retry {
+		g.l.Warn("RES-10456/gcs-retry-logic - EXPONENTIAL BACKOFF set", zap.String("objectName", objectName))
 		r := backoff.NewExponentialBackOff()
-		r.MaxElapsedTime = 15 * time.Second
+		r.InitialInterval = 10 * time.Second
+		r.MaxElapsedTime = 5 * time.Minute
 		r.Reset()
 		retryPolicy = r
 	} else {
+		g.l.Warn("RES-10456/gcs-retry-logic - NO BACKOFF set", zap.String("objectName", objectName))
 		retryPolicy = &backoff.StopBackOff{}
-	}
-
-	if newObject {
-		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
-			DoesNotExist: newObject,
-		}).NewWriter(ctx)
-	} else {
-		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
-	}
-
-	if isPutCRC {
-		writer.CRC32C = crc
 	}
 
 	// wrapping PipeIO execution so it can be retried
 	operation := func() error {
+		if newObject {
+			writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
+				DoesNotExist: newObject,
+			}).NewWriter(ctx)
+		} else {
+			writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
+		}
+
+		if isPutCRC {
+			writer.CRC32C = crc
+		}
+
 		g.l.Debug("Start Put PipeIO", zap.String("objectName", objectName))
 		_, err = storage.PipeIO(writer, readCloser{reader: reader})
 		g.l.Debug("End Put PipeIO", zap.String("objectName", objectName), zap.Error(err))
+		g.l.Warn("RES-10456/gcs-retry-logic - time-to-retry",
+			zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+			zap.String("objectName", objectName),
+		)
 		if err != nil {
-			g.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
+			g.l.Error("RES-10456/gcs-retry-logic - hit a write error in PipeIO, retrying",
 				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+				zap.String("objectName", objectName),
+				zap.Error(err),
 			)
 		}
+		g.l.Warn("RES-10456/gcs-retry-logic - bombing out in operation def", zap.String("objectName", objectName))
+		err = writer.Close()
+		if err != nil {
+			g.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+				zap.String("objectName", objectName),
+				zap.Error(err),
+			)
+		}
+
 		return err
 	}
 	err = backoff.Retry(operation, retryPolicy)
 	if err != nil {
+		g.l.Warn("RES-10456/gcs-retry-logic - bombing out IN retry block", zap.String("objectName", objectName))
 		return toSentinelErrors(err)
 	}
-	err = writer.Close()
+	g.l.Warn("RES-10456/gcs-retry-logic - bombing out AFTER retry block", zap.String("objectName", objectName))
 	return toSentinelErrors(err)
 }
 

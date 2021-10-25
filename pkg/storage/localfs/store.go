@@ -133,12 +133,19 @@ func (rc readCloser) Close() error {
 	return nil
 }
 
-func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
+func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) (err error) {
 	var retryPolicy backoff.BackOff
+
+	l.l.Warn("RES-10456/gcs-retry-logic - retry-setting", zap.String("key", key), zap.Bool("retry", l.retry))
+	l.l.Debug("Start Put", zap.String("key", key))
+	defer func() {
+		l.l.Debug("End Put", zap.String("key", key), zap.Error(err))
+	}()
 
 	if l.retry {
 		r := backoff.NewExponentialBackOff()
-		r.MaxElapsedTime = 15 * time.Second
+		r.InitialInterval = 10 * time.Second
+		r.MaxElapsedTime = 5 * time.Minute
 		r.Reset()
 		retryPolicy = r
 	} else {
@@ -169,13 +176,20 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	if ok {
 		// wrapping WriteTo execution so it can be retried
 		operation := func() error {
+			l.l.Debug("Start WriteTo", zap.String("key", key))
 			_, err = wt.WriteTo(target)
+			l.l.Debug("End WriteTo", zap.String("key", key))
+			l.l.Warn("RES-10456/gcs-retry-logic - time-to-retry",
+				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+				zap.String("key", key),
+			)
 			if err != nil {
 				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
 					zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+					zap.String("key", key),
 				)
 			}
-			return err
+			return target.Close()
 		}
 		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
@@ -184,13 +198,21 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	} else {
 		// wrapping PipeIO execution so it can be retried
 		operation := func() error {
+			l.l.Debug("Start Put PipeIO", zap.String("key", key))
+			_, err = wt.WriteTo(target)
+			l.l.Debug("End Put PipeIO PipeIO", zap.String("key", key))
+			l.l.Warn("RES-10456/gcs-retry-logic - time-to-retry",
+				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+				zap.String("key", key),
+			)
 			_, err = storage.PipeIO(target, readCloser{reader: source})
 			if err != nil {
 				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
 					zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
+					zap.String("key", key),
 				)
 			}
-			return err
+			return target.Close()
 		}
 		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
@@ -198,9 +220,6 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 		}
 	}
 
-	if err = target.Close(); err != nil {
-		return err
-	}
 	return nil
 }
 

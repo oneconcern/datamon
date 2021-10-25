@@ -37,7 +37,7 @@ var (
 	// ErrInvalidResource indicates that the storage resource has an invalid name
 	ErrInvalidResource = errors.New("invalid storage resource name")
 
-	// ErrStorageAPI indicates any other storage AI error
+	// ErrStorageAPI indicates any other storage API error
 	ErrStorageAPI = errors.New("storage API error")
 
 	// ErrNotImplemented tells that this feature has not been implemented yet
