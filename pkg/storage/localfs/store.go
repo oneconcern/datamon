@@ -133,7 +133,10 @@ func (rc readCloser) Close() error {
 }
 
 func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) (err error) {
-	var retryPolicy backoff.BackOff
+	var (
+		retryPolicy backoff.BackOff
+		target      afero.File
+	)
 
 	l.l.Warn("RES-10456/gcs-retry-logic - retry-setting", zap.String("key", key), zap.Bool("retry", l.retry))
 	l.l.Debug("Start Put", zap.String("key", key))
@@ -170,7 +173,7 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	if ok {
 		// wrapping WriteTo execution so it can be retried
 		operation := func() error {
-			target, err := l.fs.OpenFile(key, flag, 0600)
+			target, err = l.fs.OpenFile(key, flag, 0600)
 			if err != nil {
 				return fmt.Errorf("create record for %q: %v", key, err)
 			}
@@ -198,7 +201,7 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	} else {
 		// wrapping PipeIO execution so it can be retried
 		operation := func() error {
-			target, err := l.fs.OpenFile(key, flag, 0600)
+			target, err = l.fs.OpenFile(key, flag, 0600)
 			if err != nil {
 				return fmt.Errorf("create record for %q: %v", key, err)
 			}
