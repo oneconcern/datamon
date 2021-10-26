@@ -28,12 +28,12 @@ WORKDIR /build
 #
 # Build a base image with a compressed, statically linked datamon binary in /stage/usr/bin
 #
+RUN go mod download
 RUN LDFLAGS='-s -w -linkmode external -extldflags "-static"' && \
     LDFLAGS="$LDFLAGS -X '${IMPORT_PATH}.Version=${VERSION}'" && \
     LDFLAGS="$LDFLAGS -X '${IMPORT_PATH}.BuildDate=$(date -u -R)'" && \
     LDFLAGS="$LDFLAGS -X '${IMPORT_PATH}.GitCommit=${GIT_COMMIT}'" && \
     LDFLAGS="$LDFLAGS -X '${IMPORT_PATH}.GitState=${GIT_DIRTY}'" && \
-    go mod download && \
     go build -o /stage/usr/bin/datamon --ldflags "$LDFLAGS" ./cmd/datamon && \
-    upx /stage/usr/bin/datamon &&\
-    md5sum /stage/usr/bin/datamon
+RUN upx /stage/usr/bin/datamon
+RUN md5sum /stage/usr/bin/datamon
