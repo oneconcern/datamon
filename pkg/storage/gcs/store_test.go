@@ -240,7 +240,7 @@ func TestGcs_CreateNew(t *testing.T) {
 	// Expected to fail, trying to create an Object that already exists without overwrite flag
 	err = gcs.Put(ctx, constStringWithIndex(1), bytes.NewBufferString(constStringWithIndex(1)), storage.NoOverWrite)
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "Precondition Failed"))
+	require.True(t, strings.Contains(err.Error(), "conditionNotMet"))
 
 	err = gcs.Put(ctx, constStringWithIndex(1), bytes.NewBufferString(constStringWithIndex(1)), storage.OverWrite)
 	require.NoError(t, err)
