@@ -721,7 +721,6 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 		return sourceStore, fmt.Errorf("get logger: %v", err)
 	}
 
-	fmt.Printf("\n\n-----\nflags settings, retry: %t\n-----\n\n", in.params.fs.WithRetry)
 	if strings.HasPrefix(consumableStorePath, "gs://") {
 		infoLogger.Println(consumableStorePath[4:])
 		sourceStore, err = gcs.New(ctx,

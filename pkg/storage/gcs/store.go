@@ -205,32 +205,29 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 		writer      *gcsStorage.Writer
 	)
 
-	g.l.Warn("RES-10456/gcs-retry-logic - retry-setting", zap.String("objectName", objectName), zap.Bool("retry", g.retry))
 	g.l.Debug("Start Put", zap.String("objectName", objectName))
 	defer func() {
 		g.l.Debug("End Put", zap.String("objectName", objectName), zap.Error(err))
 	}()
 
 	if g.retry {
-		g.l.Warn("RES-10456/gcs-retry-logic - EXPONENTIAL BACKOFF set", zap.String("objectName", objectName))
 		r := backoff.NewExponentialBackOff()
 		r.MaxElapsedTime = 30 * time.Second
 		r.Reset()
 		retryPolicy = r
 	} else {
-		g.l.Warn("RES-10456/gcs-retry-logic - NO BACKOFF set", zap.String("objectName", objectName))
 		retryPolicy = &backoff.StopBackOff{}
 	}
+
+	gcsObject := g.client.Bucket(g.bucket).Object(objectName)
 
 	// wrapping PipeIO execution so it can be retried
 	operation := func() error {
 		if newObject {
-			writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
-				DoesNotExist: newObject,
-			}).NewWriter(ctx)
-		} else {
-			writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
+			gcsObject = gcsObject.If(gcsStorage.Conditions{DoesNotExist: newObject})
 		}
+
+		writer = gcsObject.NewWriter(ctx)
 
 		if isPutCRC {
 			writer.CRC32C = crc
@@ -238,14 +235,15 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 
 		_, err = storage.PipeIO(writer, readCloser{reader: reader})
 		if err != nil {
-			g.l.Error("RES-10456/gcs-retry-logic - hit a write error in PipeIO, retrying",
+			g.l.Error("write error, retrying",
 				zap.String("objectName", objectName),
 				zap.Error(err),
 			)
 		}
+
 		err = writer.Close()
 		if err != nil {
-			g.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+			g.l.Error("write error, retrying",
 				zap.String("objectName", objectName),
 				zap.Error(err),
 			)

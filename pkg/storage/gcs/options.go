@@ -21,7 +21,7 @@ func ReadOnly() Option {
 	}
 }
 
-// ReadOnly indicates that only the read-only client is going to be used
+// WithRetry enables exponential backoff retry logic to be enabled on put operations
 func WithRetry(enabled bool) Option {
 	return func(g *gcs) {
 		g.retry = enabled

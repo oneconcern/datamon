@@ -61,7 +61,7 @@ func WithRetry(enabled bool) Option {
 	}
 }
 
-// WithLogger adds a logger to the locafs object
+// WithLogger adds a logger to the localfs object
 func WithLogger(logger *zap.Logger) Option {
 	return func(fs *localFS) {
 		fs.l = logger
@@ -144,7 +144,6 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 		target      afero.File
 	)
 
-	l.l.Warn("RES-10456/gcs-retry-logic - retry-setting", zap.String("key", key), zap.Bool("retry", l.retry))
 	l.l.Debug("Start Put", zap.String("key", key))
 	defer func() {
 		l.l.Debug("End Put", zap.String("key", key), zap.Error(err))
@@ -186,16 +185,18 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 
 			_, err = wt.WriteTo(target)
 			if err != nil {
-				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
+				l.l.Error("write error, retrying",
 					zap.String("key", key),
+					zap.Error(err),
 				)
 			}
 			err = target.Close()
 			if err != nil {
-				l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+				l.l.Error("write error, retrying",
 					zap.String("key", key),
 					zap.Error(err),
 				)
+
 			}
 
 			return err
@@ -213,21 +214,21 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 			}
 			_, err = storage.PipeIO(target, readCloser{reader: source})
 			if err != nil {
-				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
+				l.l.Error("write error, retrying",
 					zap.String("key", key),
+					zap.Error(err),
 				)
 			}
 
 			err = target.Close()
 			if err != nil {
-				l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+				l.l.Error("write error, retrying",
 					zap.String("key", key),
 					zap.Error(err),
 				)
 			}
 
 			return err
-
 		}
 		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {

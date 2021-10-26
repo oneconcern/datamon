@@ -11,7 +11,6 @@ import (
 
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
-	"go.uber.org/zap"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -29,7 +28,6 @@ var uploadBundleCmd = &cobra.Command{
 	Short: "Upload a bundle",
 	Long: `Upload a bundle consisting of all files stored in a directory,
 to the cloud backend storage.
-l.l
 This is analogous to the "git commit" command. A message and a label may be set.
 `,
 	Example: `% datamon bundle upload --path /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo --label init
@@ -78,10 +76,8 @@ set label 'init'
 			wrapFatalln("get logger", err)
 			return
 		}
-		logger.Debug("RES-10456/gcs-retry-logic", zap.String("bundle.FileList", datamonFlags.bundle.FileList))
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
-		fmt.Printf("\n\nretry: %t\n\n", datamonFlags.fs.WithRetry)
 		bundleOpts = append(bundleOpts, core.BundleWithRetry(datamonFlags.fs.WithRetry))
 
 		// feature guard
@@ -93,7 +89,6 @@ set label 'init'
 		)
 
 		if datamonFlags.bundle.FileList != "" {
-			logger.Debug("RES-10456/gcs-retry-logic - has filelist trying to upload specific keys")
 			getKeys := func() ([]string, error) {
 				var file afero.File
 				file, err = os.Open(datamonFlags.bundle.FileList)
@@ -113,7 +108,6 @@ set label 'init'
 				return
 			}
 		} else {
-			logger.Debug("RES-10456/gcs-retry-logic - does not have filelist, uploading full bundle")
 			err = core.Upload(ctx, bundle)
 			if err != nil {
 				wrapFatalln("upload bundle", err)
