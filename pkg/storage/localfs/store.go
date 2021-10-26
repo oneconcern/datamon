@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"github.com/spf13/afero"
@@ -32,6 +33,11 @@ func New(fs afero.Fs, opts ...Option) storage.Store {
 		glob:  make(map[string][]string),
 		retry: true,
 	}
+
+	if local.l == nil {
+		local.l, _ = dlogger.GetLogger("info")
+	}
+
 	for _, apply := range opts {
 		apply(local)
 	}
