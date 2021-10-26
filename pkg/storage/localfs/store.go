@@ -170,10 +170,10 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	if ok {
 		// wrapping WriteTo execution so it can be retried
 		operation := func() error {
-	        target, err := l.fs.OpenFile(key, flag, 0600)
-	        if err != nil {
-	            return fmt.Errorf("create record for %q: %v", key, err)
-	        }
+			target, err := l.fs.OpenFile(key, flag, 0600)
+			if err != nil {
+				return fmt.Errorf("create record for %q: %v", key, err)
+			}
 
 			_, err = wt.WriteTo(target)
 			if err != nil {
@@ -182,14 +182,14 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 				)
 			}
 			err = target.Close()
-		    if err != nil {
-			    l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
-				    zap.String("key", key),
-				    zap.Error(err),
-			    )
-		    }
+			if err != nil {
+				l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+					zap.String("key", key),
+					zap.Error(err),
+				)
+			}
 
-            return err
+			return err
 		}
 		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
@@ -198,10 +198,10 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	} else {
 		// wrapping PipeIO execution so it can be retried
 		operation := func() error {
-	        target, err := l.fs.OpenFile(key, flag, 0600)
-	        if err != nil {
-	            return fmt.Errorf("create record for %q: %v", key, err)
-	        }
+			target, err := l.fs.OpenFile(key, flag, 0600)
+			if err != nil {
+				return fmt.Errorf("create record for %q: %v", key, err)
+			}
 			_, err = storage.PipeIO(target, readCloser{reader: source})
 			if err != nil {
 				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
@@ -209,15 +209,15 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 				)
 			}
 
-            err = target.Close()
-		    if err != nil {
-			    l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
-				    zap.String("key", key),
-				    zap.Error(err),
-			    )
-		    }
+			err = target.Close()
+			if err != nil {
+				l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+					zap.String("key", key),
+					zap.Error(err),
+				)
+			}
 
-            return err
+			return err
 
 		}
 		err = backoff.Retry(operation, retryPolicy)

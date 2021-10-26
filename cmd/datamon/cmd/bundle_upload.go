@@ -81,7 +81,7 @@ set label 'init'
 		logger.Debug("RES-10456/gcs-retry-logic", zap.String("bundle.FileList", datamonFlags.bundle.FileList))
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
-        fmt.Printf("\n\nretry: %t\n\n", datamonFlags.fs.WithRetry)
+		fmt.Printf("\n\nretry: %t\n\n", datamonFlags.fs.WithRetry)
 		bundleOpts = append(bundleOpts, core.BundleWithRetry(datamonFlags.fs.WithRetry))
 
 		// feature guard

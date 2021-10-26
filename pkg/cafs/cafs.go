@@ -79,8 +79,8 @@ func defaultsForFs() *defaultFs {
 		lruSize:                     DefaultCacheSize,
 		l:                           dlogger.MustGetLogger("info"),
 		withVerifyHash:              true,
-		withPrefetch:                0, // prefetching disabled by default
-        withRetry:                   true, // retry on Put operations enabled by default
+		withPrefetch:                0,    // prefetching disabled by default
+		withRetry:                   true, // retry on Put operations enabled by default
 	}
 }
 

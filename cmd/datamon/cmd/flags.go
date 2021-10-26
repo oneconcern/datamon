@@ -676,9 +676,9 @@ func (in *cliOptionInputs) datamonContext(ctx context.Context, opts ...ContextOp
 	}
 
 	gcsOpts := []gcs.Option{
-        gcs.Logger(logger),
-        gcs.WithRetry(in.params.fs.WithRetry),
-    }
+		gcs.Logger(logger),
+		gcs.WithRetry(in.params.fs.WithRetry),
+	}
 	if in.readOnlyCmd {
 		gcsOpts = append(gcsOpts, gcs.ReadOnly())
 	}
@@ -721,7 +721,7 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 		return sourceStore, fmt.Errorf("get logger: %v", err)
 	}
 
-    fmt.Printf("\n\n-----\nflags settings, retry: %t\n-----\n\n", in.params.fs.WithRetry)
+	fmt.Printf("\n\n-----\nflags settings, retry: %t\n-----\n\n", in.params.fs.WithRetry)
 	if strings.HasPrefix(consumableStorePath, "gs://") {
 		infoLogger.Println(consumableStorePath[4:])
 		sourceStore, err = gcs.New(ctx,
