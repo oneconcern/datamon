@@ -5,7 +5,6 @@ package gcs
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -52,6 +51,8 @@ func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
 // New builds a new storage object from a bucket string
 func New(ctx context.Context, bucket string, credentialFile string, opts ...Option) (storage.Store, error) {
 	googleStore := new(gcs)
+	googleStore.retry = true
+
 	for _, apply := range opts {
 		apply(googleStore)
 	}
@@ -62,7 +63,6 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 	googleStore.l = googleStore.l.With(zap.String("bucket", bucket))
 	googleStore.ctx = ctx
 	googleStore.bucket = bucket
-	googleStore.retry = true
 
 	var err error
 	googleStore.readOnlyClient, err = gcsStorage.NewClient(ctx, clientOpts(true, credentialFile)...)
@@ -79,7 +79,6 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 		// write / delete operations will fail
 		googleStore.client = googleStore.readOnlyClient
 	}
-	fmt.Printf("\n\n------------\ngoogleStore.retry: %t\n--------------\n\n", googleStore.retry)
 	return googleStore, nil
 }
 
@@ -206,7 +205,7 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 		writer      *gcsStorage.Writer
 	)
 
-	g.l.Warn("RES-10456/gcs-retry-logic - retry-setting", zap.Bool("retry", g.retry))
+	g.l.Warn("RES-10456/gcs-retry-logic - retry-setting", zap.String("objectName", objectName), zap.Bool("retry", g.retry))
 	g.l.Debug("Start Put", zap.String("objectName", objectName))
 	defer func() {
 		g.l.Debug("End Put", zap.String("objectName", objectName), zap.Error(err))
@@ -215,8 +214,7 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 	if g.retry {
 		g.l.Warn("RES-10456/gcs-retry-logic - EXPONENTIAL BACKOFF set", zap.String("objectName", objectName))
 		r := backoff.NewExponentialBackOff()
-		r.InitialInterval = 10 * time.Second
-		r.MaxElapsedTime = 5 * time.Minute
+		r.MaxElapsedTime = 30 * time.Second
 		r.Reset()
 		retryPolicy = r
 	} else {
@@ -238,25 +236,16 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 			writer.CRC32C = crc
 		}
 
-		g.l.Debug("Start Put PipeIO", zap.String("objectName", objectName))
 		_, err = storage.PipeIO(writer, readCloser{reader: reader})
-		g.l.Debug("End Put PipeIO", zap.String("objectName", objectName), zap.Error(err))
-		g.l.Warn("RES-10456/gcs-retry-logic - time-to-retry",
-			zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
-			zap.String("objectName", objectName),
-		)
 		if err != nil {
 			g.l.Error("RES-10456/gcs-retry-logic - hit a write error in PipeIO, retrying",
-				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
 				zap.String("objectName", objectName),
 				zap.Error(err),
 			)
 		}
-		g.l.Warn("RES-10456/gcs-retry-logic - bombing out in operation def", zap.String("objectName", objectName))
 		err = writer.Close()
 		if err != nil {
 			g.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
-				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
 				zap.String("objectName", objectName),
 				zap.Error(err),
 			)
@@ -266,11 +255,10 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 	}
 	err = backoff.Retry(operation, retryPolicy)
 	if err != nil {
-		g.l.Warn("RES-10456/gcs-retry-logic - bombing out IN retry block", zap.String("objectName", objectName))
 		return toSentinelErrors(err)
 	}
-	g.l.Warn("RES-10456/gcs-retry-logic - bombing out AFTER retry block", zap.String("objectName", objectName))
-	return toSentinelErrors(err)
+
+	return nil
 }
 
 func (g *gcs) Delete(ctx context.Context, objectName string) (err error) {

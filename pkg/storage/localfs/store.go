@@ -35,7 +35,6 @@ func New(fs afero.Fs, opts ...Option) storage.Store {
 	for _, apply := range opts {
 		apply(local)
 	}
-	fmt.Printf("\n\n------------\nlocalfs.retry: %t\n--------------\n\n", local.retry)
 	return local
 }
 
@@ -144,8 +143,7 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 
 	if l.retry {
 		r := backoff.NewExponentialBackOff()
-		r.InitialInterval = 10 * time.Second
-		r.MaxElapsedTime = 5 * time.Minute
+		r.MaxElapsedTime = 30 * time.Second
 		r.Reset()
 		retryPolicy = r
 	} else {
@@ -167,29 +165,31 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	if exclusive {
 		flag |= os.O_EXCL
 	}
-	target, err := l.fs.OpenFile(key, flag, 0600)
-	if err != nil {
-		return fmt.Errorf("create record for %q: %v", key, err)
-	}
 	// If reader implements writeto use it.
 	wt, ok := source.(io.WriterTo)
 	if ok {
 		// wrapping WriteTo execution so it can be retried
 		operation := func() error {
-			l.l.Debug("Start WriteTo", zap.String("key", key))
+	        target, err := l.fs.OpenFile(key, flag, 0600)
+	        if err != nil {
+	            return fmt.Errorf("create record for %q: %v", key, err)
+	        }
+
 			_, err = wt.WriteTo(target)
-			l.l.Debug("End WriteTo", zap.String("key", key))
-			l.l.Warn("RES-10456/gcs-retry-logic - time-to-retry",
-				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
-				zap.String("key", key),
-			)
 			if err != nil {
 				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
-					zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
 					zap.String("key", key),
 				)
 			}
-			return target.Close()
+			err = target.Close()
+		    if err != nil {
+			    l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+				    zap.String("key", key),
+				    zap.Error(err),
+			    )
+		    }
+
+            return err
 		}
 		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
@@ -198,21 +198,27 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	} else {
 		// wrapping PipeIO execution so it can be retried
 		operation := func() error {
-			l.l.Debug("Start Put PipeIO", zap.String("key", key))
-			_, err = wt.WriteTo(target)
-			l.l.Debug("End Put PipeIO PipeIO", zap.String("key", key))
-			l.l.Warn("RES-10456/gcs-retry-logic - time-to-retry",
-				zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
-				zap.String("key", key),
-			)
+	        target, err := l.fs.OpenFile(key, flag, 0600)
+	        if err != nil {
+	            return fmt.Errorf("create record for %q: %v", key, err)
+	        }
 			_, err = storage.PipeIO(target, readCloser{reader: source})
 			if err != nil {
 				l.l.Error("RES-10456/gcs-retry-logic - hit a write error, retrying",
-					zap.Float64("time-to-retry", retryPolicy.NextBackOff().Seconds()),
 					zap.String("key", key),
 				)
 			}
-			return target.Close()
+
+            err = target.Close()
+		    if err != nil {
+			    l.l.Error("RES-10456/gcs-retry-logic - hit a write error in writer.Close(), retrying",
+				    zap.String("key", key),
+				    zap.Error(err),
+			    )
+		    }
+
+            return err
+
 		}
 		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {

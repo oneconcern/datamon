@@ -656,7 +656,7 @@ func (in *cliOptionInputs) destStore(destT DestT,
 
 	logger, err := in.getLogger()
 	if err != nil {
-		return destStore, fmt.Errorf("get logger: %v", err)
+		return nil, fmt.Errorf("get logger: %v", err)
 	}
 	destStore = localfs.New(fs,
 		localfs.WithRetry(in.params.fs.WithRetry),
@@ -675,7 +675,10 @@ func (in *cliOptionInputs) datamonContext(ctx context.Context, opts ...ContextOp
 		return context2.New(), fmt.Errorf("get logger: %v", err)
 	}
 
-	gcsOpts := []gcs.Option{gcs.Logger(logger)}
+	gcsOpts := []gcs.Option{
+        gcs.Logger(logger),
+        gcs.WithRetry(in.params.fs.WithRetry),
+    }
 	if in.readOnlyCmd {
 		gcsOpts = append(gcsOpts, gcs.ReadOnly())
 	}
@@ -718,6 +721,7 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 		return sourceStore, fmt.Errorf("get logger: %v", err)
 	}
 
+    fmt.Printf("\n\n-----\nflags settings, retry: %t\n-----\n\n", in.params.fs.WithRetry)
 	if strings.HasPrefix(consumableStorePath, "gs://") {
 		infoLogger.Println(consumableStorePath[4:])
 		sourceStore, err = gcs.New(ctx,

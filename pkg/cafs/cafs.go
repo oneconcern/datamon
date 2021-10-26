@@ -80,6 +80,7 @@ func defaultsForFs() *defaultFs {
 		l:                           dlogger.MustGetLogger("info"),
 		withVerifyHash:              true,
 		withPrefetch:                0, // prefetching disabled by default
+        withRetry:                   true, // retry on Put operations enabled by default
 	}
 }
 
