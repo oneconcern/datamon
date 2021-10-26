@@ -34,6 +34,6 @@ RUN LDFLAGS='-s -w -linkmode external -extldflags "-static"' && \
     LDFLAGS="$LDFLAGS -X '${IMPORT_PATH}.BuildDate=$(date -u -R)'" && \
     LDFLAGS="$LDFLAGS -X '${IMPORT_PATH}.GitCommit=${GIT_COMMIT}'" && \
     LDFLAGS="$LDFLAGS -X '${IMPORT_PATH}.GitState=${GIT_DIRTY}'" && \
-    go build -o /stage/usr/bin/datamon --ldflags "$LDFLAGS" ./cmd/datamon && \
+    go build -o /stage/usr/bin/datamon --ldflags "$LDFLAGS" ./cmd/datamon
 RUN upx /stage/usr/bin/datamon
 RUN md5sum /stage/usr/bin/datamon
