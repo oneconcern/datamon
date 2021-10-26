@@ -12,9 +12,10 @@ ENV GIT_DIRTY ${dirty}
 ENV IMPORT_PATH github.com/oneconcern/datamon/cmd/datamon/cmd
 
 WORKDIR /build
-RUN make cross-compile-binaries TARGET=/stage/usr/bin OS=linux  && \
-    bash -c 'cd /stage/usr/bin ; for bin in $(ls -1) ; do mv ${bin} ${bin%_linux_amd64} ;done' && \
-    ln /stage/usr/bin/backup2blobs /stage/usr/bin/migrate
+RUN make cross-compile-binaries TARGET=/stage/usr/bin OS=linux
+RUN cd /stage/usr/bin && \
+    for bin in $(ls -1); do mv ${bin} ${bin%_linux_amd64} ; done;
+RUN ln /stage/usr/bin/backup2blobs /stage/usr/bin/migrate
 
 FROM scratch
 COPY --from=base /stage /stage
