@@ -20,3 +20,10 @@ func ReadOnly() Option {
 		g.isReadOnly = true
 	}
 }
+
+// WithRetry enables exponential backoff retry logic to be enabled on put operations
+func WithRetry(enabled bool) Option {
+	return func(g *gcs) {
+		g.retry = enabled
+	}
+}

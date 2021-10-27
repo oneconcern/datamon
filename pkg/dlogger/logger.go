@@ -29,6 +29,10 @@ func GetLogger(logLevel string) (*zap.Logger, error) {
 		return nil, err
 	}
 	zapConfig.Level = zap.NewAtomicLevelAt(lvl)
+	// zapConfig.OutputPaths = []string{"stdout"}
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	zapConfig.EncoderConfig = encoderCfg
 	logger, err := zapConfig.Build()
 	if err != nil {
 		return nil, err

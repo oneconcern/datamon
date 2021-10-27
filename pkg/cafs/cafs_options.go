@@ -114,3 +114,10 @@ func WithMetrics(enabled bool) Option {
 		w.EnableMetrics(enabled)
 	}
 }
+
+// WithRetry enables exponential backoff retry logic to be enabled on put operations
+func WithRetry(enabled bool) Option {
+	return func(w *defaultFs) {
+		w.withRetry = enabled
+	}
+}

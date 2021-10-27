@@ -6,12 +6,14 @@ package gcs
 import (
 	"context"
 	"io"
+	"time"
 
 	"go.uber.org/zap"
 	"google.golang.org/api/iterator"
 
 	gcsStorage "cloud.google.com/go/storage"
 
+	"github.com/cenkalti/backoff"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
@@ -30,6 +32,7 @@ type gcs struct {
 	ctx            context.Context
 	l              *zap.Logger
 	isReadOnly     bool
+	retry          bool
 }
 
 func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
@@ -48,6 +51,8 @@ func clientOpts(readOnly bool, credentialFile string) []option.ClientOption {
 // New builds a new storage object from a bucket string
 func New(ctx context.Context, bucket string, credentialFile string, opts ...Option) (storage.Store, error) {
 	googleStore := new(gcs)
+	googleStore.retry = true
+
 	for _, apply := range opts {
 		apply(googleStore)
 	}
@@ -187,56 +192,71 @@ func (rc readCloser) Close() error {
 }
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newObject bool) (err error) {
+	return g.putObject(ctx, objectName, reader, newObject, false, 0)
+}
+
+func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, newObject bool, crc uint32) (err error) {
+	return g.putObject(ctx, objectName, reader, newObject, true, crc)
+}
+
+func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader, newObject bool, isPutCRC bool, crc uint32) (err error) {
+	var (
+		retryPolicy backoff.BackOff
+		writer      *gcsStorage.Writer
+	)
+
 	g.l.Debug("Start Put", zap.String("objectName", objectName))
 	defer func() {
 		g.l.Debug("End Put", zap.String("objectName", objectName), zap.Error(err))
 	}()
-	// Put if not present
-	var writer *gcsStorage.Writer
-	b := false
-	if newObject {
-		b = true
-	}
-	if newObject {
-		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
-			DoesNotExist: b,
-		}).NewWriter(ctx)
-	} else {
-		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
-	}
-	g.l.Debug("Start Put PipeIO", zap.String("objectName", objectName))
-	_, err = storage.PipeIO(writer, readCloser{reader: reader})
-	g.l.Debug("End Put PipeIO", zap.String("objectName", objectName), zap.Error(err))
-	if err != nil {
-		return toSentinelErrors(err)
-	}
-	err = writer.Close()
-	return toSentinelErrors(err)
-}
 
-func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, doesNotExist bool, crc uint32) (err error) {
-	g.l.Debug("Start PutCRC", zap.String("objectName", objectName))
-	defer func() {
-		g.l.Debug("End PutCRC", zap.String("objectName", objectName), zap.Error(err))
-	}()
-	// Put if not present
-	var writer *gcsStorage.Writer
-	if doesNotExist {
-		writer = g.client.Bucket(g.bucket).Object(objectName).If(gcsStorage.Conditions{
-			DoesNotExist: doesNotExist,
-		}).NewWriter(ctx)
+	if g.retry {
+		r := backoff.NewExponentialBackOff()
+		r.MaxElapsedTime = 30 * time.Second
+		r.Reset()
+		retryPolicy = r
 	} else {
-		writer = g.client.Bucket(g.bucket).Object(objectName).NewWriter(ctx)
+		retryPolicy = &backoff.StopBackOff{}
 	}
-	writer.CRC32C = crc
-	g.l.Debug("Start PutCRC PipeIO", zap.String("objectName", objectName))
-	_, err = storage.PipeIO(writer, readCloser{reader: reader})
-	g.l.Debug("End PutCRC PipeIO", zap.String("objectName", objectName), zap.Error(err))
+
+	gcsObject := g.client.Bucket(g.bucket).Object(objectName)
+
+	// wrapping PipeIO execution so it can be retried
+	operation := func() error {
+		if newObject {
+			gcsObject = gcsObject.If(gcsStorage.Conditions{DoesNotExist: newObject})
+		}
+
+		writer = gcsObject.NewWriter(ctx)
+
+		if isPutCRC {
+			writer.CRC32C = crc
+		}
+
+		_, err = storage.PipeIO(writer, readCloser{reader: reader})
+		if err != nil {
+			g.l.Error("write error, retrying",
+				zap.String("objectName", objectName),
+				zap.Error(err),
+			)
+		}
+
+		err = writer.Close()
+		if err != nil {
+			g.l.Error("write error, retrying",
+				zap.String("objectName", objectName),
+				zap.Error(err),
+			)
+		}
+
+		return err
+	}
+	err = backoff.Retry(operation, retryPolicy)
 	if err != nil {
 		return toSentinelErrors(err)
 	}
-	err = writer.Close()
-	return toSentinelErrors(err)
+
+	return nil
 }
 
 func (g *gcs) Delete(ctx context.Context, objectName string) (err error) {

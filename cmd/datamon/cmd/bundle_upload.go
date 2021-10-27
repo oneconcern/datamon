@@ -28,7 +28,6 @@ var uploadBundleCmd = &cobra.Command{
 	Short: "Upload a bundle",
 	Long: `Upload a bundle consisting of all files stored in a directory,
 to the cloud backend storage.
-
 This is analogous to the "git commit" command. A message and a label may be set.
 `,
 	Example: `% datamon bundle upload --path /path/to/data/folder --message "The initial commit for the repo" --repo ritesh-test-repo --label init
@@ -79,6 +78,7 @@ set label 'init'
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
+		bundleOpts = append(bundleOpts, core.BundleWithRetry(datamonFlags.fs.WithRetry))
 
 		// feature guard
 		if enableBundlePreserve {
@@ -162,6 +162,7 @@ func init() {
 	addLabelNameFlag(uploadBundleCmd)
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd, 100)
+	addRetryFlag(uploadBundleCmd)
 
 	// feature guard
 	if enableBundlePreserve {

@@ -224,6 +224,7 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Logger(bundle.l),
 		cafs.WithMetrics(bundle.MetricsEnabled()),
+		cafs.WithRetry(bundle.Retry),
 	)
 	if err != nil {
 		return err

@@ -45,6 +45,7 @@ type flagsT struct {
 		CacheSize      flagext.ByteSize
 		WithPrefetch   int
 		WithVerifyHash bool
+		WithRetry      bool
 	}
 	web struct {
 		port      int
@@ -552,6 +553,14 @@ func addForceYesFlag(cmd *cobra.Command) string {
 	return c
 }
 
+func addRetryFlag(cmd *cobra.Command) string {
+	const c = "retry"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.fs.WithRetry, c, true, `Enables exponential backoff retry logic to be enabled on put operations`)
+	}
+	return c
+}
+
 /** parameters struct from other formats */
 
 // apply config file + env vars to structure used to parse cli flags
@@ -644,7 +653,15 @@ func (in *cliOptionInputs) destStore(destT DestT,
 			return nil, fmt.Errorf("failed to find metadata dir in %v", consumableStorePath)
 		}
 	}
-	destStore = localfs.New(fs)
+
+	logger, err := in.getLogger()
+	if err != nil {
+		return nil, fmt.Errorf("get logger: %v", err)
+	}
+	destStore = localfs.New(fs,
+		localfs.WithRetry(in.params.fs.WithRetry),
+		localfs.WithLogger(logger),
+	)
 	return destStore, nil
 }
 
@@ -658,7 +675,10 @@ func (in *cliOptionInputs) datamonContext(ctx context.Context, opts ...ContextOp
 		return context2.New(), fmt.Errorf("get logger: %v", err)
 	}
 
-	gcsOpts := []gcs.Option{gcs.Logger(logger)}
+	gcsOpts := []gcs.Option{
+		gcs.Logger(logger),
+		gcs.WithRetry(in.params.fs.WithRetry),
+	}
 	if in.readOnlyCmd {
 		gcsOpts = append(gcsOpts, gcs.ReadOnly())
 	}
@@ -674,6 +694,7 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 	var (
 		err                 error
 		consumableStorePath string
+		sourceStore         storage.Store
 	)
 	switch {
 	case in.params.bundle.DataPath == "":
@@ -695,24 +716,29 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 		createPath(consumableStorePath)
 	}
 
-	var sourceStore storage.Store
+	logger, err := in.getLogger()
+	if err != nil {
+		return sourceStore, fmt.Errorf("get logger: %v", err)
+	}
+
 	if strings.HasPrefix(consumableStorePath, "gs://") {
-		logger, err := in.getLogger()
-		if err != nil {
-			return sourceStore, fmt.Errorf("get logger: %v", err)
-		}
 		infoLogger.Println(consumableStorePath[4:])
 		sourceStore, err = gcs.New(ctx,
 			consumableStorePath[5:],
 			in.config.Credential,
-			gcs.Logger(logger))
+			gcs.Logger(logger),
+			gcs.WithRetry(in.params.fs.WithRetry),
+		)
 		if err != nil {
 			return sourceStore, err
 		}
 	} else {
 		DieIfNotAccessible(consumableStorePath)
 		DieIfNotDirectory(consumableStorePath)
-		sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath))
+		sourceStore = localfs.New(afero.NewBasePathFs(afero.NewOsFs(), consumableStorePath),
+			localfs.WithRetry(in.params.fs.WithRetry),
+			localfs.WithLogger(logger),
+		)
 	}
 	return sourceStore, nil
 }

@@ -15,9 +15,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cenkalti/backoff"
+	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
 	"github.com/spf13/afero"
+	"go.uber.org/zap"
 )
 
 // New creates a new local file system backed storage model
@@ -26,9 +29,15 @@ func New(fs afero.Fs, opts ...Option) storage.Store {
 		fs = afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(".datamon", "objects"))
 	}
 	local := &localFS{
-		fs:   fs,
-		glob: make(map[string][]string),
+		fs:    fs,
+		glob:  make(map[string][]string),
+		retry: true,
 	}
+
+	if local.l == nil {
+		local.l, _ = dlogger.GetLogger("info")
+	}
+
 	for _, apply := range opts {
 		apply(local)
 	}
@@ -45,12 +54,28 @@ func WithLock(flag bool) Option {
 	}
 }
 
+// WithRetry enables exponential backoff retry logic to be enabled on put operations
+func WithRetry(enabled bool) Option {
+	return func(fs *localFS) {
+		fs.retry = enabled
+	}
+}
+
+// WithLogger adds a logger to the localfs object
+func WithLogger(logger *zap.Logger) Option {
+	return func(fs *localFS) {
+		fs.l = logger
+	}
+}
+
 type localFS struct {
 	fs        afero.Fs
 	glob      map[string][]string // current state of KeyPrefix matches
 	exclusive sync.Mutex          // mutex on glob access
 	lock      bool
 	rw        sync.RWMutex
+	retry     bool
+	l         *zap.Logger
 }
 
 func (l *localFS) Has(ctx context.Context, key string) (bool, error) {
@@ -113,7 +138,26 @@ func (rc readCloser) Close() error {
 	return nil
 }
 
-func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) error {
+func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusive bool) (err error) {
+	var (
+		retryPolicy backoff.BackOff
+		target      afero.File
+	)
+
+	l.l.Debug("Start Put", zap.String("key", key))
+	defer func() {
+		l.l.Debug("End Put", zap.String("key", key), zap.Error(err))
+	}()
+
+	if l.retry {
+		r := backoff.NewExponentialBackOff()
+		r.MaxElapsedTime = 30 * time.Second
+		r.Reset()
+		retryPolicy = r
+	} else {
+		retryPolicy = &backoff.StopBackOff{}
+	}
+
 	if l.lock {
 		l.rw.Lock()
 		defer l.rw.Unlock()
@@ -129,27 +173,69 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	if exclusive {
 		flag |= os.O_EXCL
 	}
-	target, err := l.fs.OpenFile(key, flag, 0600)
-	if err != nil {
-		return fmt.Errorf("create record for %q: %v", key, err)
-	}
 	// If reader implements writeto use it.
 	wt, ok := source.(io.WriterTo)
 	if ok {
-		_, err = wt.WriteTo(target)
+		// wrapping WriteTo execution so it can be retried
+		operation := func() error {
+			target, err = l.fs.OpenFile(key, flag, 0600)
+			if err != nil {
+				return fmt.Errorf("create record for %q: %v", key, err)
+			}
+
+			_, err = wt.WriteTo(target)
+			if err != nil {
+				l.l.Error("write error, retrying",
+					zap.String("key", key),
+					zap.Error(err),
+				)
+			}
+			err = target.Close()
+			if err != nil {
+				l.l.Error("write error, retrying",
+					zap.String("key", key),
+					zap.Error(err),
+				)
+
+			}
+
+			return err
+		}
+		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
 			return fmt.Errorf("write record for %q: %v", key, err)
 		}
 	} else {
-		_, err = storage.PipeIO(target, readCloser{reader: source})
+		// wrapping PipeIO execution so it can be retried
+		operation := func() error {
+			target, err = l.fs.OpenFile(key, flag, 0600)
+			if err != nil {
+				return fmt.Errorf("create record for %q: %v", key, err)
+			}
+			_, err = storage.PipeIO(target, readCloser{reader: source})
+			if err != nil {
+				l.l.Error("write error, retrying",
+					zap.String("key", key),
+					zap.Error(err),
+				)
+			}
+
+			err = target.Close()
+			if err != nil {
+				l.l.Error("write error, retrying",
+					zap.String("key", key),
+					zap.Error(err),
+				)
+			}
+
+			return err
+		}
+		err = backoff.Retry(operation, retryPolicy)
 		if err != nil {
 			return fmt.Errorf("write record for %q: %v", key, err)
 		}
 	}
 
-	if err = target.Close(); err != nil {
-		return err
-	}
 	return nil
 }
 
