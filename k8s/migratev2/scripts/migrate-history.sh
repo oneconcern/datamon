@@ -56,7 +56,7 @@ while read -r b ;do
   if [[ -n ${start} ]] ; then
     # tells the unitary migration job to skip params & repo checks
     echo "INFO: migrating bundle ${bundle} for repo ${REPO}"
-    SOURCEBUNDLE=${bundle} SOURCELABEL="" /bin/bash /scripts/migrate.sh ${firstDone} --sane 2>&1
+    SOURCEBUNDLE=${bundle} SOURCELABEL="" /bin/bash /scripts/migrate.sh "${firstDone}" --sane 2>&1
     res=$?
     firstDone="--done"
     if [[ ${res} == 2 ]] ; then
