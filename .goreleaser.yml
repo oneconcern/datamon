@@ -85,7 +85,7 @@ brews:
   - name: datamon
     ids:
       - datamon-release
-    github:
+    tap:
       owner: oneconcern
       name: homebrew-datamon
     commit_author:
