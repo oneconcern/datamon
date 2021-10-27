@@ -493,7 +493,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 20.10.2
+          version: 20.10.7
       - checkout
       - get_cache
       - login_to_google
@@ -515,7 +515,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 20.10.2
+          version: 20.10.7
       - checkout
       - login_to_google
       - install_kubectl
@@ -535,7 +535,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 20.10.2
+          version: 20.10.7
       - checkout
       - login_to_google
       - run:
@@ -569,7 +569,7 @@ jobs:
     # > Hence ssh key is not sufficient and GITHUB_TOKEN is required.
     steps:
       - setup_remote_docker:
-          version: 20.10.2
+          version: 20.10.7
       - checkout
       - get_cache
       - login_to_google
@@ -601,7 +601,7 @@ jobs:
     executor: base_builder
     steps:
       - setup_remote_docker:
-          version: 20.10.2
+          version: 20.10.7
       - install_base
       - checkout
       - login_to_google
@@ -620,7 +620,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 20.10.2
+          version: 20.10.7
       - login_to_google
       - remove_whitelist_ip
 
