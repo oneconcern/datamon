@@ -1,7 +1,7 @@
 # A base container to build datamon and run CI jobs
 #
 # This image is updated every week on our CI
-FROM golang:1.16
+FROM golang:1.17
 WORKDIR /tmp
 USER root
 ENV SUDO=
