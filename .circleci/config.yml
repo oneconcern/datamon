@@ -548,7 +548,7 @@ jobs:
     executor: docker_builder
     steps:
       - setup_remote_docker:
-          version: 20.10.2
+          version: 20.10.7
       - checkout
       - login_to_google
       - run:
