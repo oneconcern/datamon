@@ -375,7 +375,7 @@ pg-demo-coord-build-app:
 
 .PHONY: release-all-docker
 ## RELEASE: Push all containers to be released
-release-all-docker: build-datamon build-migrate build-wrapper push-datamon push-migrate push-wrapper build-and-push-fuse-sidecar build-and-push-pg-sidecar
+release-all-docker: build-datamon build-migrate build-wrapper push-datamon push-migrate push-wrapper build-and-push-fuse-sidecar build-and-push-pg-sidecar build-datamon-util push-datamon-util
 
 .PHONY: build-alpine-base
 ## RELEASE: Build local base datamon container on alpine linux
@@ -400,6 +400,21 @@ build-datamon: build-alpine-base
 push-datamon:
 	docker push $(REPOSITORY)/datamon:${RELEASE_TAG}
 	docker push $(REPOSITORY)/datamon:latest
+
+.PHONY: build-datamon-util
+## RELEASE: Build datamon utility docker container to be released
+build-datamon-util: export BUILD_TARGET=$(REPOSITORY)/datamon-util
+build-datamon-util: export DOCKERFILE=dockerfiles/datamon-util.Dockerfile
+build-datamon-util: export BUILD_ARGS=$(VERSION_ARGS)
+build-datamon-util: export TAGS=latest $(RELEASE_TAG) $(RELEASE_TAG_LATEST) $(USER_TAG) $(BRANCH_TAG)
+build-datamon-util: build-alpine-base
+	$(MAKE) build-target
+
+.PHONY: push-datamon-util
+## RELEASE: Push released datamon utility container
+push-datamon-util:
+	docker push $(REPOSITORY)/datamon-util:${RELEASE_TAG}
+	docker push $(REPOSITORY)/datamon-util:latest
 
 .PHONY: build-migrate
 ## RELEASE: Build container for the migrate tool
