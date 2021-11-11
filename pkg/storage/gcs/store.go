@@ -129,7 +129,7 @@ func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 	defer func() {
 		r.l.Debug("End ReadAt", zap.Int("chunk size", len(p)), zap.Int64("offset", offset), zap.Int("bytes read", n), zap.Error(err))
 	}()
-	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(g.keyPrefix+r.objectName).NewRangeReader(
+	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.g.keyPrefix+r.objectName).NewRangeReader(
 		r.g.ctx, offset, int64(len(p)))
 	if err != nil {
 		return 0, toSentinelErrors(err)
