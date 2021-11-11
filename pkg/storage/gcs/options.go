@@ -27,3 +27,10 @@ func WithRetry(enabled bool) Option {
 		g.retry = enabled
 	}
 }
+
+// WithRetry enables exponential backoff retry logic to be enabled on put operations
+func KeyPrefix(keyPrefix string) Option {
+	return func(g *gcs) {
+		g.keyPrefix = keyPrefix
+	}
+}

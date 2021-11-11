@@ -723,11 +723,19 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 
 	if strings.HasPrefix(consumableStorePath, "gs://") {
 		infoLogger.Println(consumableStorePath[4:])
+		bucket := consumableStorePath[5:]
+		keyPrefix := ""
+		pathSepIndex := strings.Index(bucket, "/")
+		if pathSepIndex >= 0 {
+			bucket = bucket[:pathSepIndex]
+			keyPrefix = bucket[(pathSepIndex + 1):]
+		}
 		sourceStore, err = gcs.New(ctx,
-			consumableStorePath[5:],
+			bucket,
 			in.config.Credential,
 			gcs.Logger(logger),
 			gcs.WithRetry(in.params.fs.WithRetry),
+			gcs.KeyPrefix(keyPrefix),
 		)
 		if err != nil {
 			return sourceStore, err

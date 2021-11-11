@@ -29,6 +29,7 @@ type gcs struct {
 	client         *gcsStorage.Client
 	readOnlyClient *gcsStorage.Client
 	bucket         string
+	keyPrefix      string
 	ctx            context.Context
 	l              *zap.Logger
 	isReadOnly     bool
@@ -83,13 +84,13 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 }
 
 func (g *gcs) String() string {
-	return "gcs://" + g.bucket
+	return "gcs://" + g.bucket + g.keyPrefix
 }
 
 // Has this object in the store?
 func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
 	client := g.readOnlyClient
-	_, err := client.Bucket(g.bucket).Object(objectName).Attrs(ctx)
+	_, err := client.Bucket(g.bucket).Object(g.keyPrefix + objectName).Attrs(ctx)
 	if err != nil {
 		if err == gcsStorage.ErrObjectNotExist {
 			return false, nil
@@ -128,7 +129,7 @@ func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 	defer func() {
 		r.l.Debug("End ReadAt", zap.Int("chunk size", len(p)), zap.Int64("offset", offset), zap.Int("bytes read", n), zap.Error(err))
 	}()
-	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.objectName).NewRangeReader(
+	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(g.keyPrefix+r.objectName).NewRangeReader(
 		r.g.ctx, offset, int64(len(p)))
 	if err != nil {
 		return 0, toSentinelErrors(err)
@@ -138,7 +139,7 @@ func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 
 func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	g.l.Debug("Start Get", zap.String("objectName", objectName))
-	objectReader, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).NewReader(ctx)
+	objectReader, err := g.readOnlyClient.Bucket(g.bucket).Object(g.keyPrefix + objectName).NewReader(ctx)
 	g.l.Debug("End Get", zap.String("objectName", objectName), zap.Error(err))
 	if err != nil {
 		return nil, toSentinelErrors(err)
@@ -152,7 +153,7 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 
 func (g *gcs) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
 	g.l.Debug("Start GetAttr", zap.String("objectName", objectName))
-	attr, err := g.readOnlyClient.Bucket(g.bucket).Object(objectName).Attrs(ctx)
+	attr, err := g.readOnlyClient.Bucket(g.bucket).Object(g.keyPrefix + objectName).Attrs(ctx)
 	g.l.Debug("End GetAttr", zap.String("objectName", objectName), zap.Error(err))
 	if err != nil {
 		return storage.Attributes{}, toSentinelErrors(err)
@@ -174,7 +175,7 @@ func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error)
 
 func (g *gcs) Touch(ctx context.Context, objectName string) error {
 	g.l.Debug("Start Touch", zap.String("objectName", objectName))
-	_, err := g.client.Bucket(g.bucket).Object(objectName).Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
+	_, err := g.client.Bucket(g.bucket).Object(g.keyPrefix+objectName).Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
 	g.l.Debug("End touch", zap.String("objectName", objectName), zap.Error(err))
 	return toSentinelErrors(err)
 }
@@ -192,11 +193,11 @@ func (rc readCloser) Close() error {
 }
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newObject bool) (err error) {
-	return g.putObject(ctx, objectName, reader, newObject, false, 0)
+	return g.putObject(ctx, g.keyPrefix+objectName, reader, newObject, false, 0)
 }
 
 func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, newObject bool, crc uint32) (err error) {
-	return g.putObject(ctx, objectName, reader, newObject, true, crc)
+	return g.putObject(ctx, g.keyPrefix+objectName, reader, newObject, true, crc)
 }
 
 func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader, newObject bool, isPutCRC bool, crc uint32) (err error) {
@@ -219,7 +220,7 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 		retryPolicy = &backoff.StopBackOff{}
 	}
 
-	gcsObject := g.client.Bucket(g.bucket).Object(objectName)
+	gcsObject := g.client.Bucket(g.bucket).Object(g.keyPrefix + objectName)
 
 	// wrapping PipeIO execution so it can be retried
 	operation := func() error {
@@ -261,7 +262,7 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 
 func (g *gcs) Delete(ctx context.Context, objectName string) (err error) {
 	g.l.Debug("Start Delete", zap.String("objectName", objectName))
-	err = toSentinelErrors(g.client.Bucket(g.bucket).Object(objectName).Delete(ctx))
+	err = toSentinelErrors(g.client.Bucket(g.bucket).Object(g.keyPrefix + objectName).Delete(ctx))
 	g.l.Debug("End Delete", zap.String("objectName", objectName), zap.Error(err))
 	return
 }
@@ -295,7 +296,7 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 	defer func() {
 		g.l.Debug("End KeysPrefix", zap.String("start", pageToken), zap.String("prefix", prefix), zap.Int("keys", len(keys)), zap.Error(err))
 	}()
-	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: prefix, Delimiter: delimiter})
+	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: g.keyPrefix + prefix, Delimiter: delimiter})
 
 	var objects []*gcsStorage.ObjectAttrs
 
