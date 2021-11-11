@@ -308,9 +308,9 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 
 	for _, objAttrs := range objects {
 		if objAttrs.Prefix != "" {
-			keys = append(keys, objAttrs.Prefix)
+			keys = append(keys, objAttrs.Prefix[len(g.keyPrefix):])
 		} else {
-			keys = append(keys, objAttrs.Name)
+			keys = append(keys, objAttrs.Name[len(g.keyPrefix):])
 		}
 	}
 	return
