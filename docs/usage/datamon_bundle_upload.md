@@ -34,7 +34,7 @@ set label 'init'
   -h, --help                     help for upload
       --label string             The human-readable name of a label
       --message (*) string       The message describing the new bundle
-      --path (*) string          The path to the folder or bucket (gs://<bucket>) for the data
+      --path (*) string          The path to the folder or GCS URL (gs://<bucket></optional/path/>) for the data
       --repo (*) string          The name of this repository
       --skip-on-error            Skip files encounter errors while reading.The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false
 ```

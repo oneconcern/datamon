@@ -135,7 +135,11 @@ func addMountPathFlag(cmd *cobra.Command) string {
 func addPathFlag(cmd *cobra.Command) string {
 	const path = "path"
 	if cmd != nil {
-		cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
+		cmd.Flags().StringVar(&datamonFlags.bundle.DataPath,
+			path,
+			"",
+			"The path to the folder or GCS URL (gs://<bucket></optional/path/>) for the data",
+		)
 	}
 	return path
 }
