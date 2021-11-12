@@ -6,6 +6,7 @@ package gcs
 import (
 	"context"
 	"io"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -83,14 +84,26 @@ func New(ctx context.Context, bucket string, credentialFile string, opts ...Opti
 	return googleStore, nil
 }
 
+// Get the full GCS object key for the given "object name" relative to the gcs store's configured
+// key prefix.
+func (g *gcs) getFullObjectName(objectName string) string {
+	return g.keyPrefix + objectName
+}
+
+// Get the "object name" for the given GCS key relative to the gcs store's configured key prefix.
+func (g *gcs) getRelObjectName(key string) string {
+	return strings.TrimPrefix(key, g.keyPrefix)
+}
+
 func (g *gcs) String() string {
-	return "gcs://" + g.bucket + g.keyPrefix
+	return "gcs://" + g.bucket + "/" + g.keyPrefix
 }
 
 // Has this object in the store?
 func (g *gcs) Has(ctx context.Context, objectName string) (bool, error) {
 	client := g.readOnlyClient
-	_, err := client.Bucket(g.bucket).Object(g.keyPrefix + objectName).Attrs(ctx)
+	objectFullName := g.getFullObjectName(objectName)
+	_, err := client.Bucket(g.bucket).Object(objectFullName).Attrs(ctx)
 	if err != nil {
 		if err == gcsStorage.ErrObjectNotExist {
 			return false, nil
@@ -129,7 +142,8 @@ func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 	defer func() {
 		r.l.Debug("End ReadAt", zap.Int("chunk size", len(p)), zap.Int64("offset", offset), zap.Int("bytes read", n), zap.Error(err))
 	}()
-	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(r.g.keyPrefix+r.objectName).NewRangeReader(
+	objectFullName := r.g.getFullObjectName(r.objectName)
+	objectReader, err := r.g.readOnlyClient.Bucket(r.g.bucket).Object(objectFullName).NewRangeReader(
 		r.g.ctx, offset, int64(len(p)))
 	if err != nil {
 		return 0, toSentinelErrors(err)
@@ -139,7 +153,8 @@ func (r *gcsReader) ReadAt(p []byte, offset int64) (n int, err error) {
 
 func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	g.l.Debug("Start Get", zap.String("objectName", objectName))
-	objectReader, err := g.readOnlyClient.Bucket(g.bucket).Object(g.keyPrefix + objectName).NewReader(ctx)
+	objectFullName := g.getFullObjectName(objectName)
+	objectReader, err := g.readOnlyClient.Bucket(g.bucket).Object(objectFullName).NewReader(ctx)
 	g.l.Debug("End Get", zap.String("objectName", objectName), zap.Error(err))
 	if err != nil {
 		return nil, toSentinelErrors(err)
@@ -153,7 +168,8 @@ func (g *gcs) Get(ctx context.Context, objectName string) (io.ReadCloser, error)
 
 func (g *gcs) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
 	g.l.Debug("Start GetAttr", zap.String("objectName", objectName))
-	attr, err := g.readOnlyClient.Bucket(g.bucket).Object(g.keyPrefix + objectName).Attrs(ctx)
+	objectFullName := g.getFullObjectName(objectName)
+	attr, err := g.readOnlyClient.Bucket(g.bucket).Object(objectFullName).Attrs(ctx)
 	g.l.Debug("End GetAttr", zap.String("objectName", objectName), zap.Error(err))
 	if err != nil {
 		return storage.Attributes{}, toSentinelErrors(err)
@@ -175,7 +191,8 @@ func (g *gcs) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error)
 
 func (g *gcs) Touch(ctx context.Context, objectName string) error {
 	g.l.Debug("Start Touch", zap.String("objectName", objectName))
-	_, err := g.client.Bucket(g.bucket).Object(g.keyPrefix+objectName).Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
+	objectFullName := g.getFullObjectName(objectName)
+	_, err := g.client.Bucket(g.bucket).Object(objectFullName).Update(ctx, gcsStorage.ObjectAttrsToUpdate{})
 	g.l.Debug("End touch", zap.String("objectName", objectName), zap.Error(err))
 	return toSentinelErrors(err)
 }
@@ -193,11 +210,11 @@ func (rc readCloser) Close() error {
 }
 
 func (g *gcs) Put(ctx context.Context, objectName string, reader io.Reader, newObject bool) (err error) {
-	return g.putObject(ctx, g.keyPrefix+objectName, reader, newObject, false, 0)
+	return g.putObject(ctx, objectName, reader, newObject, false, 0)
 }
 
 func (g *gcs) PutCRC(ctx context.Context, objectName string, reader io.Reader, newObject bool, crc uint32) (err error) {
-	return g.putObject(ctx, g.keyPrefix+objectName, reader, newObject, true, crc)
+	return g.putObject(ctx, objectName, reader, newObject, true, crc)
 }
 
 func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader, newObject bool, isPutCRC bool, crc uint32) (err error) {
@@ -220,7 +237,8 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 		retryPolicy = &backoff.StopBackOff{}
 	}
 
-	gcsObject := g.client.Bucket(g.bucket).Object(g.keyPrefix + objectName)
+	objectFullName := g.getFullObjectName(objectName)
+	gcsObject := g.client.Bucket(g.bucket).Object(objectFullName)
 
 	// wrapping PipeIO execution so it can be retried
 	operation := func() error {
@@ -262,7 +280,8 @@ func (g *gcs) putObject(ctx context.Context, objectName string, reader io.Reader
 
 func (g *gcs) Delete(ctx context.Context, objectName string) (err error) {
 	g.l.Debug("Start Delete", zap.String("objectName", objectName))
-	err = toSentinelErrors(g.client.Bucket(g.bucket).Object(g.keyPrefix + objectName).Delete(ctx))
+	objectFullName := g.getFullObjectName(objectName)
+	err = toSentinelErrors(g.client.Bucket(g.bucket).Object(objectFullName).Delete(ctx))
 	g.l.Debug("End Delete", zap.String("objectName", objectName), zap.Error(err))
 	return
 }
@@ -296,7 +315,8 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 	defer func() {
 		g.l.Debug("End KeysPrefix", zap.String("start", pageToken), zap.String("prefix", prefix), zap.Int("keys", len(keys)), zap.Error(err))
 	}()
-	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: g.keyPrefix + prefix, Delimiter: delimiter})
+	fullPrefix := g.getFullObjectName(prefix)
+	itr := g.readOnlyClient.Bucket(g.bucket).Objects(ctx, &gcsStorage.Query{Prefix: fullPrefix, Delimiter: delimiter})
 
 	var objects []*gcsStorage.ObjectAttrs
 
@@ -308,9 +328,9 @@ func (g *gcs) KeysPrefix(ctx context.Context, pageToken string, prefix string, d
 
 	for _, objAttrs := range objects {
 		if objAttrs.Prefix != "" {
-			keys = append(keys, objAttrs.Prefix[len(g.keyPrefix):])
+			keys = append(keys, g.getRelObjectName(objAttrs.Prefix))
 		} else {
-			keys = append(keys, objAttrs.Name[len(g.keyPrefix):])
+			keys = append(keys, g.getRelObjectName(objAttrs.Name))
 		}
 	}
 	return
