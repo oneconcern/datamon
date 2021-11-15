@@ -27,3 +27,14 @@ func WithRetry(enabled bool) Option {
 		g.retry = enabled
 	}
 }
+
+// KeyPrefix prepends all keys within the GCS bucket.
+// This option is used to treat a subset of keys within a GCS bucket as the contents of the gcs
+// store (essentially treating the prefix as a directory path within the bucket).
+// Objects names given as arguments and returned from the gcs store will be treated as being
+// relative to the KeyPrefix.
+func KeyPrefix(keyPrefix string) Option {
+	return func(g *gcs) {
+		g.keyPrefix = keyPrefix
+	}
+}

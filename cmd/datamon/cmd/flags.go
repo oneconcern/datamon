@@ -135,7 +135,11 @@ func addMountPathFlag(cmd *cobra.Command) string {
 func addPathFlag(cmd *cobra.Command) string {
 	const path = "path"
 	if cmd != nil {
-		cmd.Flags().StringVar(&datamonFlags.bundle.DataPath, path, "", "The path to the folder or bucket (gs://<bucket>) for the data")
+		cmd.Flags().StringVar(&datamonFlags.bundle.DataPath,
+			path,
+			"",
+			"The path to the folder or GCS URL (gs://<bucket></optional/path/>) for the data",
+		)
 	}
 	return path
 }
@@ -722,12 +726,34 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 	}
 
 	if strings.HasPrefix(consumableStorePath, "gs://") {
-		infoLogger.Println(consumableStorePath[4:])
+		consumableStorePath = consumableStorePath[5:]
+		pathSepIndex := strings.Index(consumableStorePath, "/")
+
+		bucket := make([]string, 1)
+		keyPrefix := make([]string, 1)
+		if pathSepIndex > 0 {
+			// Enforce all key prefixes to be suffixed with a "/" character.
+			// This makes us treat the key prefix as if it were a path within a file system and is
+			// consistent with how the "gsutil" CLI tool handles google storage URLs.
+			if !strings.HasSuffix(consumableStorePath, "/") {
+				consumableStorePath += "/"
+			}
+			bucket[0] = consumableStorePath[:pathSepIndex]
+			keyPrefix[0] = consumableStorePath[(pathSepIndex + 1):]
+		} else {
+			bucket[0] = consumableStorePath
+			keyPrefix[0] = ""
+		}
+		infoLogger.Printf("Bucket: %s", bucket[0])
+		if keyPrefix[0] != "" {
+			infoLogger.Printf("Key Prefix: %s", keyPrefix[0])
+		}
 		sourceStore, err = gcs.New(ctx,
-			consumableStorePath[5:],
+			bucket[0],
 			in.config.Credential,
 			gcs.Logger(logger),
 			gcs.WithRetry(in.params.fs.WithRetry),
+			gcs.KeyPrefix(keyPrefix[0]),
 		)
 		if err != nil {
 			return sourceStore, err

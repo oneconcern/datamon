@@ -35,7 +35,7 @@ my-pod
       --files string             Text file containing list of files separated by newline.
   -h, --help                     help for add
       --name-filter string       A regular expression (RE2) to match names of bundle entries.
-      --path (*) string          The path to the folder or bucket (gs://<bucket>) for the data
+      --path (*) string          The path to the folder or GCS URL (gs://<bucket></optional/path/>) for the data
       --repo (*) string          The name of this repository
       --skip-on-error            Skip files encounter errors while reading.The list of files is either generated or passed in. During upload files can be deleted or encounter an error. Setting this flag will skip those files. Default to false
       --split string             The split to use

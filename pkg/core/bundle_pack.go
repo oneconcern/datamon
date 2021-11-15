@@ -217,6 +217,11 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 	if err != nil {
 		return err
 	}
+
+	if len(files) == 0 {
+		bundle.l.Warn("Uploading bundle with 0 files")
+	}
+
 	cafsArchive, err := cafs.New(
 		cafs.LeafSize(bundle.BundleDescriptor.LeafSize),
 		cafs.Backend(bundle.BlobStore()),

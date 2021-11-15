@@ -27,7 +27,7 @@ func constStringWithIndex(i int) string {
 	return longPath + fmt.Sprint(i)
 }
 
-func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
+func setup(t testing.TB, numOfObjects int, keyPrefix string) (storage.Store, string, func()) { //nolint:ireturn,varnamelen
 
 	ctx := context.Background()
 
@@ -39,7 +39,7 @@ func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
 	err = client.Bucket(bucket).Create(ctx, "onec-co", nil)
 	require.NoError(t, err, "Failed to create bucket:"+bucket)
 
-	gcs, err := New(context.TODO(), bucket, "") // Use GOOGLE_APPLICATION_CREDENTIALS env variable
+	gcs, err := New(context.TODO(), bucket, "", KeyPrefix(keyPrefix)) // Use GOOGLE_APPLICATION_CREDENTIALS env variable
 	require.NoError(t, err, "failed to create gcs client")
 	wg := sync.WaitGroup{}
 	create := func(i int, wg *sync.WaitGroup) {
@@ -83,13 +83,13 @@ func setup(t testing.TB, numOfObjects int) (storage.Store, func()) {
 		require.NoError(t, err, "Failed to delete bucket:"+bucket)
 	}
 
-	return gcs, cleanup
+	return gcs, bucket, cleanup
 }
 
 func TestGcs_Get(t *testing.T) {
 	ctx := context.Background()
 	count := 20
-	gcs, cleanup := setup(t, count)
+	gcs, _, cleanup := setup(t, count, "")
 	defer cleanup()
 	for i := 0; i < count; i++ {
 		rdr, err := gcs.Get(ctx, constStringWithIndex(i))
@@ -156,7 +156,7 @@ func TestGcs_Get(t *testing.T) {
 func TestGcs_Has(t *testing.T) {
 	ctx := context.Background()
 	count := 2
-	gcs, cleanup := setup(t, count)
+	gcs, _, cleanup := setup(t, count, "")
 	defer cleanup()
 
 	for i := 0; i < count; i++ {
@@ -174,7 +174,7 @@ func TestGcs_Has(t *testing.T) {
 func TestGcs_Put(t *testing.T) {
 	ctx := context.Background()
 	count := 3
-	gcs, cleanup := setup(t, 0)
+	gcs, _, cleanup := setup(t, 0, "")
 	defer cleanup()
 	for i := 0; i < count; i++ {
 		err := gcs.Put(ctx, constStringWithIndex(i), bytes.NewBufferString(constStringWithIndex(i)), storage.NoOverWrite)
@@ -195,7 +195,7 @@ func TestGcs_Put(t *testing.T) {
 func TestGcs_Keys(t *testing.T) {
 	ctx := context.Background()
 
-	gcs, cleanup := setup(t, 2)
+	gcs, _, cleanup := setup(t, 2, "")
 	defer cleanup()
 
 	key, err := gcs.Keys(ctx)
@@ -208,7 +208,7 @@ func TestGcs_Keys(t *testing.T) {
 func TestGcs_Delete(t *testing.T) {
 	ctx := context.Background()
 	count := 10
-	gcs, cleanup := setup(t, 0)
+	gcs, _, cleanup := setup(t, 0, "")
 	defer cleanup()
 
 	for i := 0; i < count; i++ {
@@ -231,7 +231,7 @@ func TestGcs_Delete(t *testing.T) {
 
 func TestGcs_CreateNew(t *testing.T) {
 	ctx := context.Background()
-	gcs, cleanup := setup(t, 0)
+	gcs, _, cleanup := setup(t, 0, "")
 	defer cleanup()
 
 	err := gcs.Put(ctx, constStringWithIndex(1), bytes.NewBufferString(constStringWithIndex(1)), storage.NoOverWrite)
@@ -252,7 +252,7 @@ func TestGcs_CreateNew(t *testing.T) {
 func TestGcs_KeysPrefix(t *testing.T) {
 	ctx := context.Background()
 	count := 124
-	gcs, cleanup := setup(t, count)
+	gcs, _, cleanup := setup(t, count, "")
 	defer cleanup()
 
 	fetch := count - 1
@@ -304,6 +304,85 @@ func listKeysBatch(gcs storage.Store, b *testing.B, count int, batch int) {
 	}
 }
 
+func TestGcs_KeyPrefixOption(t *testing.T) {
+	ctx := context.Background()
+	keyPrefix := "key/prefix/"
+	count := 0
+
+	gcsClient, err := gcsStorage.NewClient(ctx, option.WithScopes(gcsStorage.ScopeFullControl))
+	require.NoError(t, err)
+
+	gcs, bucket, cleanup := setup(t, count, keyPrefix)
+	defer cleanup()
+
+	objectName1 := "x/obj1"
+	objectName2 := "y/obj2"
+	err = gcs.Put(ctx, objectName1, bytes.NewBufferString("rawr"), storage.NoOverWrite)
+	require.NoError(t, err)
+	err = gcs.Put(ctx, objectName2, bytes.NewBufferString("rawr"), storage.NoOverWrite)
+	require.NoError(t, err)
+
+	// confirm the objects exist with the correct key prefix
+	_, err = gcsClient.Bucket(bucket).Object(keyPrefix + objectName1).Attrs(ctx)
+	require.NoError(t, err)
+	_, err = gcsClient.Bucket(bucket).Object(keyPrefix + objectName2).Attrs(ctx)
+	require.NoError(t, err)
+
+	// Has
+	has, err := gcs.Has(ctx, objectName1)
+	require.NoError(t, err)
+	require.True(t, has)
+
+	// Keys
+	keys, err := gcs.Keys(ctx)
+	expectedKeys := []string{"x/obj1", "y/obj2"}
+	require.NoError(t, err)
+	require.Equal(t, expectedKeys, keys)
+
+	// KeyPrefix
+	keys, next, err := gcs.KeysPrefix(ctx, "", "x", "", 10)
+	expectedKeys = []string{"x/obj1"}
+	require.NoError(t, err)
+	require.Equal(t, expectedKeys, keys)
+	require.Equal(t, "", next)
+
+	// Get
+	rdr, err := gcs.Get(ctx, objectName1)
+	require.NoError(t, err)
+	b, err := ioutil.ReadAll(rdr)
+	require.NoError(t, err)
+	assert.Equal(t, "rawr", string(b))
+
+	// GetAt
+	_, err = gcs.GetAt(ctx, objectName1)
+	require.NoError(t, err)
+
+	// GetAttr
+	attrs, err := gcs.GetAttr(ctx, objectName1)
+	require.NoError(t, err)
+	updatedBefore := attrs.Updated
+
+	// Touch
+	err = gcs.Touch(ctx, objectName1)
+	require.NoError(t, err)
+	attrs, err = gcs.GetAttr(ctx, objectName1)
+	require.NoError(t, err)
+	updatedAfter := attrs.Updated
+	require.True(t, updatedAfter.After(updatedBefore))
+
+	// Delete removes the specified object from the store.
+	err = gcs.Delete(ctx, objectName1)
+	require.NoError(t, err)
+	err = gcs.Delete(ctx, objectName2)
+	require.NoError(t, err)
+
+	// confirm the objects were deleted
+	_, err = gcsClient.Bucket(bucket).Object(keyPrefix + objectName1).Attrs(ctx)
+	require.Error(t, err)
+	_, err = gcsClient.Bucket(bucket).Object(keyPrefix + objectName2).Attrs(ctx)
+	require.Error(t, err)
+}
+
 func keysPrefix100(b *testing.B, gcs storage.Store) {
 	listKeysBatch(gcs, b, TotalObjects, 100)
 }
@@ -320,7 +399,7 @@ func keysPrefix2000(b *testing.B, gcs storage.Store) {
 	listKeysBatch(gcs, b, TotalObjects, 2000)
 }
 func BenchmarkRun(b *testing.B) {
-	gcs, _ := setup(b, TotalObjects)
+	gcs, _, _ := setup(b, TotalObjects, "")
 	// defer cleanup()
 	run := func(fn func(b2 *testing.B, gcs storage.Store)) {
 		fn(b, gcs)
