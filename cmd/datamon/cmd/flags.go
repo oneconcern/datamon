@@ -736,7 +736,7 @@ func (in *cliOptionInputs) srcStore(ctx context.Context, create bool) (storage.S
 			// This makes us treat the key prefix as if it were a path within a file system and is
 			// consistent with how the "gsutil" CLI tool handles google storage URLs.
 			if !strings.HasSuffix(consumableStorePath, "/") {
-				consumableStorePath = consumableStorePath + "/"
+				consumableStorePath += "/"
 			}
 			bucket[0] = consumableStorePath[:pathSepIndex]
 			keyPrefix[0] = consumableStorePath[(pathSepIndex + 1):]
