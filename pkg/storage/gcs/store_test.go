@@ -27,7 +27,7 @@ func constStringWithIndex(i int) string {
 	return longPath + fmt.Sprint(i)
 }
 
-func setup(t testing.TB, numOfObjects int, keyPrefix string) (storage.Store, string, func()) {
+func setup(t testing.TB, numOfObjects int, keyPrefix string) (storage.Store, string, func()) { //nolint:ireturn
 
 	ctx := context.Background()
 
