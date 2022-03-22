@@ -19,7 +19,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.2.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/influxdata/influxdb v1.9.5
+	github.com/influxdata/influxdb v1.9.6
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20220303083136-48612565d5c8
 	github.com/karrick/godirwalk v1.16.1
