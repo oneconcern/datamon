@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
 	storagestatus "github.com/oneconcern/datamon/pkg/storage/status"
