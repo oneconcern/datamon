@@ -28,11 +28,11 @@ UPX_FOR_OSX=$(shell if [[ -n "$(UPX_MAJOR)" && -n $(UPX_MINOR) && "$(UPX_MAJOR)"
 
 # go-gettable tools used for build and test
 # NOTE: we don't put packr2 in that list, to stick to the version in go.mod (no automatic upgrade)
-TOOLS ?= github.com/mitchellh/gox \
-	github.com/golangci/golangci-lint/cmd/golangci-lint \
+TOOLS ?= github.com/mitchellh/gox@latest \
+	github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
 	gotest.tools/gotestsum@latest \
 	github.com/matryer/moq@latest \
-	golang.org/x/tools/cmd/goimports
+	golang.org/x/tools/cmd/goimports@latest
 
 # Build tagging parameters
 VERSION_INFO_IMPORT_PATH ?= github.com/oneconcern/datamon/cmd/datamon/cmd.
@@ -127,7 +127,7 @@ ensure-gotools:
 	pushd ${GOPATH}/bin 1>/dev/null 2>&1 && \
 	for tool in $(TOOLS) ; do \
 	  echo "$(GREEN)INFO: ensuring $(YELLOW)$${tool}$(GREEN) is up to date$(RESET)" && \
-		go get $${tool} 1>/dev/null 2>&1; \
+		go install $${tool} 1>/dev/null 2>&1; \
 	done && \
 	popd 2>/dev/null
 
@@ -139,13 +139,13 @@ gofmt:
 .PHONY: goimports
 ## BUILD: Run goimports on the cmd and pkg packages
 goimports:
-	@TOOLS=golang.org/x/tools/cmd/goimports $(MAKE) ensure-gotools
+	@TOOLS=golang.org/x/tools/cmd/goimports@latest $(MAKE) ensure-gotools
 	@goimports -w .
 
 .PHONY: build-assets
 ## BUILD: Prepare static assets for embedding in compiled binary
 build-assets:
-	go get github.com/gobuffalo/packr/v2/packr2
+	go install github.com/gobuffalo/packr/v2/packr2@latest
 	(cd pkg/web && packr2 clean && packr2)
 
 .PHONY: compile-datamon
@@ -177,7 +177,7 @@ cross-compile-binaries: export OS=linux darwin
 cross-compile-binaries: export ARCH=amd64
 cross-compile-binaries: export LDFLAGS=${BASE_LD_FLAGS} ${VERSION_LD_FLAGS}
 cross-compile-binaries: build-assets
-	@TOOLS=github.com/mitchellh/gox $(MAKE) ensure-gotools
+	@TOOLS=github.com/mitchellh/gox@latest $(MAKE) ensure-gotools
 	@mkdir -p ${TARGET}
 
 	# Ref: https://github.com/mitchellh/gox/issues/55 for CGO_ENABLED=0
@@ -284,7 +284,7 @@ runtests: mocks
 .PHONY: lint
 ## TEST: Runs static code analysis checks (golangci-lint)
 lint: gofmt goimports
-	TOOLS=github.com/golangci/golangci-lint/cmd/golangci-lint $(MAKE) ensure-gotools
+	TOOLS=github.com/golangci/golangci-lint/cmd/golangci-lint@latest $(MAKE) ensure-gotools
 	@golangci-lint run --verbose
 
 .PHONY: profile-metrics
