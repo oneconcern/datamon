@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/iam v0.3.0 // indirect
 	cloud.google.com/go/storage v1.21.0
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/aws/aws-sdk-go v1.41.11
+	github.com/aws/aws-sdk-go v1.44.18
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/davecgh/go-spew v1.1.1
@@ -22,7 +22,7 @@ require (
 	github.com/influxdata/influxdb v1.9.5
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20220303083136-48612565d5c8
-	github.com/karrick/godirwalk v1.16.1
+	github.com/karrick/godirwalk v1.17.0
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/nightlyone/lockfile v1.0.0
