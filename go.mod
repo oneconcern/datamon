@@ -12,7 +12,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
-	github.com/go-openapi/runtime v0.23.3
+	github.com/go-openapi/runtime v0.24.1
 	github.com/gobuffalo/packd v1.0.1
 	github.com/gobuffalo/packr/v2 v2.8.3
 	github.com/google/go-querystring v1.1.0 // indirect
@@ -34,7 +34,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/objx v0.3.0 // indirect
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.7.2
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	go.opencensus.io v0.23.0
 	go.uber.org/atomic v1.9.0 // indirect
