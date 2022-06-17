@@ -332,8 +332,10 @@ func assertBundles(t *testing.T, testcase bundleFixture, bundles model.BundleDes
 
 	if !assert.ElementsMatch(t, testcase.expected, bundles) {
 		// show details
-		exp, _ := json.MarshalIndent(testcase.expected, "", " ")
-		act, _ := json.MarshalIndent(bundles, "", " ")
+		exp, err := json.MarshalIndent(testcase.expected, "", " ")
+		require.NoError(t, err)
+		act, err := json.MarshalIndent(bundles, "", " ")
+		require.NoError(t, err)
 		assert.JSONEqf(t, string(exp), string(act), "expected equal JSON bundles")
 	}
 	assert.Truef(t, sort.IsSorted(bundles), "expected a sorted output, got: %v", bundles)

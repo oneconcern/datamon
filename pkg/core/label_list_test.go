@@ -142,8 +142,10 @@ func assertLabels(t *testing.T, testcase labelFixture, labels model.LabelDescrip
 	require.NoError(t, err)
 	if !assert.ElementsMatch(t, testcase.expected, labels, "expected returned labels to match expected descriptors") {
 		// output the details upon failure
-		exp, _ := json.MarshalIndent(testcase.expected, "", " ")
-		act, _ := json.MarshalIndent(labels, "", " ")
+		exp, err := json.MarshalIndent(testcase.expected, "", " ")
+		require.NoError(t, err)
+		act, err := json.MarshalIndent(labels, "", " ")
+		require.NoError(t, err)
 		assert.JSONEqf(t, string(exp), string(act), "expected equivalent marshalled JSON")
 	}
 	assert.Truef(t, sort.IsSorted(labels), "expected a sorted output, got: %v", labels)

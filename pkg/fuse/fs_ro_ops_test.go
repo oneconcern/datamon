@@ -1,3 +1,4 @@
+//go:build fsintegration
 // +build fsintegration
 
 package fuse

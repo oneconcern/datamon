@@ -537,7 +537,7 @@ func downloadBundleAndCheck(t testing.TB, bundleID string, ctx context2.Stores, 
 	// bundle download
 
 	// set the consumable destination directory for this bundle
-	consumable := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(ev.DestinationDir)))
+	consumable := localfs.New(afero.NewBasePathFs(afero.NewOsFs(), ev.DestinationDir))
 
 	bundle := NewBundle(
 		ContextStores(ctx),

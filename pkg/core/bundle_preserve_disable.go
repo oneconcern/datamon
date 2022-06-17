@@ -1,3 +1,4 @@
+//go:build !bundle_preserve
 // +build !bundle_preserve
 
 package core
