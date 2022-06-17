@@ -16,7 +16,6 @@ require (
 	github.com/gobuffalo/packd v1.0.1
 	github.com/gobuffalo/packr/v2 v2.8.3
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/googleapis/gax-go/v2 v2.2.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/influxdata/influxdb v1.9.5
@@ -43,11 +42,9 @@ require (
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.0.0-20220321153916-2c7772ba3064 // indirect
 	golang.org/x/mod v0.5.1 // indirect
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
-	google.golang.org/api v0.73.0
-	google.golang.org/genproto v0.0.0-20220322021311-435b647f9ef2 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+	google.golang.org/api v0.84.0
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible
