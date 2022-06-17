@@ -61,5 +61,14 @@ linters:
     - revive
     - forbidigo
     - gomoddirectives
+    - varnamelen
+    - tenv
+    - nonamedreturns
+    - ireturn
+    - exhaustruct
+    - contextcheck
+    - containedctx
+    - errname
+    - maintidx
 
 max-same-issues: 0

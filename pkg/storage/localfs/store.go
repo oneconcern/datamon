@@ -165,8 +165,8 @@ func (l *localFS) Put(ctx context.Context, key string, source io.Reader, exclusi
 	// TODO: Change this implementation to use rename to put file into place.
 	dir := filepath.Dir(key)
 	if dir != "" {
-		if err := l.fs.MkdirAll(filepath.Dir(key), 0700); err != nil {
-			return fmt.Errorf("ensuring directories for %q: %v", key, err)
+		if e := l.fs.MkdirAll(filepath.Dir(key), 0700); e != nil {
+			return fmt.Errorf("ensuring directories for %q: %v", key, e)
 		}
 	}
 	flag := os.O_CREATE | os.O_WRONLY | os.O_SYNC | os.O_TRUNC

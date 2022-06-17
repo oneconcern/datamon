@@ -1,3 +1,4 @@
+//go:build fuse_cli
 // +build fuse_cli
 
 package cmd

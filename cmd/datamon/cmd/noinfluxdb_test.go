@@ -1,3 +1,4 @@
+//go:build !influxdbintegration
 // +build !influxdbintegration
 
 package cmd
