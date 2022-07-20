@@ -17,7 +17,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/influxdata/influxdb v1.9.7
+	github.com/influxdata/influxdb v1.9.8
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20220531202254-21122235c77a
 	github.com/karrick/godirwalk v1.17.0
