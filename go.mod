@@ -5,7 +5,7 @@ replace github.com/spf13/pflag => github.com/fredbi/pflag v1.0.6-0.2020110615442
 require (
 	cloud.google.com/go/storage v1.23.0
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/aws/aws-sdk-go v1.44.57
+	github.com/aws/aws-sdk-go v1.44.72
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/davecgh/go-spew v1.1.1
