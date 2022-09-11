@@ -41,6 +41,7 @@ type fsWriter struct {
 	blobFlushes         []blobFlush
 	errors              []error
 	l                   *zap.Logger
+	withVerifyHash      bool
 
 	metrics.Enable
 	m *M
@@ -172,35 +173,59 @@ func (w *fsWriter) flush(isLastNode bool) (int, error) {
 	n := w.offset
 	w.offset = 0
 	w.leaves = append(w.leaves, leafKey)
+
 	return n, nil
 }
 
-func (w *fsWriter) writeBlob(data []byte, key Key, n uint64) (err error) {
-	found, _ := w.store.Has(context.TODO(), w.pather(key))
-	if found {
-		w.l.Info("Duplicate blob", zap.Stringer("key", key), zap.Uint64("offset", n))
+func (w *fsWriter) writeBlob(data []byte, key Key, n uint64) error {
+	lg := w.l.With(zap.String("blob_key", w.pather(key)), zap.Uint64("offset", n))
+	ctx := context.TODO()
+
+	found, overwrite := existsAndValidBlob(ctx, w.store, w.pather(key), data, lg)
+	switch {
+	case found && !overwrite:
+		// the blob has been found and checked
+		w.l.Info("Duplicate blob")
 		if w.MetricsEnabled() {
 			w.m.Volume.Blobs.IncBlob("write")
 			w.m.Volume.Blobs.IncDuplicate("write")
 		}
+
 		return nil
+
+	case found && overwrite:
+		// the blob has been found, but was found corrupted
+		lg.Info("blob is already in store, but it was found corrupted. Overwrite it")
 	}
+
+	var err error
 	switch d := w.store.(type) {
 	case storage.StoreCRC:
 		crc := crc32.Checksum(data, crc32.MakeTable(crc32.Castagnoli))
-		err = d.PutCRC(context.TODO(), w.pather(key), bytes.NewReader(data), storage.OverWrite, crc)
+		err = d.PutCRC(ctx, w.pather(key), bytes.NewReader(data), storage.OverWrite, crc)
 	default:
-		err = w.store.Put(context.TODO(), w.pather(key), bytes.NewReader(data), storage.OverWrite)
+		err = w.store.Put(ctx, w.pather(key), bytes.NewReader(data), storage.OverWrite)
 	}
 	if err != nil {
 		return fmt.Errorf("write segment file: %s err:%w", w.pather(key), err)
 	}
-	w.l.Info("Uploading blob", zap.Stringer("key", key), zap.Int("chunk size", len(data)), zap.Uint64("offset", n))
+
+	w.l.Info("Uploading blob", zap.Int("chunk size", len(data)))
 	if w.MetricsEnabled() {
 		w.m.Volume.Blobs.IncBlob("write")
 		w.m.Volume.Blobs.Size(int64(len(data)), "write")
 	}
-	return
+
+	if w.withVerifyHash {
+		// in paranoid mode, we verify the blob right after writing it.
+		if err = verifyBlob(ctx, w.store, w.pather(key), data, lg); err != nil {
+			return err
+		}
+
+		lg.Debug("cafs written blob verified")
+	}
+
+	return nil
 }
 
 func (w *fsWriter) flushThread() {
@@ -227,9 +252,11 @@ func (w *fsWriter) Flush() (Key, []byte, error) {
 	}
 	close(w.flushChan)
 	<-w.flushThreadDoneChan
+
 	if len(w.errors) != 0 {
 		return Key{}, nil, w.errors[0]
 	}
+
 	w.leaves = make([]Key, len(w.blobFlushes))
 	for _, bf := range w.blobFlushes {
 		w.leaves[bf.count-1] = bf.key
@@ -252,6 +279,9 @@ func (w *fsWriter) Flush() (Key, []byte, error) {
 		offset := KeySize * i
 		copy(leafHashes[offset:offset+KeySize], leaf[:])
 	}
+
+	w.l.Debug("cafs flushed with root key computed", zap.Stringer("root_key_hash", rhash), zap.Int("root_key_length", len(leafHashes)))
+
 	return rhash, leafHashes, nil
 }
 

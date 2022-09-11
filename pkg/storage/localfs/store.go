@@ -400,14 +400,20 @@ func (l *localFS) GetAttr(ctx context.Context, objectName string) (storage.Attri
 	if err != nil {
 		return storage.Attributes{}, err
 	}
+
+	// do not block when UID is not available on local os
+	var owner string
 	sys, ok := stat.Sys().(syscall.Stat_t)
-	if !ok {
-		return storage.Attributes{}, fmt.Errorf("failed to convert sys to Stat_t for object:%s", objectName)
+	if ok {
+		owner = fmt.Sprint(sys.Uid)
 	}
+
 	return storage.Attributes{
 		Created: stat.ModTime(), // Fix me: need a platform independent way to extracting timestamps
 		Updated: stat.ModTime(),
-		Owner:   fmt.Sprint(sys.Uid),
+		Owner:   owner,
+		Size:    stat.Size(),
+		// CRC32C not supported on localfs
 	}, nil
 
 }

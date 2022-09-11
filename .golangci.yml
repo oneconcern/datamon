@@ -25,6 +25,9 @@ linters:
     - fsintegration
     - influxdbintegration
   disable:
+    - golint
+    - interfacer
+    - scopelint
     - maligned
     - lll
     - gochecknoinits
@@ -70,5 +73,6 @@ linters:
     - containedctx
     - errname
     - maintidx
+    - nosnakecase
 
 max-same-issues: 0

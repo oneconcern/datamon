@@ -546,9 +546,9 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle,
 		cafs.LeafTruncation(bundle.BundleDescriptor.Version < 1),
 		cafs.Backend(bundle.BlobStore()),
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
-		cafs.VerifyHash(true),
 		cafs.Logger(bundle.l),
 		cafs.WithMetrics(bundle.MetricsEnabled()),
+		cafs.VerifyHash(bundle.withVerifyHash),
 	)
 	if err != nil {
 		return err
@@ -611,6 +611,7 @@ func unpackDataFile(ctx context.Context, bundle *Bundle, file string) error {
 		cafs.Logger(bundle.l),
 		cafs.ReaderConcurrentChunkWrites(bundle.concurrentFileDownloads/fileDownloadsPerConcurrentChunks),
 		cafs.WithMetrics(bundle.MetricsEnabled()),
+		cafs.VerifyHash(bundle.withVerifyHash),
 	)
 	if err != nil {
 		return err

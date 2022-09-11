@@ -119,6 +119,7 @@ func newReader(blobs storage.Store, hash Key, leafSize uint32, opts ...ReaderOpt
 	if c.MetricsEnabled() {
 		c.m = c.EnsureMetrics("cafs", &M{}).(*M)
 	}
+
 	return c, nil
 }
 

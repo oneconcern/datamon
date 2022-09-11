@@ -38,6 +38,8 @@ type Bundle struct {
 	concurrentFileUploads       int
 	concurrentFileDownloads     int
 	concurrentFilelistDownloads int
+	withVerifyHash              bool // When downloading file
+	withVerifyBlobHash          bool // When uploading files
 
 	metrics.Enable
 	m *M
@@ -132,6 +134,7 @@ func defaultBundle() *Bundle {
 		concurrentFileUploads:       20,
 		concurrentFileDownloads:     10,
 		concurrentFilelistDownloads: 10,
+		withVerifyHash:              true,
 		l:                           dlogger.MustGetLogger("info"),
 	}
 }
@@ -146,6 +149,10 @@ func NewBundle(opts ...BundleOption) *Bundle {
 	if b.MetricsEnabled() {
 		b.m = b.EnsureMetrics("core", &M{}).(*M)
 	}
+	if !b.withVerifyHash {
+		b.l.Warn("hash verification disabled")
+	}
+
 	return b
 }
 

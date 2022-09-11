@@ -178,6 +178,8 @@ func (g *gcs) GetAttr(ctx context.Context, objectName string) (storage.Attribute
 		Created: attr.Created,
 		Updated: attr.Updated,
 		Owner:   attr.Owner,
+		Size:    attr.Size,
+		CRC32C:  attr.CRC32C,
 	}, nil
 }
 

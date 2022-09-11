@@ -78,9 +78,10 @@ func defaultsForFs() *defaultFs {
 		keysCacheSize:               DefaultKeysCacheSize,
 		lruSize:                     DefaultCacheSize,
 		l:                           dlogger.MustGetLogger("info"),
-		withVerifyHash:              true,
-		withPrefetch:                0,    // prefetching disabled by default
-		withRetry:                   true, // retry on Put operations enabled by default
+		withVerifyHash:              true,  // verify read blobs and written root key
+		withVerifyBlobHash:          false, // verify all written blobs
+		withPrefetch:                0,     // prefetching disabled by default
+		withRetry:                   true,  // retry on Put operations enabled by default
 	}
 }
 
@@ -155,6 +156,7 @@ type defaultFs struct {
 	deduplicationScheme         string
 	withPrefetch                int
 	withVerifyHash              bool
+	withVerifyBlobHash          bool
 	withRetry                   bool
 
 	metrics.Enable
@@ -169,6 +171,7 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
 	var (
 		err     error
 		written int64
+		empty   PutRes
 	)
 
 	d.l.Debug("Start cafs Put")
@@ -186,52 +189,97 @@ func (d *defaultFs) Put(ctx context.Context, src io.Reader) (PutRes, error) {
 	written, err = io.Copy(w, src)
 	if err != nil {
 		w.Close()
-		return PutRes{}, err
+		return empty, err
 	}
+
 	root, keys, err := w.Flush()
 	if err != nil {
 		w.Close()
-		return PutRes{}, err
+
+		return empty, err
 	}
 
 	if err = w.Close(); err != nil {
-		return PutRes{}, err
+		return empty, err
 	}
 
 	// write the root key as a blob containing all leaf keys, if it does not exist already
-	found, _ := d.store.backend.Has(ctx, d.pather(root))
-	if !found {
-		// MultiPut exposes backend.PutCRC with a []byte input
-		d.l.Debug("cafs writing the root hash blob",
-			zap.String("prefix", d.prefix),
-			zap.Stringer("root hash", root),
-		)
-		destinations := []storage.MultiStoreUnit{
-			{
-				Store:           d.store.backend,
-				TolerateFailure: false,
-			},
-		}
+	lg := d.l.With(
+		zap.String("prefix", d.prefix),
+		zap.Stringer("root hash", root),
+	)
 
-		//nolint: gocritic
-		buffer := append(keys, root[:]...) // the root key trails the sequence
-		err = storage.MultiPut(ctx, destinations, d.pather(root), buffer, storage.OverWrite)
-		if err != nil {
+	// this is the content of the root key: all keys, trailed by the root itself
+	content := d.makeRootKey(ctx, root, keys)
+
+	// check if this root key already exists AND is valid
+	found, overwrite := existsAndValidBlob(ctx, d.store.backend, d.pather(root), content, lg)
+
+	if !found || overwrite {
+		if err = d.writeRootKey(ctx, root, content); err != nil {
 			return PutRes{Found: found}, err
 		}
 	}
+
 	if d.keysCache != nil {
 		_, _ = d.keysCache.ContainsOrAdd(root, UnverifiedLeafKeys(keys, d.leafSize))
 	}
+
 	if d.MetricsEnabled() {
 		d.m.Volume.Blobs.IntRoot(1, "Put")
 	}
+
 	return PutRes{
 		Written: written,
 		Key:     root,
 		Keys:    keys,
 		Found:   found,
 	}, nil
+}
+
+func (d *defaultFs) makeRootKey(ctx context.Context, root Key, keys []byte) []byte {
+	buffer := keys
+	buffer = append(buffer, root[:]...) // the root key trails the sequence
+
+	return buffer
+}
+
+func (d *defaultFs) writeRootKey(ctx context.Context, root Key, content []byte) error {
+	lg := d.l.With(
+		zap.String("prefix", d.prefix),
+		zap.Stringer("root hash", root),
+	)
+
+	lg.Debug("cafs writing the root hash blob")
+	destinations := []storage.MultiStoreUnit{
+		{
+			Store:           d.store.backend,
+			TolerateFailure: false,
+		},
+	}
+
+	if err := storage.MultiPut(ctx, destinations, d.pather(root), content, storage.OverWrite); err != nil {
+		return err
+	}
+
+	return d.verifyFlushed(ctx, root, content)
+}
+
+func (d *defaultFs) verifyFlushed(ctx context.Context, root Key, content []byte) error {
+	lg := d.l.With(zap.String("root_key_path", d.pather(root)))
+	lg.Debug("cafs root key verification", zap.Bool("verify_root_key", d.withVerifyHash))
+
+	if !d.withVerifyHash {
+		return nil
+	}
+
+	if err := verifyBlob(ctx, d.store.backend, d.pather(root), content, d.l); err != nil {
+		return err
+	}
+
+	lg.Debug("cafs root key verified")
+
+	return nil
 }
 
 func (d *defaultFs) Get(ctx context.Context, hash Key) (io.ReadCloser, error) {
@@ -284,6 +332,7 @@ func (d *defaultFs) reader(hash Key) (Reader, error) {
 		_, _ = d.keysCache.ContainsOrAdd(hash, keys)
 	}
 
+	d.l.Debug("cafs building reader", zap.Bool("verify_hash", d.withVerifyHash))
 	rdr, err := newReader(d.store.backend, hash, d.leafSize,
 		Keys(keys),
 		TruncateLeaf(d.leafTruncation),
@@ -310,6 +359,7 @@ func (d *defaultFs) writer() Writer {
 		WriterLogger(d.l),
 		WriterPather(d.pather),
 		WriterWithMetrics(d.MetricsEnabled()),
+		WriterWithVerifyHash(d.withVerifyBlobHash),
 	)
 }
 

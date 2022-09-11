@@ -84,6 +84,7 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
+		bundleOpts = append(bundleOpts, core.BundleWithVerifyHash(datamonFlags.fs.WithVerifyHash))
 
 		bundle := core.NewBundle(
 			bundleOpts...,
@@ -135,6 +136,7 @@ func init() {
 
 	addNameFilterFlag(BundleDownloadCmd)
 	addForceDestFlag(BundleDownloadCmd)
+	addVerifyHashFlag(BundleDownloadCmd)
 
 	bundleCmd.AddCommand(BundleDownloadCmd)
 }

@@ -79,6 +79,8 @@ set label 'init'
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
 		bundleOpts = append(bundleOpts, core.BundleWithRetry(datamonFlags.fs.WithRetry))
+		bundleOpts = append(bundleOpts, core.BundleWithVerifyHash(datamonFlags.fs.WithVerifyHash))
+		bundleOpts = append(bundleOpts, core.BundleWithVerifyBlobHash(datamonFlags.fs.WithVerifyBlobHash))
 
 		// feature guard
 		if enableBundlePreserve {
@@ -163,6 +165,8 @@ func init() {
 	addSkipMissingFlag(uploadBundleCmd)
 	addConcurrencyFactorFlag(uploadBundleCmd, 100)
 	addRetryFlag(uploadBundleCmd)
+	addVerifyHashFlag(uploadBundleCmd)
+	addVerifyBlobHashFlag(uploadBundleCmd)
 
 	// feature guard
 	if enableBundlePreserve {

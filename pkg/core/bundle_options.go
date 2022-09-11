@@ -47,7 +47,7 @@ func BundleID(bID string) BundleOption {
 	}
 }
 
-// SkipMissing indicates that bundle retrieval errors should be ignored. Currently not implementated.
+// SkipMissing indicates that bundle retrieval errors should be ignored. Currently not implemented.
 func SkipMissing(s bool) BundleOption {
 	return func(b *Bundle) {
 		b.SkipOnError = s
@@ -93,5 +93,19 @@ func BundleWithMetrics(enabled bool) BundleOption {
 func BundleWithRetry(enabled bool) BundleOption {
 	return func(b *Bundle) {
 		b.Retry = enabled
+	}
+}
+
+// BundleWithVerifyHash toggles hash verification when downloading (enabled by default).
+func BundleWithVerifyHash(enabled bool) BundleOption {
+	return func(b *Bundle) {
+		b.withVerifyHash = enabled
+	}
+}
+
+// BundleWithVerifyBlob toggles root key verification when uploading (enabled by default).
+func BundleWithVerifyBlobHash(enabled bool) BundleOption {
+	return func(b *Bundle) {
+		b.withVerifyBlobHash = enabled
 	}
 }

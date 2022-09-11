@@ -48,3 +48,10 @@ func WriterWithMetrics(enabled bool) WriterOption {
 		}
 	}
 }
+
+// WriterWithVerifyHash enables hash verification on written blobs.
+func WriterWithVerifyHash(enabled bool) WriterOption {
+	return func(writer *fsWriter) {
+		writer.withVerifyHash = enabled
+	}
+}

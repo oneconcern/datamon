@@ -92,7 +92,8 @@ func Prefetch(ahead int) Option {
 	}
 }
 
-// VerifyHash enables hash verification on blob objects
+// VerifyHash enables hash verification on read blob objects and written root keys.
+// This is enabled by default.
 func VerifyHash(enabled bool) Option {
 	return func(w *defaultFs) {
 		w.withVerifyHash = enabled
@@ -116,8 +117,17 @@ func WithMetrics(enabled bool) Option {
 }
 
 // WithRetry enables exponential backoff retry logic to be enabled on put operations
+// This is disabled by default.
 func WithRetry(enabled bool) Option {
 	return func(w *defaultFs) {
 		w.withRetry = enabled
+	}
+}
+
+// VerifyBlobHash enables hash verification on all written blob objects.
+// This is enabled by default.
+func VerifyBlobHash(enabled bool) Option {
+	return func(w *defaultFs) {
+		w.withVerifyBlobHash = enabled
 	}
 }

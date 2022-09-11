@@ -11,6 +11,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
+	"go.uber.org/zap"
 )
 
 const (
@@ -111,6 +112,12 @@ func setupTestData(dir string, files []testFile) (*testDataGenerator, storage.St
 	defer func() {
 		log.Printf("INFO: setup duration: %v", time.Since(t0).Truncate(time.Millisecond))
 	}()
+	var lg *zap.Logger
+	if os.Getenv("DEBUG_TEST") != "" {
+		lg = dlogger.MustGetLogger("debug")
+	} else {
+		lg = dlogger.MustGetLogger("warn")
+	}
 
 	_ = os.RemoveAll(dir)
 
@@ -119,7 +126,7 @@ func setupTestData(dir string, files []testFile) (*testDataGenerator, storage.St
 		LeafSize(leafSize),
 		Backend(blobs),
 		LeafTruncation(false),
-		Logger(dlogger.MustGetLogger("warn")),
+		Logger(lg),
 	)
 	if err != nil {
 		return nil, nil, nil, err
