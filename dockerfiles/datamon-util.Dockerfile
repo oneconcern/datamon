@@ -2,10 +2,10 @@
 # with datamon as a part of kubernetes workloads
 FROM reg.onec.co/datamon-alpine-base:latest as datamon
 
-FROM golang:1.17.0-alpine as gcsfuse
+FROM golang:1.19-alpine as gcsfuse
 RUN apk add --no-cache git
 ENV GOPATH /go
-RUN go get -u github.com/googlecloudplatform/gcsfuse
+RUN go install github.com/googlecloudplatform/gcsfuse@latest
 
 FROM alpine:3.14
 RUN apk add --no-cache ca-certificates fuse bash rsync && rm -rf /tmp/*

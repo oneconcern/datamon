@@ -1,7 +1,7 @@
 # A base container with a datamon binary
 #
 # This image remains local and is not released
-FROM golang:alpine as base
+FROM golang:1.19-alpine as base
 
 RUN mkdir -p /stage/data /stage/etc/ssl/certs &&\
   apk add --no-cache --quiet musl-dev gcc ca-certificates mailcap upx tzdata zip git make bash ncurses &&\

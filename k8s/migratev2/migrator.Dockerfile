@@ -22,7 +22,7 @@ RUN git clone https://github.com/oneconcern/datamon datamon1 && cd datamon1 && g
 RUN cd ${GOPATH}/src/github.com/oneconcern/datamon1/cmd/datamon && go build && upx datamon && mv datamon /stage/usr/bin/datamon1
 
 WORKDIR ${GOPATH}/src/datamon2
-RUN go get -tags bundle_preserve github.com/oneconcern/datamon/cmd/datamon@master
+RUN go install -tags bundle_preserve github.com/oneconcern/datamon/cmd/datamon@master
 RUN upx $GOBIN/datamon && mv $GOBIN/datamon /stage/usr/bin/datamon2
 
 FROM base

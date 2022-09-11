@@ -42,7 +42,7 @@ chmod +x /usr/local/bin/datamon
 ## From source
 
 ```bash
-go get -u github.com/oneconcern/datamon
+go install github.com/oneconcern/datamon@latest
 ```
 
 ## Homebrew/Linuxbrew
