@@ -230,6 +230,8 @@ func uploadBundle(ctx context.Context, bundle *Bundle, bundleEntriesPerFile uint
 		cafs.Logger(bundle.l),
 		cafs.WithMetrics(bundle.MetricsEnabled()),
 		cafs.WithRetry(bundle.Retry),
+		cafs.VerifyHash(bundle.withVerifyHash),
+		cafs.VerifyBlobHash(bundle.withVerifyBlobHash),
 	)
 	if err != nil {
 		return err

@@ -66,12 +66,15 @@ The destination path is a temporary staging area for write operations.`,
 		}
 		bundleOpts = append(bundleOpts, core.Logger(logger))
 		bundleOpts = append(bundleOpts, core.BundleWithMetrics(datamonFlags.root.metrics.IsEnabled()))
+		bundleOpts = append(bundleOpts, core.BundleWithVerifyHash(datamonFlags.fs.WithVerifyHash))
+		bundleOpts = append(bundleOpts, core.BundleWithVerifyBlobHash(datamonFlags.fs.WithVerifyBlobHash))
 
 		bundle := core.NewBundle(bundleOpts...)
 
 		var fsOpts []fuse.Option
 		fsOpts = append(fsOpts, fuse.Logger(logger))
 		fsOpts = append(fsOpts, fuse.WithMetrics(datamonFlags.root.metrics.IsEnabled()))
+		fsOpts = append(fsOpts, fuse.VerifyHash(datamonFlags.fs.WithVerifyHash))
 
 		fs, err := fuse.NewMutableFS(bundle, fsOpts...)
 		if err != nil {
@@ -131,6 +134,8 @@ func init() {
 	addDaemonizeFlag(mutableMountBundleCmd)
 	addDataPathFlag(mutableMountBundleCmd)
 	addLabelNameFlag(mutableMountBundleCmd)
+	addVerifyHashFlag(mutableMountBundleCmd)
+	addVerifyBlobHashFlag(mutableMountBundleCmd)
 
 	mountBundleCmd.AddCommand(mutableMountBundleCmd)
 }

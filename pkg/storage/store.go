@@ -25,6 +25,8 @@ type Attributes struct {
 	Created time.Time
 	Updated time.Time
 	Owner   string
+	Size    int64
+	CRC32C  uint32
 }
 
 // Store implementations know how to fetch and write entries from a and a K/V store.

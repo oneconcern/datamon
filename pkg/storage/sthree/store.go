@@ -3,6 +3,9 @@ package sthree
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 
@@ -162,7 +165,37 @@ func (s *s3FS) GetAt(ctx context.Context, objectName string) (io.ReaderAt, error
 }
 
 func (s *s3FS) GetAttr(ctx context.Context, objectName string) (storage.Attributes, error) {
-	return storage.Attributes{}, status.ErrNotImplemented
+	attr, err := s.s3.HeadObjectWithContext(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(objectName),
+	})
+	if err != nil {
+		return storage.Attributes{}, filterErrNotExists(toSentinelErrors(err))
+	}
+
+	raw := aws.StringValue(attr.ChecksumCRC32C)
+	var crc32c uint32
+	if len(raw) > 0 {
+
+		uint32Bytes, err := base64.StdEncoding.DecodeString(raw)
+		if err != nil {
+			return storage.Attributes{}, err
+		}
+		crc32cAsUint64, n := binary.Uvarint(uint32Bytes)
+		if n <= 0 {
+			return storage.Attributes{}, fmt.Errorf("could not decode crc32c: %q", raw)
+		}
+
+		crc32c = uint32(crc32cAsUint64)
+	}
+
+	ts := aws.TimeValue(attr.LastModified)
+	return storage.Attributes{
+		Created: ts,
+		Updated: ts,
+		Size:    aws.Int64Value(attr.ContentLength),
+		CRC32C:  crc32c,
+	}, nil
 }
 
 func (s *s3FS) Touch(ctx context.Context, objectName string) error {

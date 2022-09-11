@@ -40,12 +40,13 @@ type flagsT struct {
 		ForceDest         bool
 	}
 	fs struct {
-		MountPath      string
-		Stream         bool
-		CacheSize      flagext.ByteSize
-		WithPrefetch   int
-		WithVerifyHash bool
-		WithRetry      bool
+		MountPath          string
+		Stream             bool
+		CacheSize          flagext.ByteSize
+		WithPrefetch       int
+		WithVerifyHash     bool
+		WithVerifyBlobHash bool
+		WithRetry          bool
 	}
 	web struct {
 		port      int
@@ -407,7 +408,7 @@ func addPrefetchFlag(cmd *cobra.Command) string {
 func addVerifyHashFlag(cmd *cobra.Command) string {
 	const c = "verify-hash"
 	if cmd != nil {
-		cmd.Flags().BoolVar(&datamonFlags.fs.WithVerifyHash, c, true, "Enables hash verification on read blobs (requires Stream enabled)")
+		cmd.Flags().BoolVar(&datamonFlags.fs.WithVerifyHash, c, true, "Enables hash verification on read blobs and written root key (for mount, requires Stream enabled)")
 	}
 	return c
 }
@@ -561,6 +562,14 @@ func addRetryFlag(cmd *cobra.Command) string {
 	const c = "retry"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.fs.WithRetry, c, true, `Enables exponential backoff retry logic to be enabled on put operations`)
+	}
+	return c
+}
+
+func addVerifyBlobHashFlag(cmd *cobra.Command) string {
+	const c = "verify-blob-hash"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.fs.WithVerifyBlobHash, c, false, `Enable blob hash verification for each uploaded blob`)
 	}
 	return c
 }
