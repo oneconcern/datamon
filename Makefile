@@ -381,7 +381,7 @@ release-all-docker: build-datamon build-migrate build-wrapper push-datamon push-
 ## RELEASE: Build local base datamon container on alpine linux
 build-alpine-base: export BUILD_TARGET=$(LOCALREPO)/datamon-alpine-base
 build-alpine-base: export DOCKERFILE=dockerfiles/alpine-base.Dockerfile
-build-alpine-base: export BUILD_ARGS=$(VERSION_ARGS)
+build-alpine-base: export BUILD_ARGS="--pull" $(VERSION_ARGS)
 build-alpine-base: export TAGS=
 build-alpine-base:
 	$(MAKE) build-target

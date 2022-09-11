@@ -31,7 +31,7 @@ executors:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       SUDO: ''
     docker:
-      - image: golang:1.16
+      - image: golang:1.19
 
   docker_builder:
     # An executor to run and build: it is based on the base_builder, with some
@@ -464,10 +464,10 @@ jobs:
       - run:
           name: Coverage tools
           command: |
-            go get -u github.com/wadey/gocovmerge
-            go get -u github.com/axw/gocov/gocov
-            go get -u github.com/matm/gocov-html
-            go get github.com/mattn/goveralls
+            go install github.com/wadey/gocovmerge@latest
+            go install github.com/axw/gocov/gocov@latest
+            go install github.com/matm/gocov-html@latest
+            go install github.com/mattn/goveralls@latest
       - run:
           name: Merge raw coverage results and produce coverage reports
           command: |
