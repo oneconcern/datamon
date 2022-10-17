@@ -14,7 +14,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.5.0
 	github.com/go-chi/chi v4.1.2+incompatible
-	github.com/go-openapi/runtime v0.24.1
+	github.com/go-openapi/runtime v0.24.2
 	github.com/gobuffalo/packd v1.0.2
 	github.com/gobuffalo/packr/v2 v2.8.3
 	github.com/google/go-cmp v0.5.9 // indirect
