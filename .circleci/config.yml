@@ -477,7 +477,7 @@ jobs:
           command: |
             go install github.com/wadey/gocovmerge@latest
             go install github.com/axw/gocov/gocov@latest
-            go install github.com/matm/gocov-html@latest
+            go install github.com/matm/gocov-html/cmd/gocov-html@latest
             go install github.com/mattn/goveralls@latest
       - run:
           name: Merge raw coverage results and produce coverage reports
