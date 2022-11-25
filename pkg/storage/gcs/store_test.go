@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -20,8 +21,17 @@ import (
 )
 
 const (
-	longPath = "this/is/a/long/path/to/an/object/the/object/is/under/this/path/list/with/prefix/please/"
+	longPath         = "this/is/a/long/path/to/an/object/the/object/is/under/this/path/list/with/prefix/please/"
+	defaultProjectID = "onec-dev"
 )
+
+func projectID() string {
+	if projectID := os.Getenv("GOOGLE_PROJECT_ID"); projectID != "" {
+		return projectID
+	}
+
+	return defaultProjectID
+}
 
 func constStringWithIndex(i int) string {
 	return longPath + fmt.Sprint(i)
@@ -36,7 +46,7 @@ func setup(t testing.TB, numOfObjects int, keyPrefix string) (storage.Store, str
 
 	client, err := gcsStorage.NewClient(context.TODO(), option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err)
-	err = client.Bucket(bucket).Create(ctx, "onec-co", nil)
+	err = client.Bucket(bucket).Create(ctx, projectID(), nil)
 	require.NoError(t, err, "Failed to create bucket:"+bucket)
 
 	gcs, err := New(context.TODO(), bucket, "", KeyPrefix(keyPrefix)) // Use GOOGLE_APPLICATION_CREDENTIALS env variable

@@ -25,7 +25,7 @@ func setupVersions(t testing.TB, numOfObjects, numOfVersions int) (*gcs, func())
 	require.NoError(t, err)
 
 	require.NoError(t,
-		client.Bucket(bucket).Create(ctx, "onec-co",
+		client.Bucket(bucket).Create(ctx, projectID(),
 			&gcsStorage.BucketAttrs{
 				VersioningEnabled: true,
 			}),

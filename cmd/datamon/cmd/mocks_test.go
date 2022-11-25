@@ -15,6 +15,16 @@ import (
 	"google.golang.org/api/option"
 )
 
+const defaultProjectID = "onec-dev"
+
+func projectID() string {
+	if projectID := os.Getenv("GOOGLE_PROJECT_ID"); projectID != "" {
+		return projectID
+	}
+
+	return defaultProjectID
+}
+
 func generateRepoName(in string) string {
 	return "test-" + in + "-repo-" + rand.LetterString(10)
 }
@@ -80,7 +90,7 @@ func setupConfig(t *testing.T, flags flagsT) func() {
 	testContext := testContext()
 	client, err := gcsStorage.NewClient(context.Background(), option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err, "couldn't create bucket client")
-	err = client.Bucket(bucketConfig).Create(context.Background(), "onec-co", nil)
+	err = client.Bucket(bucketConfig).Create(context.Background(), projectID(), nil)
 	require.NoError(t, err, "couldn't create config bucket")
 	runCmd(t, []string{
 		"context",
@@ -145,7 +155,7 @@ func setupTests(t *testing.T) func() {
 
 	for _, b := range buckets {
 		lb := b
-		err = client.Bucket(b).Create(ctx, "onec-co", nil)
+		err = client.Bucket(b).Create(ctx, projectID(), nil)
 		handleErr()
 		bucketsToClean = append(bucketsToClean, func() {
 			deleteBucket(ctx, t, client, lb)
