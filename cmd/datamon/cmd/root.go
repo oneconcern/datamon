@@ -303,7 +303,7 @@ func handleConfigErrors(err error) {
 	}
 }
 
-//  getOutboundIP returns the preferred outbound ip of this machine
+// getOutboundIP returns the preferred outbound ip of this machine
 func getOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80") // doesn't actually connect: only resolves
 	if err != nil {

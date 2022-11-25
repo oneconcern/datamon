@@ -198,6 +198,13 @@ commands:
             gcloud --quiet config set compute/region ${GOOGLE_COMPUTE_REGION}
             echo $GCLOUD_SERVICE_KEY | docker login -u _json_key --password-stdin https://gcr.io
 
+  login_to_docker:
+    steps:
+      - run:
+          name: Login to docker private registry
+          command: |
+            echo $GCLOUD_SERVICE_KEY | docker login -u _json_key --password-stdin https://gcr.io
+
   get_cache:
     description: retrieve golang modules cache
     steps:
@@ -234,78 +241,78 @@ commands:
             hack/go-generate.sh
             go mod download
 
-  whitelist_ip:
-    steps:
-      - run:
-          name: Add CircleCI IP to whitelist
-          command: |
-            set -o errexit
-            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
-            if [[ -z "${CIRCLE_CI_IP}" ]] ; then
-              echo "ERROR: could not retrieve external IP"
-              exit 1
-            fi
-            echo "INFO: external IP address for the current job: ${CIRCLE_CI_IP}"
+  #whitelist_ip:
+  #  steps:
+  #    - run:
+  #        name: Add CircleCI IP to whitelist
+  #        command: |
+  #          set -o errexit
+  #          CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
+  #          if [[ -z "${CIRCLE_CI_IP}" ]] ; then
+  #            echo "ERROR: could not retrieve external IP"
+  #            exit 1
+  #          fi
+  #          echo "INFO: external IP address for the current job: ${CIRCLE_CI_IP}"
+  #
+  #          # Persist the whitelisted IP to be removed later on (actually a CIDR)
+  #          mkdir -p /tmp/whitelisted/ips && touch /tmp/whitelisted/ips/"${CIRCLE_CI_IP}"
+  #          ALREADY="$(gcloud container clusters describe --region "${GOOGLE_COMPUTE_REGION}" --format json "${CLUSTER}"|\
+  #          jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. == "'"${CIRCLE_CI_IP}"'/32"))|.[]')"
+  #          if [ -n "${ALREADY}" ] ; then
+  #            exit 0
+  #          fi
+  #          typeset -i COUNT
+  #          COUNT=0
+  #          # cluster updates can't occur concurrently. Handle errors and retry during 10s.
+  #          while [[ "${COUNT}" -lt 10 ]] ; do
+  #            if gcloud container clusters update --region "${GOOGLE_COMPUTE_REGION}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${ALLOWED_NETWORKS},${CIRCLE_CI_IP}/32" ; then
+  #              exit 0
+  #            fi
+  #            COUNT=$((COUNT+1))
+  #            echo "WARN: could not update cluster [${COUNT}] - retrying..."
+  #            sleep 1
+  #          done
+  #          echo "ERROR: could not update cluster to whitelist ${CIRCLE_CI_IP}"
+  #          exit 1
+  #    - persist_to_workspace:
+  #        root: /tmp/whitelisted
+  #        paths:
+  #          - ips
 
-            # Persist the whitelisted IP to be removed later on (actually a CIDR)
-            mkdir -p /tmp/whitelisted/ips && touch /tmp/whitelisted/ips/"${CIRCLE_CI_IP}"
-            ALREADY="$(gcloud container clusters describe --region "${GOOGLE_COMPUTE_REGION}" --format json "${CLUSTER}"|\
-            jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(. == "'"${CIRCLE_CI_IP}"'/32"))|.[]')"
-            if [ -n "${ALREADY}" ] ; then
-              exit 0
-            fi
-            typeset -i COUNT
-            COUNT=0
-            # cluster updates can't occur concurrently. Handle errors and retry during 10s.
-            while [[ "${COUNT}" -lt 10 ]] ; do
-              if gcloud container clusters update --region "${GOOGLE_COMPUTE_REGION}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${ALLOWED_NETWORKS},${CIRCLE_CI_IP}/32" ; then
-                exit 0
-              fi
-              COUNT=$((COUNT+1))
-              echo "WARN: could not update cluster [${COUNT}] - retrying..."
-              sleep 1
-            done
-            echo "ERROR: could not update cluster to whitelist ${CIRCLE_CI_IP}"
-            exit 1
-      - persist_to_workspace:
-          root: /tmp/whitelisted
-          paths:
-            - ips
 
-
-  remove_whitelist_ip:
-    steps:
-      - attach_workspace:
-          at: /tmp/whitelisted
-      - run:
-          name: Remove previously added CircleCI IP from whitelist
-          command: |
-            set -o errexit
-            CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
-            echo "INFO: external IP address for the current job: ${CIRCLE_CI_IP}"
-            IPS_TO_REMOVE="$(find /tmp/whitelisted/ips -type f|awk '{for(i=1;i<NF;i++){printf("\"%s/32\"",$i);if ((NF>1) && (i<NF-1)){printf(",");}}}')"
-            PREVIOUS="${ALLOWED_NETWORKS}"
-            if [[ -z "${IPS_TO_REMOVE}" ]] ; then
-              echo "INFO: no previous IP found: resetting to pre-configured state"
-            else
-              echo "INFO: previously added IP to be removed: ${IPS_TO_REMOVE}"
-              PREVIOUS="$(gcloud container clusters describe --region "${GOOGLE_COMPUTE_REGION}" --format json "${CLUSTER}"|\
-              jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(inside('"${IPS_TO_REMOVE}"')))')"
-            fi
-            echo "INFO: previously authorized networks: ${PREVIOUS}"
-            typeset -i COUNT
-            COUNT=0
-            # cluster updates can't occur concurrently. Handle errors and retry during 10s.
-            while [[ "${COUNT}" -lt 10 ]] ; do
-              if gcloud container clusters update --region "${GOOGLE_COMPUTE_REGION}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${PREVIOUS}" ; then
-                exit 0
-              fi
-              COUNT=$((COUNT+1))
-              echo "WARN: could not update cluster [${COUNT}] - retrying..."
-              sleep 1
-            done
-            echo "ERROR: could not remove whitelist IPs"
-            exit 1
+  #remove_whitelist_ip:
+  #  steps:
+  #    - attach_workspace:
+  #        at: /tmp/whitelisted
+  #    - run:
+  #        name: Remove previously added CircleCI IP from whitelist
+  #        command: |
+  #          set -o errexit
+  #          CIRCLE_CI_IP="$(curl -sSL https://checkip.amazonaws.com)"
+  #          echo "INFO: external IP address for the current job: ${CIRCLE_CI_IP}"
+  #          IPS_TO_REMOVE="$(find /tmp/whitelisted/ips -type f|awk '{for(i=1;i<NF;i++){printf("\"%s/32\"",$i);if ((NF>1) && (i<NF-1)){printf(",");}}}')"
+  #          PREVIOUS="${ALLOWED_NETWORKS}"
+  #          if [[ -z "${IPS_TO_REMOVE}" ]] ; then
+  #            echo "INFO: no previous IP found: resetting to pre-configured state"
+  #          else
+  #            echo "INFO: previously added IP to be removed: ${IPS_TO_REMOVE}"
+  #            PREVIOUS="$(gcloud container clusters describe --region "${GOOGLE_COMPUTE_REGION}" --format json "${CLUSTER}"|\
+  #            jq -c '{net: .masterAuthorizedNetworksConfig.cidrBlocks}|.net|map(.cidrBlock)|map(select(inside('"${IPS_TO_REMOVE}"')))')"
+  #          fi
+  #          echo "INFO: previously authorized networks: ${PREVIOUS}"
+  #          typeset -i COUNT
+  #          COUNT=0
+  #          # cluster updates can't occur concurrently. Handle errors and retry during 10s.
+  #          while [[ "${COUNT}" -lt 10 ]] ; do
+  #            if gcloud container clusters update --region "${GOOGLE_COMPUTE_REGION}" "${CLUSTER}" --enable-master-authorized-networks --master-authorized-networks "${PREVIOUS}" ; then
+  #              exit 0
+  #            fi
+  #            COUNT=$((COUNT+1))
+  #            echo "WARN: could not update cluster [${COUNT}] - retrying..."
+  #            sleep 1
+  #          done
+  #          echo "ERROR: could not remove whitelist IPs"
+  #          exit 1
 
 jobs:
   go_lint:
@@ -340,6 +347,7 @@ jobs:
 
   go_test:
     executor: docker_minio
+    circleci_ip_ranges: true
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       GO111MODULE: 'on'
@@ -386,6 +394,7 @@ jobs:
 
   go_test_metrics:
     executor: metrics_tester
+    circleci_ip_ranges: true
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       GO111MODULE: 'on'
@@ -423,6 +432,7 @@ jobs:
 
   go_test_fuse:
     executor: fuse_tester
+    circleci_ip_ranges: true
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/extra/appcredentials.json
       GO111MODULE: 'on'
@@ -457,6 +467,7 @@ jobs:
 
   test_coverage:
     executor: docker_builder
+    circleci_ip_ranges: true
     steps:
       - attach_workspace:
           at: /tmp/test-coverage
@@ -491,6 +502,7 @@ jobs:
 
   fuse_sidecar_test:
     executor: docker_builder
+    circleci_ip_ranges: true
     steps:
       - setup_remote_docker:
           version: 20.10.7
@@ -499,7 +511,7 @@ jobs:
       - login_to_google
       - install_kubectl
       - google_app_credentials
-      - whitelist_ip
+      #- whitelist_ip
       - run:
           name: Run fuse sidecar demo
           command: |
@@ -513,6 +525,7 @@ jobs:
 
   pg_sidecar_test:
     executor: docker_builder
+    circleci_ip_ranges: true
     steps:
       - setup_remote_docker:
           version: 20.10.7
@@ -520,7 +533,7 @@ jobs:
       - login_to_google
       - install_kubectl
       - google_app_credentials
-      - whitelist_ip
+      #- whitelist_ip
       - run:
           name: Run pg sidecar demo
           command: |
@@ -537,7 +550,7 @@ jobs:
       - setup_remote_docker:
           version: 20.10.7
       - checkout
-      - login_to_google
+      - login_to_docker
       - run:
           name: Build docker artifacts
           command: |
@@ -550,7 +563,7 @@ jobs:
       - setup_remote_docker:
           version: 20.10.7
       - checkout
-      - login_to_google
+      - login_to_docker
       - run:
           name: DEMO - Build datamon fuse demo images
           command: |
@@ -572,7 +585,7 @@ jobs:
           version: 20.10.7
       - checkout
       - get_cache
-      - login_to_google
+      - login_to_docker
       - run:
           name: Prepare github release
           command: |
@@ -604,7 +617,7 @@ jobs:
           version: 20.10.7
       - install_base
       - checkout
-      - login_to_google
+      - login_to_docker
       - run:
           name: push prebuilt images with all dependencies to build sidecars
           command: |
@@ -616,13 +629,13 @@ jobs:
           command: |
             make build-and-push-datamon-builder
 
-  k8s_remove_whitelist:
-    executor: docker_builder
-    steps:
-      - setup_remote_docker:
-          version: 20.10.7
-      - login_to_google
-      - remove_whitelist_ip
+  #k8s_remove_whitelist:
+  #  executor: docker_builder
+  #  steps:
+  #    - setup_remote_docker:
+  #        version: 20.10.7
+  #    - login_to_google
+  #    - remove_whitelist_ip
 
 workflows:
   version: 2
@@ -656,15 +669,16 @@ workflows:
             branches:
               only: /.*/
 
-      - go_test_fuse:
-          context: "onec-dev"
-          requires:
-            - go_lint
-          filters:
-            tags:
-              only: /.*/
-            branches:
-              only: /.*/
+      # Disabled since machine executor doesn't support IP ranges
+      #- go_test_fuse:
+      #    context: "onec-dev"
+      #    requires:
+      #      - go_lint
+      #    filters:
+      #      tags:
+      #        only: /.*/
+      #      branches:
+      #        only: /.*/
 
       - go_test_metrics:
           context: "onec-dev"
@@ -680,7 +694,7 @@ workflows:
           context: "onec-dev"
           requires:
             - go_test
-            - go_test_fuse
+            #- go_test_fuse
             - go_test_metrics
           filters:
             tags:
@@ -754,7 +768,7 @@ workflows:
           context: "onec-dev"
           requires:
             - go_test
-            - go_test_fuse
+            #- go_test_fuse
             - go_test_metrics
             - build_images
           filters:
