@@ -193,6 +193,7 @@ func init() {
 	addPurgeForceFlag(purgeCmd)
 	purgeCmd.AddCommand(reverseLookupCmd)
 	purgeCmd.AddCommand(deleteUnusedCmd)
+	purgeCmd.AddCommand(deleteLookupCmd)
 	rootCmd.AddCommand(purgeCmd)
 }
 
