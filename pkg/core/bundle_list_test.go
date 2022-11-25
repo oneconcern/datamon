@@ -257,9 +257,7 @@ func mockedContextStores(scenario string) context2.Stores {
 
 func testListBundles(t *testing.T, concurrency int, i int) {
 	initBatchKeysFixture.Do(buildKeysBatchFixture(t))
-	defer goleak.VerifyNone(t,
-		// opencensus stats collection goroutine
-		goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 
 	for _, toPin := range bundleTestCases() {
 		testcase := toPin
