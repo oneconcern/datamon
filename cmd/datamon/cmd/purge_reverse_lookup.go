@@ -62,12 +62,25 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			return
 		}
 
-		err = core.PurgeBuildReverseIndex(remoteStores, opts...)
+		descriptor, err := core.PurgeBuildReverseIndex(remoteStores, opts...)
 		erp := core.PurgeUnlock(remoteStores, opts...)
 
 		if erh := handlePurgeErrors(cmd.Name(), err, erp); erh != nil {
 			wrapFatalln(cmd.Name(), erh)
 		}
+
+		log.Printf(
+			"An index of the blob keys in use is now built in metadata.\n"+
+				"Metadata store: %v\n"+
+				"Blob store: %s\n"+
+				"Index built at: %v\n"+
+				"Num entries: (blob keys): %d\n"+
+				"\nYou may now use datamon purge remove-unused\n",
+			remoteStores.Metadata(),
+			remoteStores.Blob(),
+			descriptor.IndexTime,
+			descriptor.NumEntries,
+		)
 	},
 }
 

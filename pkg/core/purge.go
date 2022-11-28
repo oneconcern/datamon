@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dgraph-io/badger/v3"
@@ -27,9 +28,25 @@ const (
 	maxParallel = 10 + 1
 )
 
+type (
+	PurgeIndex struct {
+		IndexTime  time.Time
+		NumEntries uint64
+	}
+
+	PurgeBlobs struct {
+		IndexTime         time.Time
+		ScannedEntries    uint64
+		IndexedEntries    uint64
+		MoreRecentEntries uint64
+		DeletedEntries    uint64
+		DeletedSize       uint64
+	}
+)
+
 // PurgeBuildReverseIndex creates or update a reverse-lookip index
 // of all used blob keys.
-func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
+func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*PurgeIndex, error) {
 	// 1. scan all repos, all bundles
 	// 2. Fetch root key, explode root key
 	// 3. Add root key and children keys to index
@@ -41,7 +58,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
 
 	db, err := makeKV(options.localStorePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		_ = db.Close()
@@ -60,7 +77,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
 
 	repos, err := ListRepos(stores)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// iterate over all objects referred to by the metadata
@@ -91,7 +108,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
 			return nil
 		})
 		if erb != nil {
-			return erb
+			return nil, erb
 		}
 	}
 
@@ -109,14 +126,17 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
 	// NOTE: we don't compute CRC here.
 	err = indexStore.Put(ctx, indexPath, dbReader, storage.OverWrite)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	logger.Info("done uploading index file to metadata",
 		zap.String("index_file", indexPath),
 	)
 
-	return nil
+	return &PurgeIndex{
+		IndexTime:  indexTime,
+		NumEntries: dbReader.Count(),
+	}, nil
 }
 
 func bundleKeys(ctx context.Context, b *Bundle, size uint32) ([]string, error) {
@@ -146,7 +166,7 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32) ([]string, error) {
 }
 
 // PurgeDeleteUnused deletes blob entries that are not referenced by the reserve-lookup index.
-func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) error {
+func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs, error) {
 	options := defaultPurgeOptions(opts)
 	indexStore := getMetaStore(stores)
 	indexPath := model.ReverseIndex()
@@ -155,7 +175,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) error {
 
 	db, err := makeKV(options.localStorePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		_ = db.Close()
@@ -164,7 +184,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) error {
 	// 1. Download index and store it on a local badgerdb KV store
 	r, err := indexStore.Get(ctx, indexPath)
 	if err != nil {
-		return fmt.Errorf("open index in metadata: %w", err)
+		return nil, fmt.Errorf("open index in metadata: %w", err)
 	}
 	defer func() {
 		_ = r.Close()
@@ -176,7 +196,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) error {
 
 	indexTime, numKeys, err := copyIndex(db, r)
 	if err != nil {
-		return fmt.Errorf("copy index: %w", err)
+		return nil, fmt.Errorf("copy index: %w", err)
 	}
 
 	// 2. Scan all keys in blob store
@@ -195,8 +215,9 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) error {
 	logger.Info("scanning blob entries against index")
 
 	// 3. Remove blob keys that are not indexed
-	if err = scanBlob(ctx, blob, iterator, db, *indexTime, logger, options.dryRun); err != nil {
-		return fmt.Errorf("scan blob: %w", err)
+	descriptor, err := scanBlob(ctx, blob, iterator, db, *indexTime, logger, options.dryRun)
+	if err != nil {
+		return nil, fmt.Errorf("scan blob: %w", err)
 	}
 
 	logger.Info("done with purging unused blobs",
@@ -205,7 +226,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) error {
 		zap.Stringer("blob", blob),
 	)
 
-	return nil
+	return descriptor, nil
 }
 
 func makeKV(pth string) (*badger.DB, error) {
@@ -227,7 +248,7 @@ func makeKV(pth string) (*badger.DB, error) {
 	return db, nil
 }
 
-func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]string, string, error), db *badger.DB, indexTime time.Time, logger *zap.Logger, dryRun bool) error {
+func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]string, string, error), db *badger.DB, indexTime time.Time, logger *zap.Logger, dryRun bool) (*PurgeBlobs, error) {
 	var wg sync.WaitGroup
 	doneWithKeysChan := make(chan struct{}, 1)
 	keysChan := make(chan keyBatchEvent, 1)
@@ -238,6 +259,8 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 	wg.Add(1)
 	defer wg.Wait()
 	go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
+
+	var scannedKeys, indexedEntries, moreRecentEntries, deletedEntries, deletedSize uint64
 
 	// check against KV store for the existing of the key in the index: if not found, delete the blob key
 	lookupGroup.Go(func() error {
@@ -257,6 +280,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 
 					return batch.err
 				}
+				scannedKeys += uint64(len(batch.keys))
 
 				// run up to maxParallel lookup & delete routines
 				lookupGroup.TryGo(func() error {
@@ -267,7 +291,11 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 						default:
 						}
 
-						if err := checkAndDeleteKey(gctx, db, indexTime, key, blob, logger, dryRun); err != nil {
+						if err := checkAndDeleteKey(gctx, db,
+							indexTime, key, blob,
+							logger, dryRun,
+							&indexedEntries, &moreRecentEntries, &deletedEntries, &deletedSize,
+						); err != nil {
 							return err
 						}
 					}
@@ -281,15 +309,25 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 	if err := lookupGroup.Wait(); err != nil {
 		logger.Error("waiting on index lookup", zap.Error(err))
 		close(doneWithKeysChan) // interrupt background key scanning
+
+		return nil, err
 	}
 
-	return nil
+	return &PurgeBlobs{
+		IndexTime:         indexTime,
+		ScannedEntries:    scannedKeys,
+		IndexedEntries:    indexedEntries,
+		MoreRecentEntries: moreRecentEntries,
+		DeletedEntries:    deletedEntries,
+		DeletedSize:       deletedSize,
+	}, nil
 }
 
 func checkAndDeleteKey(ctx context.Context,
 	db *badger.DB, indexTime time.Time,
 	key string, blob storage.Store,
 	logger *zap.Logger, dryRun bool,
+	indexedEntries, moreRecentEntries, deletedEntries, deletedSize *uint64,
 ) error {
 	var croak func(string, ...zap.Field)
 	logger = logger.With(zap.String("key", key))
@@ -307,6 +345,7 @@ func checkAndDeleteKey(ctx context.Context,
 	if err == nil {
 		// key found in the index
 		croak("key found in index: keeping blob")
+		_ = atomic.AddUint64(indexedEntries, 1)
 
 		return nil
 	}
@@ -329,10 +368,13 @@ func checkAndDeleteKey(ctx context.Context,
 	// the blob has been created after the index: skip
 	if indexTime.Before(attrs.Updated) {
 		croak("key more recent than index. Keeping blob", zap.Time("key_updated_at", attrs.Updated))
+		_ = atomic.AddUint64(moreRecentEntries, 1)
 
 		return nil
 	}
 
+	_ = atomic.AddUint64(deletedEntries, 1)
+	_ = atomic.AddUint64(deletedSize, uint64(attrs.Size))
 	if dryRun {
 		croak("key to be deleted (dry-run)", zap.Int64("size", attrs.Size))
 
@@ -426,10 +468,12 @@ func PurgeDropReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
 }
 
 type dbReader struct {
+	mx        sync.Mutex
 	readOnce  bool
 	indexTime time.Time
 	group     *errgroup.Group
 	out       chan []byte
+	count     uint64
 }
 
 func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time) *dbReader {
@@ -474,8 +518,16 @@ func (r *dbReader) iterateKV(ctx context.Context, db *badger.DB) func() error {
 	}
 }
 
+func (r *dbReader) Count() uint64 {
+	r.mx.Lock()
+	defer r.mx.Unlock()
+
+	return r.count
+}
+
 func (r *dbReader) Read(p []byte) (int, error) {
 	var b []byte
+	r.mx.Lock()
 	if !r.readOnce {
 		// first line read is the formatted index timestamp
 		var buf bytes.Buffer
@@ -489,7 +541,9 @@ func (r *dbReader) Read(p []byte) (int, error) {
 		}
 		b = key
 		b = append(b, '\n') // add newline to separate keys
+		r.count++
 	}
+	r.mx.Unlock()
 
 	if len(p) < len(b) {
 		copy(p, b[:len(p)])

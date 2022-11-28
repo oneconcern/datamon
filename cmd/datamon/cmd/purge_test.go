@@ -84,6 +84,7 @@ func TestPurgeRepo(t *testing.T) {
 			"--context", testContext(),
 		}, "refresh index", false)
 	})
+	// TODO: purge dry run
 
 	t.Run("purge #1", func(t *testing.T) {
 		runCmd(t, []string{"purge",

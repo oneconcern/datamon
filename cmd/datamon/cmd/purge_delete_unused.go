@@ -66,11 +66,30 @@ You MUST make sure that no delete job is still running before doing that.
 			return
 		}
 
-		err = core.PurgeDeleteUnused(remoteStores, opts...)
+		descriptor, err := core.PurgeDeleteUnused(remoteStores, opts...)
 		erp := core.PurgeUnlock(remoteStores, opts...)
 
 		if erh := handlePurgeErrors(cmd.Name(), err, erp); erh != nil {
 			wrapFatalln(cmd.Name(), erh)
 		}
+		log.Printf(
+			"unused blob keys removed.\n"+
+				"Metadata store: %v\n"+
+				"Blob store: %s\n"+
+				"Index built at: %v\n"+
+				"Num blob keys scanned: %d\n"+
+				"Num blob keys found in use: %d\n"+
+				"Num blob keys found more recent than index: %d\n"+
+				"Num blob keys deleted: %d\n"+
+				"Num bytes relinquished: %d\n",
+			remoteStores.Metadata(),
+			remoteStores.Blob(),
+			descriptor.IndexTime,
+			descriptor.ScannedEntries,
+			descriptor.IndexedEntries,
+			descriptor.MoreRecentEntries,
+			descriptor.DeletedEntries,
+			descriptor.DeletedSize,
+		)
 	},
 }
