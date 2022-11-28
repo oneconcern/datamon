@@ -49,29 +49,23 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			zap.String("context BLOB bucket", datamonFlags.context.Descriptor.Blob),
 			zap.String("context metadata bucket", datamonFlags.context.Descriptor.Metadata),
 		)
+		opts := []core.PurgeOption{
+			core.WithPurgeForce(datamonFlags.purge.Force),
+			core.WithPurgeLogger(logger),
+		}
 
-		err = core.PurgeLock(remoteStores, core.WithPurgeForce(datamonFlags.purge.Force))
+		err = core.PurgeLock(remoteStores, opts...)
 		if err != nil {
 			wrapFatalln("deleting reverse-lookup: another purge job is running", err)
 
 			return
 		}
 
-		err = core.PurgeDropReverseIndex(remoteStores, core.WithPurgeForce(datamonFlags.purge.Force))
-		if err != nil {
-			erp := core.PurgeUnlock(remoteStores)
-			if erp != nil {
-				wrapFatalWithCodef(2,
-					`building reverse-lookup failed: %v.\n`+
-						`Failed to unlock: %v.\n`+
-						`Use the '--force' flag on subsequent runs`,
-					err, erp,
-				)
-			}
+		err = core.PurgeDropReverseIndex(remoteStores, opts...)
+		erp := core.PurgeUnlock(remoteStores, opts...)
 
-			wrapFatalln("building reverse-lookup (could remove job lock before exiting)", err)
-
-			return
+		if erh := handlePurgeErrors(cmd.Name(), err, erp); erh != nil {
+			wrapFatalln(cmd.Name(), erh)
 		}
 	},
 }

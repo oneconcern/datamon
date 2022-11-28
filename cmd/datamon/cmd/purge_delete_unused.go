@@ -52,29 +52,25 @@ You MUST make sure that no delete job is still running before doing that.
 			zap.String("context BLOB bucket", datamonFlags.context.Descriptor.Blob),
 			zap.String("context metadata bucket", datamonFlags.context.Descriptor.Metadata),
 		)
+		opts := []core.PurgeOption{
+			core.WithPurgeForce(datamonFlags.purge.Force),
+			core.WithPurgeLogger(logger),
+			core.WithPurgeLocalStore(datamonFlags.purge.LocalStorePath),
+			core.WithPurgeDryRun(datamonFlags.purge.DryRun),
+		}
 
-		err = core.PurgeLock(remoteStores, core.WithPurgeForce(datamonFlags.purge.Force))
+		err = core.PurgeLock(remoteStores, opts...)
 		if err != nil {
 			wrapFatalln("delete-unused: another purge job is running", err)
 
 			return
 		}
 
-		err = core.PurgeDeleteUnused(remoteStores, core.WithPurgeForce(datamonFlags.purge.Force))
-		if err != nil {
-			erp := core.PurgeUnlock(remoteStores)
-			if erp != nil {
-				wrapFatalWithCodef(2,
-					`delete-unused failed: %v.\n`+
-						`Failed to unlock: %v.\n`+
-						`Use the '--force' flag on subsequent runs`,
-					err, erp,
-				)
-			}
+		err = core.PurgeDeleteUnused(remoteStores, opts...)
+		erp := core.PurgeUnlock(remoteStores, opts...)
 
-			wrapFatalln("deleting unused blobs (could remove job lock before exiting)", err)
-
-			return
+		if erh := handlePurgeErrors(cmd.Name(), err, erp); erh != nil {
+			wrapFatalln(cmd.Name(), erh)
 		}
 	},
 }

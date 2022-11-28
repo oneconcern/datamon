@@ -11,6 +11,7 @@ type (
 
 	purgeOptions struct {
 		force          bool
+		dryRun         bool
 		localStorePath string
 		l              *zap.Logger
 	}
@@ -18,19 +19,29 @@ type (
 
 func WithPurgeForce(enabled bool) PurgeOption {
 	return func(o *purgeOptions) {
-		o.force = true
+		o.force = enabled
+	}
+}
+
+func WithPurgeDryRun(enabled bool) PurgeOption {
+	return func(o *purgeOptions) {
+		o.dryRun = enabled
 	}
 }
 
 func WithPurgeLocalStore(pth string) PurgeOption {
 	return func(o *purgeOptions) {
-		o.localStorePath = pth
+		if pth != "" {
+			o.localStorePath = pth
+		}
 	}
 }
 
 func WithPurgeLogger(zlg *zap.Logger) PurgeOption {
 	return func(o *purgeOptions) {
-		o.l = zlg
+		if zlg != nil {
+			o.l = zlg
+		}
 	}
 }
 

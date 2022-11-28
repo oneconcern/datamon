@@ -191,6 +191,8 @@ func init() {
 	addBundleFileFlag(repoDeleteFiles)
 
 	addPurgeForceFlag(purgeCmd)
+	addPurgeLocalPathFlag(purgeCmd)
+	addPurgeDryRunFlag(deleteUnusedCmd)
 	purgeCmd.AddCommand(reverseLookupCmd)
 	purgeCmd.AddCommand(deleteUnusedCmd)
 	purgeCmd.AddCommand(deleteLookupCmd)

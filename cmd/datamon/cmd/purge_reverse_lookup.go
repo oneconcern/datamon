@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -48,29 +49,50 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			zap.String("context BLOB bucket", datamonFlags.context.Descriptor.Blob),
 			zap.String("context metadata bucket", datamonFlags.context.Descriptor.Metadata),
 		)
+		opts := []core.PurgeOption{
+			core.WithPurgeForce(datamonFlags.purge.Force),
+			core.WithPurgeLogger(logger),
+			core.WithPurgeLocalStore(datamonFlags.purge.LocalStorePath),
+		}
 
-		err = core.PurgeLock(remoteStores, core.WithPurgeForce(datamonFlags.purge.Force))
+		err = core.PurgeLock(remoteStores, opts...)
 		if err != nil {
 			wrapFatalln("building reverse-lookup: another purge job is running", err)
 
 			return
 		}
 
-		err = core.PurgeBuildReverseIndex(remoteStores, core.WithPurgeForce(datamonFlags.purge.Force))
-		if err != nil {
-			erp := core.PurgeUnlock(remoteStores)
-			if erp != nil {
-				wrapFatalWithCodef(2,
-					`building reverse-lookup failed: %v.\n`+
-						`Failed to unlock: %v.\n`+
-						`Use the '--force' flag on subsequent runs`,
-					err, erp,
-				)
-			}
+		err = core.PurgeBuildReverseIndex(remoteStores, opts...)
+		erp := core.PurgeUnlock(remoteStores, opts...)
 
-			wrapFatalln("building reverse-lookup (could remove job lock before exiting)", err)
-
-			return
+		if erh := handlePurgeErrors(cmd.Name(), err, erp); erh != nil {
+			wrapFatalln(cmd.Name(), erh)
 		}
 	},
+}
+
+func handlePurgeErrors(cmdName string, err, erp error) error {
+	switch {
+	case err != nil && erp != nil:
+		return fmt.Errorf(`%v: %v.\n`+
+			`Failed to unlock: %v.\n`+
+			`Use the '--force' flag on subsequent runs`,
+			cmdName, err, erp,
+		)
+
+	case err != nil && erp == nil:
+		return fmt.Errorf("%v failed (could remove job lock before exiting): %v",
+			cmdName, err,
+		)
+
+	case err == nil && erp != nil:
+		return fmt.Errorf(
+			`%v was successful.\n`+
+				`But failed to unlock: %v.\n`+
+				`Use the '--force' flag on subsequent runs`,
+			cmdName, erp,
+		)
+	default:
+		return nil
+	}
 }
