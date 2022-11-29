@@ -61,8 +61,8 @@ func DiamondExists(repo, diamondID string, stores context2.Stores) error {
 
 // diamondReady returns an error if the diamond is not in one of the following states:
 //
-//   * DiamondInitialized
-//   * DiamondRunning
+//   - DiamondInitialized
+//   - DiamondRunning
 //
 // Diamonds in the DiamondCommitting state are not ready unless the state is older than 30s (stale lock state).
 func diamondReady(repo, diamondID string, stores context2.Stores) error {

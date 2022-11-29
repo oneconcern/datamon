@@ -79,39 +79,39 @@ func mergeTags(extras []map[string]string) []tag.Mutator {
 //
 // Sample usage:
 //
-//   type myType struct{
-//     ...
-//     metrics.Enable
-//     m *myMetrics // m points to the globally registered metrics collector
-//   }
+//	type myType struct{
+//	  ...
+//	  metrics.Enable
+//	  m *myMetrics // m points to the globally registered metrics collector
+//	}
 //
-//   ...
+//	...
 //
-//   // MyTypeUsage describes a tree of metrics to be recorded on myType
-//   type MyTypeUsage struct {
-//     Volumetry struct {
-//       Metadata  FilesMetrics `group:"metadata" description:"some file metrics issued by myType"`
-//       TestCount *stats.Int64Measure   `metric:"testCount" description:"number of tests" extraviews:"sum"`
-//     } `group:"volumetry" description:"volumetry measurements that pertain to myType"`
-//   }
+//	// MyTypeUsage describes a tree of metrics to be recorded on myType
+//	type MyTypeUsage struct {
+//	  Volumetry struct {
+//	    Metadata  FilesMetrics `group:"metadata" description:"some file metrics issued by myType"`
+//	    TestCount *stats.Int64Measure   `metric:"testCount" description:"number of tests" extraviews:"sum"`
+//	  } `group:"volumetry" description:"volumetry measurements that pertain to myType"`
+//	}
 //
-//   func (u *MyTypeUsage) Reads() {
-//     metrics.Inc(u.Volumetry.Metadata.Read)
-//   }
+//	func (u *MyTypeUsage) Reads() {
+//	  metrics.Inc(u.Volumetry.Metadata.Read)
+//	}
 //
-//   func (u *MyTypeUsage) Tests(p int) {
-//     metrics.Int64(u.Volumetry.TestCount, intt64(p))
-//   }
+//	func (u *MyTypeUsage) Tests(p int) {
+//	  metrics.Int64(u.Volumetry.TestCount, intt64(p))
+//	}
 //
-//   ...
+//	...
 //
-//   func NewMyType() *myType {
-//     ...
-//     t := &MyType{}
-//     t.m := t.EnsureMetrics("MyType", &myMetrics{})
-//     t.EnableMetrics(true)
-//     return t
-//   }
+//	func NewMyType() *myType {
+//	  ...
+//	  t := &MyType{}
+//	  t.m := t.EnsureMetrics("MyType", &myMetrics{})
+//	  t.EnableMetrics(true)
+//	  return t
+//	}
 type Enable struct {
 	metricsEnabled bool
 }

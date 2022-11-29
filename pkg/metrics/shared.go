@@ -42,20 +42,21 @@ func (n *IOMetrics) tags(operation string) map[string]string {
 // IO records some metrics for an IO operation.
 //
 // Example:
-//   var myIOMetrics = &IOMetrics{}
 //
-//   func (m *myType) MyInstrumentedFunc() {
-//     var size int, err error
+//	var myIOMetrics = &IOMetrics{}
 //
-//     defer myIOMetrics.IO(time.Now(), "read")
-//     ...
-//     size,err := doSomeWork()
-//     if err != nil {
-//       myIOMetrics.Failed("read")
-//       return err
-//     }
-//     myIOMetrics.IOSize(size, "read")
-//   }
+//	func (m *myType) MyInstrumentedFunc() {
+//	  var size int, err error
+//
+//	  defer myIOMetrics.IO(time.Now(), "read")
+//	  ...
+//	  size,err := doSomeWork()
+//	  if err != nil {
+//	    myIOMetrics.Failed("read")
+//	    return err
+//	  }
+//	  myIOMetrics.IOSize(size, "read")
+//	}
 func (n *IOMetrics) IO(start time.Time, operation string) {
 	now := time.Now()
 	Duration(start, now, n.Timing, n.tags(operation))
@@ -94,20 +95,21 @@ func (n *IOMetrics) Throughput(start, end time.Time, size int64, operation strin
 // deferred call.
 //
 // Example with deferred error capture:
-//   var myIOMetrics = &IOMetrics{}
 //
-//   func (m *myType) MyInstrumentedFunc() {
-//     var size int, err error
+//	var myIOMetrics = &IOMetrics{}
 //
-//     defer func(start time.Time) {
-//       myIOMetrics.IORecord(start, "read")(size, err)
-//     }(time.Now())
-//     ...
-//     size, err = doSomeWork()
-//     if err != nil {
-//       return
-//     }
-//   }
+//	func (m *myType) MyInstrumentedFunc() {
+//	  var size int, err error
+//
+//	  defer func(start time.Time) {
+//	    myIOMetrics.IORecord(start, "read")(size, err)
+//	  }(time.Now())
+//	  ...
+//	  size, err = doSomeWork()
+//	  if err != nil {
+//	    return
+//	  }
+//	}
 func (n *IOMetrics) IORecord(start time.Time, operation string) func(int64, error) {
 	return func(size int64, err error) {
 		now := time.Now()
@@ -141,17 +143,18 @@ func (u *UsageMetrics) Inc(method string) {
 // Used records usage of some instrumented entry point.
 //
 // Example:
-//   var myUsageMetrics = &UsageMetrics{}
 //
-//   func (m *myType) MyInstrumentedFunc() {
-//     defer myUsageMetrics.Used(time.Now(), "MyInstrumentedFunc")
-//     ...
-//     err := doSomeWork()
-//     if err != nil {
-//       myUsageMetrics.Failed()
-//       ...
-//     }
-//   }
+//	var myUsageMetrics = &UsageMetrics{}
+//
+//	func (m *myType) MyInstrumentedFunc() {
+//	  defer myUsageMetrics.Used(time.Now(), "MyInstrumentedFunc")
+//	  ...
+//	  err := doSomeWork()
+//	  if err != nil {
+//	    myUsageMetrics.Failed()
+//	    ...
+//	  }
+//	}
 func (u *UsageMetrics) Used(start time.Time, method string) {
 	Since(start, u.Timing, u.tags(method))
 	Inc(u.Count, u.tags(method))
@@ -160,19 +163,20 @@ func (u *UsageMetrics) Used(start time.Time, method string) {
 // UsedAll records usage of some instrumented entry point with failures, in one go.
 //
 // Example:
-//   var myUsageMetrics = &UsageMetrics{}
-//   var err error
 //
-//   func (m *myType) MyInstrumentedFunc() {
-//     defer func(start time.Time) {
-//       myUsageMetrics.UsedAll(start, "MyInstrumentedFunc")(err)
-//     }(time.Now())
-//     ...
-//     err = doSomeWork()
-//     if err != nil {
-//       return
-//     }
-//   }
+//	var myUsageMetrics = &UsageMetrics{}
+//	var err error
+//
+//	func (m *myType) MyInstrumentedFunc() {
+//	  defer func(start time.Time) {
+//	    myUsageMetrics.UsedAll(start, "MyInstrumentedFunc")(err)
+//	  }(time.Now())
+//	  ...
+//	  err = doSomeWork()
+//	  if err != nil {
+//	    return
+//	  }
+//	}
 func (u *UsageMetrics) UsedAll(start time.Time, method string) func(error) {
 	return func(err error) {
 		Since(start, u.Timing, u.tags(method))

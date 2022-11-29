@@ -35,7 +35,8 @@ func (b RepoDescriptors) Last() RepoDescriptor {
 // GetArchivePathToRepoDescriptor yields a path in a repo to the descriptor of a bundle
 //
 // Example:
-//   repos/{repo}/{bundleID}/repo.yaml
+//
+//	repos/{repo}/{bundleID}/repo.yaml
 func GetArchivePathToRepoDescriptor(repo string) string {
 	return fmt.Sprint("repos/", repo, "/", repoDescriptorFile)
 }

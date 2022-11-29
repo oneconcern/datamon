@@ -212,7 +212,8 @@ func getArchivePathToDiamonds() string {
 // GetArchivePathPrefixToDiamonds yields a path to all diamonds in a repo.
 //
 // Example:
-//   diamonds/{repo}/
+//
+//	diamonds/{repo}/
 func GetArchivePathPrefixToDiamonds(repo string) string {
 	return fmt.Sprint(getArchivePathToDiamonds(), repo+"/")
 }
@@ -220,7 +221,8 @@ func GetArchivePathPrefixToDiamonds(repo string) string {
 // GetArchivePathToDiamond yields a path in a repo to the descriptor of a diamond in any state.
 //
 // Example:
-//   diamonds/{repo}/{diamond}/diamond-*.yaml
+//
+//	diamonds/{repo}/{diamond}/diamond-*.yaml
 func GetArchivePathToDiamond(repo, diamondID string, state DiamondState) string {
 	var suffix string
 	switch state {
@@ -235,7 +237,8 @@ func GetArchivePathToDiamond(repo, diamondID string, state DiamondState) string 
 // GetArchivePathToFinalDiamond yields a path in a repo to the descriptor of a diamond in a final state.
 //
 // Example:
-//   diamonds/{repo}/{diamond}/diamond-done.yaml
+//
+//	diamonds/{repo}/{diamond}/diamond-done.yaml
 func GetArchivePathToFinalDiamond(repo, diamondID string) string {
 	return fmt.Sprint(getArchivePathToDiamonds(), repo, "/", diamondID, "/", diamondFinalDescriptorFile)
 }
@@ -243,7 +246,8 @@ func GetArchivePathToFinalDiamond(repo, diamondID string) string {
 // GetArchivePathToInitialDiamond yields a path in a repo to the descriptor of a diamond in an initialized state.
 //
 // Example:
-//   diamonds/{repo}/{diamond}/diamond-running.yaml
+//
+//	diamonds/{repo}/{diamond}/diamond-running.yaml
 func GetArchivePathToInitialDiamond(repo, diamondID string) string {
 	return fmt.Sprint(getArchivePathToDiamonds(), repo, "/", diamondID, "/", diamondInitialDescriptorFile)
 }
@@ -251,7 +255,8 @@ func GetArchivePathToInitialDiamond(repo, diamondID string) string {
 // GetArchivePathPrefixToSplits yields a path to all splits in a diamond in a repo.
 //
 // Example:
-//   diamonds/{repo}/{diamond}/
+//
+//	diamonds/{repo}/{diamond}/
 func GetArchivePathPrefixToSplits(repo, diamondID string) string {
 	return fmt.Sprint(getArchivePathToDiamonds(), repo, "/", diamondID, "/", "splits", "/")
 }
@@ -259,7 +264,8 @@ func GetArchivePathPrefixToSplits(repo, diamondID string) string {
 // GetArchivePathToSplit yields a path in a repo to the descriptor of a split in any state.
 //
 // Example:
-//   diamonds/{repo}/{diamond}/splits/{split}/split-*.yaml
+//
+//	diamonds/{repo}/{diamond}/splits/{split}/split-*.yaml
 func GetArchivePathToSplit(repo, diamondID, splitID string, state SplitState) string {
 	var suffix string
 	switch state {
@@ -274,7 +280,8 @@ func GetArchivePathToSplit(repo, diamondID, splitID string, state SplitState) st
 // GetArchivePathToFinalSplit yields a path in a repo to the descriptor of a split in a final state.
 //
 // Example:
-//   diamonds/{repo}/{diamond}/splits/{split}/split-done.yaml
+//
+//	diamonds/{repo}/{diamond}/splits/{split}/split-done.yaml
 func GetArchivePathToFinalSplit(repo, diamondID, splitID string) string {
 	return fmt.Sprint(getArchivePathToDiamonds(), repo, "/", diamondID, "/", "splits", "/", splitID, "/", splitFinalDescriptorFile)
 }
@@ -282,7 +289,8 @@ func GetArchivePathToFinalSplit(repo, diamondID, splitID string) string {
 // GetArchivePathToInitialSplit yields a path in a repo to the descriptor of a split in a running state.
 //
 // Example:
-//   diamonds/{repo}/{diamond}/splits/split}/split-running.yaml
+//
+//	diamonds/{repo}/{diamond}/splits/split}/split-running.yaml
 func GetArchivePathToInitialSplit(repo, diamondID, splitID string) string {
 	return fmt.Sprint(getArchivePathToDiamonds(), repo, "/", diamondID, "/", "splits", "/", splitID, "/", splitInitialDescriptorFile)
 }
@@ -290,7 +298,8 @@ func GetArchivePathToInitialSplit(repo, diamondID, splitID string) string {
 // GetArchivePathToSplitFileList yields a path to the list of the files in a diamond split
 //
 // Example:
-//   diamonds/{repo}/{diamond}/splits/{split}/{generation}/bundle-files-{index}.yaml
+//
+//	diamonds/{repo}/{diamond}/splits/{split}/{generation}/bundle-files-{index}.yaml
 func GetArchivePathToSplitFileList(repo, diamondID, splitID string, generationID string, index uint64) string {
 	return fmt.Sprint(getArchivePathToDiamonds(), repo, "/", diamondID, "/", "splits", "/", splitID, "/", generationID, "/", splitFilesIndexPrefix, index, ext)
 }

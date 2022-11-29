@@ -87,9 +87,9 @@ func distributeKeys(keys []string) func(chan<- string, <-chan struct{}, *sync.Wa
 //
 // To achieve this without stashing previously fetched keys, we rely on the following properties of the metadata keys.
 //
-// * (filtered) keys for the same diamond or split in different states are adjacent: the internal map remains sparsely
-//   populated under normal conditions
-// * keys are sorted: ".../{diamond-id}/diamond-done.yaml" will be fetched _before_ ".../{diamond-id}/diamond-running.yaml"
+//   - (filtered) keys for the same diamond or split in different states are adjacent: the internal map remains sparsely
+//     populated under normal conditions
+//   - keys are sorted: ".../{diamond-id}/diamond-done.yaml" will be fetched _before_ ".../{diamond-id}/diamond-running.yaml"
 func mergeKeys(inputChan <-chan keyBatchEvent, outputChan chan<- keyBatchEvent, settings Settings, wg *sync.WaitGroup) {
 	defer func() {
 		close(outputChan)

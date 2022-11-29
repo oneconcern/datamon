@@ -37,9 +37,9 @@ type diamondsEvent struct {
 //
 // Example usage:
 //
-//		err := doSelectDiamonds(diamondsChan, func(diamondBatch model.DiamondDescriptors) {
-//			diamonds = append(diamonds, diamondBatch...)
-//		})
+//	err := doSelectDiamonds(diamondsChan, func(diamondBatch model.DiamondDescriptors) {
+//		diamonds = append(diamonds, diamondBatch...)
+//	})
 func doSelectDiamonds(diamondsChan <-chan diamondsEvent, do func(model.DiamondDescriptors)) error {
 	// consume batches of ordered diamond metadata
 	for diamondBatch := range diamondsChan {
@@ -60,10 +60,10 @@ type ApplyDiamondFunc func(model.DiamondDescriptor) error
 //
 // Example usage: printing diamond descriptors as they come
 //
-//   err := core.ListDiamondsApply(repo, store, func(diamond model.DiamondDescriptor) error {
-//				fmt.Fprintf(os.Stderr, "%v\n", diamond)
-//				return nil
-//			})
+//	  err := core.ListDiamondsApply(repo, store, func(diamond model.DiamondDescriptor) error {
+//					fmt.Fprintf(os.Stderr, "%v\n", diamond)
+//					return nil
+//				})
 func ListDiamondsApply(repo string, stores context2.Stores, apply ApplyDiamondFunc, opts ...Option) error {
 	var (
 		err, applyErr error

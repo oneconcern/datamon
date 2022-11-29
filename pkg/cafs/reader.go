@@ -10,13 +10,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"go.uber.org/zap"
-
 	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/storage"
+	"go.uber.org/zap"
 )
 
 const (

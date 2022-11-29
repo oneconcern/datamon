@@ -98,10 +98,10 @@ func skipMetric(field reflect.Value) bool {
 
 // fieldTags decodes field tags that decorate the struct.
 // Supported tags are:
-//  * metric: the metric name
-//  * group: builds an additional path to the metric (e.g.  root/path/mymetrics/{metric})
-//  * description: adds this description to the metric and the associated views
-//  * extraviews:[aggregator, ...]: builds additional views with alternate aggregators
+//   - metric: the metric name
+//   - group: builds an additional path to the metric (e.g.  root/path/mymetrics/{metric})
+//   - description: adds this description to the metric and the associated views
+//   - extraviews:[aggregator, ...]: builds additional views with alternate aggregators
 func fieldTags(field reflect.StructField) map[string]string {
 	tags := make(map[string]string, 5)
 	if metric, ok := field.Tag.Lookup("metric"); ok {

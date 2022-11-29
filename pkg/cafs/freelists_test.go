@@ -176,23 +176,23 @@ func testFreeBuffers(t *testing.T, leafSize, expectedSize uint32, expectedType i
 	var xsize uint32
 	switch expectedType.(type) {
 	case *leafBuffer1MB:
-		// nolint: staticcheck
+		//nolint: staticcheck
 		d := leafBuffer1MB{}
 		xsize = uint32(unsafe.Sizeof(d))
 	case *leafBuffer2MB:
-		// nolint: staticcheck
+		//nolint: staticcheck
 		d := leafBuffer2MB{}
 		xsize = uint32(unsafe.Sizeof(d))
 	case *leafBuffer3MB:
-		// nolint: staticcheck
+		//nolint: staticcheck
 		d := leafBuffer3MB{}
 		xsize = uint32(unsafe.Sizeof(d))
 	case *leafBuffer4MB:
-		// nolint: staticcheck
+		//nolint: staticcheck
 		d := leafBuffer4MB{}
 		xsize = uint32(unsafe.Sizeof(d))
 	case *leafBufferMax:
-		// nolint: staticcheck
+		//nolint: staticcheck
 		d := leafBufferMax{}
 		xsize = uint32(unsafe.Sizeof(d))
 	default:

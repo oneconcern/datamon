@@ -164,7 +164,7 @@ func (page *fileListPage) filenames(t *testing.T) map[string]bool {
 }
 
 func getPageDocument(t *testing.T, routes http.Handler, relURLPath string) *goquery.Document {
-	req, err := http.NewRequestWithContext(context.Background(), "GET", relURLPath, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, relURLPath, nil)
 	require.NoError(t, err, "create mock request")
 	rr := httptest.NewRecorder()
 	routes.ServeHTTP(rr, req)

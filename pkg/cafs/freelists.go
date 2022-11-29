@@ -46,10 +46,10 @@ type FreeList interface {
 // It allocates a fixed array and exposes a slice backed by this array for consuming callers.
 //
 // Usage:
-//  * Bytes() buffer method to access the backing array as a slice
-//  * Copy() and Slice() buffer methods to modify the content of the buffer
-//  * Pin() to pin the buffer and prevent it from being recycled while in a critical section
-//  * Unpin() to mark a buffer recyclable
+//   - Bytes() buffer method to access the backing array as a slice
+//   - Copy() and Slice() buffer methods to modify the content of the buffer
+//   - Pin() to pin the buffer and prevent it from being recycled while in a critical section
+//   - Unpin() to mark a buffer recyclable
 type LeafBuffer interface {
 	Bytes() []byte
 	Copy([]byte)
@@ -250,8 +250,8 @@ func sizeFunc(leafSize uint32) func() uint32 {
 // The nil instance behaves as a regular new allocator, without buffer recycling.
 //
 // Usage:
-//  * Get() to get a bufer
-//  * Release() to mark a buffer for releasing to the free list.
+//   - Get() to get a bufer
+//   - Release() to mark a buffer for releasing to the free list.
 //
 // Releasing buffers to the list means that they can be re-used whenever idle.
 //

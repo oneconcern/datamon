@@ -279,8 +279,8 @@ func (l *localFS) Keys(ctx context.Context) ([]string, error) {
 // is required to make KeyPrefix a first class citizen for localfs.
 //
 // TODO(known limitations):
-//   * this implementation does not really scale up, but it is quite workable for our testcases using localfs.
-//   * this implementation is not meant for parallel use with mutable FS.
+//   - this implementation does not really scale up, but it is quite workable for our testcases using localfs.
+//   - this implementation is not meant for parallel use with mutable FS.
 func (l *localFS) KeysPrefix(_ context.Context, token, prefix, delimiter string, count int) ([]string, string, error) {
 	l.exclusive.Lock()
 	defer l.exclusive.Unlock()
