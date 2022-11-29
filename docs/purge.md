@@ -28,6 +28,9 @@ This will require some time and some local storage to store the keys: all bundle
 
 NOTE: running again the command will scratch the existing index and create an updated version.
 
+NOTE: the index is by default built in `./.datamon-index` in the current working directory. This location may be altered
+by using the `--local-work-dir` flag to the `datamon purge` commands.
+
 3. Delete all unused blobs
 ```
 datamon purge delete-unused [--context dev]
