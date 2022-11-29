@@ -14,16 +14,14 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	lru "github.com/hashicorp/golang-lru"
-	"go.uber.org/zap"
-
 	"github.com/oneconcern/datamon/internal/rand"
-
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func keyFromFile(t testing.TB, pth string) Key {

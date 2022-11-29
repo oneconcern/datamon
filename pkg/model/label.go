@@ -63,7 +63,8 @@ func GetArchivePathPrefixToLabels(repo string, prefixes ...string) string {
 // GetArchivePathToLabel gets the path to the label descriptor.
 //
 // Example:
-//  labels/{repo}/{label}/label.yaml
+//
+//	labels/{repo}/{label}/label.yaml
 func GetArchivePathToLabel(repo string, labelName string) string {
 	return fmt.Sprint(GetArchivePathPrefixToLabels(repo), labelName, "/", labelDescriptorFile)
 }

@@ -38,9 +38,9 @@ type splitsEvent struct {
 //
 // Example usage:
 //
-//		err := doSelectSplits(splitsChan, func(splitBatch model.SplitDescriptors) {
-//			splits = append(splits, splitBatch...)
-//		})
+//	err := doSelectSplits(splitsChan, func(splitBatch model.SplitDescriptors) {
+//		splits = append(splits, splitBatch...)
+//	})
 func doSelectSplits(splitsChan <-chan splitsEvent, do func(model.SplitDescriptors)) error {
 	// consume batches of ordered split metadata
 	for splitBatch := range splitsChan {
@@ -61,10 +61,10 @@ type ApplySplitFunc func(model.SplitDescriptor) error
 //
 // Example usage: printing split descriptors as they come
 //
-//   err := core.ListSplitsApply(repo, store, func(split model.SplitDescriptor) error {
-//				fmt.Fprintf(os.Stderr, "%v\n", split)
-//				return nil
-//			})
+//	  err := core.ListSplitsApply(repo, store, func(split model.SplitDescriptor) error {
+//					fmt.Fprintf(os.Stderr, "%v\n", split)
+//					return nil
+//				})
 func ListSplitsApply(repo, diamondID string, stores context2.Stores, apply ApplySplitFunc, opts ...Option) error {
 	var (
 		err, applyErr error

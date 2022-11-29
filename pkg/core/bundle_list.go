@@ -42,9 +42,9 @@ type bundlesEvent struct {
 //
 // Example usage:
 //
-//		err := doSelectBundles(bundlesChan, func(bundleBatch model.BundleDescriptors) {
-//			bundles = append(bundles, bundleBatch...)
-//		})
+//	err := doSelectBundles(bundlesChan, func(bundleBatch model.BundleDescriptors) {
+//		bundles = append(bundles, bundleBatch...)
+//	})
 func doSelectBundles(bundlesChan <-chan bundlesEvent, do func(model.BundleDescriptors)) error {
 	// consume batches of ordered bundle metadata
 	for bundleBatch := range bundlesChan {
@@ -65,10 +65,10 @@ type ApplyBundleFunc func(model.BundleDescriptor) error
 //
 // Example usage: printing bundle descriptors as they come
 //
-//   err := core.ListBundlesApply(repo, store, func(bundle model.BundleDescriptor) error {
-//				fmt.Fprintf(os.Stderr, "%v\n", bundle)
-//				return nil
-//			})
+//	  err := core.ListBundlesApply(repo, store, func(bundle model.BundleDescriptor) error {
+//					fmt.Fprintf(os.Stderr, "%v\n", bundle)
+//					return nil
+//				})
 func ListBundlesApply(repo string, stores context2.Stores, apply ApplyBundleFunc, opts ...Option) error {
 	var (
 		err, applyErr error

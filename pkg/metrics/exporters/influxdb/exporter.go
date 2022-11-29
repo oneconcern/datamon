@@ -22,9 +22,9 @@ func defaultExporter() *Exporter {
 // NewExporter creates a new Influxdb exporter.
 //
 // Use options to configure:
-//   * an influxdd.Store instance, configured with the desired settings
-//   * an error handler. If set to nil, a no-op handler is set by default
-//   * a map of custom tags for written records (may be nil)
+//   - an influxdd.Store instance, configured with the desired settings
+//   - an error handler. If set to nil, a no-op handler is set by default
+//   - a map of custom tags for written records (may be nil)
 func NewExporter(opts ...Option) *Exporter {
 	e := defaultExporter()
 	for _, apply := range opts {

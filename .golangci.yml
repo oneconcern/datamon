@@ -74,5 +74,9 @@ linters:
     - errname
     - maintidx
     - nosnakecase
+    - structcheck
+    - varcheck
+    - deadcode
+    - interfacebloat
 
 max-same-issues: 0

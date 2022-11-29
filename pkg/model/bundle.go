@@ -169,7 +169,8 @@ func GetConsumablePathToBundleFileList(bundleID string, index uint64) string {
 // GetArchivePathToBundle yields a path in a repo to the descriptor of a bundle
 //
 // Example:
-//   bundles/{repo}/{bundleID}/bundle.yaml
+//
+//	bundles/{repo}/{bundleID}/bundle.yaml
 func GetArchivePathToBundle(repo string, bundleID string) string {
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/", bundleDescriptorFile)
 }
@@ -177,7 +178,8 @@ func GetArchivePathToBundle(repo string, bundleID string) string {
 // GetArchivePathPrefixToBundles yields a path to all bundles in a repo.
 //
 // Example:
-//   bundles/{repo}/
+//
+//	bundles/{repo}/
 func GetArchivePathPrefixToBundles(repo string) string {
 	return fmt.Sprint(getArchivePathToBundles(), repo+"/")
 }
@@ -189,7 +191,8 @@ func getArchivePathToBundles() string {
 // GetArchivePathToBundleFileList yields a path to the list of the files in a bundle
 //
 // Example:
-//   bundles/{repo}/{bundleID}/bundle-files-{index}.yaml
+//
+//	bundles/{repo}/{bundleID}/bundle-files-{index}.yaml
 func GetArchivePathToBundleFileList(repo string, bundleID string, index uint64) string {
 	return fmt.Sprint(getArchivePathToBundles(), repo, "/", bundleID, "/", bundleFilesIndexPrefix, index, ".yaml")
 }

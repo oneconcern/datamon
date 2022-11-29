@@ -7,16 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/go-units"
 	lru "github.com/hashicorp/golang-lru"
-
-	"go.uber.org/zap"
-
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"github.com/oneconcern/datamon/pkg/metrics"
 	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/oneconcern/datamon/pkg/storage/localfs"
-
-	"github.com/docker/go-units"
+	"go.uber.org/zap"
 )
 
 const (
