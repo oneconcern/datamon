@@ -71,9 +71,12 @@ You MUST make sure that no delete job is still running before doing that.
 
 		if erh := handlePurgeErrors(cmd.Name(), err, erp); erh != nil {
 			wrapFatalln(cmd.Name(), erh)
+
+			return
 		}
+
 		log.Printf(
-			"unused blob keys removed.\n"+
+			"unused blob keys removed (none is actually removed if this is a dry-run).\n"+
 				"Metadata store: %v\n"+
 				"Blob store: %s\n"+
 				"Index built at: %v\n"+
@@ -81,7 +84,8 @@ You MUST make sure that no delete job is still running before doing that.
 				"Num blob keys found in use: %d\n"+
 				"Num blob keys found more recent than index: %d\n"+
 				"Num blob keys deleted: %d\n"+
-				"Num bytes relinquished: %d\n",
+				"Num bytes relinquished: %d\n"+
+				"Dry-run: %t\n",
 			remoteStores.Metadata(),
 			remoteStores.Blob(),
 			descriptor.IndexTime,
@@ -90,6 +94,7 @@ You MUST make sure that no delete job is still running before doing that.
 			descriptor.MoreRecentEntries,
 			descriptor.DeletedEntries,
 			descriptor.DeletedSize,
+			descriptor.DryRun,
 		)
 	},
 }

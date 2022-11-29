@@ -67,6 +67,8 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 
 		if erh := handlePurgeErrors(cmd.Name(), err, erp); erh != nil {
 			wrapFatalln(cmd.Name(), erh)
+
+			return
 		}
 
 		log.Printf(
@@ -74,7 +76,7 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 				"Metadata store: %v\n"+
 				"Blob store: %s\n"+
 				"Index built at: %v\n"+
-				"Num entries: (blob keys): %d\n"+
+				"Num entries (blob keys): %d\n"+
 				"\nYou may now use datamon purge remove-unused\n",
 			remoteStores.Metadata(),
 			remoteStores.Blob(),

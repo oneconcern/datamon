@@ -18,6 +18,7 @@ import (
 	"github.com/oneconcern/datamon/pkg/errors"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/oneconcern/datamon/pkg/storage"
+	"github.com/oneconcern/datamon/pkg/storage/status"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -41,6 +42,7 @@ type (
 		MoreRecentEntries uint64
 		DeletedEntries    uint64
 		DeletedSize       uint64
+		DryRun            bool
 	}
 )
 
@@ -83,6 +85,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 	// iterate over all objects referred to by the metadata
 	// * for all repos, all bundles, all files, all keys in the root key
 	for _, repo := range repos {
+		logger.Info("scanning entries", zap.String("repo", repo.Name))
 		erb := ListBundlesApply(repo.Name, stores, func(bundle model.BundleDescriptor) error {
 			b := NewBundle(
 				BundleID(bundle.ID),
@@ -117,14 +120,20 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 		zap.String("index_file", indexPath),
 	)
 
-	dbReader := newDBReader(ctx, db, indexTime)
+	dbReader := newDBReader(ctx, db, indexTime, logger)
 	defer func() {
 		_ = dbReader.Close()
 	}()
 
+	// make sure the overwrite does not leaves some trailing stuff
+	err = indexStore.Delete(ctx, indexPath)
+	if err != nil && !errors.Is(err, status.ErrNotExists) {
+		return nil, err
+	}
+
 	// iterate over all deduplicated keys from KV and upload the index file
 	// NOTE: we don't compute CRC here.
-	err = indexStore.Put(ctx, indexPath, dbReader, storage.OverWrite)
+	err = indexStore.Put(ctx, indexPath, dbReader, storage.NoOverWrite)
 	if err != nil {
 		return nil, err
 	}
@@ -320,6 +329,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 		MoreRecentEntries: moreRecentEntries,
 		DeletedEntries:    deletedEntries,
 		DeletedSize:       deletedSize,
+		DryRun:            dryRun,
 	}, nil
 }
 
@@ -373,14 +383,16 @@ func checkAndDeleteKey(ctx context.Context,
 		return nil
 	}
 
-	_ = atomic.AddUint64(deletedEntries, 1)
 	_ = atomic.AddUint64(deletedSize, uint64(attrs.Size))
+	_ = atomic.AddUint64(deletedEntries, 1)
+
 	if dryRun {
 		croak("key to be deleted (dry-run)", zap.Int64("size", attrs.Size))
 
 		return nil
 	}
 
+	logger.Warn("(FRED)key not found in index: to be deleted")
 	// proceed with deletion from the blob store
 	if err := blob.Delete(ctx, key); err != nil {
 		logger.Error("deleting blob", zap.Error(err))
@@ -427,9 +439,14 @@ func copyIndex(db *badger.DB, r io.Reader) (indexTime *time.Time, numKeys uint64
 }
 
 // PurgeUnlock removes the purge job lock from the metadata store.
-func PurgeUnlock(stores context2.Stores, _ ...PurgeOption) error {
+func PurgeUnlock(stores context2.Stores, opts ...PurgeOption) error {
 	store := getMetaStore(stores)
 	path := model.PurgeLock()
+	options := defaultPurgeOptions(opts)
+	logger := options.l.With(
+		zap.Stringer("index_metadata_store", store),
+	)
+	logger.Info("removing purge lock", zap.String("lock_file", path))
 
 	return store.Delete(context.Background(), path)
 }
@@ -440,6 +457,9 @@ func PurgeLock(stores context2.Stores, opts ...PurgeOption) error {
 	fmt.Fprintf(r, "locked_at: %q\n", time.Now().UTC())
 	store := getMetaStore(stores)
 	options := defaultPurgeOptions(opts)
+	logger := options.l.With(
+		zap.Stringer("index_metadata_store", store),
+	)
 
 	var overwrite bool
 	if options.force {
@@ -449,6 +469,8 @@ func PurgeLock(stores context2.Stores, opts ...PurgeOption) error {
 	}
 
 	path := model.PurgeLock()
+	logger.Info("enabling purge lock", zap.String("lock_file", path))
+
 	if err := store.Put(context.Background(), path, r, overwrite); err != nil {
 		if strings.Contains(err.Error(), "googleapi: Error 412: Precondition Failed, conditionNotMet") {
 			return fmt.Errorf("a lock exist [%s]: %v", path, stores.Metadata())
@@ -463,6 +485,12 @@ func PurgeLock(stores context2.Stores, opts ...PurgeOption) error {
 func PurgeDropReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
 	store := getMetaStore(stores)
 	path := model.ReverseIndex()
+	options := defaultPurgeOptions(opts)
+	logger := options.l.With(
+		zap.Stringer("index_metadata_store", store),
+	)
+
+	logger.Info("deleting index file", zap.String("index_file", path))
 
 	return store.Delete(context.Background(), path)
 }
@@ -474,12 +502,15 @@ type dbReader struct {
 	group     *errgroup.Group
 	out       chan []byte
 	count     uint64
+	logger    *zap.Logger
+	partial   []byte
 }
 
-func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time) *dbReader {
+func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time, logger *zap.Logger) *dbReader {
 	r := &dbReader{
 		indexTime: indexTime,
 		out:       make(chan []byte, 1024),
+		logger:    logger,
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -490,6 +521,7 @@ func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time) *dbRea
 	return r
 }
 
+// iterateKV iterates over all keys and send them over the internal channel of this reader.
 func (r *dbReader) iterateKV(ctx context.Context, db *badger.DB) func() error {
 	return func() error {
 		return db.View(func(txn *badger.Txn) error {
@@ -505,7 +537,8 @@ func (r *dbReader) iterateKV(ctx context.Context, db *badger.DB) func() error {
 			defer iterator.Close()
 
 			for iterator.Rewind(); iterator.Valid(); iterator.Next() {
-				key := iterator.Item().Key()
+				key := iterator.Item().KeyCopy(nil)
+
 				select {
 				case r.out <- key:
 				case <-ctx.Done():
@@ -526,29 +559,42 @@ func (r *dbReader) Count() uint64 {
 }
 
 func (r *dbReader) Read(p []byte) (int, error) {
+	// TODO(fredbi): could probably do something more elegant here.
 	var b []byte
+
 	r.mx.Lock()
-	if !r.readOnce {
-		// first line read is the formatted index timestamp
-		var buf bytes.Buffer
-		fmt.Fprintln(&buf, r.indexTime.Format(layout))
-		b = buf.Bytes()
-		r.readOnce = true
-	} else {
-		key, isOpen := <-r.out
-		if !isOpen {
-			return 0, io.EOF
+	defer r.mx.Unlock()
+
+	if reminder := len(r.partial); reminder > 0 {
+		// handle edge case of partially returned key
+		if reminder > len(p) {
+			b = r.partial[:len(p)]
+			r.partial = r.partial[len(p):]
+		} else {
+			b = r.partial
+			r.partial = nil
 		}
-		b = key
-		b = append(b, '\n') // add newline to separate keys
-		r.count++
-	}
-	r.mx.Unlock()
+	} else {
+		if !r.readOnce {
+			// first line read is the formatted index timestamp
+			var buf bytes.Buffer
+			fmt.Fprintln(&buf, r.indexTime.Format(layout))
+			b = buf.Bytes()
+			r.readOnce = true
+		} else {
+			key, isOpen := <-r.out
+			if !isOpen {
+				return 0, io.EOF
+			}
+			b = key
+			b = append(b, '\n') // add newline to separate keys
+			r.count++
+		}
 
-	if len(p) < len(b) {
-		copy(p, b[:len(p)])
-
-		return len(p), nil
+		if len(p) < len(b) {
+			r.partial = b[len(p):]
+			b = b[:len(p)]
+		}
 	}
 
 	copy(p, b)

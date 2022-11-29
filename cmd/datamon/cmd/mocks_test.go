@@ -90,8 +90,12 @@ func setupConfig(t *testing.T, flags flagsT) func() {
 	testContext := testContext()
 	client, err := gcsStorage.NewClient(context.Background(), option.WithScopes(gcsStorage.ScopeFullControl))
 	require.NoError(t, err, "couldn't create bucket client")
-	err = client.Bucket(bucketConfig).Create(context.Background(), projectID(), nil)
-	require.NoError(t, err, "couldn't create config bucket")
+
+	require.NoError(t,
+		client.Bucket(bucketConfig).Create(context.Background(), projectID(), nil),
+		"couldn't create config bucket",
+	)
+
 	runCmd(t, []string{
 		"context",
 		"create",
@@ -111,10 +115,13 @@ func setupConfig(t *testing.T, flags flagsT) func() {
 		flags.context.Descriptor.ReadLog,
 		// "--loglevel", "debug",
 	}, "test and create context", false)
-	err = os.Setenv("DATAMON_GLOBAL_CONFIG", bucketConfig)
-	require.NoError(t, err)
-	err = os.Setenv("DATAMON_CONTEXT", testContext)
-	require.NoError(t, err)
+	require.NoError(t,
+		os.Setenv("DATAMON_GLOBAL_CONFIG", bucketConfig),
+	)
+	require.NoError(t,
+		os.Setenv("DATAMON_CONTEXT", testContext),
+	)
+
 	cleanup := func() {
 		deleteBucket(context.Background(), t, client, bucketConfig)
 	}
@@ -175,6 +182,7 @@ func setupTests(t *testing.T) func() {
 		_ = os.RemoveAll(destinationDir)
 		doBucketCleanup()
 	}
+
 	return cleanup
 }
 
