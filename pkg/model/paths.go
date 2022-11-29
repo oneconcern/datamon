@@ -14,6 +14,8 @@ const (
 	labelDescriptorFile   = "label.yaml"
 	bundleDescriptorFile  = "bundle.yaml"
 	contextDescriptorFile = "context.yaml"
+	reverseIndexFile      = "reverse-lookup.yaml"
+	purgeLockFile         = "purge.lock"
 
 	// file index files
 	bundleFilesIndexPrefix = "bundle-files-"
@@ -202,4 +204,12 @@ func GetArchivePathComponents(archivePath string) (ArchivePathComponents, error)
 	default:
 		return ArchivePathComponents{}, fmt.Errorf("path is invalid: %v, path: %s", cs, archivePath)
 	}
+}
+
+func PurgeLock() string {
+	return purgeLockFile
+}
+
+func ReverseIndex() string {
+	return reverseIndexFile
 }

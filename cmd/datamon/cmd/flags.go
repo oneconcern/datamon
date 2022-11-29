@@ -95,6 +95,11 @@ type flagsT struct {
 		noConflicts     bool
 	}
 	upgrade upgradeFlags
+	purge   struct {
+		Force          bool
+		LocalStorePath string
+		DryRun         bool
+	}
 }
 
 var datamonFlags = flagsT{}
@@ -570,6 +575,30 @@ func addVerifyBlobHashFlag(cmd *cobra.Command) string {
 	const c = "verify-blob-hash"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.fs.WithVerifyBlobHash, c, false, `Enable blob hash verification for each uploaded blob`)
+	}
+	return c
+}
+
+func addPurgeForceFlag(cmd *cobra.Command) string {
+	const c = "force"
+	if cmd != nil {
+		cmd.PersistentFlags().BoolVar(&datamonFlags.purge.Force, c, false, "Forces a locked purge job to run. You MUST make sure that no such concurrent job is running")
+	}
+	return c
+}
+
+func addPurgeDryRunFlag(cmd *cobra.Command) string {
+	const c = "dry-run"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.purge.DryRun, c, false, "Report about the purge, but don't actually delete anything")
+	}
+	return c
+}
+
+func addPurgeLocalPathFlag(cmd *cobra.Command) string {
+	const c = "local-work-dir"
+	if cmd != nil {
+		cmd.PersistentFlags().StringVar(&datamonFlags.purge.LocalStorePath, c, ".datamon-index", "Indicates the local folder that datamon will use as its working area")
 	}
 	return c
 }

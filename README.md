@@ -45,6 +45,7 @@ output/new data that is generated from the existing data.
 #### Extra tools
 
 * Scripted interface to use as a sidecar container (e.g. for ARGO workflows)
+* [Cleaning-up unused storage](docs/purge.md)
 
 #### Experimental
 

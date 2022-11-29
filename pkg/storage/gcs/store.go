@@ -96,7 +96,7 @@ func (g *gcs) getRelObjectName(key string) string {
 }
 
 func (g *gcs) String() string {
-	return "gcs://" + g.bucket + "/" + g.keyPrefix
+	return "gs://" + g.bucket + "/" + g.keyPrefix
 }
 
 // Has this object in the store?

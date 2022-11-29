@@ -189,6 +189,14 @@ func init() {
 	addForceYesFlag(repoDeleteFiles)
 	addFileListFlag(repoDeleteFiles)
 	addBundleFileFlag(repoDeleteFiles)
+
+	addPurgeForceFlag(purgeCmd)
+	addPurgeLocalPathFlag(purgeCmd)
+	addPurgeDryRunFlag(deleteUnusedCmd)
+	purgeCmd.AddCommand(reverseLookupCmd)
+	purgeCmd.AddCommand(deleteUnusedCmd)
+	purgeCmd.AddCommand(deleteLookupCmd)
+	rootCmd.AddCommand(purgeCmd)
 }
 
 // readConfig reads in config file and ENV variables if set.

@@ -86,9 +86,8 @@ func mockedRepoContextStores(scenario string) context2.Stores {
 
 func testListRepos(t *testing.T, concurrency int, i int) {
 	initRepoBatchFixture.Do(buildRepoBatchFixture(t))
-	defer goleak.VerifyNone(t,
-		// opencensus stats collection goroutine
-		goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
 	for _, toPin := range repoTestCases() {
 		testcase := toPin
 
