@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/oneconcern/datamon/pkg/core"
@@ -49,10 +48,19 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			zap.String("context BLOB bucket", datamonFlags.context.Descriptor.Blob),
 			zap.String("context metadata bucket", datamonFlags.context.Descriptor.Metadata),
 		)
+
+		// figure out if we need to scan other contexts (if they share the same blob store)
+		extraContexts, err := metaForSharedContexts(optionInputs.params.context.Descriptor.Name, remoteStores.Blob())
+		if err != nil {
+			wrapFatalln("scanning other contexts", err)
+			return
+		}
+
 		opts := []core.PurgeOption{
 			core.WithPurgeForce(datamonFlags.purge.Force),
 			core.WithPurgeLogger(logger),
 			core.WithPurgeLocalStore(datamonFlags.purge.LocalStorePath),
+			core.WithPurgeExtraContexts(extraContexts),
 		}
 
 		err = core.PurgeLock(remoteStores, opts...)
@@ -84,30 +92,4 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			descriptor.NumEntries,
 		)
 	},
-}
-
-func handlePurgeErrors(cmdName string, err, erp error) error {
-	switch {
-	case err != nil && erp != nil:
-		return fmt.Errorf(`%v: %v.\n`+
-			`Failed to unlock: %v.\n`+
-			`Use the '--force' flag on subsequent runs`,
-			cmdName, err, erp,
-		)
-
-	case err != nil && erp == nil:
-		return fmt.Errorf("%v failed (could remove job lock before exiting): %v",
-			cmdName, err,
-		)
-
-	case err == nil && erp != nil:
-		return fmt.Errorf(
-			`%v was successful.\n`+
-				`But failed to unlock: %v.\n`+
-				`Use the '--force' flag on subsequent runs`,
-			cmdName, erp,
-		)
-	default:
-		return nil
-	}
 }

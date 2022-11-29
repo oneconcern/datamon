@@ -38,16 +38,16 @@ spec:
         command:
         - datamon
         - purge
-        - build-reverse-index
+        - build-reverse-lookup
         - '--skip-auth'
         - '--local-work-dir'
         - '{{ .Values.staging }}'
         env:
-          # location of datamon local config files
+          # location of datamon local config file
           - name: HOME
             value: {{ .Values.home }}
         volumeMounts:
-          - mountPath: {{ .Values.home }}/.datamon
+          - mountPath: {{ .Values.home }}/.datamon2
             name: config
           - mountPath: {{ .Values.staging }}
             name: staging-volume

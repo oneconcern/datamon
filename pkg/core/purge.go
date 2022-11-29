@@ -66,6 +66,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 		_ = db.Close()
 	}()
 
+	// about to write the index in the current context
 	indexStore := getMetaStore(stores)
 	blob := getBlobStore(stores)
 	logger := options.l.With(
@@ -77,41 +78,51 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 		zap.Stringer("blob_store", blob),
 	)
 
-	repos, err := ListRepos(stores)
-	if err != nil {
-		return nil, err
-	}
+	contextStores := []context2.Stores{stores}
+	// include extra context stores to scan additional metadata
+	contextStores = append(contextStores, options.extraStores...)
 
-	// iterate over all objects referred to by the metadata
-	// * for all repos, all bundles, all files, all keys in the root key
-	for _, repo := range repos {
-		logger.Info("scanning entries", zap.String("repo", repo.Name))
-		erb := ListBundlesApply(repo.Name, stores, func(bundle model.BundleDescriptor) error {
-			b := NewBundle(
-				BundleID(bundle.ID),
-				Repo(repo.Name),
-				BundleDescriptor(&bundle),
-				ContextStores(stores),
-			)
+	// iterate over all contexts that share the same blob store
+	for _, toPin := range contextStores {
+		contextStore := toPin
+		logger.Info("scanning metadata for context", zap.Stringer("context metadata", contextStore.Metadata()))
 
-			keys, erk := bundleKeys(ctx, b, bundle.LeafSize)
-			if erk != nil {
-				return erk
-			}
+		repos, erl := ListRepos(contextStore)
+		if erl != nil {
+			return nil, erl
+		}
 
-			for _, key := range keys {
-				eru := db.Update(func(txn *badger.Txn) error {
-					return txn.Set([]byte(key), []byte{})
-				})
-				if eru != nil {
-					return eru
+		// iterate over all objects referred to by the metadata
+		// * for all repos, all bundles, all files, all keys in the root key
+		for _, repo := range repos {
+			logger.Info("scanning entries", zap.String("repo", repo.Name))
+			erb := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
+				b := NewBundle(
+					BundleID(bundle.ID),
+					Repo(repo.Name),
+					BundleDescriptor(&bundle),
+					ContextStores(contextStore),
+				)
+
+				keys, erk := bundleKeys(ctx, b, bundle.LeafSize)
+				if erk != nil {
+					return erk
 				}
-			}
 
-			return nil
-		})
-		if erb != nil {
-			return nil, erb
+				for _, key := range keys {
+					eru := db.Update(func(txn *badger.Txn) error {
+						return txn.Set([]byte(key), []byte{})
+					})
+					if eru != nil {
+						return eru
+					}
+				}
+
+				return nil
+			})
+			if erb != nil {
+				return nil, erb
+			}
 		}
 	}
 

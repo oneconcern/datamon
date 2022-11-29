@@ -1,9 +1,9 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: hash-706c559
+  tag: hash-6a96c95
   pullPolicy: Always
 
-serviceAccountName: geodude
+serviceAccountName: flood
 
 # default config to map as ${HOME}/.datamon/datamon.yaml
 config: |

@@ -1,6 +1,7 @@
 package core
 
 import (
+	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"go.uber.org/zap"
 )
@@ -14,6 +15,7 @@ type (
 		dryRun         bool
 		localStorePath string
 		l              *zap.Logger
+		extraStores    []context2.Stores
 	}
 )
 
@@ -42,6 +44,12 @@ func WithPurgeLogger(zlg *zap.Logger) PurgeOption {
 		if zlg != nil {
 			o.l = zlg
 		}
+	}
+}
+
+func WithPurgeExtraContexts(extraStores []context2.Stores) PurgeOption {
+	return func(o *purgeOptions) {
+		o.extraStores = extraStores
 	}
 }
 
