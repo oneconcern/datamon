@@ -190,6 +190,7 @@ func init() {
 	addFileListFlag(repoDeleteFiles)
 	addBundleFileFlag(repoDeleteFiles)
 
+	addSkipAuthFlag(purgeCmd)
 	addPurgeForceFlag(purgeCmd)
 	addPurgeLocalPathFlag(purgeCmd)
 	addPurgeDryRunFlag(deleteUnusedCmd)
