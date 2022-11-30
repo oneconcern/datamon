@@ -57,6 +57,7 @@ You MUST make sure that no delete job is still running before doing that.
 			core.WithPurgeLogger(logger),
 			core.WithPurgeLocalStore(datamonFlags.purge.LocalStorePath),
 			core.WithPurgeDryRun(datamonFlags.purge.DryRun),
+			core.WithPurgeParallel(datamonFlags.bundle.ConcurrencyFactor),
 		}
 
 		err = core.PurgeLock(remoteStores, opts...)

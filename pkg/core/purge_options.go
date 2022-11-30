@@ -1,6 +1,7 @@
 package core
 
 import (
+	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"go.uber.org/zap"
 )
@@ -14,12 +15,22 @@ type (
 		dryRun         bool
 		localStorePath string
 		l              *zap.Logger
+		extraStores    []context2.Stores
+		maxParallel    int
 	}
 )
 
 func WithPurgeForce(enabled bool) PurgeOption {
 	return func(o *purgeOptions) {
 		o.force = enabled
+	}
+}
+
+func WithPurgeParallel(parallel int) PurgeOption {
+	return func(o *purgeOptions) {
+		if parallel > 0 {
+			o.maxParallel = parallel
+		}
 	}
 }
 
@@ -45,10 +56,17 @@ func WithPurgeLogger(zlg *zap.Logger) PurgeOption {
 	}
 }
 
+func WithPurgeExtraContexts(extraStores []context2.Stores) PurgeOption {
+	return func(o *purgeOptions) {
+		o.extraStores = extraStores
+	}
+}
+
 func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 	o := &purgeOptions{
 		localStorePath: ".datamon-index",
 		l:              dlogger.MustGetLogger("info"),
+		maxParallel:    10,
 	}
 
 	for _, apply := range opts {

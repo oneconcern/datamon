@@ -39,7 +39,10 @@ func TestPurgeRepo(t *testing.T) {
 	input3, err := os.MkdirTemp(".", "")
 	require.NoError(t, err)
 	defer func() {
-		_ = os.RemoveAll(input2)
+		_ = os.RemoveAll(input3)
+	}()
+	defer func() {
+		_ = os.RemoveAll(".datamon-index")
 	}()
 
 	for i, file := range []string{"file1", "file2", "file3", "file4"} {

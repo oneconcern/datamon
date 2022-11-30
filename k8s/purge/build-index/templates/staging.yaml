@@ -1,0 +1,18 @@
+{{- if eq .Values.storageClassName "manual" }}{{/* for local cluster testing only */}}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "{{ .Release.Name }}-staging-volume"
+  type: .Values.storageType
+spec:
+  storageClassName: {{ .Values.storageClassName }}
+  persistentVolumeReclaimPolicy: Delete
+  capacity:
+    storage: {{ .Values.stagingSize }}
+  accessModes:
+    - ReadWriteOnce
+  {{- if eq .Values.storageClassName "manual" }}{{/* for local cluster testing only */}}
+  hostPath:
+    path: "/mnt/data"
+  {{- end }}
+{{- end }}

@@ -1,6 +1,13 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+
+	context2 "github.com/oneconcern/datamon/pkg/context"
+	gcscontext "github.com/oneconcern/datamon/pkg/context/gcs"
+	"github.com/oneconcern/datamon/pkg/core"
+	"github.com/oneconcern/datamon/pkg/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -27,4 +34,67 @@ NOTES:
 			wrapFatalln("populate remote config", err)
 		}
 	},
+}
+
+func handlePurgeErrors(cmdName string, err, erp error) error {
+	switch {
+	case err != nil && erp != nil:
+		return fmt.Errorf(`%v: %v.\n`+
+			`Failed to unlock: %v.\n`+
+			`Use the '--force' flag on subsequent runs`,
+			cmdName, err, erp,
+		)
+
+	case err != nil && erp == nil:
+		return fmt.Errorf("%v failed (could remove job lock before exiting): %v",
+			cmdName, err,
+		)
+
+	case err == nil && erp != nil:
+		return fmt.Errorf(
+			`%v was successful.\n`+
+				`But failed to unlock: %v.\n`+
+				`Use the '--force' flag on subsequent runs`,
+			cmdName, erp,
+		)
+	default:
+		return nil
+	}
+}
+
+// returns all metadata stores known to the different contexts that share the same blob store
+// as the current context.
+func metaForSharedContexts(currentContext string, blob storage.Store) ([]context2.Stores, error) {
+	configStore := mustGetConfigStore()
+	ctx := context.Background()
+	contexts, err := core.ListContexts(configStore)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]context2.Stores, 0, len(contexts)-1)
+
+	for _, contextName := range contexts {
+		if contextName == currentContext {
+			continue
+		}
+
+		datamonContext, err := context2.GetContext(ctx, configStore, contextName)
+		if err != nil {
+			return nil, err
+		}
+
+		optionInputs := newCliOptionInputs(config, &datamonFlags)
+		contextStore, err := gcscontext.MakeContext(ctx, *datamonContext, optionInputs.config.Credential)
+		if err != nil {
+			return nil, err
+		}
+
+		if contextStore.Blob().String() == blob.String() {
+			// shared
+			result = append(result, contextStore)
+		}
+	}
+
+	return result, nil
 }
