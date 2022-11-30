@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: hash-6a96c95
+  tag: latest
   pullPolicy: Always
 
 serviceAccountName: flood
@@ -20,7 +20,7 @@ force: false
 concurrency: 50
 
 # the size of the volume claim to attach as download staging
-stagingSize: 36Gi
+stagingSize: 50Gi
 #storageClassName: manual # for local testing only
 #storageType: local # for local testing only
 storageClassName: ssd

@@ -21,6 +21,7 @@ type Settings struct {
 	labelVersions bool
 
 	metrics.Enable
+	ignoreCorruptedMetadata bool
 	// m *M // TODO(fred): enable metrics for list operations
 }
 
@@ -89,6 +90,12 @@ func WithLabelVersions(enabled bool) Option {
 func WithLabelPrefix(prefix string) Option {
 	return func(s *Settings) {
 		s.labelPrefix = prefix
+	}
+}
+
+func WithIgnoreCorruptedMetadata(enabled bool) Option {
+	return func(s *Settings) {
+		s.ignoreCorruptedMetadata = enabled
 	}
 }
 

@@ -48,7 +48,7 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string) error {
 
 	store := getMetaStore(stores)
 	pth := model.GetArchivePathToBundle(repo, bundleID)
-	bundle, err := downloadBundleDescriptor(store, repo, pth)
+	bundle, err := downloadBundleDescriptor(store, repo, pth, defaultSettings())
 	if err != nil {
 		return fmt.Errorf("cannot retrieve bundle metadata from bundle: %s in repo %s: %v", bundleID, repo, err)
 	}
@@ -113,7 +113,7 @@ func DeleteEntriesFromRepo(repo string, stores context2.Stores, toDelete []strin
 	for _, b := range bundles {
 		bundleID := b.ID
 		pth := model.GetArchivePathToBundle(repo, bundleID)
-		bundle, e := downloadBundleDescriptor(store, repo, pth)
+		bundle, e := downloadBundleDescriptor(store, repo, pth, defaultSettings())
 		if e != nil {
 			return fmt.Errorf("cannot download metadata for bundle %s in repo %s: %v", bundleID, repo, err)
 		}

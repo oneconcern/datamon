@@ -150,6 +150,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 					return nil
 				},
 					ConcurrentList(options.maxParallel),
+					WithIgnoreCorruptedMetadata(true), // ignore when bundle.yaml is corrupted (e.g. empty file)
 				)
 			})
 		}

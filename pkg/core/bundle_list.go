@@ -252,7 +252,7 @@ func fetchBundleBatch(repo string, store storage.Store, settings Settings, keys 
 	// spin up workers pool
 	for i := 0; i < minInt(settings.concurrentList, len(keys)); i++ {
 		workers.Add(1)
-		go getBundleAsync(repo, store, keyChan, bundleChan, &workers)
+		go getBundleAsync(repo, store, keyChan, bundleChan, &workers, settings)
 	}
 
 	bds := make(model.BundleDescriptors, 0, len(keys))
@@ -292,7 +292,7 @@ func fetchBundleBatch(repo string, store storage.Store, settings Settings, keys 
 	return bds, nil
 }
 
-func downloadBundleDescriptor(store storage.Store, repo, key string) (model.BundleDescriptor, error) {
+func downloadBundleDescriptor(store storage.Store, repo, key string, settings Settings) (model.BundleDescriptor, error) {
 	apc, err := model.GetArchivePathComponents(key)
 	if err != nil {
 		return model.BundleDescriptor{}, err
@@ -315,18 +315,26 @@ func downloadBundleDescriptor(store storage.Store, repo, key string) (model.Bund
 	}
 
 	if bd.ID != apc.BundleID {
-		err = fmt.Errorf("bundle IDs in descriptor '%v' and archive path '%v' don't match", bd.ID, apc.BundleID)
-		return model.BundleDescriptor{}, err
+		if !settings.ignoreCorruptedMetadata {
+			err = fmt.Errorf("bundle IDs in descriptor '%v' and archive path '%v' don't match", bd.ID, apc.BundleID)
+
+			return model.BundleDescriptor{}, err
+		} else {
+			bd.ID = apc.BundleID // other metadata might be missing (case of a corrupted bundle.yaml file, should not be blocking)
+		}
 	}
+
 	return bd, nil
 }
 
 // getBundleAsync fetches and unmarshalls the bundle descriptor for each single key submitted as input
 func getBundleAsync(repo string, store storage.Store, input <-chan string, output chan<- bundleEvent,
-	wg *sync.WaitGroup) {
+	wg *sync.WaitGroup,
+	settings Settings,
+) {
 	defer wg.Done()
 	for k := range input {
-		bd, err := downloadBundleDescriptor(store, repo, k)
+		bd, err := downloadBundleDescriptor(store, repo, k, settings)
 
 		if err != nil {
 			if errors.Is(err, storagestatus.ErrNotExists) {
