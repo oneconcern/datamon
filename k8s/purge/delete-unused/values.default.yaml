@@ -15,7 +15,7 @@ config: |
   metrics:
     enabled: false
 
-command: build-reverse-lookup
+command: delete-unused
 force: false
 concurrency: 50
 

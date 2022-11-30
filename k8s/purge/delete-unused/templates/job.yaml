@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{.Release.Name}}"
+  labels:
+    app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+    app.kubernetes.io/instance: {{.Release.Name | quote }}
+    helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app.kubernetes.io/name: {{ include "datamon.name" . }}
+spec:
+  backoffLimit: {{ .Values.backoffs }}
+  ttlSecondsAfterFinished: {{ .Values.ttl }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "datamon.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: {{ .Values.restartPolicy }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{.Release.Name}}-config
+        - name: staging-volume
+          persistentVolumeClaim:
+            claimName: "{{.Release.Name}}-staging-claim"
+      {{- if .Values.extraVolumes }}
+{{ toYaml .Values.extraVolumes | indent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      containers:
+      - name: datamon-index-job
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - datamon
+        - purge
+        - '{{ .Values.command }}'
+        - '--skip-auth'
+        - '--local-work-dir'
+        - '{{ .Values.staging }}'
+        {{- with .Values.force }}
+        - '--force'
+        {{- end }}
+        {{- with .Values.concurrency }}
+        - '--concurrency-factor'
+        - '{{ . }}'
+        {{- end }}
+        env:
+          # location of datamon local config file
+          - name: HOME
+            value: {{ .Values.home }}
+        volumeMounts:
+          - mountPath: {{ .Values.home }}/.datamon2
+            name: config
+          - mountPath: {{ .Values.staging }}
+            name: staging-volume
+{{- if .Values.extraVolumeMounts }}
+{{ toYaml .Values.extraVolumeMounts | indent 10 }}
+{{- end }}
+        resources:
+{{ toYaml .Values.resources | indent 12 }}
+{{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+{{- end }}

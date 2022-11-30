@@ -114,7 +114,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 			repo := repoToPin
 
 			// scan repos in parallel
-			reposGroup.TryGo(func() error {
+			reposGroup.Go(func() error {
 				logger.Info("scanning entries", zap.String("repo", repo.Name))
 
 				return ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
@@ -344,7 +344,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 				scannedKeys += uint64(len(batch.keys))
 
 				// run up to maxParallel lookup & delete routines
-				lookupGroup.TryGo(func() error {
+				lookupGroup.Go(func() error {
 					for _, key := range batch.keys {
 						select {
 						case <-gctx.Done():
