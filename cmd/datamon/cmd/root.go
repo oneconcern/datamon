@@ -193,7 +193,11 @@ func init() {
 	addSkipAuthFlag(purgeCmd, true)
 	addPurgeForceFlag(purgeCmd)
 	addPurgeLocalPathFlag(purgeCmd)
+
 	addPurgeDryRunFlag(deleteUnusedCmd)
+	addConcurrencyFactorFlag(deleteUnusedCmd, 100)
+	addConcurrencyFactorFlag(reverseLookupCmd, 100)
+
 	purgeCmd.AddCommand(reverseLookupCmd)
 	purgeCmd.AddCommand(deleteUnusedCmd)
 	purgeCmd.AddCommand(deleteLookupCmd)

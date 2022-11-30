@@ -359,6 +359,7 @@ jobs:
       - prepare_tests
       - run:
           name: Run golang tests (1)
+          no_output_timeout: 20m
           command: |
             PKGS="$(go list ./...|grep -v cafs)"
             DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
@@ -366,11 +367,12 @@ jobs:
             gotestsum --junitfile /tmp/test-results/noncafs/go-test-report-noncafs.xml --format short-with-failures \
                       --packages "${PKGS}" \
               -- \
-              -timeout 15m \
+              -timeout 20m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/noncafs/c_non_cafs.out \
               -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - run:
           name: 'Run golang tests (2): cafs'
+          no_output_timeout: 20m
           command: |
             PKGS="./pkg/cafs/..."
             DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
@@ -380,7 +382,7 @@ jobs:
             gotestsum --junitfile /tmp/test-results/cafs/go-test-report-cafs.xml --format short-with-failures \
                       --packages "${PKGS}" \
                -- \
-              -timeout 15m \
+              -timeout 20m \
               -parallel 4 -covermode atomic -coverprofile /tmp/test-coverage/cafs/c_cafs_only.out \
               -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - put_cache
@@ -419,7 +421,7 @@ jobs:
                       --packages "${PKGS}" \
                -- \
               -tags influxdbintegration \
-              -timeout 15m \
+              -timeout 20m \
               -race -cover -covermode atomic -coverprofile /tmp/test-coverage/metrics/c_metrics.out \
               -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - put_cache
@@ -446,6 +448,7 @@ jobs:
       - prepare_tests
       - run:
           name: Run golang tests in integration environment
+          no_output_timeout: 20m
           command: |
             PKGS="./pkg/core ./cmd/datamon/cmd"
             DEPS="$(go list -deps ${PKGS}|grep 'oneconcern/datamon'|grep -vE '(mock)|(hack)|(internal/rand)')"
@@ -454,7 +457,7 @@ jobs:
                       --packages "${PKGS}" \
               -- \
               -tags fuse_cli,fsintegration -run '(Mount)|(Workshop)' \
-              -timeout 15m \
+              -timeout 20m \
               -covermode atomic -coverprofile /tmp/test-coverage/fuse/c_fuse_integration.out \
               -coverpkg="$(echo ${DEPS}|sed -E '1,$s/\s/,/g')"
       - put_cache

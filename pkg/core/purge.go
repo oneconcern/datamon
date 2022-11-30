@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,9 +25,8 @@ import (
 )
 
 const (
-	layout      = time.RFC3339Nano
-	batchSize   = 1024
-	maxParallel = 10 + 1
+	layout    = time.RFC3339Nano
+	batchSize = 1024
 )
 
 type (
@@ -68,10 +68,11 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 
 	// about to write the index in the current context
 	indexStore := getMetaStore(stores)
+	indexPath := model.ReverseIndex()
 	blob := getBlobStore(stores)
 	logger := options.l.With(
-		zap.String("path", options.localStorePath),
-		zap.Stringer("index_metadata_store", indexStore),
+		zap.String("index_path", path.Join(indexStore.String(), indexPath)),
+		zap.String("local_index_path", options.localStorePath),
 	)
 	logger.Info("copying index entries to local KV store",
 		zap.Time("index_recording_time", indexTime),
@@ -82,53 +83,92 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 	// include extra context stores to scan additional metadata
 	contextStores = append(contextStores, options.extraStores...)
 
+	// announce all contexts to be scanned
+	for _, contextStore := range contextStores {
+		logger.Info("about to scan metadata for context", zap.Stringer("context metadata", contextStore.Metadata()))
+	}
+
 	// iterate over all contexts that share the same blob store
+	var allKeysCount uint64
 	for _, toPin := range contextStores {
 		contextStore := toPin
-		logger.Info("scanning metadata for context", zap.Stringer("context metadata", contextStore.Metadata()))
+		logger.Info("scanning metadata for context",
+			zap.Stringer("context metadata", contextStore.Metadata()),
+			zap.Int("max_parallel", options.maxParallel),
+		)
 
-		repos, erl := ListRepos(contextStore)
+		repos, erl := ListRepos(contextStore, ConcurrentList(options.maxParallel))
 		if erl != nil {
 			return nil, erl
 		}
 
-		// iterate over all objects referred to by the metadata
+		logger.Info("scanning repos", zap.Int("num_repos_in_context", len(repos)))
+
+		reposGroup, gctx := errgroup.WithContext(ctx)
+		reposGroup.SetLimit(options.maxParallel)
+
+		var count uint64
+		// iterate over all objects referred to by metadata in this context.
 		// * for all repos, all bundles, all files, all keys in the root key
-		for _, repo := range repos {
-			logger.Info("scanning entries", zap.String("repo", repo.Name))
-			erb := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
-				b := NewBundle(
-					BundleID(bundle.ID),
-					Repo(repo.Name),
-					BundleDescriptor(&bundle),
-					ContextStores(contextStore),
-				)
+		for _, repoToPin := range repos {
+			repo := repoToPin
 
-				keys, erk := bundleKeys(ctx, b, bundle.LeafSize)
-				if erk != nil {
-					return erk
-				}
+			// scan repos in parallel
+			reposGroup.TryGo(func() error {
+				logger.Info("scanning entries", zap.String("repo", repo.Name))
 
-				for _, key := range keys {
-					eru := db.Update(func(txn *badger.Txn) error {
-						return txn.Set([]byte(key), []byte{})
-					})
-					if eru != nil {
-						return eru
+				return ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
+					b := NewBundle(
+						BundleID(bundle.ID),
+						Repo(repo.Name),
+						BundleDescriptor(&bundle),
+						ContextStores(contextStore),
+						Logger(zap.NewNop()), // mute verbosity on retrieving bundle details
+					)
+
+					keys, erk := bundleKeys(gctx, b, bundle.LeafSize)
+					if erk != nil {
+						return erk
 					}
-				}
+					atomic.AddUint64(&count, uint64(len(keys)))
 
-				return nil
+					for _, key := range keys {
+						select {
+						case <-gctx.Done():
+							return gctx.Err()
+						default:
+						}
+
+						eru := db.Update(func(txn *badger.Txn) error {
+							return txn.Set([]byte(key), []byte{})
+						})
+						if eru != nil {
+							return eru
+						}
+					}
+
+					return nil
+				},
+					ConcurrentList(options.maxParallel),
+				)
 			})
-			if erb != nil {
-				return nil, erb
-			}
 		}
+
+		erw := reposGroup.Wait()
+		if erw != nil {
+			return nil, erw
+		}
+
+		logger.Info("keys scanned over all repos for this context",
+			zap.Stringer("context metadata", contextStore.Metadata()),
+			zap.Uint64("num_keys", count),
+		)
+		allKeysCount += count
 	}
 
-	indexPath := model.ReverseIndex()
 	logger.Info("uploading index file to metadata",
 		zap.String("index_file", indexPath),
+		zap.Uint64("total_keys", allKeysCount),
 	)
 
 	dbReader := newDBReader(ctx, db, indexTime, logger)
@@ -190,7 +230,10 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	options := defaultPurgeOptions(opts)
 	indexStore := getMetaStore(stores)
 	indexPath := model.ReverseIndex()
-	logger := options.l.With(zap.String("path", options.localStorePath))
+	logger := options.l.With(
+		zap.String("index_path", path.Join(indexStore.String(), indexPath)),
+		zap.String("local_index_path", options.localStorePath),
+	)
 	ctx := context.Background() // no timeout here
 
 	db, err := makeKV(options.localStorePath)
@@ -210,9 +253,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 		_ = r.Close()
 	}()
 
-	logger.Info("copying index entries to local KV store",
-		zap.Stringer("index_metadata_store", indexStore),
-	)
+	logger.Info("copying index entries to local KV store")
 
 	indexTime, numKeys, err := copyIndex(db, r)
 	if err != nil {
@@ -235,14 +276,13 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	logger.Info("scanning blob entries against index")
 
 	// 3. Remove blob keys that are not indexed
-	descriptor, err := scanBlob(ctx, blob, iterator, db, *indexTime, logger, options.dryRun)
+	descriptor, err := scanBlob(ctx, blob, iterator, db, *indexTime, logger, options.dryRun, options.maxParallel)
 	if err != nil {
 		return nil, fmt.Errorf("scan blob: %w", err)
 	}
 
 	logger.Info("done with purging unused blobs",
 		zap.Timep("index_creation_time", indexTime),
-		zap.String("path", options.localStorePath),
 		zap.Stringer("blob", blob),
 	)
 
@@ -268,12 +308,12 @@ func makeKV(pth string) (*badger.DB, error) {
 	return db, nil
 }
 
-func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]string, string, error), db *badger.DB, indexTime time.Time, logger *zap.Logger, dryRun bool) (*PurgeBlobs, error) {
+func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]string, string, error), db *badger.DB, indexTime time.Time, logger *zap.Logger, dryRun bool, maxParallel int) (*PurgeBlobs, error) {
 	var wg sync.WaitGroup
 	doneWithKeysChan := make(chan struct{}, 1)
 	keysChan := make(chan keyBatchEvent, 1)
 	lookupGroup, gctx := errgroup.WithContext(ctx)
-	lookupGroup.SetLimit(maxParallel)
+	lookupGroup.SetLimit(maxParallel + 1)
 
 	// fetch a blob keys asynchronously, in batches
 	wg.Add(1)

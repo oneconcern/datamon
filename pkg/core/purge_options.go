@@ -16,12 +16,21 @@ type (
 		localStorePath string
 		l              *zap.Logger
 		extraStores    []context2.Stores
+		maxParallel    int
 	}
 )
 
 func WithPurgeForce(enabled bool) PurgeOption {
 	return func(o *purgeOptions) {
 		o.force = enabled
+	}
+}
+
+func WithPurgeParallel(parallel int) PurgeOption {
+	return func(o *purgeOptions) {
+		if parallel > 0 {
+			o.maxParallel = parallel
+		}
 	}
 }
 
@@ -57,6 +66,7 @@ func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 	o := &purgeOptions{
 		localStorePath: ".datamon-index",
 		l:              dlogger.MustGetLogger("info"),
+		maxParallel:    10,
 	}
 
 	for _, apply := range opts {
