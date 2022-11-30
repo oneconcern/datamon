@@ -13,7 +13,7 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2103.4
 	github.com/docker/go-units v0.5.0
 	github.com/go-chi/chi v4.1.2+incompatible
-	github.com/go-openapi/runtime v0.24.2
+	github.com/go-openapi/runtime v0.25.0
 	github.com/gobuffalo/packd v1.0.2
 	github.com/gobuffalo/packr/v2 v2.8.3
 	github.com/google/go-querystring v1.1.0 // indirect
