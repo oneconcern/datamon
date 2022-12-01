@@ -231,7 +231,9 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger)
 			// ignore the leaves and just return the root key.
 			logger.Warn("the root key is corrupted: indexing the root, skipping unavailable leaves", zap.String("key", entry.Hash), zap.Error(err))
 
-			return []string{root.String()}, nil
+			keys = append(keys, root.String())
+
+			continue
 		}
 
 		for _, leaf := range leaves {
