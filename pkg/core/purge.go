@@ -85,24 +85,26 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 
 	// announce all contexts to be scanned
 	for _, contextStore := range contextStores {
-		logger.Info("about to scan metadata for context", zap.Stringer("context metadata", contextStore.Metadata()))
+		logger.Info("about to scan metadata for context",
+			zap.Stringer("context metadata", contextStore.Metadata()),
+		)
 	}
 
 	// iterate over all contexts that share the same blob store
 	var allKeysCount uint64
 	for _, toPin := range contextStores {
 		contextStore := toPin
-		logger.Info("scanning metadata for context",
+		clogger := logger.With(
 			zap.Stringer("context metadata", contextStore.Metadata()),
-			zap.Int("max_parallel", options.maxParallel),
 		)
+		clogger.Info("scanning metadata for context", zap.Int("max_parallel", options.maxParallel))
 
 		repos, erl := ListRepos(contextStore, ConcurrentList(options.maxParallel))
 		if erl != nil {
 			return nil, erl
 		}
 
-		logger.Info("scanning repos", zap.Int("num_repos_in_context", len(repos)))
+		clogger.Info("scanning repos", zap.Int("num_repos_in_context", len(repos)))
 
 		reposGroup, gctx := errgroup.WithContext(ctx)
 		reposGroup.SetLimit(options.maxParallel)
@@ -115,7 +117,11 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 
 			// scan repos in parallel
 			reposGroup.Go(func() error {
-				logger.Info("scanning entries", zap.String("repo", repo.Name))
+				lg := clogger.With(
+					zap.String("repo", repo.Name),
+					zap.Stringer("context metadata", contextStore.Metadata()),
+				)
+				lg.Info("scanning entries")
 
 				return ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
 					b := NewBundle(
@@ -126,7 +132,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 						Logger(zap.NewNop()), // mute verbosity on retrieving bundle details
 					)
 
-					keys, erk := bundleKeys(gctx, b, bundle.LeafSize)
+					keys, erk := bundleKeys(gctx, b, bundle.LeafSize, lg)
 					if erk != nil {
 						return erk
 					}
@@ -200,8 +206,10 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 	}, nil
 }
 
-func bundleKeys(ctx context.Context, b *Bundle, size uint32) ([]string, error) {
+func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger) ([]string, error) {
 	if err := unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile); err != nil {
+		logger.Error("the metadata for bundle is invalid", zap.String("bundle_id", b.BundleID), zap.Error(err))
+
 		return nil, err
 	}
 
@@ -210,14 +218,22 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32) ([]string, error) {
 	for _, entry := range b.BundleEntries {
 		root, err := cafs.KeyFromString(entry.Hash)
 		if err != nil {
+			// The root key contains invalid bytes. We've never seen this issue so far: block the process.
+			logger.Error("the root key is invalid", zap.String("key", entry.Hash), zap.Error(err))
+
 			return nil, err
 		}
 		keys = append(keys, root.String())
 
 		leaves, err := cafs.LeavesForHash(b.BlobStore(), root, size, "")
 		if err != nil {
-			return nil, err
+			// The root key is somehow corrupted. This might happen with objects created with previous versions of datamon:
+			// ignore the leaves and just return the root key.
+			logger.Warn("the root key is corrupted: indexing the root, skipping unavailable leaves", zap.String("key", entry.Hash), zap.Error(err))
+
+			return []string{root.String()}, nil
 		}
+
 		for _, leaf := range leaves {
 			keys = append(keys, leaf.String())
 		}

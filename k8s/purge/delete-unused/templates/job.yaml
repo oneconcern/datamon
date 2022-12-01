@@ -49,6 +49,9 @@ spec:
         - '--concurrency-factor'
         - '{{ . }}'
         {{- end }}
+        {{- with .Values.dryrun }}
+        - '--dry-run'
+        {{- end }}
         env:
           # location of datamon local config file
           - name: HOME
