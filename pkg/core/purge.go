@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v3"
+	"github.com/docker/go-units"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/errors"
@@ -48,6 +49,8 @@ type (
 
 // PurgeBuildReverseIndex creates or update a reverse-lookip index
 // of all used blob keys.
+//
+// This operation can take quite a long time: there is some extra logging to keep track of the progress.
 func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*PurgeIndex, error) {
 	// 1. scan all repos, all bundles
 	// 2. Fetch root key, explode root key
@@ -108,22 +111,55 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 
 		reposGroup, gctx := errgroup.WithContext(ctx)
 		reposGroup.SetLimit(options.maxParallel)
+		monitorGroup, mctx := errgroup.WithContext(gctx)
 
 		var count uint64
+		// progress status reporting: report about progress and KV store size every 5 minutes
+		monitorGroup.Go(func() error {
+			interval := 5 * time.Minute
+			ticker := time.NewTicker(interval)
+			defer func() {
+				ticker.Stop()
+			}()
+
+			var lastSeen uint64
+			for {
+				select {
+				case <-ticker.C:
+					keys := atomic.LoadUint64(&count)
+					lsmSize, logSize := db.Size()
+					dbSize := lsmSize + logSize
+					throughput := int64(float64(keys-lastSeen) / interval.Seconds())
+					clogger.Info("keys scanned so far for this context",
+						zap.Uint64("keys", keys),
+						zap.Uint64("keys_since_last_report", keys-lastSeen),
+						zap.Int64("throuhput keys/s", throughput),
+						zap.String("db_size", units.HumanSize(float64(dbSize))),
+					)
+					lastSeen = keys
+				case <-mctx.Done():
+					return nil
+				}
+			}
+		})
+
 		// iterate over all objects referred to by metadata in this context.
 		// * for all repos, all bundles, all files, all keys in the root key
-		for _, repoToPin := range repos {
+		for i, repoToPin := range repos {
 			repo := repoToPin
+			clogger.Info("in-progress percent of current context",
+				zap.Int("percent_repos_in_context", int(float64(i)/float64(len(repos))*100.00)),
+			)
 
 			// scan repos in parallel
 			reposGroup.Go(func() error {
 				lg := clogger.With(
 					zap.String("repo", repo.Name),
-					zap.Stringer("context metadata", contextStore.Metadata()),
 				)
-				lg.Info("scanning entries")
+				lg.Info("start scanning repo entries")
+				var repoCount uint64
 
-				return ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
+				erb := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
 					b := NewBundle(
 						BundleID(bundle.ID),
 						Repo(repo.Name),
@@ -137,6 +173,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 						return erk
 					}
 					atomic.AddUint64(&count, uint64(len(keys)))
+					atomic.AddUint64(&repoCount, uint64(len(keys)))
 
 					for _, key := range keys {
 						select {
@@ -158,10 +195,26 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 					ConcurrentList(options.maxParallel),
 					WithIgnoreCorruptedMetadata(true), // ignore when bundle.yaml is corrupted (e.g. empty file)
 				)
+
+				if erb != nil {
+					lg.Error("could not retrieve keys for repo",
+						zap.Uint64("repo_keys_so_far", repoCount),
+						zap.Error(erb),
+					)
+
+					return erb
+				}
+
+				lg.Info("finished scanning repo entries",
+					zap.Uint64("repo_keys", repoCount),
+				)
+
+				return nil
 			})
 		}
 
 		erw := reposGroup.Wait()
+		_ = monitorGroup.Wait()
 		if erw != nil {
 			return nil, erw
 		}
@@ -215,6 +268,7 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger)
 
 	keys := make([]string, 0, 1024)
 
+	logger.Info("unpacked file entries for bundle", zap.Int("num_entries", len(b.BundleEntries)))
 	for _, entry := range b.BundleEntries {
 		root, err := cafs.KeyFromString(entry.Hash)
 		if err != nil {
@@ -229,9 +283,9 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger)
 		if err != nil {
 			// The root key is somehow corrupted. This might happen with objects created with previous versions of datamon:
 			// ignore the leaves and just return the root key.
-			logger.Warn("the root key is corrupted: indexing the root, skipping unavailable leaves", zap.String("key", entry.Hash), zap.Error(err))
-
-			keys = append(keys, root.String())
+			logger.Warn("the root key is corrupted: indexing the root, skipping unavailable leaves",
+				zap.String("entry", entry.NameWithPath),
+				zap.String("key", entry.Hash), zap.Error(err))
 
 			continue
 		}
@@ -311,10 +365,15 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 func makeKV(pth string) (*badger.DB, error) {
 	err := os.MkdirAll(pth, 0700)
 	if err != nil {
-		return nil, fmt.Errorf("makeKV: mkdr: %w", err)
+		return nil, fmt.Errorf("makeKV: mkdir: %w", err)
 	}
 
-	db, err := badger.Open(badger.LSMOnlyOptions(pth).WithLoggingLevel(badger.WARNING))
+	db, err := badger.Open(
+		badger.LSMOnlyOptions(pth).
+			WithLoggingLevel(badger.WARNING).
+			WithIndexCacheSize(100 << 20). // 100MB
+			WithMetricsEnabled(false),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("open KV: %w", err)
 	}
@@ -333,13 +392,39 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 	keysChan := make(chan keyBatchEvent, 1)
 	lookupGroup, gctx := errgroup.WithContext(ctx)
 	lookupGroup.SetLimit(maxParallel + 1)
+	monitorGroup, mctx := errgroup.WithContext(gctx)
+
+	var scannedKeys, indexedEntries, moreRecentEntries, deletedEntries, deletedSize uint64
+
+	monitorGroup.Go(func() error {
+		interval := 5 * time.Minute
+		ticker := time.NewTicker(interval)
+		defer func() {
+			ticker.Stop()
+		}()
+
+		var lastSeen uint64
+		for {
+			select {
+			case <-ticker.C:
+				keys := atomic.LoadUint64(&scannedKeys)
+				throughput := int64(float64(keys-lastSeen) / interval.Seconds())
+				logger.Info("keys scanned so far from blob store",
+					zap.Uint64("keys", keys),
+					zap.Uint64("keys_since_last_report", keys-lastSeen),
+					zap.Int64("throuhput keys/s", throughput),
+				)
+				lastSeen = keys
+			case <-mctx.Done():
+				return nil
+			}
+		}
+	})
 
 	// fetch a blob keys asynchronously, in batches
 	wg.Add(1)
 	defer wg.Wait()
 	go fetchKeys(iterator, keysChan, doneWithKeysChan, &wg) // scan for key batches
-
-	var scannedKeys, indexedEntries, moreRecentEntries, deletedEntries, deletedSize uint64
 
 	// check against KV store for the existing of the key in the index: if not found, delete the blob key
 	lookupGroup.Go(func() error {
@@ -359,7 +444,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 
 					return batch.err
 				}
-				scannedKeys += uint64(len(batch.keys))
+				atomic.AddUint64(&scannedKeys, uint64(len(batch.keys)))
 
 				// run up to maxParallel lookup & delete routines
 				lookupGroup.Go(func() error {
@@ -391,6 +476,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 
 		return nil, err
 	}
+	_ = monitorGroup.Wait()
 
 	return &PurgeBlobs{
 		IndexTime:         indexTime,
@@ -462,7 +548,6 @@ func checkAndDeleteKey(ctx context.Context,
 		return nil
 	}
 
-	logger.Warn("(FRED)key not found in index: to be deleted")
 	// proceed with deletion from the blob store
 	if err := blob.Delete(ctx, key); err != nil {
 		logger.Error("deleting blob", zap.Error(err))
@@ -592,6 +677,8 @@ func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time, logger
 }
 
 // iterateKV iterates over all keys and send them over the internal channel of this reader.
+//
+// NOTE(fred): should have used badger stream there. Maybe next time...
 func (r *dbReader) iterateKV(ctx context.Context, db *badger.DB) func() error {
 	return func() error {
 		return db.View(func(txn *badger.Txn) error {
