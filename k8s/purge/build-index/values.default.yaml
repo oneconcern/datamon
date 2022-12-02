@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: v2.5.1
+  tag: v2.5.3
   pullPolicy: Always
 
 serviceAccountName: flood
@@ -11,22 +11,23 @@ config: |
   email: ""
   name: ""
   config: global-onec-co-datamon-config
-  context: dev
+  context: staging
   metrics:
     enabled: false
 
 command: build-reverse-lookup
 force: false
-concurrency: 100
+concurrency: 200
 
 # the size of the volume claim to attach as download staging
-stagingSize: 50Gi
+#stagingSize: 50Gi
+stagingSize: 100Gi
 #storageClassName: manual # for local testing only
 #storageType: local # for local testing only
-storageClassName: ssd
-storageType: pd-ssd
-#storageClassName: standard
-#storageType: pd-standard
+#storageClassName: ssd
+#storageType: pd-ssd
+storageClassName: standard
+storageType: pd-standard
 
 # time to live for k8 resources (in seconds)
 ttl: 86400
