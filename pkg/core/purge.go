@@ -187,11 +187,18 @@ func scanContext(ctx context.Context, contextStore context2.Stores, indexStore s
 
 	// iterate over all objects referred to by metadata in this context.
 	// * for all repos, all bundles, all files, all keys in the root key
+LOOP:
 	for i, repoToPin := range repos {
 		repo := repoToPin
 		lg.Info("in-progress percent of current context",
 			zap.Int("percent_repos_in_context", int(float64(i)/float64(len(repos))*100.00)),
 		)
+		select {
+		case <-gctx.Done():
+			// early failure
+			break LOOP
+		default:
+		}
 
 		// scan repos in parallel
 		reposGroup.Go(
@@ -253,8 +260,15 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 		lg.Info("start scanning repo entries")
 		var repoCount uint64
 
+		// early failure
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
 		parallelBundles := max(10, options.maxParallel/4)
-		erb := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
+		err := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
 			b := NewBundle(
 				BundleID(bundle.ID),
 				Repo(repo.Name),
@@ -272,22 +286,41 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 
 			for _, key := range keys {
 				select {
+				// interrupted
 				case <-ctx.Done():
 					return ctx.Err()
 				default:
 				}
 
-				eru := db.Update(func(txn *badger.Txn) error {
-					k := []byte(key)
-					_, erg := txn.Get(k)
-					if erg != nil && errors.Is(erg, badger.ErrKeyNotFound) {
+				eru := backoff.Retry(func() error {
+					return db.Update(func(txn *badger.Txn) error {
+						k := []byte(key)
+
+						_, erg := txn.Get(k)
+						if erg == nil {
+							return nil
+						}
+
+						if !errors.Is(erg, badger.ErrKeyNotFound) {
+							return backoff.Permanent(erg)
+						}
+
+						ers := txn.Set(k, []byte{})
+						if ers != nil {
+							if errors.Is(ers, badger.ErrConflict) {
+								return ers // retry
+							}
+
+							return backoff.Permanent(ers)
+						}
+
 						atomic.AddUint64(countUniquePtr, uint64(1))
 
-						return txn.Set(k, []byte{})
-					}
-
-					return erg
-				})
+						return nil
+					})
+				},
+					backoff.NewConstantBackOff(10*time.Millisecond),
+				)
 				if eru != nil {
 					return eru
 				}
@@ -299,13 +332,13 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 			WithIgnoreCorruptedMetadata(true), // ignore when bundle.yaml is corrupted (e.g. empty file)
 		)
 
-		if erb != nil {
+		if err != nil {
 			lg.Error("could not retrieve keys for repo",
 				zap.Uint64("repo_keys_so_far", repoCount),
-				zap.Error(erb),
+				zap.Error(err),
 			)
 
-			return erb
+			return err
 		}
 
 		lg.Info("finished scanning repo entries",
@@ -462,7 +495,9 @@ func chunkUploader(ctx context.Context,
 			)
 
 			return nil
-		}, defaultBackoff())
+		},
+			backoff.WithContext(defaultBackoff(), ctx),
+		)
 	}
 }
 
@@ -477,7 +512,9 @@ func defaultBackoff() backoff.BackOff {
 func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger) ([]string, error) {
 	if err := backoff.Retry(func() error {
 		return unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile)
-	}, defaultBackoff()); err != nil {
+	},
+		backoff.WithContext(defaultBackoff(), ctx),
+	); err != nil {
 		logger.Error("the metadata for this bundle cannot be read", zap.String("bundle_id", b.BundleID), zap.Error(err))
 
 		return nil, err
