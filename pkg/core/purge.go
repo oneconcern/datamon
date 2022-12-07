@@ -182,7 +182,7 @@ func scanContext(ctx context.Context, contextStore context2.Stores, indexStore s
 
 	// progress status reporting: report about progress and KV store size every 5 minutes
 	monitorGroup.Go(
-		monitor(mctx, &count, uniqueKeysPtr, db, lg),
+		monitor(mctx, &count, uniqueKeysPtr, db, lg, options),
 	)
 
 	// iterate over all objects referred to by metadata in this context.
@@ -213,9 +213,9 @@ func scanContext(ctx context.Context, contextStore context2.Stores, indexStore s
 	return nil
 }
 
-func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db *badger.DB, logger *zap.Logger) func() error {
+func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db *badger.DB, logger *zap.Logger, options *purgeOptions) func() error {
 	return func() error {
-		interval := 5 * time.Minute
+		interval := options.monitorInterval
 		ticker := time.NewTicker(interval)
 		defer func() {
 			ticker.Stop()
@@ -320,7 +320,7 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time, uniqueKeysPtr, uploadKeysPtr *uint64, db *badger.DB, logger *zap.Logger, doneScanning <-chan struct{}, options *purgeOptions) func() error {
 	return func() error {
 		chunkSize := options.indexChunkSize
-		interval := 5 * time.Minute
+		interval := options.uploaderInterval
 		ticker := time.NewTicker(interval)
 		defer func() {
 			ticker.Stop()
@@ -485,7 +485,7 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger)
 
 	keys := make([]string, 0, 1024)
 
-	logger.Info("unpacked file entries for bundle", zap.Int("num_entries", len(b.BundleEntries)))
+	logger.Debug("unpacked file entries for bundle", zap.Int("num_entries", len(b.BundleEntries)))
 	for _, entry := range b.BundleEntries {
 		root, err := cafs.KeyFromString(entry.Hash)
 		if err != nil {

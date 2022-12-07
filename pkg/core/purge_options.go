@@ -1,6 +1,8 @@
 package core
 
 import (
+	"time"
+
 	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/dlogger"
 	"go.uber.org/zap"
@@ -11,13 +13,15 @@ type (
 	PurgeOption func(*purgeOptions)
 
 	purgeOptions struct {
-		force          bool
-		dryRun         bool
-		localStorePath string
-		l              *zap.Logger
-		extraStores    []context2.Stores
-		maxParallel    int
-		indexChunkSize uint64 // in # of keys
+		force            bool
+		dryRun           bool
+		localStorePath   string
+		l                *zap.Logger
+		extraStores      []context2.Stores
+		maxParallel      int
+		indexChunkSize   uint64 // in # of keys
+		uploaderInterval time.Duration
+		monitorInterval  time.Duration
 	}
 )
 
@@ -71,10 +75,12 @@ func WithPurgeIndexChunkSize(chunkSize uint64) PurgeOption {
 
 func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 	o := &purgeOptions{
-		localStorePath: ".datamon-index",
-		l:              dlogger.MustGetLogger("info"),
-		maxParallel:    10,
-		indexChunkSize: 500000,
+		localStorePath:   ".datamon-index",
+		l:                dlogger.MustGetLogger("info"),
+		maxParallel:      10,
+		indexChunkSize:   500000,
+		uploaderInterval: 5 * time.Minute,
+		monitorInterval:  5 * time.Minute,
 	}
 
 	for _, apply := range opts {
