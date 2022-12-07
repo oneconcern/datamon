@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/docker/go-units"
 	"github.com/oneconcern/datamon/pkg/cafs"
@@ -75,7 +75,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 
 	// about to write the index in the current context
 	logger := options.l.With(
-		zap.String("index_path", path.Join(indexStore.String(), indexPath)),
+		zap.String("index_path", indexStore.String()+"/"+indexPath),
 		zap.String("local_index_path", options.localStorePath),
 	)
 
@@ -162,7 +162,8 @@ func scanContext(ctx context.Context, contextStore context2.Stores, indexStore s
 		zap.Int("max_parallel", options.maxParallel),
 	)
 
-	repos, err := ListRepos(contextStore, ConcurrentList(options.maxParallel))
+	parallelRepos := max(1, options.maxParallel/4) // reduce undue pressure on gcs
+	repos, err := ListRepos(contextStore, ConcurrentList(parallelRepos))
 	if err != nil {
 		lg.Error("could not list repos for this context", zap.Error(err))
 
@@ -252,6 +253,7 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 		lg.Info("start scanning repo entries")
 		var repoCount uint64
 
+		parallelBundles := max(10, options.maxParallel/4)
 		erb := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
 			b := NewBundle(
 				BundleID(bundle.ID),
@@ -293,7 +295,7 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 
 			return nil
 		},
-			ConcurrentList(options.maxParallel),
+			ConcurrentList(parallelBundles),
 			WithIgnoreCorruptedMetadata(true), // ignore when bundle.yaml is corrupted (e.g. empty file)
 		)
 
@@ -430,41 +432,53 @@ func chunkUploader(ctx context.Context,
 	options *purgeOptions,
 ) func() error {
 	return func() error {
-		indexFile := model.ReverseIndexFile(chunkIndex)
-		dbReader := newDBReader(ctx, db, indexTime, logger, chunkSize)
-		defer func() {
-			_ = dbReader.Close()
-		}()
+		return backoff.Retry(func() error {
+			indexFile := model.ReverseIndexFile(chunkIndex)
+			dbReader := newDBReader(ctx, db, indexTime, logger, chunkSize)
+			defer func() {
+				_ = dbReader.Close()
+			}()
 
-		// make sure the overwrite does not leaves some trailing stuff
-		if err := indexStore.Delete(ctx, indexFile); err != nil {
-			if !errors.Is(err, status.ErrNotExists) {
+			// make sure the overwrite does not leaves some trailing stuff
+			if err := indexStore.Delete(ctx, indexFile); err != nil {
+				if !errors.Is(err, status.ErrNotExists) {
+					return err
+				}
+			}
+
+			// iterate over all deduplicated keys from KV and upload the index file
+			// NOTE: we don't compute CRC here.
+			// Keys are marked when scanned over and next instance of the reader will skip those.
+			if err := indexStore.Put(ctx, indexFile, dbReader, storage.NoOverWrite); err != nil {
 				return err
 			}
-		}
 
-		// iterate over all deduplicated keys from KV and upload the index file
-		// NOTE: we don't compute CRC here.
-		// Keys are marked when scanned over and next instance of the reader will skip those.
-		if err := indexStore.Put(ctx, indexFile, dbReader, storage.NoOverWrite); err != nil {
-			return err
-		}
+			uploaded := dbReader.Count()
+			atomic.AddUint64(uploadKeysPtr, uploaded)
 
-		uploaded := dbReader.Count()
-		atomic.AddUint64(uploadKeysPtr, uploaded)
+			logger.Info("done uploading index chunk file to metadata",
+				zap.String("index_file", indexFile),
+				zap.Uint64("keys_uploaded_in_chunk", uploaded),
+			)
 
-		logger.Info("done uploading index chunk file to metadata",
-			zap.String("index_file", indexFile),
-			zap.Uint64("keys_uploaded_in_chunk", uploaded),
-		)
-
-		return nil
+			return nil
+		}, defaultBackoff())
 	}
 }
 
+func defaultBackoff() backoff.BackOff {
+	withRetry := backoff.NewExponentialBackOff()
+	withRetry.MaxElapsedTime = 30 * time.Second
+	withRetry.Reset()
+
+	return withRetry
+}
+
 func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger) ([]string, error) {
-	if err := unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile); err != nil {
-		logger.Error("the metadata for bundle is invalid", zap.String("bundle_id", b.BundleID), zap.Error(err))
+	if err := backoff.Retry(func() error {
+		return unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile)
+	}, defaultBackoff()); err != nil {
+		logger.Error("the metadata for this bundle cannot be read", zap.String("bundle_id", b.BundleID), zap.Error(err))
 
 		return nil, err
 	}
@@ -507,7 +521,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	indexStore := getMetaStore(stores)
 	indexPath := model.ReverseIndex()
 	logger := options.l.With(
-		zap.String("index_path", path.Join(indexStore.String(), indexPath)),
+		zap.String("index_path", indexStore.String()+"/"+indexPath),
 		zap.String("local_index_path", options.localStorePath),
 	)
 	ctx := context.Background() // no timeout here
