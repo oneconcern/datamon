@@ -19,7 +19,7 @@ func TestPurgeDBReader(t *testing.T) {
 		_ = os.RemoveAll(kvStore)
 	}()
 
-	db, erk := makeKV(kvStore)
+	db, erk := makeKV(kvStore, defaultPurgeOptions(nil))
 	require.NoError(t, erk)
 
 	// prepare some keys in the store
@@ -31,7 +31,7 @@ func TestPurgeDBReader(t *testing.T) {
 	}
 
 	ts := time.Now().UTC()
-	r := newDBReader(context.Background(), db, ts, zap.NewNop())
+	r := newDBReader(context.Background(), db, ts, zap.NewNop(), 100)
 	defer func() {
 		_ = r.Close()
 	}()

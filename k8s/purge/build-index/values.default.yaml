@@ -17,11 +17,11 @@ config: |
 
 command: build-reverse-lookup
 force: false
-concurrency: 200
+concurrency: 100
 
 # the size of the volume claim to attach as download staging
 #stagingSize: 50Gi
-stagingSize: 100Gi
+stagingSize: 2000Gi
 #storageClassName: manual # for local testing only
 #storageType: local # for local testing only
 #storageClassName: ssd
@@ -46,8 +46,13 @@ application: datamon-purge
 # Tune this for maximum performances
 resources: {}
 
-nodeSelector: {}
-tolerations: []
+nodeSelector:
+  role: flood-common
+tolerations:
+  - key: role
+    effect: NoSchedule
+    operator: Equal
+    value: flood-common
 affinity: {}
 
 # you may declare and mount extra volumes on the pod

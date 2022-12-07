@@ -21,7 +21,7 @@ dryrun: false
 concurrency: 50
 
 # the size of the volume claim to attach as download staging
-stagingSize: 50Gi
+stagingSize: 2000Gi
 #storageClassName: manual # for local testing only
 #storageType: local # for local testing only
 storageClassName: ssd

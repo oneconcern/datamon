@@ -17,6 +17,7 @@ type (
 		l              *zap.Logger
 		extraStores    []context2.Stores
 		maxParallel    int
+		indexChunkSize uint64 // in # of keys
 	}
 )
 
@@ -62,11 +63,18 @@ func WithPurgeExtraContexts(extraStores []context2.Stores) PurgeOption {
 	}
 }
 
+func WithPurgeIndexChunkSize(chunkSize uint64) PurgeOption {
+	return func(o *purgeOptions) {
+		o.indexChunkSize = chunkSize
+	}
+}
+
 func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 	o := &purgeOptions{
 		localStorePath: ".datamon-index",
 		l:              dlogger.MustGetLogger("info"),
 		maxParallel:    10,
+		indexChunkSize: 500000,
 	}
 
 	for _, apply := range opts {
