@@ -14,6 +14,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/dgraph-io/badger/v3"
+	badgeroptions "github.com/dgraph-io/badger/v3/options"
 	"github.com/docker/go-units"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	context2 "github.com/oneconcern/datamon/pkg/context"
@@ -394,6 +395,7 @@ func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time
 
 					break
 				}
+				lastSeen = uniqueKeys
 
 				chunkIndex++
 				started := chunkGroup.TryGo(
@@ -620,9 +622,35 @@ func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
 	db, err := badger.Open(
 		badger.LSMOnlyOptions(pth).
 			WithLoggingLevel(badger.WARNING).
-			WithIndexCacheSize(100 << 20). // 100MB
-			WithMetricsEnabled(true).      // need to enable this in order to collect a reporting of the DB size
-			WithNumCompactors(compactors), // need quite a few compactors, or the DB grows exceedingly fast
+			WithMetricsEnabled(true).            // need to enable this in order to collect a reporting of the DB size
+			WithCompression(badgeroptions.None). // a set of keys that are random hashes is unlikely to compress well
+			WithNumCompactors(compactors).       // need quite a few compactors, or the DB grows exceedingly fast
+			// WithBlockCacheSize(...) // not recommended without compression && without encryption
+			//
+			// tunables
+			// Badger DB defaults are not suitable for a large operation like the purge job.
+			// After ~ 50 millions keys are inserted, the DB performance grinds to a halt. Processing
+			// keys becomes 10x slower than at the start of the process. Later on, the insertion speed degrades even more,
+			// so we end up with a 20x slower pace... At this point, progress is super slow, almost halted.
+			// The DB size remains rather stable at around 14 GB and grows only very slowly.
+			//
+			// I suspect the compaction process to become prominent at this stage.
+			//
+			// The specifics of our workload are:
+			// * we store mostly keys. Values are either empty or a single character (to flag uploaded keys)
+			// * compression is futile (we store random-like hashes)
+			// * no specific ordering in how keys appear
+			// * # get/set to try insertion ~ 1 billion
+			// * # unique keys  ~ 100-500 millions (stopped so far at ~ 85 millions unique keys)
+			WithIndexCacheSize(options.kvIndexCacheSize).                   // 0 -> 200MB
+			WithBaseLevelSize(options.kvBaseLevelSize).                     // 10MB -> 100 MB
+			WithBaseTableSize(options.kvBaseTableSize).                     // 2MB -> 64MB
+			WithLevelSizeMultiplier(options.kvLevelSizeMultiplier).         // 10 (default)
+			WithMaxLevels(options.kvMaxLevels).                             // 7 (default)
+			WithMemTableSize(options.kvMemTableSize).                       // 64MB (default) - ~ 500k keys per table
+			WithNumLevelZeroTables(options.kvNumLevelZeroTables).           // 5 -> 50 - compaction will start later
+			WithNumLevelZeroTablesStall(options.kvNumLevelZeroTablesStall). // 10 -> 100 - stall will occur later
+			WithNumMemtables(options.kvNumMemTables),                       // 5 -> 10
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open KV: %w", err)

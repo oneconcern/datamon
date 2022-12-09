@@ -8,6 +8,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const MB = 1024 * 1024
+
 type (
 	// PurgeOption modifies the behavior of the purge operations.
 	PurgeOption func(*purgeOptions)
@@ -22,8 +24,36 @@ type (
 		indexChunkSize   uint64 // in # of keys
 		uploaderInterval time.Duration
 		monitorInterval  time.Duration
+
+		kvOptions
+	}
+
+	kvOptions struct {
+		kvIndexCacheSize          int64
+		kvBaseLevelSize           int64
+		kvBaseTableSize           int64
+		kvLevelSizeMultiplier     int
+		kvMaxLevels               int
+		kvMemTableSize            int64
+		kvNumLevelZeroTables      int
+		kvNumLevelZeroTablesStall int
+		kvNumMemTables            int
 	}
 )
+
+func defaultKVOptions() kvOptions {
+	return kvOptions{
+		kvIndexCacheSize:          200 << 20, // 200MB, badger default: 0
+		kvBaseLevelSize:           64 * MB,   // badger default: 10MB
+		kvBaseTableSize:           16 * MB,   // badger default: 2MB
+		kvLevelSizeMultiplier:     10,        // badger default: 10 [governs KV compaction process trigger]
+		kvMaxLevels:               7,         // badger default: 7
+		kvMemTableSize:            64 * MB,   // badger default: 64MB
+		kvNumLevelZeroTables:      50,        // badger default: 5
+		kvNumLevelZeroTablesStall: 100,       // badger default: 10
+		kvNumMemTables:            10,        // badger default: 5
+	}
+}
 
 func WithPurgeForce(enabled bool) PurgeOption {
 	return func(o *purgeOptions) {
@@ -73,6 +103,60 @@ func WithPurgeIndexChunkSize(chunkSize uint64) PurgeOption {
 	}
 }
 
+func WithPurgeKVIndexCacheSize(size int64) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvIndexCacheSize = size
+	}
+}
+
+func WithPurgeKVBaseLevelSize(size int64) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvBaseLevelSize = size
+	}
+}
+
+func WithPurgeKVBaseTableSize(size int64) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvBaseTableSize = size
+	}
+}
+
+func WithPurgeKVLevelSizeMultiplier(mult int) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvLevelSizeMultiplier = mult
+	}
+}
+
+func WithPurgeKVMaxLevels(levels int) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvMaxLevels = levels
+	}
+}
+
+func WithPurgeKVNumLevelZeroTables(tables int) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvNumLevelZeroTables = tables
+	}
+}
+
+func WithPurgeKVNumLevelZeroTablesStall(tables int) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvNumLevelZeroTablesStall = tables
+	}
+}
+
+func WithPurgeKVNumMemTables(tables int) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvNumMemTables = tables
+	}
+}
+
+func WithPurgeKVMemGTableSize(size int64) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvMemTableSize = size
+	}
+}
+
 func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 	o := &purgeOptions{
 		localStorePath:   ".datamon-index",
@@ -81,6 +165,7 @@ func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 		indexChunkSize:   500000,
 		uploaderInterval: 5 * time.Minute,
 		monitorInterval:  5 * time.Minute,
+		kvOptions:        defaultKVOptions(),
 	}
 
 	for _, apply := range opts {
