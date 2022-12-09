@@ -38,6 +38,7 @@ type (
 		kvNumLevelZeroTables      int
 		kvNumLevelZeroTablesStall int
 		kvNumMemTables            int
+		kvBlockCacheSize          int64
 	}
 )
 
@@ -50,8 +51,9 @@ func defaultKVOptions() kvOptions {
 		kvMaxLevels:               7,         // badger default: 7
 		kvMemTableSize:            64 * MB,   // badger default: 64MB
 		kvNumLevelZeroTables:      50,        // badger default: 5
-		kvNumLevelZeroTablesStall: 100,       // badger default: 10
+		kvNumLevelZeroTablesStall: 100,       // badger default: 15
 		kvNumMemTables:            10,        // badger default: 5
+		kvBlockCacheSize:          1024 * MB, // badger default: 256MB
 	}
 }
 
@@ -154,6 +156,12 @@ func WithPurgeKVNumMemTables(tables int) PurgeOption {
 func WithPurgeKVMemGTableSize(size int64) PurgeOption {
 	return func(o *purgeOptions) {
 		o.kvMemTableSize = size
+	}
+}
+
+func WithPurgeKVBlockCacheSize(size int64) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvBlockCacheSize = size
 	}
 }
 

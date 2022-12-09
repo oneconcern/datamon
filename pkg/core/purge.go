@@ -650,7 +650,8 @@ func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
 			WithMemTableSize(options.kvMemTableSize).                       // 64MB (default) - ~ 500k keys per table
 			WithNumLevelZeroTables(options.kvNumLevelZeroTables).           // 5 -> 50 - compaction will start later
 			WithNumLevelZeroTablesStall(options.kvNumLevelZeroTablesStall). // 10 -> 100 - stall will occur later
-			WithNumMemtables(options.kvNumMemTables),                       // 5 -> 10
+			WithNumMemtables(options.kvNumMemTables).                       // 5 -> 10
+			WithBlockCacheSize(options.kvBlockCacheSize),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open KV: %w", err)
