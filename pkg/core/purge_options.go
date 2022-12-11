@@ -45,15 +45,15 @@ type (
 func defaultKVOptions() kvOptions {
 	return kvOptions{
 		kvIndexCacheSize:          200 << 20, // 200MB, badger default: 0
-		kvBaseLevelSize:           64 * MB,   // badger default: 10MB
-		kvBaseTableSize:           16 * MB,   // badger default: 2MB
+		kvBaseLevelSize:           10 * MB,   // badger default: 10MB
+		kvBaseTableSize:           2 * MB,    // badger default: 2MB (or ~ 8k 128-bytes keys)
 		kvLevelSizeMultiplier:     10,        // badger default: 10 [governs KV compaction process trigger]
 		kvMaxLevels:               7,         // badger default: 7
-		kvMemTableSize:            64 * MB,   // badger default: 64MB
-		kvNumLevelZeroTables:      50,        // badger default: 5
-		kvNumLevelZeroTablesStall: 100,       // badger default: 15
-		kvNumMemTables:            10,        // badger default: 5
-		kvBlockCacheSize:          1024 * MB, // badger default: 256MB
+		kvMemTableSize:            64 * MB,   // badger default: 64MB (or ~ 500k keys)
+		kvNumLevelZeroTables:      5,         // badger default: 5
+		kvNumLevelZeroTablesStall: 512,       // badger default: 15 (-> ~ 512 * 2MB = 4m keys)
+		kvNumMemTables:            5,         // badger default: 5
+		kvBlockCacheSize:          256 * MB,  // badger default: 256MB
 	}
 }
 

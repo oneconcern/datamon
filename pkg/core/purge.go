@@ -246,6 +246,7 @@ func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db *badger.D
 					zap.String("db_size", units.HumanSize(float64(dbSize))),
 				)
 				lastSeen = keys
+				// TODO(fred): we need to pause from time to time and reorganize the KV
 			case <-ctx.Done():
 				return nil
 			}
@@ -617,7 +618,9 @@ func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
 		return nil, fmt.Errorf("makeKV: mkdir: %w", err)
 	}
 
-	compactors := max(2, options.maxParallel/10)
+	// we queue up one compactor to back each key inserting goroutine.
+	// Let's hope this is enough to keep up with keys insertion.
+	compactors := max(4, options.maxParallel)
 
 	db, err := badger.Open(
 		badger.LSMOnlyOptions(pth).
@@ -625,10 +628,9 @@ func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
 			WithMetricsEnabled(true).            // need to enable this in order to collect a reporting of the DB size
 			WithCompression(badgeroptions.None). // a set of keys that are random hashes is unlikely to compress well
 			WithNumCompactors(compactors).       // need quite a few compactors, or the DB grows exceedingly fast
-			// WithBlockCacheSize(...) // not recommended without compression && without encryption
 			//
-			// tunables
-			// Badger DB defaults are not suitable for a large operation like the purge job.
+			// Badger tunables...
+			// Badger DB defaults seem not suitable for a large operation like the purge job.
 			// After ~ 50 millions keys are inserted, the DB performance grinds to a halt. Processing
 			// keys becomes 10x slower than at the start of the process. Later on, the insertion speed degrades even more,
 			// so we end up with a 20x slower pace... At this point, progress is super slow, almost halted.
@@ -643,15 +645,15 @@ func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
 			// * # get/set to try insertion ~ 1 billion
 			// * # unique keys  ~ 100-500 millions (stopped so far at ~ 85 millions unique keys)
 			WithIndexCacheSize(options.kvIndexCacheSize).                   // 0 -> 200MB
-			WithBaseLevelSize(options.kvBaseLevelSize).                     // 10MB -> 100 MB
-			WithBaseTableSize(options.kvBaseTableSize).                     // 2MB -> 64MB
+			WithBaseLevelSize(options.kvBaseLevelSize).                     // 10MB (default)
+			WithBaseTableSize(options.kvBaseTableSize).                     // 2MB (default)
 			WithLevelSizeMultiplier(options.kvLevelSizeMultiplier).         // 10 (default)
 			WithMaxLevels(options.kvMaxLevels).                             // 7 (default)
 			WithMemTableSize(options.kvMemTableSize).                       // 64MB (default) - ~ 500k keys per table
-			WithNumLevelZeroTables(options.kvNumLevelZeroTables).           // 5 -> 50 - compaction will start later
-			WithNumLevelZeroTablesStall(options.kvNumLevelZeroTablesStall). // 10 -> 100 - stall will occur later
-			WithNumMemtables(options.kvNumMemTables).                       // 5 -> 10
-			WithBlockCacheSize(options.kvBlockCacheSize),
+			WithNumLevelZeroTables(options.kvNumLevelZeroTables).           // 5 (default)
+			WithNumLevelZeroTablesStall(options.kvNumLevelZeroTablesStall). // 10 -> 500 - stall will occur later
+			WithNumMemtables(options.kvNumMemTables).                       // 5 (default)
+			WithBlockCacheSize(options.kvBlockCacheSize),                   // disabled by default (badger default: 256MB)
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open KV: %w", err)
