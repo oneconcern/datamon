@@ -693,7 +693,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 				logger.Info("keys scanned so far from blob store",
 					zap.Uint64("keys", keys),
 					zap.Uint64("keys_since_last_report", keys-lastSeen),
-					zap.Int64("throuhput keys/s", throughput),
+					zap.Int64("throughput keys/s", throughput),
 				)
 				lastSeen = keys
 			case <-mctx.Done():
