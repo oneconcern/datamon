@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: v2.5.3
+  tag: hash-3555a3d
   pullPolicy: Always
 
 serviceAccountName: flood

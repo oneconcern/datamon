@@ -1,0 +1,19 @@
+* [ ] python API
+* [ ] refact core
+* [ ] refact api
+* [ ] mock gcs
+* [ ] versioned documentation
+* [ ] key-value store to replace fuse mount cache (badgerdb)
+* [ ] mutable mount with checkout
+* [ ] sort tags with semantic versioning (label list --sort-semver, bundle list --sort-semver [--show-label])
+* [x] udpate auth procedure in workshop doc (confluence)
+* [ ] coveralls
+* [ ] CI VPN?
+* [ ] vacuum command to remove unused objects from the blob store
+* [ ] opt-in auth depending on context options
+* [x] rename repo
+* [ ] clone repo across contexts ("release") (bundle clone --clone-context --clone-repo, repo clone --clone-context --clone-repo)
+* [ ] get label for bundle in one go (bundle get --show-label)/ bundle list --show-label
+* [ ] filter label for bundle ID or latest (label list --bundle), or other filter (label list --filter {RE2})
+* [ ] get repo size (repo get --show-size, bundle get --show-size, bundle list --show-size)
+* [ ] usability: .ID alias .BundleID in structs (for --format)

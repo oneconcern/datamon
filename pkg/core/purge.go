@@ -620,7 +620,7 @@ func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
 
 	// we queue up one compactor to back each key inserting goroutine.
 	// Let's hope this is enough to keep up with keys insertion.
-	compactors := max(4, options.maxParallel)
+	compactors := max(4, int(float64(options.maxParallel)*1.5))
 
 	db, err := badger.Open(
 		badger.LSMOnlyOptions(pth).
