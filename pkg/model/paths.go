@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 
@@ -14,12 +15,13 @@ const (
 	labelDescriptorFile   = "label.yaml"
 	bundleDescriptorFile  = "bundle.yaml"
 	contextDescriptorFile = "context.yaml"
-	reverseIndexFile      = "reverse-lookup.yaml"
+	reverseIndexFile      = "reverse-index"
 	purgeLockFile         = "purge.lock"
 
 	// file index files
 	bundleFilesIndexPrefix = "bundle-files-"
 	splitFilesIndexPrefix  = bundleFilesIndexPrefix
+	indexFilePrefix        = "chunk-"
 )
 
 var isBundleFileIndexRe, isSplitIndexFileRe *regexp.Regexp
@@ -212,4 +214,12 @@ func PurgeLock() string {
 
 func ReverseIndex() string {
 	return reverseIndexFile
+}
+
+func ReverseIndexFile(chunk uint64) string {
+	return path.Join(reverseIndexFile, fmt.Sprintf("%s%d.yaml", indexFilePrefix, chunk))
+}
+
+func ReverseIndexPrefix() string {
+	return path.Join(reverseIndexFile, indexFilePrefix)
 }

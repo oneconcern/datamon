@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/dgraph-io/badger/v3"
+	badgeroptions "github.com/dgraph-io/badger/v3/options"
 	"github.com/docker/go-units"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	context2 "github.com/oneconcern/datamon/pkg/context"
@@ -61,7 +62,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 	ctx := context.Background() // no timeout here
 	indexTime := time.Now().UTC()
 
-	db, err := makeKV(options.localStorePath)
+	db, err := makeKV(options.localStorePath, options)
 	if err != nil {
 		return nil, err
 	}
@@ -69,14 +70,16 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 		_ = db.Close()
 	}()
 
-	// about to write the index in the current context
 	indexStore := getMetaStore(stores)
 	indexPath := model.ReverseIndex()
 	blob := getBlobStore(stores)
+
+	// about to write the index in the current context
 	logger := options.l.With(
-		zap.String("index_path", path.Join(indexStore.String(), indexPath)),
+		zap.String("index_path", indexStore.String()+"/"+indexPath),
 		zap.String("local_index_path", options.localStorePath),
 	)
+
 	logger.Info("copying index entries to local KV store",
 		zap.Time("index_recording_time", indexTime),
 		zap.Stringer("blob_store", blob),
@@ -93,182 +96,436 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 		)
 	}
 
-	// iterate over all contexts that share the same blob store
-	var allKeysCount uint64
-	for _, toPin := range contextStores {
-		contextStore := toPin
-		clogger := logger.With(
-			zap.Stringer("context metadata", contextStore.Metadata()),
-		)
-		clogger.Info("scanning metadata for context", zap.Int("max_parallel", options.maxParallel))
+	cancellable, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-		repos, erl := ListRepos(contextStore, ConcurrentList(options.maxParallel))
-		if erl != nil {
-			return nil, erl
-		}
+	uploadGroup, uctx := errgroup.WithContext(cancellable) // goroutine to regularly upload chunks of indexes
+	uploadGroup.SetLimit(1)                                // upload one index chunk at a time
 
-		clogger.Info("scanning repos", zap.Int("num_repos_in_context", len(repos)))
+	var allKeysCount, uploadedKeys, uniqueKeys uint64
+	doneScanning := make(chan struct{})
 
-		reposGroup, gctx := errgroup.WithContext(ctx)
-		reposGroup.SetLimit(options.maxParallel)
-		monitorGroup, mctx := errgroup.WithContext(gctx)
-
-		var count uint64
-		// progress status reporting: report about progress and KV store size every 5 minutes
-		monitorGroup.Go(func() error {
-			interval := 5 * time.Minute
-			ticker := time.NewTicker(interval)
-			defer func() {
-				ticker.Stop()
-			}()
-
-			var lastSeen uint64
-			for {
-				select {
-				case <-ticker.C:
-					keys := atomic.LoadUint64(&count)
-					lsmSize, logSize := db.Size()
-					dbSize := lsmSize + logSize
-					throughput := int64(float64(keys-lastSeen) / interval.Seconds())
-					clogger.Info("keys scanned so far for this context",
-						zap.Uint64("keys", keys),
-						zap.Uint64("keys_since_last_report", keys-lastSeen),
-						zap.Int64("throuhput keys/s", throughput),
-						zap.String("db_size", units.HumanSize(float64(dbSize))),
-					)
-					lastSeen = keys
-				case <-mctx.Done():
-					return nil
-				}
-			}
-		})
-
-		// iterate over all objects referred to by metadata in this context.
-		// * for all repos, all bundles, all files, all keys in the root key
-		for i, repoToPin := range repos {
-			repo := repoToPin
-			clogger.Info("in-progress percent of current context",
-				zap.Int("percent_repos_in_context", int(float64(i)/float64(len(repos))*100.00)),
-			)
-
-			// scan repos in parallel
-			reposGroup.Go(func() error {
-				lg := clogger.With(
-					zap.String("repo", repo.Name),
-				)
-				lg.Info("start scanning repo entries")
-				var repoCount uint64
-
-				erb := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
-					b := NewBundle(
-						BundleID(bundle.ID),
-						Repo(repo.Name),
-						BundleDescriptor(&bundle),
-						ContextStores(contextStore),
-						Logger(zap.NewNop()), // mute verbosity on retrieving bundle details
-					)
-
-					keys, erk := bundleKeys(gctx, b, bundle.LeafSize, lg)
-					if erk != nil {
-						return erk
-					}
-					atomic.AddUint64(&count, uint64(len(keys)))
-					atomic.AddUint64(&repoCount, uint64(len(keys)))
-
-					for _, key := range keys {
-						select {
-						case <-gctx.Done():
-							return gctx.Err()
-						default:
-						}
-
-						eru := db.Update(func(txn *badger.Txn) error {
-							return txn.Set([]byte(key), []byte{})
-						})
-						if eru != nil {
-							return eru
-						}
-					}
-
-					return nil
-				},
-					ConcurrentList(options.maxParallel),
-					WithIgnoreCorruptedMetadata(true), // ignore when bundle.yaml is corrupted (e.g. empty file)
-				)
-
-				if erb != nil {
-					lg.Error("could not retrieve keys for repo",
-						zap.Uint64("repo_keys_so_far", repoCount),
-						zap.Error(erb),
-					)
-
-					return erb
-				}
-
-				lg.Info("finished scanning repo entries",
-					zap.Uint64("repo_keys", repoCount),
-				)
-
-				return nil
-			})
-		}
-
-		erw := reposGroup.Wait()
-		_ = monitorGroup.Wait()
-		if erw != nil {
-			return nil, erw
-		}
-
-		logger.Info("keys scanned over all repos for this context",
-			zap.Stringer("context metadata", contextStore.Metadata()),
-			zap.Uint64("num_keys", count),
-		)
-		allKeysCount += count
-	}
-
-	logger.Info("uploading index file to metadata",
-		zap.String("index_file", indexPath),
-		zap.Uint64("total_keys", allKeysCount),
+	// background upload of index keys into chunks
+	uploadGroup.Go(
+		uploader(uctx, indexStore, indexTime, &uniqueKeys, &uploadedKeys, db, logger, doneScanning, options),
 	)
 
-	dbReader := newDBReader(ctx, db, indexTime, logger)
-	defer func() {
-		_ = dbReader.Close()
-	}()
+	// iterate over all contexts that share the same blob store
+	for _, toPin := range contextStores {
+		contextStore := toPin
 
-	// make sure the overwrite does not leaves some trailing stuff
-	err = indexStore.Delete(ctx, indexPath)
-	if err != nil && !errors.Is(err, status.ErrNotExists) {
+		// scan metadata for an entire context store
+		if err = scanContext(ctx, contextStore, indexStore, &allKeysCount, &uniqueKeys, db, logger, options); err != nil {
+			logger.Error("failed to scan context",
+				zap.Stringer("context metadata", contextStore.Metadata()),
+				zap.Error(err),
+			)
+			cancel() // signals the uploader to interrupt
+
+			break
+		}
+	}
+
+	if err == nil {
+		close(doneScanning)
+
+		logger.Info("all contexts successfully scanned. Waiting for all index keys to be uploaded",
+			zap.Uint64("unique_keys", uniqueKeys),
+			zap.Uint64("uploaded_keys_so_far", atomic.LoadUint64(&uploadedKeys)),
+		)
+	}
+
+	if err = uploadGroup.Wait(); err != nil {
+		logger.Error("failed to upload index", zap.Error(err))
+
 		return nil, err
 	}
 
-	// iterate over all deduplicated keys from KV and upload the index file
-	// NOTE: we don't compute CRC here.
-	err = indexStore.Put(ctx, indexPath, dbReader, storage.NoOverWrite)
-	if err != nil {
-		return nil, err
-	}
-
-	logger.Info("done uploading index file to metadata",
+	logger.Info("uploaded index file to metadata",
 		zap.String("index_file", indexPath),
+		zap.Uint64("total_keys", allKeysCount),
+		zap.Uint64("unique_keys", uniqueKeys),
+		zap.Uint64("uploaded_keys", uploadedKeys),
 	)
 
 	return &PurgeIndex{
 		IndexTime:  indexTime,
-		NumEntries: dbReader.Count(),
+		NumEntries: uploadedKeys,
 	}, nil
 }
 
+func scanContext(ctx context.Context, contextStore context2.Stores, indexStore storage.Store, allKeysPtr, uniqueKeysPtr *uint64, db *badger.DB, logger *zap.Logger, options *purgeOptions) error {
+	lg := logger.With(
+		zap.Stringer("context metadata", contextStore.Metadata()),
+	)
+
+	lg.Info("scanning metadata for context",
+		zap.Int("max_parallel", options.maxParallel),
+	)
+
+	parallelRepos := max(1, options.maxParallel/4) // reduce undue pressure on gcs
+	repos, err := ListRepos(contextStore, ConcurrentList(parallelRepos))
+	if err != nil {
+		lg.Error("could not list repos for this context", zap.Error(err))
+
+		return err
+	}
+
+	lg.Info("scanning repos",
+		zap.Int("num_repos_in_context", len(repos)),
+	)
+
+	reposGroup, gctx := errgroup.WithContext(ctx) // goroutines scanning for keys in metadata
+	reposGroup.SetLimit(options.maxParallel)
+	monitorGroup, mctx := errgroup.WithContext(gctx) // goroutine for reporting activity
+
+	var count uint64
+
+	// progress status reporting: report about progress and KV store size every 5 minutes
+	monitorGroup.Go(
+		monitor(mctx, &count, uniqueKeysPtr, db, lg, options),
+	)
+
+	// iterate over all objects referred to by metadata in this context.
+	// * for all repos, all bundles, all files, all keys in the root key
+LOOP:
+	for i, repoToPin := range repos {
+		repo := repoToPin
+		lg.Info("in-progress percent of current context",
+			zap.Int("percent_repos_in_context", int(float64(i)/float64(len(repos))*100.00)),
+		)
+		select {
+		case <-gctx.Done():
+			// early failure
+			break LOOP
+		default:
+		}
+
+		// scan repos in parallel
+		reposGroup.Go(
+			repoKeysScanner(gctx, contextStore, repo, &count, uniqueKeysPtr, db, lg, options),
+		)
+	}
+
+	erw := reposGroup.Wait()
+	_ = monitorGroup.Wait()
+	if erw != nil {
+		return erw
+	}
+
+	lg.Info("keys scanned over all repos for this context",
+		zap.Uint64("num_keys", count),
+	)
+	atomic.AddUint64(allKeysPtr, count)
+
+	return nil
+}
+
+func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db *badger.DB, logger *zap.Logger, options *purgeOptions) func() error {
+	return func() error {
+		interval := options.monitorInterval
+		ticker := time.NewTicker(interval)
+		defer func() {
+			ticker.Stop()
+		}()
+
+		var lastSeen uint64
+		for {
+			select {
+			case <-ticker.C:
+				keys := atomic.LoadUint64(countPtr)
+				lsmSize, logSize := db.Size()
+				dbSize := lsmSize + logSize
+				throughput := int64(float64(keys-lastSeen) / interval.Seconds())
+
+				logger.Info("keys scanned so far for this context",
+					zap.Uint64("keys", keys),
+					zap.Uint64("unique_keys", atomic.LoadUint64(countUniquePtr)),
+					zap.Uint64("keys_since_last_report", keys-lastSeen),
+					zap.Int64("throuhput keys scanned/s", throughput),
+					zap.String("db_size", units.HumanSize(float64(dbSize))),
+				)
+				lastSeen = keys
+				// TODO(fred): we need to pause from time to time and reorganize the KV
+			case <-ctx.Done():
+				return nil
+			}
+		}
+	}
+}
+
+func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo model.RepoDescriptor, countPtr, countUniquePtr *uint64, db *badger.DB, logger *zap.Logger, options *purgeOptions) func() error {
+	return func() error {
+		lg := logger.With(
+			zap.String("repo", repo.Name),
+		)
+		lg.Info("start scanning repo entries")
+		var repoCount uint64
+
+		// early failure
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		parallelBundles := max(10, options.maxParallel/4)
+		err := ListBundlesApply(repo.Name, contextStore, func(bundle model.BundleDescriptor) error {
+			b := NewBundle(
+				BundleID(bundle.ID),
+				Repo(repo.Name),
+				BundleDescriptor(&bundle),
+				ContextStores(contextStore),
+				Logger(zap.NewNop()), // mute verbosity on retrieving bundle details
+			)
+
+			keys, erk := bundleKeys(ctx, b, bundle.LeafSize, lg)
+			if erk != nil {
+				return erk
+			}
+			atomic.AddUint64(countPtr, uint64(len(keys)))
+			atomic.AddUint64(&repoCount, uint64(len(keys)))
+
+			for _, key := range keys {
+				select {
+				// interrupted
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+				}
+
+				eru := backoff.Retry(func() error {
+					return db.Update(func(txn *badger.Txn) error {
+						k := []byte(key)
+
+						_, erg := txn.Get(k)
+						if erg == nil {
+							return nil
+						}
+
+						if !errors.Is(erg, badger.ErrKeyNotFound) {
+							return backoff.Permanent(erg)
+						}
+
+						ers := txn.Set(k, []byte{})
+						if ers != nil {
+							if errors.Is(ers, badger.ErrConflict) {
+								return ers // retry
+							}
+
+							return backoff.Permanent(ers)
+						}
+
+						atomic.AddUint64(countUniquePtr, uint64(1))
+
+						return nil
+					})
+				},
+					backoff.NewConstantBackOff(10*time.Millisecond),
+				)
+				if eru != nil {
+					return eru
+				}
+			}
+
+			return nil
+		},
+			ConcurrentList(parallelBundles),
+			WithIgnoreCorruptedMetadata(true), // ignore when bundle.yaml is corrupted (e.g. empty file)
+		)
+
+		if err != nil {
+			lg.Error("could not retrieve keys for repo",
+				zap.Uint64("repo_keys_so_far", repoCount),
+				zap.Error(err),
+			)
+
+			return err
+		}
+
+		lg.Info("finished scanning repo entries",
+			zap.Uint64("repo_keys", repoCount),
+		)
+
+		return nil
+	}
+}
+
+// uploader scans over newly written keys every 5 minutes and uploads a new chunk of keys.
+func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time, uniqueKeysPtr, uploadKeysPtr *uint64, db *badger.DB, logger *zap.Logger, doneScanning <-chan struct{}, options *purgeOptions) func() error {
+	return func() error {
+		chunkSize := options.indexChunkSize
+		interval := options.uploaderInterval
+		ticker := time.NewTicker(interval)
+		defer func() {
+			ticker.Stop()
+		}()
+
+		var (
+			chunkIndex, lastSeen uint64
+		)
+
+		chunkGroup, cctx := errgroup.WithContext(ctx)
+		chunkGroup.SetLimit(1)
+
+	LOOP:
+		for {
+			select {
+			case <-ctx.Done():
+				// the caller cancelled the upload
+				_ = chunkGroup.Wait()
+
+				return ctx.Err()
+
+			case <-cctx.Done():
+				// some chunk loader failed
+				_ = chunkGroup.Wait()
+
+				return cctx.Err()
+
+			case <-ticker.C:
+				logger.Info("uploaded keys so far",
+					zap.Uint64("num_chunks", chunkIndex),
+					zap.Uint64("uploaded_keys", atomic.LoadUint64(uploadKeysPtr)),
+				)
+				// iterate over newly inserted keys
+				uniqueKeys := atomic.LoadUint64(uniqueKeysPtr)
+				if uniqueKeys < lastSeen+chunkSize {
+					// skip: not enough keys have been produced yet to start a chunk
+					logger.Info("skipping keys upload for now. Not enough new keys")
+
+					break
+				}
+				lastSeen = uniqueKeys
+
+				chunkIndex++
+				started := chunkGroup.TryGo(
+					chunkUploader(cctx,
+						chunkIndex, chunkSize,
+						indexStore, indexTime, uploadKeysPtr, db, logger,
+						options,
+					),
+				)
+				if started {
+					logger.Info("started index chunk upload",
+						zap.Uint64("chunk", chunkIndex),
+					)
+				}
+			case <-doneScanning:
+				// no more keys are going to be produced
+				logger.Info("uploader received done scanning signal")
+
+				break LOOP
+			}
+		}
+
+		if err := chunkGroup.Wait(); err != nil {
+			return err
+		}
+
+		// write last chunks
+		for {
+			chunkIndex++
+			uploadedBefore := atomic.LoadUint64(uploadKeysPtr)
+
+			if err := chunkUploader(ctx,
+				chunkIndex, chunkSize,
+				indexStore, indexTime, uploadKeysPtr, db, logger,
+				options,
+			)(); err != nil {
+				logger.Error("failed to flush index chunk",
+					zap.Uint64("chunk", chunkIndex),
+					zap.Error(err),
+				)
+
+				return err
+			}
+
+			uploaded := atomic.LoadUint64(uploadKeysPtr)
+			if uploaded <= uploadedBefore {
+				break
+			}
+
+			logger.Info("uploaded keys so far",
+				zap.Uint64("num_chunks", chunkIndex-1),
+				zap.Uint64("uploaded_keys", uploaded),
+			)
+		}
+
+		logger.Info("upload index completed",
+			zap.Uint64("num_chunks", chunkIndex),
+			zap.Uint64("uploaded_keys", atomic.LoadUint64(uploadKeysPtr)),
+		)
+
+		return nil
+	}
+}
+
+// uploads an index chunk file
+func chunkUploader(ctx context.Context,
+	chunkIndex, chunkSize uint64,
+	indexStore storage.Store, indexTime time.Time, uploadKeysPtr *uint64, db *badger.DB, logger *zap.Logger,
+	options *purgeOptions,
+) func() error {
+	return func() error {
+		return backoff.Retry(func() error {
+			indexFile := model.ReverseIndexFile(chunkIndex)
+			dbReader := newDBReader(ctx, db, indexTime, logger, chunkSize)
+			defer func() {
+				_ = dbReader.Close()
+			}()
+
+			// make sure the overwrite does not leaves some trailing stuff
+			if err := indexStore.Delete(ctx, indexFile); err != nil {
+				if !errors.Is(err, status.ErrNotExists) {
+					return err
+				}
+			}
+
+			// iterate over all deduplicated keys from KV and upload the index file
+			// NOTE: we don't compute CRC here.
+			// Keys are marked when scanned over and next instance of the reader will skip those.
+			if err := indexStore.Put(ctx, indexFile, dbReader, storage.NoOverWrite); err != nil {
+				return err
+			}
+
+			uploaded := dbReader.Count()
+			atomic.AddUint64(uploadKeysPtr, uploaded)
+
+			logger.Info("done uploading index chunk file to metadata",
+				zap.String("index_file", indexFile),
+				zap.Uint64("keys_uploaded_in_chunk", uploaded),
+			)
+
+			return nil
+		},
+			backoff.WithContext(defaultBackoff(), ctx),
+		)
+	}
+}
+
+func defaultBackoff() backoff.BackOff {
+	withRetry := backoff.NewExponentialBackOff()
+	withRetry.MaxElapsedTime = 30 * time.Second
+	withRetry.Reset()
+
+	return withRetry
+}
+
 func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger) ([]string, error) {
-	if err := unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile); err != nil {
-		logger.Error("the metadata for bundle is invalid", zap.String("bundle_id", b.BundleID), zap.Error(err))
+	if err := backoff.Retry(func() error {
+		return unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile)
+	},
+		backoff.WithContext(defaultBackoff(), ctx),
+	); err != nil {
+		logger.Error("the metadata for this bundle cannot be read", zap.String("bundle_id", b.BundleID), zap.Error(err))
 
 		return nil, err
 	}
 
 	keys := make([]string, 0, 1024)
 
-	logger.Info("unpacked file entries for bundle", zap.Int("num_entries", len(b.BundleEntries)))
+	logger.Debug("unpacked file entries for bundle", zap.Int("num_entries", len(b.BundleEntries)))
 	for _, entry := range b.BundleEntries {
 		root, err := cafs.KeyFromString(entry.Hash)
 		if err != nil {
@@ -304,12 +561,12 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	indexStore := getMetaStore(stores)
 	indexPath := model.ReverseIndex()
 	logger := options.l.With(
-		zap.String("index_path", path.Join(indexStore.String(), indexPath)),
+		zap.String("index_path", indexStore.String()+"/"+indexPath),
 		zap.String("local_index_path", options.localStorePath),
 	)
 	ctx := context.Background() // no timeout here
 
-	db, err := makeKV(options.localStorePath)
+	db, err := makeKV(options.localStorePath, options)
 	if err != nil {
 		return nil, err
 	}
@@ -318,17 +575,10 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	}()
 
 	// 1. Download index and store it on a local badgerdb KV store
-	r, err := indexStore.Get(ctx, indexPath)
-	if err != nil {
-		return nil, fmt.Errorf("open index in metadata: %w", err)
-	}
-	defer func() {
-		_ = r.Close()
-	}()
 
 	logger.Info("copying index entries to local KV store")
 
-	indexTime, numKeys, err := copyIndex(db, r)
+	indexTime, numKeys, err := copyIndexChunks(ctx, db, indexStore) // iterate over multiple index files
 	if err != nil {
 		return nil, fmt.Errorf("copy index: %w", err)
 	}
@@ -362,17 +612,48 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	return descriptor, nil
 }
 
-func makeKV(pth string) (*badger.DB, error) {
+func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
 	err := os.MkdirAll(pth, 0700)
 	if err != nil {
 		return nil, fmt.Errorf("makeKV: mkdir: %w", err)
 	}
 
+	// we queue up one compactor to back each key inserting goroutine.
+	// Let's hope this is enough to keep up with keys insertion.
+	compactors := max(4, int(float64(options.maxParallel)*1.5))
+
 	db, err := badger.Open(
 		badger.LSMOnlyOptions(pth).
 			WithLoggingLevel(badger.WARNING).
-			WithIndexCacheSize(100 << 20). // 100MB
-			WithMetricsEnabled(false),
+			WithMetricsEnabled(true).            // need to enable this in order to collect a reporting of the DB size
+			WithCompression(badgeroptions.None). // a set of keys that are random hashes is unlikely to compress well
+			WithNumCompactors(compactors).       // need quite a few compactors, or the DB grows exceedingly fast
+			//
+			// Badger tunables...
+			// Badger DB defaults seem not suitable for a large operation like the purge job.
+			// After ~ 50 millions keys are inserted, the DB performance grinds to a halt. Processing
+			// keys becomes 10x slower than at the start of the process. Later on, the insertion speed degrades even more,
+			// so we end up with a 20x slower pace... At this point, progress is super slow, almost halted.
+			// The DB size remains rather stable at around 14 GB and grows only very slowly.
+			//
+			// I suspect the compaction process to become prominent at this stage.
+			//
+			// The specifics of our workload are:
+			// * we store mostly keys. Values are either empty or a single character (to flag uploaded keys)
+			// * compression is futile (we store random-like hashes)
+			// * no specific ordering in how keys appear
+			// * # get/set to try insertion ~ 1 billion
+			// * # unique keys  ~ 100-500 millions (stopped so far at ~ 85 millions unique keys)
+			WithIndexCacheSize(options.kvIndexCacheSize).                   // 0 -> 200MB
+			WithBaseLevelSize(options.kvBaseLevelSize).                     // 10MB (default)
+			WithBaseTableSize(options.kvBaseTableSize).                     // 2MB (default)
+			WithLevelSizeMultiplier(options.kvLevelSizeMultiplier).         // 10 (default)
+			WithMaxLevels(options.kvMaxLevels).                             // 7 (default)
+			WithMemTableSize(options.kvMemTableSize).                       // 64MB (default) - ~ 500k keys per table
+			WithNumLevelZeroTables(options.kvNumLevelZeroTables).           // 5 (default)
+			WithNumLevelZeroTablesStall(options.kvNumLevelZeroTablesStall). // 10 -> 500 - stall will occur later
+			WithNumMemtables(options.kvNumMemTables).                       // 5 (default)
+			WithBlockCacheSize(options.kvBlockCacheSize),                   // disabled by default (badger default: 256MB)
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open KV: %w", err)
@@ -412,7 +693,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 				logger.Info("keys scanned so far from blob store",
 					zap.Uint64("keys", keys),
 					zap.Uint64("keys_since_last_report", keys-lastSeen),
-					zap.Int64("throuhput keys/s", throughput),
+					zap.Int64("throughput keys/s", throughput),
 				)
 				lastSeen = keys
 			case <-mctx.Done():
@@ -558,9 +839,58 @@ func checkAndDeleteKey(ctx context.Context,
 	return nil
 }
 
-func copyIndex(db *badger.DB, r io.Reader) (indexTime *time.Time, numKeys uint64, err error) {
+// copyIndexChunks iterates over all index chunks and load the keys in the local KV store.
+func copyIndexChunks(ctx context.Context, db *badger.DB, indexStore storage.Store) (indexTime *time.Time, numKeys uint64, err error) {
+	iterator := func(next string) ([]string, string, error) {
+		return indexStore.KeysPrefix(ctx, next, model.ReverseIndexPrefix(), "", 1024)
+	}
+
+	var (
+		ks   []string
+		next string
+	)
+
+	for {
+		ks, next, err = iterator(next)
+		if err != nil {
+			return nil, numKeys, fmt.Errorf("iterating index chunks in metadata [%s]: %w", next, err)
+		}
+
+		if len(ks) == 0 {
+			break
+		}
+
+		for _, chunk := range ks {
+			r, err := indexStore.Get(ctx, chunk)
+			if err != nil {
+				return nil, numKeys, fmt.Errorf("open index chunk in metadata [%s]: %w", chunk, err)
+			}
+
+			var loadedKeys uint64
+			indexTime, loadedKeys, err = loadChunk(db, r)
+			if err != nil {
+				return nil, numKeys, fmt.Errorf("loading index chunk in metadata [%s]: %w", chunk, err)
+			}
+
+			numKeys += loadedKeys
+			_ = r.Close()
+		}
+
+		if next == "" {
+			break
+		}
+	}
+
+	return indexTime, numKeys, nil
+}
+
+func loadChunk(db *badger.DB, r io.Reader) (*time.Time, uint64, error) {
 	scanner := bufio.NewScanner(r)
 	isFirst := true
+	var (
+		indexTime *time.Time
+		numKeys   uint64
+	)
 
 	for scanner.Scan() {
 		key := scanner.Bytes()
@@ -577,12 +907,13 @@ func copyIndex(db *badger.DB, r io.Reader) (indexTime *time.Time, numKeys uint64
 		}
 
 		// write key to local KV store. Payload is empty.
-		eru := db.Update(func(txn *badger.Txn) error {
+		err := db.Update(func(txn *badger.Txn) error {
 			return txn.Set(key, []byte{})
 		})
-		if eru != nil {
-			return nil, numKeys, eru
+		if err != nil {
+			return nil, numKeys, err
 		}
+
 		numKeys++
 	}
 
@@ -637,21 +968,56 @@ func PurgeLock(stores context2.Stores, opts ...PurgeOption) error {
 	return nil
 }
 
+// PurgeDropReverseIndex drop all index chunks in the metadata store
+//
+// TODO(fred): nice to have - should factorize index chunk iterations.
 func PurgeDropReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
-	store := getMetaStore(stores)
-	path := model.ReverseIndex()
+	indexStore := getMetaStore(stores)
+	indexPath := model.ReverseIndex()
 	options := defaultPurgeOptions(opts)
 	logger := options.l.With(
-		zap.Stringer("index_metadata_store", store),
+		zap.Stringer("index_metadata_store", indexStore),
+	)
+	ctx := context.Background()
+
+	logger.Info("deleting index files", zap.String("index_prefix", indexPath))
+	iterator := func(next string) ([]string, string, error) {
+		return indexStore.KeysPrefix(ctx, next, model.ReverseIndexPrefix(), "", 1024)
+	}
+
+	var (
+		ks   []string
+		next string
+		err  error
 	)
 
-	logger.Info("deleting index file", zap.String("index_file", path))
+	for {
+		ks, next, err = iterator(next)
+		if err != nil {
+			return fmt.Errorf("iterating index chunks in metadata [%s]: %w", next, err)
+		}
 
-	return store.Delete(context.Background(), path)
+		if len(ks) == 0 {
+			break
+		}
+
+		for _, chunk := range ks {
+			if err = indexStore.Delete(ctx, chunk); err != nil {
+				return fmt.Errorf("delete index chunk in metadata [%s]: %w", chunk, err)
+			}
+		}
+
+		if next == "" {
+			break
+		}
+	}
+
+	return nil
 }
 
 type dbReader struct {
 	mx        sync.Mutex
+	db        *badger.DB
 	readOnce  bool
 	indexTime time.Time
 	group     *errgroup.Group
@@ -659,26 +1025,27 @@ type dbReader struct {
 	count     uint64
 	logger    *zap.Logger
 	partial   []byte
+	maxKeys   uint64
 }
 
-func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time, logger *zap.Logger) *dbReader {
+func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time, logger *zap.Logger, maxKeys uint64) *dbReader {
 	r := &dbReader{
+		db:        db,
 		indexTime: indexTime,
 		out:       make(chan []byte, 1024),
 		logger:    logger,
+		maxKeys:   maxKeys,
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
 	r.group = g
 
-	r.group.Go(r.iterateKV(gctx, db))
+	r.group.Go(r.iterateKV(gctx, r.db))
 
 	return r
 }
 
 // iterateKV iterates over all keys and send them over the internal channel of this reader.
-//
-// NOTE(fred): should have used badger stream there. Maybe next time...
 func (r *dbReader) iterateKV(ctx context.Context, db *badger.DB) func() error {
 	return func() error {
 		return db.View(func(txn *badger.Txn) error {
@@ -689,12 +1056,32 @@ func (r *dbReader) iterateKV(ctx context.Context, db *badger.DB) func() error {
 			// iterate over all keys
 			iterator := txn.NewIterator(badger.IteratorOptions{
 				PrefetchSize:   1024,
-				PrefetchValues: false,
+				PrefetchValues: true,
 			})
 			defer iterator.Close()
 
+			var iterated, skipped uint64
+			defer func() {
+				r.logger.Debug("skipped keys for this upload iteration", zap.Uint64("skipped", skipped))
+			}()
+
 			for iterator.Rewind(); iterator.Valid(); iterator.Next() {
 				key := iterator.Item().KeyCopy(nil)
+				val, err := iterator.Item().ValueCopy(nil)
+				if err != nil {
+					return fmt.Errorf("failed to fetch KV value [%s]: %w", key, err)
+				}
+				if len(val) > 0 {
+					// key has been marked as already read once: skip
+					skipped++
+
+					continue
+				}
+
+				iterated++
+				if iterated > r.maxKeys {
+					return nil
+				}
 
 				select {
 				case r.out <- key:
@@ -716,7 +1103,7 @@ func (r *dbReader) Count() uint64 {
 }
 
 func (r *dbReader) Read(p []byte) (int, error) {
-	// TODO(fredbi): could probably do something more elegant here.
+	// TODO(fredbi): nice to have - could probably do something more elegant here.
 	var b []byte
 
 	r.mx.Lock()
@@ -745,6 +1132,14 @@ func (r *dbReader) Read(p []byte) (int, error) {
 			}
 			b = key
 			b = append(b, '\n') // add newline to separate keys
+
+			// mark key as read in the DB
+			if err := r.db.Update(func(txn *badger.Txn) error {
+				return txn.Set(key, []byte("X"))
+			}); err != nil {
+				return 0, fmt.Errorf("failed to mark KV key as read: %w", err)
+			}
+
 			r.count++
 		}
 
@@ -761,4 +1156,12 @@ func (r *dbReader) Read(p []byte) (int, error) {
 
 func (r *dbReader) Close() error {
 	return r.group.Wait()
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+
+	return b
 }
