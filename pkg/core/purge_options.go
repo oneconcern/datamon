@@ -51,7 +51,7 @@ func defaultKVOptions() kvOptions {
 		kvMaxLevels:               7,         // badger default: 7
 		kvMemTableSize:            64 * MB,   // badger default: 64MB (or ~ 500k keys)
 		kvNumLevelZeroTables:      5,         // badger default: 5
-		kvNumLevelZeroTablesStall: 512,       // badger default: 15 (-> ~ 512 * 2MB = 4m keys)
+		kvNumLevelZeroTablesStall: 1024,      // badger default: 15 (-> ~ 1024 * 2MB = 8m keys)
 		kvNumMemTables:            5,         // badger default: 5
 		kvBlockCacheSize:          0,         // badger default: 256MB
 	}
