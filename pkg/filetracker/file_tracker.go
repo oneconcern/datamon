@@ -121,7 +121,7 @@ func (t *TFile) trackWrite(offset int64, length int64) {
 			// There is an end that is after start and no other key in the range.
 			// Skip inserting start, previous start will cover the range.
 			insertStart = false
-			// This key might need deleting and process other other keys
+			// This key might need deleting and process other keys
 			if key >= end {
 				insertEnd = false
 				return terminate
