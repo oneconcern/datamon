@@ -8,9 +8,18 @@ import (
 	"go.uber.org/zap"
 )
 
-const MB = 1024 * 1024
+const (
+	MB = 1024 * 1024
+)
+
+const (
+	KVTypeBadger KVType = iota
+	KVTypePebble
+)
 
 type (
+	KVType uint8
+
 	// PurgeOption modifies the behavior of the purge operations.
 	PurgeOption func(*purgeOptions)
 
@@ -26,6 +35,7 @@ type (
 		uploaderInterval time.Duration
 		monitorInterval  time.Duration
 		indexStart       uint64
+		kvType           KVType
 
 		kvOptions
 	}
@@ -85,6 +95,12 @@ func WithPurgeResumeIndex(enabled bool) PurgeOption {
 	}
 }
 
+func WithKVType(kvType KVType) PurgeOption {
+	return func(o *purgeOptions) {
+		o.kvType = kvType
+	}
+}
+
 func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 	o := &purgeOptions{
 		localStorePath:   ".datamon-index",
@@ -93,6 +109,7 @@ func defaultPurgeOptions(opts []PurgeOption) *purgeOptions {
 		indexChunkSize:   500000,
 		uploaderInterval: 5 * time.Minute,
 		monitorInterval:  5 * time.Minute,
+		kvType:           KVTypePebble, // defaults to pebble, since we have encountered issues with badger DB
 		kvOptions:        defaultKVOptions(),
 	}
 

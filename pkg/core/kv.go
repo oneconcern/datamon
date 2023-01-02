@@ -32,5 +32,10 @@ type (
 
 // openKV opens a kvStore
 func openKV(pth string, options *purgeOptions) (kvStore, error) {
-	return makeKVBadger(pth, options)
+	switch options.kvType {
+	case KVTypeBadger:
+		return makeKVBadger(pth, options)
+	default:
+		return makeKVPebble(pth, options)
+	}
 }

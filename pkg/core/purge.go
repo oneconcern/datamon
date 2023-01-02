@@ -260,7 +260,6 @@ func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db kvStore, 
 					zap.String("db_size", units.HumanSize(float64(dbSize))),
 				)
 				lastSeen = keys
-				// TODO(fred): we need to pause from time to time and reorganize the KV
 			case <-ctx.Done():
 				return nil
 			}
