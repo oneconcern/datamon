@@ -763,7 +763,7 @@ func testDownloadBundle(t *testing.T, files []uploadTree, bcnt int) {
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
-	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	require.True(t, exists, "filesystem entry at destination path '"+dpc+"' after bundle upload")
 	//
 	for _, file := range files {
 		expected := readTextFile(t, filePathStr(t, file))
@@ -826,7 +826,7 @@ func TestDownloadBundleNameFilter(t *testing.T) {
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
-	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	require.True(t, exists, "filesystem entry at destination path '"+dpc+"' after bundle upload")
 	//
 	fileInfos := make(map[string]os.FileInfo)
 	err = afero.Walk(destFS, dpc, func(path string, info os.FileInfo, err error) error {
@@ -904,7 +904,7 @@ func TestDiffBundle(t *testing.T) {
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
-	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	require.True(t, exists, "filesystem entry at destination path '"+dpc+"' after bundle upload")
 	//
 	srcFS := afero.NewBasePathFs(afero.NewOsFs(), dirPathStr(t, files[0]))
 	delFile := files[0]
@@ -1029,7 +1029,7 @@ func TestUpdateBundle(t *testing.T) {
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
-	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	require.True(t, exists, "filesystem entry at destination path '"+dpc+"' after bundle upload")
 	//
 	srcFS := afero.NewBasePathFs(afero.NewOsFs(), dirPathStr(t, files[0]))
 	delFile := files[0]
@@ -1160,7 +1160,7 @@ func TestDownloadBundleByLabel(t *testing.T) {
 	}, "download bundle uploaded from "+dirPathStr(t, files[0]), false)
 	exists, err = afero.Exists(destFS, dpc)
 	require.NoError(t, err, "error out of afero upstream library.  possibly programming error in test.")
-	require.True(t, exists, "filesystem entry at at destination path '"+dpc+"' after bundle upload")
+	require.True(t, exists, "filesystem entry at destination path '"+dpc+"' after bundle upload")
 	//
 	for _, file := range files {
 		expected := readTextFile(t, filePathStr(t, file))

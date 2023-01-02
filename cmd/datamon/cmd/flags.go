@@ -99,6 +99,7 @@ type flagsT struct {
 		Force          bool
 		LocalStorePath string
 		DryRun         bool
+		Resume         bool
 	}
 }
 
@@ -599,6 +600,14 @@ func addPurgeLocalPathFlag(cmd *cobra.Command) string {
 	const c = "local-work-dir"
 	if cmd != nil {
 		cmd.PersistentFlags().StringVar(&datamonFlags.purge.LocalStorePath, c, ".datamon-index", "Indicates the local folder that datamon will use as its working area")
+	}
+	return c
+}
+
+func addPurgeResumeFlag(cmd *cobra.Command) string {
+	const c = "resume"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.purge.Resume, c, false, "Resume index building: reload already uploaded index files (implies --force)")
 	}
 	return c
 }

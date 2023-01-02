@@ -42,9 +42,14 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 		}
 		logger, err := optionInputs.getLogger()
 
+		if datamonFlags.purge.Resume {
+			datamonFlags.purge.Force = true
+		}
+
 		logger.Info("building reverse-lookup index",
 			zap.String("context", datamonFlags.context.Descriptor.Name),
 			zap.Bool("force?", datamonFlags.purge.Force),
+			zap.Bool("resume?", datamonFlags.purge.Resume),
 			zap.String("context BLOB bucket", datamonFlags.context.Descriptor.Blob),
 			zap.String("context metadata bucket", datamonFlags.context.Descriptor.Metadata),
 		)

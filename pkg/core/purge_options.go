@@ -17,6 +17,7 @@ type (
 	purgeOptions struct {
 		force            bool
 		dryRun           bool
+		resume           bool
 		localStorePath   string
 		l                *zap.Logger
 		extraStores      []context2.Stores
@@ -162,6 +163,12 @@ func WithPurgeKVMemGTableSize(size int64) PurgeOption {
 func WithPurgeKVBlockCacheSize(size int64) PurgeOption {
 	return func(o *purgeOptions) {
 		o.kvBlockCacheSize = size
+	}
+}
+
+func WithPurgeResumeIndex(enabled bool) PurgeOption {
+	return func(o *purgeOptions) {
+		o.resume = enabled
 	}
 }
 
