@@ -152,7 +152,7 @@ func (f *fileIndex) downloadAll(chans downloadBundleFileListChans) {
 	chans.doneOk <- struct{}{}
 }
 
-// reset reset all index files to empty files
+// reset all index files to empty files
 func (f *fileIndex) reset() error {
 	throttle := make(chan struct{}, f.concurrency)
 	errC := make(chan error)

@@ -268,3 +268,12 @@ func TestGetArchivePathComponents(t *testing.T) {
 		})
 	}
 }
+
+func TestReverseIndexChunk(t *testing.T) {
+	res, err := ReverseIndexChunk("chunk-593.yaml")
+	require.NoError(t, err)
+	require.Equal(t, uint64(593), res)
+
+	_, err = ReverseIndexChunk("chunk-zork.yaml")
+	require.Error(t, err)
+}

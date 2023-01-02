@@ -25,6 +25,7 @@ type (
 		indexChunkSize   uint64 // in # of keys
 		uploaderInterval time.Duration
 		monitorInterval  time.Duration
+		indexStart       uint64
 
 		kvOptions
 	}
