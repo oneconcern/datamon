@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v3"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -19,15 +18,14 @@ func TestPurgeDBReader(t *testing.T) {
 		_ = os.RemoveAll(kvStore)
 	}()
 
-	db, erk := makeKV(kvStore, defaultPurgeOptions(nil))
+	db, erk := openKV(kvStore, defaultPurgeOptions(nil))
 	require.NoError(t, erk)
 
 	// prepare some keys in the store
 	for _, key := range testKeys() {
 		require.NoError(t,
-			db.Update(func(txn *badger.Txn) error {
-				return txn.Set([]byte(key), []byte{})
-			}))
+			db.Set([]byte(key), []byte{}),
+		)
 	}
 
 	ts := time.Now().UTC()
