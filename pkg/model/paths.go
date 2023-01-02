@@ -228,8 +228,7 @@ func ReverseIndexChunk(chunk string) (uint64, error) {
 	const indexFilePattern = "chunk-%d.yaml"
 
 	var result uint64
-
-	_, err := fmt.Sscanf(chunk, indexFilePattern, &result)
+	_, err := fmt.Sscanf(path.Base(chunk), indexFilePattern, &result)
 
 	return result, err
 }

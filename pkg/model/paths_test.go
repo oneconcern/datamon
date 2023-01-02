@@ -274,6 +274,14 @@ func TestReverseIndexChunk(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(593), res)
 
+	res, err = ReverseIndexChunk("dir/dir/chunk-593.yaml")
+	require.NoError(t, err)
+	require.Equal(t, uint64(593), res)
+
+	res, err = ReverseIndexChunk("reverse-index/chunk-1.yaml")
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), res)
+
 	_, err = ReverseIndexChunk("chunk-zork.yaml")
 	require.Error(t, err)
 }
