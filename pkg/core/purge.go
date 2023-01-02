@@ -830,6 +830,7 @@ func copyIndexChunks(ctx context.Context, db kvStore, indexStore storage.Store, 
 				}
 
 				atomic.AddUint64(&numKeys, loadedKeys)
+				logger.Info("loaded index chunk", zap.String("chunk", chunk))
 
 				return nil
 			})
