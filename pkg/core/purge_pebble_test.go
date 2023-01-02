@@ -19,8 +19,14 @@ func TestPebbleMerger(t *testing.T) {
 
 	require.NoError(t, db.Set([]byte("abc"), []byte("X")))
 	require.NoError(t, db.SetIfNotExists([]byte("abc"), []byte("Y")))
+	require.NoError(t, db.SetIfNotExists([]byte("abc"), []byte("Z")))
 
 	val, err := db.Get([]byte("abc"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("X"), val)
+
+	require.NoError(t, db.SetIfNotExists([]byte("xyz"), []byte("Y")))
+	val, err = db.Get([]byte("xyz"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("Y"), val)
 }

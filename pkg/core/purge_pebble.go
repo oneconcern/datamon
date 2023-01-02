@@ -127,8 +127,10 @@ func makeKVPebble(pth string, _ *purgeOptions) (*kvPebble, error) {
 	options.DisableWAL = true
 	options.Merger = &pebble.Merger{
 		Name: "ignore new",
-		Merge: func(_, _ []byte) (pebble.ValueMerger, error) {
-			return &ignoreNewMerger{}, nil
+		Merge: func(_, value []byte) (pebble.ValueMerger, error) {
+			return &ignoreNewMerger{
+				buf: value,
+			}, nil
 		},
 	}
 
@@ -146,12 +148,18 @@ func makeKVPebble(pth string, _ *purgeOptions) (*kvPebble, error) {
 	return pb, nil
 }
 
-func (m *ignoreNewMerger) MergeNewer(_ []byte) error {
+func (m *ignoreNewMerger) MergeNewer(val []byte) error {
+	if m.buf == nil {
+		m.buf = val
+	}
+
 	return nil
 }
 
 func (m *ignoreNewMerger) MergeOlder(val []byte) error {
-	m.buf = val
+	if val != nil {
+		m.buf = val
+	}
 
 	return nil
 }
