@@ -15,9 +15,11 @@ func TestPebbleMerger(t *testing.T) {
 	}()
 
 	db, err := makeKVPebble(kvStore, nil)
+	require.NoError(t, err)
 
 	require.NoError(t, db.Set([]byte("abc"), []byte("X")))
 	require.NoError(t, db.SetIfNotExists([]byte("abc"), []byte("Y")))
+
 	val, err := db.Get([]byte("abc"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("X"), val)

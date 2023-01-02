@@ -879,7 +879,7 @@ func loadChunk(ctx context.Context, db kvStore, r io.Reader) (*time.Time, uint64
 		}
 
 		// write key to local KV store. Payload is marked as "uploaded", to support the resume use-case.
-		if err := db.Set([]byte(key), []byte("X")); err != nil {
+		if err := db.Set(key, []byte("X")); err != nil {
 			return nil, numKeys, err
 		}
 

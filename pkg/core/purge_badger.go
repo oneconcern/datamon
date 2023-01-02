@@ -52,7 +52,7 @@ func (kv *kvBadger) AllKeys() kvIterator {
 func (kv *kvBadger) Get(key []byte) ([]byte, error) {
 	var value []byte
 	err := kv.DB.View(func(txn *badger.Txn) error {
-		item, e := txn.Get([]byte(key))
+		item, e := txn.Get(key)
 		if e != nil {
 			return e
 		}
@@ -66,7 +66,7 @@ func (kv *kvBadger) Get(key []byte) ([]byte, error) {
 
 func (kv *kvBadger) Exists(key []byte) (bool, error) {
 	err := kv.DB.View(func(txn *badger.Txn) error {
-		_, e := txn.Get([]byte(key))
+		_, e := txn.Get(key)
 
 		return e
 	})
@@ -141,11 +141,8 @@ func (i *kvBadgerIterator) Next() bool {
 	}
 
 	i.iterator.Next()
-	if !i.iterator.Valid() {
-		return false
-	}
 
-	return true
+	return i.iterator.Valid()
 }
 
 func (i *kvBadgerIterator) Item() ([]byte, []byte, error) {
