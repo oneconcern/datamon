@@ -89,12 +89,17 @@ func WithPurgeIndexChunkSize(chunkSize uint64) PurgeOption {
 	}
 }
 
+// WithPurgeResumeIndex will resume index building by first reloading a fresh KV
+// with all the already uploaded index files.
 func WithPurgeResumeIndex(enabled bool) PurgeOption {
 	return func(o *purgeOptions) {
 		o.resume = enabled
 	}
 }
 
+// WithKVType selects the KV implementation (badgerDB or pebble).
+//
+// The current default is pebble.
 func WithKVType(kvType KVType) PurgeOption {
 	return func(o *purgeOptions) {
 		o.kvType = kvType

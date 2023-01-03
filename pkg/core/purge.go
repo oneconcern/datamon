@@ -563,8 +563,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 		_ = db.Close()
 	}()
 
-	// 1. Download index and store it on a local KV store
-
+	// 1. Download index and save it on a local KV store
 	logger.Info("copying index entries to local KV store")
 
 	indexTime, numKeys, lastIndex, err := copyIndexChunks(ctx, db, indexStore, logger, options) // iterate over multiple index files
@@ -771,7 +770,7 @@ func checkAndDeleteKey(ctx context.Context,
 	return nil
 }
 
-// copyIndexChunks iterates over all index chunks and load the keys in the local KV store.
+// copyIndexChunks iterates over all index chunks and loads the keys in the local KV store.
 func copyIndexChunks(ctx context.Context, db kvStore, indexStore storage.Store, logger *zap.Logger, options *purgeOptions) (indexTime *time.Time, numKeys uint64, lastIndex uint64, err error) {
 	iterator := func(next string) ([]string, string, error) {
 		return indexStore.KeysPrefix(ctx, next, model.ReverseIndexPrefix(), "", 1024)
@@ -804,7 +803,9 @@ func copyIndexChunks(ctx context.Context, db kvStore, indexStore storage.Store, 
 				return nil, numKeys, lastIndex, fmt.Errorf("invalid index chunk file [%s]: %w", chunk, erp)
 
 			}
-			lastIndex = index
+			if index > lastIndex {
+				lastIndex = index
+			}
 
 			copyGroup.Go(func() error {
 				r, e := indexStore.Get(gctx, chunk)

@@ -18,11 +18,11 @@ type (
 		Set([]byte, []byte) error
 		// Set a key if it does not exists (upsert)
 		SetIfNotExists([]byte, []byte) error
-		// AllKeys returns a iterator over all keys in the DB
+		// AllKeys returns an iterator over all keys in the DB
 		AllKeys() kvIterator
 	}
 
-	// kvIterator provides a simplified abstraction for some KV iterator
+	// kvIterator provides a simplified abstraction to a KV iterator
 	kvIterator interface {
 		Next() bool
 		Item() ([]byte, []byte, error)
@@ -30,7 +30,7 @@ type (
 	}
 )
 
-// openKV opens a kvStore
+// openKV opens a kvStore. Select the appropriate KV implementation with the provided options.
 func openKV(pth string, options *purgeOptions) (kvStore, error) {
 	switch options.kvType {
 	case KVTypeBadger:
