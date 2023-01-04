@@ -60,7 +60,7 @@ var (
 	// ErrSplitMustExist occurs when forcing a split ID: this one must already exist
 	ErrSplitMustExist = errors.New("cannot create split: split must already exist")
 
-	// ErrSplitUpdate tells there is an error when uploading a split descriptor the the vmetadata store
+	// ErrSplitUpdate tells there is an error when uploading a split descriptor the vmetadata store
 	ErrSplitUpdate = errors.New("cannot update split descriptor")
 
 	// ErrVersionedStoreRequired indicates that a versioned store is required to operate on versioned objects (e.g. labels)

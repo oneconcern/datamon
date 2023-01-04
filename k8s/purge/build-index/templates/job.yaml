@@ -49,6 +49,7 @@ spec:
         - '--concurrency-factor'
         - '{{ . }}'
         {{- end }}
+        - '--resume'
         env:
           # location of datamon local config file
           - name: HOME

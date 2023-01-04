@@ -29,7 +29,7 @@ const (
 	// This defines the number of leaf buffers allocated to the cache (rounded up)
 	DefaultCacheSize = 50 * units.MiB
 
-	// DefaultLeafSize sets the the default size of a blob leaf (2 MB). It cannot exceed MaxLeafSize.
+	// DefaultLeafSize sets the default size of a blob leaf (2 MB). It cannot exceed MaxLeafSize.
 	// The actual leaf size used is usually specified by each bundle.
 	DefaultLeafSize uint32 = 2 * units.MiB
 

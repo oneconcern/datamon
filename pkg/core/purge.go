@@ -6,15 +6,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/dgraph-io/badger/v3"
-	badgeroptions "github.com/dgraph-io/badger/v3/options"
 	"github.com/docker/go-units"
 	"github.com/oneconcern/datamon/pkg/cafs"
 	context2 "github.com/oneconcern/datamon/pkg/context"
@@ -62,7 +59,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 	ctx := context.Background() // no timeout here
 	indexTime := time.Now().UTC()
 
-	db, err := makeKV(options.localStorePath, options)
+	db, err := openKV(options.localStorePath, options)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +81,23 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 		zap.Time("index_recording_time", indexTime),
 		zap.Stringer("blob_store", blob),
 	)
+
+	if options.resume {
+		// reload existing index files into a fresh local KV store
+		lastIndex, numKeys, ts, erp := preloadIndexFiles(ctx, stores, db, logger, options)
+		if erp != nil {
+			return nil, erp
+		}
+		options.indexStart = lastIndex // will resume index construction at the next chunk
+		indexTime = *ts                // keep the creation date of the original index
+
+		logger.Info("pre-existing index entries loaded into local KV store",
+			zap.Time("index_recording_time", indexTime),
+			zap.Uint64("num_keys", numKeys),
+			zap.Uint64("resuming new index entries with index", options.indexStart),
+			zap.Stringer("blob_store", blob),
+		)
+	}
 
 	contextStores := []context2.Stores{stores}
 	// include extra context stores to scan additional metadata
@@ -154,7 +168,7 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 	}, nil
 }
 
-func scanContext(ctx context.Context, contextStore context2.Stores, indexStore storage.Store, allKeysPtr, uniqueKeysPtr *uint64, db *badger.DB, logger *zap.Logger, options *purgeOptions) error {
+func scanContext(ctx context.Context, contextStore context2.Stores, indexStore storage.Store, allKeysPtr, uniqueKeysPtr *uint64, db kvStore, logger *zap.Logger, options *purgeOptions) error {
 	lg := logger.With(
 		zap.Stringer("context metadata", contextStore.Metadata()),
 	)
@@ -192,6 +206,7 @@ LOOP:
 	for i, repoToPin := range repos {
 		repo := repoToPin
 		lg.Info("in-progress percent of current context",
+			zap.Int("number of repos in this context", len(repos)),
 			zap.Int("percent_repos_in_context", int(float64(i)/float64(len(repos))*100.00)),
 		)
 		select {
@@ -221,7 +236,7 @@ LOOP:
 	return nil
 }
 
-func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db *badger.DB, logger *zap.Logger, options *purgeOptions) func() error {
+func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db kvStore, logger *zap.Logger, options *purgeOptions) func() error {
 	return func() error {
 		interval := options.monitorInterval
 		ticker := time.NewTicker(interval)
@@ -234,19 +249,17 @@ func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db *badger.D
 			select {
 			case <-ticker.C:
 				keys := atomic.LoadUint64(countPtr)
-				lsmSize, logSize := db.Size()
-				dbSize := lsmSize + logSize
+				dbSize := db.Size()
 				throughput := int64(float64(keys-lastSeen) / interval.Seconds())
 
 				logger.Info("keys scanned so far for this context",
 					zap.Uint64("keys", keys),
 					zap.Uint64("unique_keys", atomic.LoadUint64(countUniquePtr)),
 					zap.Uint64("keys_since_last_report", keys-lastSeen),
-					zap.Int64("throuhput keys scanned/s", throughput),
+					zap.Int64("throughput keys scanned/s", throughput),
 					zap.String("db_size", units.HumanSize(float64(dbSize))),
 				)
 				lastSeen = keys
-				// TODO(fred): we need to pause from time to time and reorganize the KV
 			case <-ctx.Done():
 				return nil
 			}
@@ -254,7 +267,7 @@ func monitor(ctx context.Context, countPtr, countUniquePtr *uint64, db *badger.D
 	}
 }
 
-func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo model.RepoDescriptor, countPtr, countUniquePtr *uint64, db *badger.DB, logger *zap.Logger, options *purgeOptions) func() error {
+func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo model.RepoDescriptor, countPtr, countUniquePtr *uint64, db kvStore, logger *zap.Logger, options *purgeOptions) func() error {
 	return func() error {
 		lg := logger.With(
 			zap.String("repo", repo.Name),
@@ -294,38 +307,11 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 				default:
 				}
 
-				eru := backoff.Retry(func() error {
-					return db.Update(func(txn *badger.Txn) error {
-						k := []byte(key)
-
-						_, erg := txn.Get(k)
-						if erg == nil {
-							return nil
-						}
-
-						if !errors.Is(erg, badger.ErrKeyNotFound) {
-							return backoff.Permanent(erg)
-						}
-
-						ers := txn.Set(k, []byte{})
-						if ers != nil {
-							if errors.Is(ers, badger.ErrConflict) {
-								return ers // retry
-							}
-
-							return backoff.Permanent(ers)
-						}
-
-						atomic.AddUint64(countUniquePtr, uint64(1))
-
-						return nil
-					})
-				},
-					backoff.NewConstantBackOff(10*time.Millisecond),
-				)
-				if eru != nil {
+				if eru := db.SetIfNotExists([]byte(key), []byte{}); eru != nil {
 					return eru
 				}
+
+				atomic.AddUint64(countUniquePtr, uint64(1))
 			}
 
 			return nil
@@ -352,7 +338,7 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 }
 
 // uploader scans over newly written keys every 5 minutes and uploads a new chunk of keys.
-func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time, uniqueKeysPtr, uploadKeysPtr *uint64, db *badger.DB, logger *zap.Logger, doneScanning <-chan struct{}, options *purgeOptions) func() error {
+func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time, uniqueKeysPtr, uploadKeysPtr *uint64, db kvStore, logger *zap.Logger, doneScanning <-chan struct{}, options *purgeOptions) func() error {
 	return func() error {
 		chunkSize := options.indexChunkSize
 		interval := options.uploaderInterval
@@ -362,8 +348,10 @@ func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time
 		}()
 
 		var (
-			chunkIndex, lastSeen uint64
+			lastSeen uint64
 		)
+
+		chunkIndex := options.indexStart
 
 		chunkGroup, cctx := errgroup.WithContext(ctx)
 		chunkGroup.SetLimit(1)
@@ -424,6 +412,7 @@ func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time
 		}
 
 		// write last chunks
+		logger.Info("uploading last chunks: no more keys are being received")
 		for {
 			chunkIndex++
 			uploadedBefore := atomic.LoadUint64(uploadKeysPtr)
@@ -464,7 +453,7 @@ func uploader(ctx context.Context, indexStore storage.Store, indexTime time.Time
 // uploads an index chunk file
 func chunkUploader(ctx context.Context,
 	chunkIndex, chunkSize uint64,
-	indexStore storage.Store, indexTime time.Time, uploadKeysPtr *uint64, db *badger.DB, logger *zap.Logger,
+	indexStore storage.Store, indexTime time.Time, uploadKeysPtr *uint64, db kvStore, logger *zap.Logger,
 	options *purgeOptions,
 ) func() error {
 	return func() error {
@@ -566,7 +555,7 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	)
 	ctx := context.Background() // no timeout here
 
-	db, err := makeKV(options.localStorePath, options)
+	db, err := openKV(options.localStorePath, options)
 	if err != nil {
 		return nil, err
 	}
@@ -574,11 +563,10 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 		_ = db.Close()
 	}()
 
-	// 1. Download index and store it on a local badgerdb KV store
-
+	// 1. Download index and save it on a local KV store
 	logger.Info("copying index entries to local KV store")
 
-	indexTime, numKeys, err := copyIndexChunks(ctx, db, indexStore) // iterate over multiple index files
+	indexTime, numKeys, lastIndex, err := copyIndexChunks(ctx, db, indexStore, logger, options) // iterate over multiple index files
 	if err != nil {
 		return nil, fmt.Errorf("copy index: %w", err)
 	}
@@ -586,11 +574,14 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 	// 2. Scan all keys in blob store
 	blob := getBlobStore(stores)
 	logger = logger.With(
-		zap.Timep("index_creation_time", indexTime),
 		zap.Stringer("blob_store", blob),
 	)
 
-	logger.Info("done with dumping index entries to local KV store", zap.Uint64("num_keys", numKeys))
+	logger.Info("done with dumping index entries to local KV store",
+		zap.Timep("index_creation_time", indexTime),
+		zap.Uint64("num_keys", numKeys),
+		zap.Uint64("last_index_file", lastIndex),
+	)
 
 	iterator := func(next string) ([]string, string, error) {
 		return blob.KeysPrefix(ctx, next, "", "", batchSize)
@@ -606,68 +597,12 @@ func PurgeDeleteUnused(stores context2.Stores, opts ...PurgeOption) (*PurgeBlobs
 
 	logger.Info("done with purging unused blobs",
 		zap.Timep("index_creation_time", indexTime),
-		zap.Stringer("blob", blob),
 	)
 
 	return descriptor, nil
 }
 
-func makeKV(pth string, options *purgeOptions) (*badger.DB, error) {
-	err := os.MkdirAll(pth, 0700)
-	if err != nil {
-		return nil, fmt.Errorf("makeKV: mkdir: %w", err)
-	}
-
-	// we queue up one compactor to back each key inserting goroutine.
-	// Let's hope this is enough to keep up with keys insertion.
-	compactors := max(4, int(float64(options.maxParallel)*1.5))
-
-	db, err := badger.Open(
-		badger.LSMOnlyOptions(pth).
-			WithLoggingLevel(badger.WARNING).
-			WithMetricsEnabled(true).            // need to enable this in order to collect a reporting of the DB size
-			WithCompression(badgeroptions.None). // a set of keys that are random hashes is unlikely to compress well
-			WithNumCompactors(compactors).       // need quite a few compactors, or the DB grows exceedingly fast
-			//
-			// Badger tunables...
-			// Badger DB defaults seem not suitable for a large operation like the purge job.
-			// After ~ 50 millions keys are inserted, the DB performance grinds to a halt. Processing
-			// keys becomes 10x slower than at the start of the process. Later on, the insertion speed degrades even more,
-			// so we end up with a 20x slower pace... At this point, progress is super slow, almost halted.
-			// The DB size remains rather stable at around 14 GB and grows only very slowly.
-			//
-			// I suspect the compaction process to become prominent at this stage.
-			//
-			// The specifics of our workload are:
-			// * we store mostly keys. Values are either empty or a single character (to flag uploaded keys)
-			// * compression is futile (we store random-like hashes)
-			// * no specific ordering in how keys appear
-			// * # get/set to try insertion ~ 1 billion
-			// * # unique keys  ~ 100-500 millions (stopped so far at ~ 85 millions unique keys)
-			WithIndexCacheSize(options.kvIndexCacheSize).                   // 0 -> 200MB
-			WithBaseLevelSize(options.kvBaseLevelSize).                     // 10MB (default)
-			WithBaseTableSize(options.kvBaseTableSize).                     // 2MB (default)
-			WithLevelSizeMultiplier(options.kvLevelSizeMultiplier).         // 10 (default)
-			WithMaxLevels(options.kvMaxLevels).                             // 7 (default)
-			WithMemTableSize(options.kvMemTableSize).                       // 64MB (default) - ~ 500k keys per table
-			WithNumLevelZeroTables(options.kvNumLevelZeroTables).           // 5 (default)
-			WithNumLevelZeroTablesStall(options.kvNumLevelZeroTablesStall). // 10 -> 500 - stall will occur later
-			WithNumMemtables(options.kvNumMemTables).                       // 5 (default)
-			WithBlockCacheSize(options.kvBlockCacheSize),                   // disabled by default (badger default: 256MB)
-	)
-	if err != nil {
-		return nil, fmt.Errorf("open KV: %w", err)
-	}
-
-	//  scratch any pre-existing local index
-	if err = db.DropAll(); err != nil {
-		return nil, fmt.Errorf("scrach KV: %w", err)
-	}
-
-	return db, nil
-}
-
-func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]string, string, error), db *badger.DB, indexTime time.Time, logger *zap.Logger, dryRun bool, maxParallel int) (*PurgeBlobs, error) {
+func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]string, string, error), db kvStore, indexTime time.Time, logger *zap.Logger, dryRun bool, maxParallel int) (*PurgeBlobs, error) {
 	var wg sync.WaitGroup
 	doneWithKeysChan := make(chan struct{}, 1)
 	keysChan := make(chan keyBatchEvent, 1)
@@ -771,7 +706,7 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 }
 
 func checkAndDeleteKey(ctx context.Context,
-	db *badger.DB, indexTime time.Time,
+	db kvStore, indexTime time.Time,
 	key string, blob storage.Store,
 	logger *zap.Logger, dryRun bool,
 	indexedEntries, moreRecentEntries, deletedEntries, deletedSize *uint64,
@@ -784,12 +719,8 @@ func checkAndDeleteKey(ctx context.Context,
 		croak = logger.Debug
 	}
 
-	err := db.View(func(txn *badger.Txn) error {
-		_, e := txn.Get([]byte(key))
-
-		return e
-	})
-	if err == nil {
+	found, err := db.Exists([]byte(key))
+	if found {
 		// key found in the index
 		croak("key found in index: keeping blob")
 		_ = atomic.AddUint64(indexedEntries, 1)
@@ -797,7 +728,7 @@ func checkAndDeleteKey(ctx context.Context,
 		return nil
 	}
 
-	if !errors.Is(err, badger.ErrKeyNotFound) {
+	if err != nil {
 		// some technical error occurred: interrupt
 		logger.Error("searching index", zap.Error(err))
 
@@ -839,8 +770,8 @@ func checkAndDeleteKey(ctx context.Context,
 	return nil
 }
 
-// copyIndexChunks iterates over all index chunks and load the keys in the local KV store.
-func copyIndexChunks(ctx context.Context, db *badger.DB, indexStore storage.Store) (indexTime *time.Time, numKeys uint64, err error) {
+// copyIndexChunks iterates over all index chunks and loads the keys in the local KV store.
+func copyIndexChunks(ctx context.Context, db kvStore, indexStore storage.Store, logger *zap.Logger, options *purgeOptions) (indexTime *time.Time, numKeys uint64, lastIndex uint64, err error) {
 	iterator := func(next string) ([]string, string, error) {
 		return indexStore.KeysPrefix(ctx, next, model.ReverseIndexPrefix(), "", 1024)
 	}
@@ -848,32 +779,63 @@ func copyIndexChunks(ctx context.Context, db *badger.DB, indexStore storage.Stor
 	var (
 		ks   []string
 		next string
+		mx   sync.Mutex
 	)
+	copyGroup, gctx := errgroup.WithContext(ctx)
+	copyGroup.SetLimit(options.maxParallel)
 
 	for {
 		ks, next, err = iterator(next)
 		if err != nil {
-			return nil, numKeys, fmt.Errorf("iterating index chunks in metadata [%s]: %w", next, err)
+			return nil, numKeys, lastIndex, fmt.Errorf("iterating index chunks in metadata [%s]: %w", next, err)
 		}
 
 		if len(ks) == 0 {
 			break
 		}
 
-		for _, chunk := range ks {
-			r, err := indexStore.Get(ctx, chunk)
-			if err != nil {
-				return nil, numKeys, fmt.Errorf("open index chunk in metadata [%s]: %w", chunk, err)
+		for _, toPin := range ks {
+			chunk := toPin
+			logger.Debug("loading index chunk", zap.String("chunk", chunk))
+
+			index, erp := model.ReverseIndexChunk(chunk)
+			if erp != nil {
+				return nil, numKeys, lastIndex, fmt.Errorf("invalid index chunk file [%s]: %w", chunk, erp)
+
+			}
+			if index > lastIndex {
+				lastIndex = index
 			}
 
-			var loadedKeys uint64
-			indexTime, loadedKeys, err = loadChunk(db, r)
-			if err != nil {
-				return nil, numKeys, fmt.Errorf("loading index chunk in metadata [%s]: %w", chunk, err)
-			}
+			copyGroup.Go(func() error {
+				r, e := indexStore.Get(gctx, chunk)
+				if e != nil {
+					return fmt.Errorf("open index chunk in metadata [%s]: %w", chunk, e)
+				}
+				defer func() {
+					_ = r.Close()
+				}()
 
-			numKeys += loadedKeys
-			_ = r.Close()
+				ts, loadedKeys, e := loadChunk(gctx, db, r)
+				if e != nil {
+					return fmt.Errorf("loading index chunk in metadata [%s]: %w", chunk, e)
+				}
+				logger.Debug("index chunk keys",
+					zap.String("chunk", chunk),
+					zap.Uint64("num_keys_in_chunk", loadedKeys),
+				)
+
+				if ts != nil {
+					mx.Lock()
+					indexTime = ts
+					mx.Unlock()
+				}
+
+				atomic.AddUint64(&numKeys, loadedKeys)
+				logger.Info("loaded index chunk", zap.String("chunk", chunk))
+
+				return nil
+			})
 		}
 
 		if next == "" {
@@ -881,10 +843,15 @@ func copyIndexChunks(ctx context.Context, db *badger.DB, indexStore storage.Stor
 		}
 	}
 
-	return indexTime, numKeys, nil
+	if err := copyGroup.Wait(); err != nil {
+		return indexTime, numKeys, lastIndex, fmt.Errorf("copy index chunks: %w", err)
+	}
+	logger.Debug("loaded all index chunks", zap.Uint64("num_keys", numKeys), zap.Uint64("last_chunk", lastIndex))
+
+	return indexTime, numKeys, lastIndex, nil
 }
 
-func loadChunk(db *badger.DB, r io.Reader) (*time.Time, uint64, error) {
+func loadChunk(ctx context.Context, db kvStore, r io.Reader) (*time.Time, uint64, error) {
 	scanner := bufio.NewScanner(r)
 	isFirst := true
 	var (
@@ -893,11 +860,18 @@ func loadChunk(db *badger.DB, r io.Reader) (*time.Time, uint64, error) {
 	)
 
 	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			// interrupt scanning whenever the group context is cancelled
+			return indexTime, numKeys, ctx.Err()
+		default:
+		}
+
 		key := scanner.Bytes()
 		if isFirst {
-			ts, erp := time.Parse(layout, string(key))
-			if erp != nil {
-				return nil, 0, erp
+			ts, err := time.Parse(layout, string(key))
+			if err != nil {
+				return nil, 0, err
 			}
 			indexTime = &ts
 
@@ -906,11 +880,8 @@ func loadChunk(db *badger.DB, r io.Reader) (*time.Time, uint64, error) {
 			continue
 		}
 
-		// write key to local KV store. Payload is empty.
-		err := db.Update(func(txn *badger.Txn) error {
-			return txn.Set(key, []byte{})
-		})
-		if err != nil {
+		// write key to local KV store. Payload is marked as "uploaded", to support the resume use-case.
+		if err := db.Set(key, []byte("X")); err != nil {
 			return nil, numKeys, err
 		}
 
@@ -1017,7 +988,7 @@ func PurgeDropReverseIndex(stores context2.Stores, opts ...PurgeOption) error {
 
 type dbReader struct {
 	mx        sync.Mutex
-	db        *badger.DB
+	db        kvStore
 	readOnce  bool
 	indexTime time.Time
 	group     *errgroup.Group
@@ -1028,7 +999,7 @@ type dbReader struct {
 	maxKeys   uint64
 }
 
-func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time, logger *zap.Logger, maxKeys uint64) *dbReader {
+func newDBReader(ctx context.Context, db kvStore, indexTime time.Time, logger *zap.Logger, maxKeys uint64) *dbReader {
 	r := &dbReader{
 		db:        db,
 		indexTime: indexTime,
@@ -1046,52 +1017,48 @@ func newDBReader(ctx context.Context, db *badger.DB, indexTime time.Time, logger
 }
 
 // iterateKV iterates over all keys and send them over the internal channel of this reader.
-func (r *dbReader) iterateKV(ctx context.Context, db *badger.DB) func() error {
+func (r *dbReader) iterateKV(ctx context.Context, db kvStore) func() error {
 	return func() error {
-		return db.View(func(txn *badger.Txn) error {
-			defer func() {
-				close(r.out)
-			}()
+		defer func() {
+			close(r.out)
+		}()
 
-			// iterate over all keys
-			iterator := txn.NewIterator(badger.IteratorOptions{
-				PrefetchSize:   1024,
-				PrefetchValues: true,
-			})
-			defer iterator.Close()
+		iterator := db.AllKeys()
+		defer func() {
+			_ = iterator.Close()
+		}()
 
-			var iterated, skipped uint64
-			defer func() {
-				r.logger.Debug("skipped keys for this upload iteration", zap.Uint64("skipped", skipped))
-			}()
+		var iterated, skipped uint64
+		defer func() {
+			r.logger.Debug("skipped keys for this upload iteration", zap.Uint64("skipped", skipped))
+		}()
 
-			for iterator.Rewind(); iterator.Valid(); iterator.Next() {
-				key := iterator.Item().KeyCopy(nil)
-				val, err := iterator.Item().ValueCopy(nil)
-				if err != nil {
-					return fmt.Errorf("failed to fetch KV value [%s]: %w", key, err)
-				}
-				if len(val) > 0 {
-					// key has been marked as already read once: skip
-					skipped++
-
-					continue
-				}
-
-				iterated++
-				if iterated > r.maxKeys {
-					return nil
-				}
-
-				select {
-				case r.out <- key:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
+		for iterator.Next() {
+			key, val, err := iterator.Item()
+			if err != nil {
+				return fmt.Errorf("failed to fetch KV value [%s]: %w", key, err)
 			}
 
-			return nil
-		})
+			if len(val) > 0 {
+				// key has been marked as already uploaded: skip
+				skipped++
+
+				continue
+			}
+
+			iterated++
+			if iterated > r.maxKeys {
+				return nil
+			}
+
+			select {
+			case r.out <- key:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		return nil
 	}
 }
 
@@ -1134,9 +1101,7 @@ func (r *dbReader) Read(p []byte) (int, error) {
 			b = append(b, '\n') // add newline to separate keys
 
 			// mark key as read in the DB
-			if err := r.db.Update(func(txn *badger.Txn) error {
-				return txn.Set(key, []byte("X"))
-			}); err != nil {
+			if err := r.db.Set(key, []byte("X")); err != nil {
 				return 0, fmt.Errorf("failed to mark KV key as read: %w", err)
 			}
 
@@ -1164,4 +1129,14 @@ func max(a, b int) int {
 	}
 
 	return b
+}
+
+func preloadIndexFiles(ctx context.Context, stores context2.Stores, db kvStore, logger *zap.Logger, options *purgeOptions) (uint64, uint64, *time.Time, error) {
+	indexStore := getMetaStore(stores)
+	indexTime, numKeys, lastIndex, err := copyIndexChunks(ctx, db, indexStore, logger, options) // iterate over multiple index files
+	if err != nil {
+		return lastIndex, numKeys, indexTime, fmt.Errorf("copy index: %w", err)
+	}
+
+	return lastIndex, numKeys, indexTime, nil
 }

@@ -230,7 +230,7 @@ func validateUpload(t *testing.T,
 		origEnt, exists := origBundleEntries[reEnt.Hash]
 		require.True(t, exists)
 		require.Equal(t, reEnt.NameWithPath, origEnt.NameWithPath)
-		// ??? unchecked values on on BundleEntry.  what values to test at this level of abstraction?
+		// ??? unchecked values on BundleEntry.  what values to test at this level of abstraction?
 	}
 
 	// Check Bundle File
@@ -239,7 +239,7 @@ func validateUpload(t *testing.T,
 	expectedBundleDescriptor := mocks.FakeBundleDescriptor(bundleEntriesFileCount, ev)
 	require.Equal(t, bundleDescriptor.Parents, expectedBundleDescriptor.Parents)
 	require.Equal(t, bundleDescriptor.LeafSize, expectedBundleDescriptor.LeafSize)
-	// ??? unchecked values on on BundleDescriptor.  what values to test at this level of abstraction?
+	// ??? unchecked values on BundleDescriptor.  what values to test at this level of abstraction?
 	return true
 }
 

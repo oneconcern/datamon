@@ -223,3 +223,12 @@ func ReverseIndexFile(chunk uint64) string {
 func ReverseIndexPrefix() string {
 	return path.Join(reverseIndexFile, indexFilePrefix)
 }
+
+func ReverseIndexChunk(chunk string) (uint64, error) {
+	const indexFilePattern = "chunk-%d.yaml"
+
+	var result uint64
+	_, err := fmt.Sscanf(path.Base(chunk), indexFilePattern, &result)
+
+	return result, err
+}
