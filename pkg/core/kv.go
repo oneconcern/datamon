@@ -20,6 +20,8 @@ type (
 		SetIfNotExists([]byte, []byte) error
 		// AllKeys returns an iterator over all keys in the DB
 		AllKeys() kvIterator
+		// Compact the KV
+		Compact() error
 	}
 
 	// kvIterator provides a simplified abstraction to a KV iterator

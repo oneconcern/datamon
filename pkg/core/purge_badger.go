@@ -132,6 +132,10 @@ func (kv *kvBadger) SetIfNotExists(key, value []byte) error {
 
 }
 
+func (kv *kvBadger) Compact() error {
+	return kv.DB.Flatten(100)
+}
+
 func (i *kvBadgerIterator) Next() bool {
 	if i.isFirst {
 		i.iterator.Rewind()
