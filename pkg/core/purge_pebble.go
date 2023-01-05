@@ -90,6 +90,14 @@ func (kv *kvPebble) SetIfNotExists(key, value []byte) error {
 	return kv.Merge(key, value, &pebble.WriteOptions{Sync: false}) // skip new value
 }
 
+func (kv *kvPebble) Compact() error {
+	iterator := kv.DB.NewIter(nil)
+	start, end := iterator.RangeBounds()
+	_ = iterator.Close()
+
+	return kv.DB.Compact(start, end, true)
+}
+
 func (i *kvPebbleIterator) Next() bool {
 	if i.isFirst {
 		_ = i.iterator.First()

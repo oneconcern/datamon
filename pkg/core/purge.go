@@ -847,6 +847,10 @@ func copyIndexChunks(ctx context.Context, db kvStore, indexStore storage.Store, 
 		return indexTime, numKeys, lastIndex, fmt.Errorf("copy index chunks: %w", err)
 	}
 	logger.Debug("loaded all index chunks", zap.Uint64("num_keys", numKeys), zap.Uint64("last_chunk", lastIndex))
+	if err := db.Compact(); err != nil {
+		return indexTime, numKeys, lastIndex, err
+	}
+	logger.Debug("index compacted")
 
 	return indexTime, numKeys, lastIndex, nil
 }
