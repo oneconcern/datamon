@@ -45,6 +45,10 @@ You MUST make sure that no delete job is still running before doing that.
 			return
 		}
 		logger, err := optionInputs.getLogger()
+		if err != nil {
+			wrapFatalln("create logger", err)
+			return
+		}
 
 		logger.Info("deleting unused blobs",
 			zap.String("context", datamonFlags.context.Descriptor.Name),

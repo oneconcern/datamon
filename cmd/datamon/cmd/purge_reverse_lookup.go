@@ -41,6 +41,10 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			return
 		}
 		logger, err := optionInputs.getLogger()
+		if err != nil {
+			wrapFatalln("create logger", err)
+			return
+		}
 
 		if datamonFlags.purge.Resume {
 			datamonFlags.purge.Force = true
