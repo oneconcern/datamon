@@ -84,7 +84,7 @@ func (label *Label) UploadDescriptor(ctx context.Context, bundle *Bundle) (err e
 	return nil
 }
 
-// DownloadDescriptorVersions retrieves all versions of a abel descriptor for a bundle
+// DownloadDescriptorVersions retrieves all versions of a label descriptor for a bundle
 func (label *Label) DownloadDescriptorVersions(ctx context.Context, bundle *Bundle, checkRepoExists bool) (lds []model.LabelDescriptor, err error) {
 	defer func(t0 time.Time) {
 		if label.MetricsEnabled() {
