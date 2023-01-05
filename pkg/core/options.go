@@ -22,6 +22,8 @@ type Settings struct {
 
 	metrics.Enable
 	ignoreCorruptedMetadata bool
+	retainTags              bool
+	retainSemverTags        bool
 	// m *M // TODO(fred): enable metrics for list operations
 }
 
@@ -96,6 +98,18 @@ func WithLabelPrefix(prefix string) Option {
 func WithIgnoreCorruptedMetadata(enabled bool) Option {
 	return func(s *Settings) {
 		s.ignoreCorruptedMetadata = enabled
+	}
+}
+
+func WithRetainTags(enabled bool) Option {
+	return func(s *Settings) {
+		s.retainTags = enabled
+	}
+}
+
+func WithRetainSemverTags(enabled bool) Option {
+	return func(s *Settings) {
+		s.retainSemverTags = enabled
 	}
 }
 

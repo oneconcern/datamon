@@ -32,7 +32,12 @@ Optionally, the squashing may also retain past tagged bundles, or only past tagg
 		}
 
 		// squash history for this repo
-		err = core.RepoSquash(remoteStores, datamonFlags.repo.RepoName)
+		err = core.RepoSquash(remoteStores, datamonFlags.repo.RepoName,
+			core.WithRetainTags(datamonFlags.squash.RetainTags),
+			core.WithRetainSemverTags(datamonFlags.squash.RetainSemverTags),
+			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
+			core.BatchSize(datamonFlags.core.BatchSize),
+		)
 		if err != nil {
 			wrapFatalln("squash repo", err)
 			return

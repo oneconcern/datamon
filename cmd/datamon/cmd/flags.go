@@ -102,8 +102,8 @@ type flagsT struct {
 		Resume         bool
 	}
 	squash struct {
-		RetainTags   bool
-		RetainSemver bool
+		RetainTags       bool
+		RetainSemverTags bool
 	}
 }
 
@@ -627,7 +627,7 @@ func addRetainTagsFlag(cmd *cobra.Command) string {
 func addRetainSemverTagsFlag(cmd *cobra.Command) string {
 	const c = "retain-semver-tags"
 	if cmd != nil {
-		cmd.Flags().BoolVar(&datamonFlags.squash.RetainTags, c, false, "Squash past bundles and retain all semver tagged past bundles")
+		cmd.Flags().BoolVar(&datamonFlags.squash.RetainSemverTags, c, false, "Squash past bundles and retain all semver tagged past bundles")
 	}
 	return c
 }
