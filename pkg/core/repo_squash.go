@@ -1,6 +1,8 @@
 package core
 
 import (
+	"sort"
+
 	"github.com/blang/semver"
 	context2 "github.com/oneconcern/datamon/pkg/context"
 )
@@ -44,7 +46,12 @@ func RepoSquash(stores context2.Stores, repoName string, opts ...Option) error {
 		}
 	}
 
-	// bundles are ordered from oldest to most recent (with natural ksuid ordering)
+	// bundles are ordered from oldest to most recent (with natural ksuid ordering).
+	// However, ksuid is imperfect when timings differ only slightly (e.g. when running tests).
+	// Hence the explicit re-sorting on a slice that is essentially already almost sorted.
+	sort.SliceStable(bundles, func(i, j int) bool {
+		return bundles[i].Timestamp.Before(bundles[j].Timestamp)
+	})
 	for _, bundle := range bundles[:len(bundles)-1] {
 		if settings.retainTags || settings.retainSemverTags {
 			if _, retain := labelsIndex[bundle.ID]; retain {
