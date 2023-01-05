@@ -6,19 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/docker/go-units"
+	context2 "github.com/oneconcern/datamon/pkg/context"
 	"github.com/oneconcern/datamon/pkg/core"
 	"github.com/oneconcern/datamon/pkg/model"
 	"github.com/spf13/cobra"
 )
-
-func applyRepoTemplate(repo model.RepoDescriptor) error {
-	var buf bytes.Buffer
-	if err := repoDescriptorTemplate(datamonFlags).Execute(&buf, repo); err != nil {
-		return fmt.Errorf("executing template: %w", err)
-	}
-	log.Println(buf.String())
-	return nil
-}
 
 var repoList = &cobra.Command{
 	Use:   "list",
@@ -41,7 +34,7 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 			wrapFatalln("create remote stores", err)
 			return
 		}
-		err = core.ListReposApply(remoteStores, applyRepoTemplate,
+		err = core.ListReposApply(remoteStores, applyRepoTemplate(remoteStores, optionInputs, datamonFlagsPtr.repo.withSize),
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
 			core.BatchSize(datamonFlags.core.BatchSize),
 			core.WithMetrics(datamonFlags.root.metrics.IsEnabled()),
@@ -62,5 +55,45 @@ func init() {
 	addCoreConcurrencyFactorFlag(repoList, 500)
 	addBatchSizeFlag(repoList)
 	addSkipAuthFlag(repoList)
+	addRepoSizeFlag(repoList)
 	repoCmd.AddCommand(repoList)
+}
+
+func applyRepoTemplate(stores context2.Stores, optionInputs *cliOptionInputs, withSize bool) func(model.RepoDescriptor) error {
+	return func(repo model.RepoDescriptor) error {
+		var buf bytes.Buffer
+		if err := repoDescriptorTemplate(datamonFlags).Execute(&buf, repo); err != nil {
+			return fmt.Errorf("executing template: %w", err)
+		}
+		log.Println(buf.String())
+
+		if !withSize {
+			return nil
+		}
+
+		var grandTotal uint64
+		err := core.ListBundlesApply(repo.Name, stores,
+			retrieveFileSizes(
+				repo.Name,
+				stores,
+				&datamonFlags,
+				optionInputs,
+				&grandTotal,
+			),
+			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
+			core.BatchSize(datamonFlags.core.BatchSize),
+			core.WithMetrics(datamonFlags.root.metrics.IsEnabled()),
+		)
+		if err != nil {
+			return err
+		}
+
+		log.Printf("\nGrand total for repo %q: %d (%s)",
+			repo.Name,
+			grandTotal,
+			units.HumanSize(float64(grandTotal)),
+		)
+
+		return nil
+	}
 }

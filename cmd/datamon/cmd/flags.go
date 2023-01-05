@@ -62,6 +62,7 @@ type flagsT struct {
 	repo struct {
 		RepoName    string
 		Description string
+		withSize    bool
 	}
 	root struct {
 		credFile string
@@ -628,6 +629,14 @@ func addRetainSemverTagsFlag(cmd *cobra.Command) string {
 	const c = "retain-semver-tags"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.squash.RetainSemverTags, c, false, "Squash past bundles and retain all semver tagged past bundles")
+	}
+	return c
+}
+
+func addRepoSizeFlag(cmd *cobra.Command) string {
+	const c = "with-size"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.repo.withSize, c, false, "Reports the assessed repo size in bytes for all bundles, without accounting for deduplicated blobs")
 	}
 	return c
 }
