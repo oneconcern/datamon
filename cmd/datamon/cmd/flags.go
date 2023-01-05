@@ -101,6 +101,10 @@ type flagsT struct {
 		DryRun         bool
 		Resume         bool
 	}
+	squash struct {
+		RetainTags   bool
+		RetainSemver bool
+	}
 }
 
 var datamonFlags = flagsT{}
@@ -608,6 +612,22 @@ func addPurgeResumeFlag(cmd *cobra.Command) string {
 	const c = "resume"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.purge.Resume, c, false, "Resume index building: reload already uploaded index files (implies --force)")
+	}
+	return c
+}
+
+func addRetainTagsFlag(cmd *cobra.Command) string {
+	const c = "retain-tags"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.squash.RetainTags, c, false, "Squash past bundles and retain all tagged past bundles")
+	}
+	return c
+}
+
+func addRetainSemverTagsFlag(cmd *cobra.Command) string {
+	const c = "retain-semver-tags"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.squash.RetainTags, c, false, "Squash past bundles and retain all semver tagged past bundles")
 	}
 	return c
 }
