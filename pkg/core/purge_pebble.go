@@ -32,7 +32,16 @@ func (kv *kvPebble) Drop() error {
 	}()
 
 	start, end := iterator.RangeBounds()
+	if pebble.DefaultComparer.Compare(start, end) >= 0 {
+		return nil
+	}
+
 	if err := kv.DB.DeleteRange(start, end, &pebble.WriteOptions{Sync: false}); err != nil {
+		return err
+	}
+
+	// as DeleteRange excludes the upper bound
+	if err := kv.DB.Delete(end, &pebble.WriteOptions{Sync: false}); err != nil && !errors.Is(err, pebble.ErrNotFound) {
 		return err
 	}
 
@@ -93,7 +102,13 @@ func (kv *kvPebble) SetIfNotExists(key, value []byte) error {
 func (kv *kvPebble) Compact() error {
 	iterator := kv.DB.NewIter(nil)
 	start, end := iterator.RangeBounds()
-	_ = iterator.Close()
+	defer func() {
+		_ = iterator.Close()
+	}()
+
+	if pebble.DefaultComparer.Compare(start, end) >= 0 {
+		return nil
+	}
 
 	return kv.DB.Compact(start, end, true)
 }
