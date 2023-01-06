@@ -69,6 +69,7 @@ func applyRepoSquash(remoteStores context2.Stores, datamonFlags *flagsT, logger 
 		return core.RepoSquash(remoteStores, repo.Name,
 			core.WithRetainTags(datamonFlags.squash.RetainTags),
 			core.WithRetainSemverTags(datamonFlags.squash.RetainSemverTags),
+			core.WithRetainNLatest(datamonFlags.squash.RetainNLatest),
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
 			core.BatchSize(datamonFlags.core.BatchSize),
 		)
@@ -81,6 +82,7 @@ func init() {
 	)
 	addRetainTagsFlag(contextSquash)
 	addRetainSemverTagsFlag(contextSquash)
+	addRetainNLatestFlag(contextSquash)
 	addCoreConcurrencyFactorFlag(contextSquash, 500)
 	addBatchSizeFlag(contextSquash)
 

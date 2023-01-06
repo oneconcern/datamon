@@ -24,6 +24,7 @@ type Settings struct {
 	ignoreCorruptedMetadata bool
 	retainTags              bool
 	retainSemverTags        bool
+	retainNLatest           int
 	// m *M // TODO(fred): enable metrics for list operations
 }
 
@@ -113,10 +114,19 @@ func WithRetainSemverTags(enabled bool) Option {
 	}
 }
 
+func WithRetainNLatest(n int) Option {
+	return func(s *Settings) {
+		if n > 0 {
+			s.retainNLatest = n
+		}
+	}
+}
+
 func defaultSettings() Settings {
 	return Settings{
 		concurrentList: defaultListConcurrency,
 		batchSize:      defaultBatchSize,
 		memProfDir:     ".",
+		retainNLatest:  1,
 	}
 }
