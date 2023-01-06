@@ -35,6 +35,7 @@ Optionally, the squashing may also retain past tagged bundles, or only past tagg
 		err = core.RepoSquash(remoteStores, datamonFlags.repo.RepoName,
 			core.WithRetainTags(datamonFlags.squash.RetainTags),
 			core.WithRetainSemverTags(datamonFlags.squash.RetainSemverTags),
+			core.WithRetainNLatest(datamonFlags.squash.RetainNLatest),
 			core.ConcurrentList(datamonFlags.core.ConcurrencyFactor),
 			core.BatchSize(datamonFlags.core.BatchSize),
 		)
@@ -67,6 +68,7 @@ func init() {
 	)
 	addRetainTagsFlag(repoSquash)
 	addRetainSemverTagsFlag(repoSquash)
+	addRetainNLatestFlag(repoSquash)
 	addCoreConcurrencyFactorFlag(repoSquash, 500)
 	addBatchSizeFlag(repoSquash)
 

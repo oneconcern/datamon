@@ -105,6 +105,7 @@ type flagsT struct {
 	squash struct {
 		RetainTags       bool
 		RetainSemverTags bool
+		RetainNLatest    int
 	}
 }
 
@@ -637,6 +638,14 @@ func addRepoSizeFlag(cmd *cobra.Command) string {
 	const c = "with-size"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.repo.withSize, c, false, "Reports the assessed repo size in bytes for all bundles, without accounting for deduplicated blobs")
+	}
+	return c
+}
+
+func addRetainNLatestFlag(cmd *cobra.Command) string {
+	const c = "retain-n-latest"
+	if cmd != nil {
+		cmd.Flags().IntVar(&datamonFlags.squash.RetainNLatest, c, 1, "Squash past bundles and retain n latest versions. May be combined with retain-tags and retain-semver-flags")
 	}
 	return c
 }

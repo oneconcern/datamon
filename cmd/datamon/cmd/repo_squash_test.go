@@ -222,15 +222,25 @@ func TestSquashRepo(t *testing.T) {
 		require.Contains(t, lines[2], "sixth and last commit for the repo")
 	})
 
-	t.Run("should squash repo13 with no tags retained and get only the last commit", func(t *testing.T) {
+	runCmd(t, []string{"bundle",
+		"upload",
+		"--path", input3,
+		"--message", "keep this commit",
+		"--repo", repo13,
+		"--context", dcontext,
+	}, fmt.Sprintf("added bundle at %q", input3), false)
+
+	t.Run("should squash repo13 with no tags retained and get only the 2 last commits", func(t *testing.T) {
 		r, w := startCapture(t)
 		runCmd(t, []string{"repo",
 			"squash",
+			"--retain-n-latest", "2",
 			"--repo", repo13,
 		}, fmt.Sprintf("squashed repo %q", repo13), false)
 		lines := endCapture(t, r, w, []string{})
-		require.Len(t, lines, 1)
+		require.Len(t, lines, 2)
 		require.Contains(t, lines[0], "sixth and last commit for the repo")
+		require.Contains(t, lines[1], "keep this commit")
 	})
 
 	t.Run("with squash context", func(t *testing.T) {

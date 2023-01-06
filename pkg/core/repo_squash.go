@@ -13,14 +13,17 @@ func RepoSquash(stores context2.Stores, repoName string, opts ...Option) error {
 		return err
 	}
 
-	if len(bundles) < 2 {
-		// nothing to be squashed
-		return nil
-	}
-
 	settings := defaultSettings()
 	for _, bApply := range opts {
 		bApply(&settings)
+	}
+	if settings.retainNLatest == 0 {
+		settings.retainNLatest = 1
+	}
+
+	if len(bundles) < settings.retainNLatest+1 {
+		// nothing to be squashed
+		return nil
 	}
 
 	labelsIndex := make(map[string]struct{}, 10)
@@ -52,7 +55,7 @@ func RepoSquash(stores context2.Stores, repoName string, opts ...Option) error {
 	sort.SliceStable(bundles, func(i, j int) bool {
 		return bundles[i].Timestamp.Before(bundles[j].Timestamp)
 	})
-	for _, bundle := range bundles[:len(bundles)-1] {
+	for _, bundle := range bundles[:len(bundles)-settings.retainNLatest] {
 		if settings.retainTags || settings.retainSemverTags {
 			if _, retain := labelsIndex[bundle.ID]; retain {
 				continue
