@@ -9,15 +9,46 @@ Since BLOBs are deduplicated, a single BLOB resource may be referenced by one or
 
 ## How to proceed
 
-1. Delete the repos that you no longer want
+1. Delete unnecessary data
+There are a few ways to derefence the data that you no longer want to keep.
+* delete a repo (`datamon repo delete`)
+* delete some files in all bundles from a repo (`datamon repo delete files`)
+* squash a repo to retain only some bundles (`datamon repo squash`)
+
+1.1 Delete the repos that you no longer want
 ```
-datamon repo delete --repo {my-deprecated-repo} [--context dev]
+datamon repo delete --repo {my-deprecated-repo} --context dev
 ```
 
 This will remove the metadata for this repo: all bundles and files are now irrecoverable.
 However, raw BLOB storage is still there (because we don't know yet if other resources refer to them).
 
 This command is very fast as it operates only on metadata.
+
+1.2 Delete files in a repo
+```
+datamon repo delete files --repo {my-deprecated-repo} {--files file-list.txt|--file path/file-to-delete} --context dev
+```
+
+1.3 Squash bundles in a repo
+This removes from the metadata some unwanted past versions of your data.
+
+* Retain only the latest bundle:
+```
+datamon repo squash --repo {my-deprecated-repo} --context dev
+```
+* Retain the latest bundle AND all bundles with a tag (aka label):
+```
+datamon repo squash --repo {my-deprecated-repo} --retain-tags --context dev
+```
+* Retain the latest bundle AND all bundles with a valid semver tag (e.g. 1.2.3 or v1.2.3):
+```
+datamon repo squash --repo {my-deprecated-repo} --retain-semver-tags --context dev
+```
+* Retain the latest n bundles (possibly mixed with the retain tag options above)
+```
+datamon repo squash --repo {my-deprecated-repo} --retain-n-latest 10 --context dev
+```
 
 2. Build a reverse-lookup index of all BLOB keys currently in use on your blob bucket
 ```
@@ -31,6 +62,14 @@ NOTE: running again the command will scratch the existing index and create an up
 NOTE: the index is by default built in `./.datamon-index` in the current working directory. This location may be altered
 by using the `--local-work-dir` flag to the `datamon purge` commands.
 
+> A kubernetes job template is provided in the folder `k8s/purge/build-index`.
+> You can run it with a command such as:
+>
+> `helm install -n flood -f values.default.yaml .`
+
+> **NOTE**: the job indexing keys in use may be interrupted and restarted with the `--resume` flag: it will reload the index 
+> chunks already uploaded and resume indexing.
+
 3. Delete all unused blobs
 ```
 datamon purge delete-unused [--context dev]
@@ -40,10 +79,18 @@ This will remove permanently all BLOB keys that are not referenced by the index.
 Again, for large stores, this command may take quite some time, as it is scanning all keys in the BLOB bucket.
 Similarly, enough local storage must be added to store locally the index of used keys (e.g. ~ 10GB).
 
+> A kubernetes job template is provided in the folder `k8s/purge/delete-unused`.
+> You can run it with a command such as:
+>
+> `helm install -n flood -f values.default.yaml .`
+
 4. You might want now to drop the index from the metadata
 ```
 datamon purge delete-reverse-lookup [--context dev]
 ```
+
+> **NOTE**: the job deleting BLOB keys may be interrupted and restarted: it will reload its index and 
+> resume deletion.
 
 ## Caveats
 
