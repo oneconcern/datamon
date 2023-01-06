@@ -292,7 +292,7 @@ func repoKeysScanner(ctx context.Context, contextStore context2.Stores, repo mod
 				Logger(zap.NewNop()), // mute verbosity on retrieving bundle details
 			)
 
-			keys, erk := bundleKeys(ctx, b, bundle.LeafSize, lg)
+			keys, erk := bundleKeys(ctx, b, bundle.LeafSize, db, lg)
 			if erk != nil {
 				return erk
 			}
@@ -501,7 +501,7 @@ func defaultBackoff() backoff.BackOff {
 	return withRetry
 }
 
-func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger) ([]string, error) {
+func bundleKeys(ctx context.Context, b *Bundle, size uint32, db kvStore, logger *zap.Logger) ([]string, error) {
 	if err := backoff.Retry(func() error {
 		return unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile)
 	},
@@ -518,13 +518,27 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32, logger *zap.Logger)
 	for _, entry := range b.BundleEntries {
 		root, err := cafs.KeyFromString(entry.Hash)
 		if err != nil {
-			// The root key contains invalid bytes. We've never seen this issue so far: block the process.
+			// the root key contains invalid bytes. We've never seen this issue so far: block the process.
 			logger.Error("the root key is invalid", zap.String("key", entry.Hash), zap.Error(err))
 
 			return nil, err
 		}
-		keys = append(keys, root.String())
+		key := root.String()
+		found, err := db.Exists([]byte(key))
+		if err != nil {
+			return nil, err
+		}
 
+		if found {
+			// the root key is found in store, no need to unpack it: we necessarily have all its leaves in store
+			continue
+		}
+
+		keys = append(keys, key)
+
+		// NOTE: this section issues a GET on remote store for this key and has been seen as the
+		// limiting factor on the throughput of the index building job.
+		// By skipping it on already existing root keys, we shall call this about 2.5x less often.
 		leaves, err := cafs.LeavesForHash(b.BlobStore(), root, size, "")
 		if err != nil {
 			// The root key is somehow corrupted. This might happen with objects created with previous versions of datamon:
@@ -624,10 +638,12 @@ func scanBlob(ctx context.Context, blob storage.Store, iterator func(string) ([]
 			select {
 			case <-ticker.C:
 				keys := atomic.LoadUint64(&scannedKeys)
+				deletedKeys := atomic.LoadUint64(&deletedEntries)
 				throughput := int64(float64(keys-lastSeen) / interval.Seconds())
 				logger.Info("keys scanned so far from blob store",
 					zap.Uint64("keys", keys),
 					zap.Uint64("keys_since_last_report", keys-lastSeen),
+					zap.Uint64("deleted_keys_so_far", deletedKeys),
 					zap.Int64("throughput keys/s", throughput),
 				)
 				lastSeen = keys
