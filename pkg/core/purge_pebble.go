@@ -96,6 +96,15 @@ func (kv *kvPebble) Set(key, value []byte) error {
 }
 
 func (kv *kvPebble) SetIfNotExists(key, value []byte) error {
+	found, err := kv.Exists(key)
+	if err != nil {
+		return err
+	}
+
+	if found {
+		return nil
+	}
+
 	return kv.Merge(key, value, &pebble.WriteOptions{Sync: false}) // skip new value
 }
 
