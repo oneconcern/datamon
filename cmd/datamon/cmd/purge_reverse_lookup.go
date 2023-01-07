@@ -58,20 +58,22 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			zap.String("context metadata bucket", datamonFlags.context.Descriptor.Metadata),
 		)
 
-		// figure out if we need to scan other contexts (if they share the same blob store)
-		extraContexts, err := metaForSharedContexts(optionInputs.params.context.Descriptor.Name, remoteStores.Blob())
-		if err != nil {
-			wrapFatalln("scanning other contexts", err)
-			return
-		}
-
 		opts := []core.PurgeOption{
 			core.WithPurgeForce(datamonFlags.purge.Force),
 			core.WithPurgeLogger(logger),
 			core.WithPurgeLocalStore(datamonFlags.purge.LocalStorePath),
-			core.WithPurgeExtraContexts(extraContexts),
 			core.WithPurgeParallel(datamonFlags.bundle.ConcurrencyFactor),
 			core.WithPurgeResumeIndex(datamonFlags.purge.Resume),
+		}
+
+		if !datamonFlags.purge.SingleContext {
+			// figure out if we need to scan other contexts (if they share the same blob store)
+			extraContexts, er := metaForSharedContexts(optionInputs.params.context.Descriptor.Name, remoteStores.Blob())
+			if er != nil {
+				wrapFatalln("scanning other contexts", er)
+				return
+			}
+			opts = append(opts, core.WithPurgeExtraContexts(extraContexts))
 		}
 
 		err = core.PurgeLock(remoteStores, opts...)
