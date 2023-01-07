@@ -196,9 +196,10 @@ func init() {
 
 	addPurgeDryRunFlag(deleteUnusedCmd)
 	addConcurrencyFactorFlag(deleteUnusedCmd, 100)
-	addConcurrencyFactorFlag(reverseLookupCmd, 100)
 
+	addConcurrencyFactorFlag(reverseLookupCmd, 100)
 	addPurgeResumeFlag(reverseLookupCmd)
+	addPurgeSingleContextFlag(reverseLookupCmd)
 
 	purgeCmd.AddCommand(reverseLookupCmd)
 	purgeCmd.AddCommand(deleteUnusedCmd)

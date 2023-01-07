@@ -101,6 +101,7 @@ type flagsT struct {
 		LocalStorePath string
 		DryRun         bool
 		Resume         bool
+		SingleContext  bool
 	}
 	squash struct {
 		RetainTags       bool
@@ -614,6 +615,14 @@ func addPurgeResumeFlag(cmd *cobra.Command) string {
 	const c = "resume"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.purge.Resume, c, false, "Resume index building: reload already uploaded index files (implies --force)")
+	}
+	return c
+}
+
+func addPurgeSingleContextFlag(cmd *cobra.Command) string {
+	const c = "current-context-only"
+	if cmd != nil {
+		cmd.Flags().BoolVar(&datamonFlags.purge.SingleContext, c, false, "Index building is only applied to the metadata of the current context")
 	}
 	return c
 }
