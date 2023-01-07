@@ -25,6 +25,7 @@ type Settings struct {
 	retainTags              bool
 	retainSemverTags        bool
 	retainNLatest           int
+	withMinimalBundle       bool
 	// m *M // TODO(fred): enable metrics for list operations
 }
 
@@ -119,6 +120,12 @@ func WithRetainNLatest(n int) Option {
 		if n > 0 {
 			s.retainNLatest = n
 		}
+	}
+}
+
+func WithMinimalBundle(enabled bool) Option {
+	return func(s *Settings) {
+		s.withMinimalBundle = enabled
 	}
 }
 

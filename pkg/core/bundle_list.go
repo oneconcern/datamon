@@ -298,6 +298,13 @@ func downloadBundleDescriptor(store storage.Store, repo, key string, settings Se
 		return model.BundleDescriptor{}, err
 	}
 
+	if settings.withMinimalBundle {
+		// in this configuration, don't fetch the bundle descriptor: we are only interested about the key
+		return model.BundleDescriptor{
+			ID: apc.BundleID,
+		}, nil
+	}
+
 	r, err := store.Get(context.Background(), model.GetArchivePathToBundle(repo, apc.BundleID))
 	if err != nil {
 		return model.BundleDescriptor{}, err
