@@ -102,6 +102,7 @@ type flagsT struct {
 		DryRun         bool
 		Resume         bool
 		SingleContext  bool
+		ChunkIndex     int
 	}
 	squash struct {
 		RetainTags       bool
@@ -623,6 +624,14 @@ func addPurgeSingleContextFlag(cmd *cobra.Command) string {
 	const c = "current-context-only"
 	if cmd != nil {
 		cmd.Flags().BoolVar(&datamonFlags.purge.SingleContext, c, false, "Index building is only applied to the metadata of the current context")
+	}
+	return c
+}
+
+func addPurgeChunkIndexFlag(cmd *cobra.Command) string {
+	const c = "index-chunk-start"
+	if cmd != nil {
+		cmd.Flags().IntVar(&datamonFlags.purge.ChunkIndex, c, 0, "Index building starts with this index chunk sequence number. This allows for manually copying other chunks and merging indexes")
 	}
 	return c
 }

@@ -89,6 +89,14 @@ func WithPurgeIndexChunkSize(chunkSize uint64) PurgeOption {
 	}
 }
 
+func WithPurgeIndexChunkStart(indexStart int) PurgeOption {
+	return func(o *purgeOptions) {
+		if indexStart > 0 {
+			o.indexStart = uint64(indexStart)
+		}
+	}
+}
+
 // WithPurgeResumeIndex will resume index building by first reloading a fresh KV
 // with all the already uploaded index files.
 func WithPurgeResumeIndex(enabled bool) PurgeOption {

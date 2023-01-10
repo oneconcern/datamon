@@ -200,6 +200,7 @@ func init() {
 	addConcurrencyFactorFlag(reverseLookupCmd, 100)
 	addPurgeResumeFlag(reverseLookupCmd)
 	addPurgeSingleContextFlag(reverseLookupCmd)
+	addPurgeChunkIndexFlag(reverseLookupCmd)
 
 	purgeCmd.AddCommand(reverseLookupCmd)
 	purgeCmd.AddCommand(deleteUnusedCmd)
