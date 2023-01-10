@@ -115,7 +115,7 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string, opts ...
 	}
 
 	// 3. remove bundle descriptor
-	if e := store.Delete(context.Background(), pth); e != nil {
+	if e := store.Delete(context.Background(), pth); e != nil && !options.ignoreBundleError {
 		return fmt.Errorf("cannot delete bundle descriptor for %s in repo %s: %v", bundleID, repo, e)
 	}
 	return nil
