@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/oneconcern/datamon/internal/rand"
 	"github.com/stretchr/testify/require"
@@ -99,6 +100,7 @@ func TestSquashRepo(t *testing.T) {
 		// insert additional bundles
 		doUpdate(t, input2)
 
+		time.Sleep(time.Second)
 		runCmd(t, []string{"bundle",
 			"upload",
 			"--path", input2,
@@ -109,6 +111,7 @@ func TestSquashRepo(t *testing.T) {
 
 		doUpdate(t, input2)
 
+		time.Sleep(time.Second)
 		runCmd(t, []string{"bundle",
 			"upload",
 			"--path", input2,
@@ -139,6 +142,7 @@ func TestSquashRepo(t *testing.T) {
 		}, fmt.Sprintf("upload bundle at %q", input3), false)
 
 		doUpdate(t, input3)
+		time.Sleep(time.Second)
 
 		runCmd(t, []string{"bundle",
 			"upload",
@@ -150,6 +154,7 @@ func TestSquashRepo(t *testing.T) {
 		}, fmt.Sprintf("upload bundle at %q", input3), false)
 
 		doUpdate(t, input3)
+		time.Sleep(time.Second)
 
 		runCmd(t, []string{"bundle",
 			"upload",
@@ -161,6 +166,7 @@ func TestSquashRepo(t *testing.T) {
 		}, fmt.Sprintf("upload bundle at %q", input3), false)
 
 		doUpdate(t, input3)
+		time.Sleep(time.Second)
 
 		runCmd(t, []string{"bundle",
 			"upload",
@@ -261,6 +267,7 @@ func TestSquashRepo(t *testing.T) {
 				"--context", dcontext,
 			}, fmt.Sprintf("upload bundle at %q", input2), false)
 
+			time.Sleep(time.Second)
 			runCmd(t, []string{"bundle",
 				"upload",
 				"--path", input2,
@@ -277,6 +284,7 @@ func TestSquashRepo(t *testing.T) {
 				"--context", dcontext,
 			}, fmt.Sprintf("upload bundle at %q", input3), false)
 
+			time.Sleep(time.Second)
 			runCmd(t, []string{"bundle",
 				"upload",
 				"--path", input3,
@@ -286,6 +294,7 @@ func TestSquashRepo(t *testing.T) {
 				"--context", dcontext,
 			}, fmt.Sprintf("upload bundle at %q", input3), false)
 
+			time.Sleep(time.Second)
 			runCmd(t, []string{"bundle",
 				"upload",
 				"--path", input3,
