@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: datamon-dev
+spec:
+  containers:
+    - name: dev
+      image: golang:1.11-alpine
+      tty: true
+      stdin: true
+  nodeSelector:
+    role: flood-common
+  tolerations:
+  - key: role
+    effect: NoSchedule
+    operator: Equal
+    value: flood-common
+  affinity: {}
+  serviceAccountName: flood
+
+

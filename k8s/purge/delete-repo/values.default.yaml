@@ -1,0 +1,48 @@
+image:
+  repository: gcr.io/onec-co/datamon
+  tag: v2.6.5
+  pullPolicy: Always
+
+serviceAccountName: flood
+
+# default config to map as ${HOME}/.datamon/datamon.yaml
+config: |
+  credential: ""
+  email: ""
+  name: ""
+  config: global-onec-co-datamon-config
+  context: dev
+  metrics:
+    enabled: false
+
+concurrency: 200
+repo: lisflood-dev-workflow-outputs
+loglevel: debug
+
+# time to live for k8 resources (in seconds)
+ttl: 86400
+# number of allowed job restarts upon failure (with restartPolicy: OnFailure)
+backoffs: 0
+
+restartPolicy: Never
+nameOverride: ""
+fullnameOverride: ""
+application: datamon-delete
+
+# Tune this for maximum performances
+resources: {}
+
+nodeSelector:
+  role: flood-common
+tolerations:
+  - key: role
+    effect: NoSchedule
+    operator: Equal
+    value: flood-common
+affinity: {}
+
+# you may declare and mount extra volumes on the pod
+extraVolumes:
+extraVolumeMounts:
+
+extraArgs: []

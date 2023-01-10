@@ -24,33 +24,27 @@ spec:
         - name: config
           configMap:
             name: {{.Release.Name}}-config
-        - name: staging-volume
-          persistentVolumeClaim:
-            claimName: "{{.Release.Name}}-staging-claim"
       {{- if .Values.extraVolumes }}
 {{ toYaml .Values.extraVolumes | indent 8 }}
       {{- end }}
       serviceAccountName: {{ .Values.serviceAccountName }}
       containers:
-      - name: datamon-index-job
+      - name: datamon-delete-job
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:
         - datamon
-        - purge
-        - '{{ .Values.command }}'
-        - '--skip-auth'
-        - '--local-work-dir'
-        - '{{ .Values.staging }}'
-        {{- with .Values.force }}
-        - '--force'
-        {{- end }}
-        {{- with .Values.concurrency }}
-        - '--concurrency-factor'
+        - repo
+        - delete
+        - '--context'
+        - '{{ .Values.context }}'
+        - '--repo'
+        - '{{ .Values.repo }}'
+        - '--force-yes'
+        {{- with .Values.loglevel  }}
+        - '--loglevel'
         - '{{ . }}'
         {{- end }}
-        #- '--resume'
-        - '--current-context-only'
         env:
           # location of datamon local config file
           - name: HOME
@@ -58,8 +52,6 @@ spec:
         volumeMounts:
           - mountPath: {{ .Values.home }}/.datamon2
             name: config
-          - mountPath: {{ .Values.staging }}
-            name: staging-volume
 {{- if .Values.extraVolumeMounts }}
 {{ toYaml .Values.extraVolumeMounts | indent 10 }}
 {{- end }}
