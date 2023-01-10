@@ -64,6 +64,7 @@ You MUST make sure that no concurrent build-reverse-lookup or delete job is stil
 			core.WithPurgeLocalStore(datamonFlags.purge.LocalStorePath),
 			core.WithPurgeParallel(datamonFlags.bundle.ConcurrencyFactor),
 			core.WithPurgeResumeIndex(datamonFlags.purge.Resume),
+			core.WithPurgeIndexChunkStart(datamonFlags.purge.ChunkIndex),
 		}
 
 		if !datamonFlags.purge.SingleContext {

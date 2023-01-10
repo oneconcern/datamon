@@ -88,8 +88,10 @@ func PurgeBuildReverseIndex(stores context2.Stores, opts ...PurgeOption) (*Purge
 		if erp != nil {
 			return nil, erp
 		}
-		options.indexStart = lastIndex // will resume index construction at the next chunk
-		indexTime = *ts                // keep the creation date of the original index
+		if lastIndex > options.indexStart {
+			options.indexStart = lastIndex // will resume index construction at the next chunk
+		}
+		indexTime = *ts // keep the creation date of the original index
 
 		logger.Info("pre-existing index entries loaded into local KV store",
 			zap.Time("index_recording_time", indexTime),
