@@ -29,18 +29,33 @@ func DeleteRepo(repo string, stores context2.Stores, opts ...DeleteOption) error
 	if err != nil {
 		return fmt.Errorf("cannot list bundles in repo %s: %v", repo, err)
 	}
-	for _, b := range bundles {
-		bopts := opts
-		bopts = append(bopts, WithDeleteSkipCheckRepo(true))
+	bopts := opts
+	bopts = append(bopts,
+		WithDeleteSkipCheckRepo(true),
+		WithDeleteSkipDeleteLabel(true),
+	)
 
+	for _, b := range bundles {
 		if e := DeleteBundle(repo, stores, b.ID, bopts...); e != nil {
 			return fmt.Errorf("cannot delete bundle %s in repo %s: %v", b.ID, repo, e)
 		}
 	}
 
 	pth := model.GetArchivePathToRepoDescriptor(repo)
-	if err := store.Delete(context.Background(), pth); err != nil {
+	if err = store.Delete(context.Background(), pth); err != nil {
 		return fmt.Errorf("cannot delete repo: %s: %v", repo, err)
+	}
+
+	// 2. remove all labels
+	labels, err := ListLabels(repo, stores)
+	if err != nil {
+		return fmt.Errorf("cannot list labels in repo %s: %v", repo, err)
+	}
+
+	for _, l := range labels {
+		if e := DeleteLabel(repo, stores, l.Name, WithDeleteSkipCheckRepo(true)); e != nil {
+			return fmt.Errorf("cannot delete label %s on bundle %s in repo %s: %v", l.Name, l.BundleID, repo, e)
+		}
 	}
 
 	return nil
