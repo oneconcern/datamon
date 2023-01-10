@@ -14,11 +14,14 @@ import (
 )
 
 // DeleteRepo removes a repository from metadata
-func DeleteRepo(repo string, stores context2.Stores) error {
+func DeleteRepo(repo string, stores context2.Stores, opts ...DeleteOption) error {
 	store := GetRepoStore(stores)
+	options := deleteOptionsWithDefaults(opts)
 
-	if err := RepoExists(repo, stores); err != nil {
-		return fmt.Errorf("cannot find repo: %s: %v", repo, err)
+	if !options.skipCheckRepo {
+		if err := RepoExists(repo, stores); err != nil {
+			return fmt.Errorf("cannot find repo: %s: %v", repo, err)
+		}
 	}
 
 	// 1. remove all bundles in repo
@@ -27,7 +30,10 @@ func DeleteRepo(repo string, stores context2.Stores) error {
 		return fmt.Errorf("cannot list bundles in repo %s: %v", repo, err)
 	}
 	for _, b := range bundles {
-		if e := DeleteBundle(repo, stores, b.ID); e != nil {
+		bopts := opts
+		bopts = append(bopts, WithDeleteSkipCheckRepo(true))
+
+		if e := DeleteBundle(repo, stores, b.ID, bopts...); e != nil {
 			return fmt.Errorf("cannot delete bundle %s in repo %s: %v", b.ID, repo, e)
 		}
 	}
@@ -40,10 +46,14 @@ func DeleteRepo(repo string, stores context2.Stores) error {
 	return nil
 }
 
-// DeleteBundle removes a single bundle from a repo
-func DeleteBundle(repo string, stores context2.Stores, bundleID string) error {
-	if err := RepoExists(repo, stores); err != nil {
-		return fmt.Errorf("cannot find repo: %s: %v", repo, err)
+// DeleteBundle removes a single bundle from a repo.
+func DeleteBundle(repo string, stores context2.Stores, bundleID string, opts ...DeleteOption) error {
+	options := deleteOptionsWithDefaults(opts)
+
+	if !options.skipCheckRepo {
+		if err := RepoExists(repo, stores); err != nil {
+			return fmt.Errorf("cannot find repo: %s: %v", repo, err)
+		}
 	}
 
 	store := getMetaStore(stores)
@@ -53,16 +63,18 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string) error {
 		return fmt.Errorf("cannot retrieve bundle metadata from bundle: %s in repo %s: %v", bundleID, repo, err)
 	}
 
-	// 1. remove all labels for that bundle
-	labels, err := ListLabels(repo, stores)
-	if err != nil {
-		return fmt.Errorf("cannot list labels in repo %s: %v", repo, err)
-	}
+	if !options.skipDeleteLabel {
+		// 1. remove all labels for that bundle
+		labels, err := ListLabels(repo, stores)
+		if err != nil {
+			return fmt.Errorf("cannot list labels in repo %s: %v", repo, err)
+		}
 
-	for _, l := range labels {
-		if l.BundleID == bundleID {
-			if e := DeleteLabel(repo, stores, l.Name); e != nil {
-				return fmt.Errorf("cannot delete label %s on bundle %s in repo %s: %v", l.Name, bundleID, repo, e)
+		for _, l := range labels {
+			if l.BundleID == bundleID {
+				if e := DeleteLabel(repo, stores, l.Name, opts...); e != nil {
+					return fmt.Errorf("cannot delete label %s on bundle %s in repo %s: %v", l.Name, bundleID, repo, e)
+				}
 			}
 		}
 	}
@@ -84,10 +96,15 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string) error {
 }
 
 // DeleteLabel removes a single label from a repo
-func DeleteLabel(repo string, stores context2.Stores, name string) error {
-	if err := RepoExists(repo, stores); err != nil {
-		return fmt.Errorf("cannot find repo: %s: %v", repo, err)
+func DeleteLabel(repo string, stores context2.Stores, name string, opts ...DeleteOption) error {
+	options := deleteOptionsWithDefaults(opts)
+
+	if !options.skipCheckRepo {
+		if err := RepoExists(repo, stores); err != nil {
+			return fmt.Errorf("cannot find repo: %s: %v", repo, err)
+		}
 	}
+
 	// TODO(fred): delete all versions???
 	store := stores.VMetadata()
 	pth := model.GetArchivePathToLabel(repo, name)

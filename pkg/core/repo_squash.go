@@ -1,12 +1,14 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/blang/semver"
 	context2 "github.com/oneconcern/datamon/pkg/context"
 )
 
 func RepoSquash(stores context2.Stores, repoName string, opts ...Option) error {
-	opts = append(opts, WithMinimalBundle(true))
+	opts = append(opts, WithMinimalBundle(true)) // limits I/Os with remote store: we only need keys
 
 	bundles, err := ListBundles(repoName, stores, opts...)
 	if err != nil {
@@ -59,6 +61,8 @@ func RepoSquash(stores context2.Stores, repoName string, opts ...Option) error {
 			return bundles[i].Timestamp.Before(bundles[j].Timestamp)
 		})
 	*/
+	deletedIndex := make(map[string]struct{}, len(bundles)-settings.retainNLatest)
+
 	for _, bundle := range bundles[:len(bundles)-settings.retainNLatest] {
 		if settings.retainTags || settings.retainSemverTags {
 			if _, retain := labelsIndex[bundle.ID]; retain {
@@ -66,8 +70,29 @@ func RepoSquash(stores context2.Stores, repoName string, opts ...Option) error {
 			}
 		}
 
-		if erd := DeleteBundle(repoName, stores, bundle.ID); erd != nil {
+		if erd := DeleteBundle(repoName, stores, bundle.ID,
+			// disable some deletion to make it faster, esp. when there are a lot of labels
+			WithDeleteSkipCheckRepo(true),
+			WithDeleteSkipDeleteLabel(true),
+		); erd != nil {
 			return erd
+		}
+		deletedIndex[bundle.ID] = struct{}{}
+	}
+
+	// now address labels to keep consistent metadata
+	labels, err := ListLabels(repoName, stores)
+	if err != nil {
+		return fmt.Errorf("cannot list labels in repo %s: %v", repoName, err)
+	}
+
+	for _, l := range labels {
+		if _, found := deletedIndex[l.BundleID]; !found {
+			continue
+		}
+
+		if e := DeleteLabel(repoName, stores, l.Name, WithDeleteSkipCheckRepo(true)); e != nil {
+			return fmt.Errorf("cannot delete label %s on bundle %s in repo %s: %v", l.Name, l.BundleID, repoName, e)
 		}
 	}
 
