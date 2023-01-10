@@ -78,6 +78,7 @@ func RepoSquash(stores context2.Stores, repoName string, opts ...Option) error {
 			// disable some deletion to make it faster, esp. when there are a lot of labels
 			WithDeleteSkipCheckRepo(true),   // already done
 			WithDeleteSkipDeleteLabel(true), // we'll clean up labels later
+			WithDeleteIgnoreBundleError(true),
 		); erd != nil {
 			return erd
 		}

@@ -33,6 +33,7 @@ func DeleteRepo(repo string, stores context2.Stores, opts ...DeleteOption) error
 	bopts = append(bopts,
 		WithDeleteSkipCheckRepo(true),
 		WithDeleteSkipDeleteLabel(true),
+		WithDeleteIgnoreBundleError(true),
 	)
 
 	// remove all bundles, leave labels
@@ -75,7 +76,7 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string, opts ...
 	store := getMetaStore(stores)
 	pth := model.GetArchivePathToBundle(repo, bundleID)
 	bundle, err := downloadBundleDescriptor(store, repo, pth, defaultSettings())
-	if err != nil {
+	if err != nil && !options.ignoreBundleError {
 		return fmt.Errorf("cannot retrieve bundle metadata from bundle: %s in repo %s: %v", bundleID, repo, err)
 	}
 
@@ -97,10 +98,19 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string, opts ...
 
 	// 2. remove all file entry index files for that bundle
 	indexFiles := bundle.BundleEntriesFileCount
-	for i := uint64(0); i < indexFiles; i++ {
-		archivePathToBundleFileList := model.GetArchivePathToBundleFileList(repo, bundleID, i)
-		if e := store.Delete(context.Background(), archivePathToBundleFileList); e != nil {
-			return fmt.Errorf("cannot delete file list %s on bundle %s in repo %s: %v", archivePathToBundleFileList, bundleID, repo, e)
+	if indexFiles == 0 && options.ignoreBundleError {
+		var e error
+		for i := uint64(0); e == nil; i++ {
+			// delete everything until an error is found
+			archivePathToBundleFileList := model.GetArchivePathToBundleFileList(repo, bundleID, i)
+			e = store.Delete(context.Background(), archivePathToBundleFileList)
+		}
+	} else {
+		for i := uint64(0); i < indexFiles; i++ {
+			archivePathToBundleFileList := model.GetArchivePathToBundleFileList(repo, bundleID, i)
+			if e := store.Delete(context.Background(), archivePathToBundleFileList); e != nil {
+				return fmt.Errorf("cannot delete file list %s on bundle %s in repo %s: %v", archivePathToBundleFileList, bundleID, repo, e)
+			}
 		}
 	}
 

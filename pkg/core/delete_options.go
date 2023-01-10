@@ -4,8 +4,9 @@ type (
 	DeleteOption func(*deleteOptions)
 
 	deleteOptions struct {
-		skipCheckRepo   bool
-		skipDeleteLabel bool
+		skipCheckRepo     bool
+		skipDeleteLabel   bool
+		ignoreBundleError bool
 	}
 )
 
@@ -28,5 +29,11 @@ func WithDeleteSkipCheckRepo(skip bool) DeleteOption {
 func WithDeleteSkipDeleteLabel(skip bool) DeleteOption {
 	return func(o *deleteOptions) {
 		o.skipDeleteLabel = skip
+	}
+}
+
+func WithDeleteIgnoreBundleError(enabled bool) DeleteOption {
+	return func(o *deleteOptions) {
+		o.ignoreBundleError = enabled
 	}
 }
