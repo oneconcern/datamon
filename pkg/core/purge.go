@@ -509,9 +509,10 @@ func bundleKeys(ctx context.Context, b *Bundle, size uint32, db kvStore, logger 
 	},
 		backoff.WithContext(defaultBackoff(), ctx),
 	); err != nil {
-		logger.Error("the metadata for this bundle cannot be read", zap.String("bundle_id", b.BundleID), zap.Error(err))
+		logger.Warn("the metadata for this bundle cannot be read", zap.String("bundle_id", b.BundleID), zap.Error(err))
 
-		return nil, err
+		// some metadata is incomplete and/or invalid: ignore errors
+		return nil, nil
 	}
 
 	keys := make([]string, 0, 1024)
