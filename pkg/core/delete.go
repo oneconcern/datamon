@@ -89,7 +89,7 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string, opts ...
 
 		for _, l := range labels {
 			if l.BundleID == bundleID {
-				if e := DeleteLabel(repo, stores, l.Name, opts...); e != nil {
+				if e := DeleteLabel(repo, stores, l.Name, opts...); e != nil && !options.ignoreBundleError {
 					return fmt.Errorf("cannot delete label %s on bundle %s in repo %s: %v", l.Name, bundleID, repo, e)
 				}
 			}
@@ -108,7 +108,7 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string, opts ...
 	} else {
 		for i := uint64(0); i < indexFiles; i++ {
 			archivePathToBundleFileList := model.GetArchivePathToBundleFileList(repo, bundleID, i)
-			if e := store.Delete(context.Background(), archivePathToBundleFileList); e != nil {
+			if e := store.Delete(context.Background(), archivePathToBundleFileList); e != nil && !options.ignoreBundleError {
 				return fmt.Errorf("cannot delete file list %s on bundle %s in repo %s: %v", archivePathToBundleFileList, bundleID, repo, e)
 			}
 		}
@@ -118,6 +118,7 @@ func DeleteBundle(repo string, stores context2.Stores, bundleID string, opts ...
 	if e := store.Delete(context.Background(), pth); e != nil && !options.ignoreBundleError {
 		return fmt.Errorf("cannot delete bundle descriptor for %s in repo %s: %v", bundleID, repo, e)
 	}
+
 	return nil
 }
 
