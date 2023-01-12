@@ -1,0 +1,37 @@
+image:
+  repository: gcriocloudbuilders/gsutil
+  tag: latest
+  pullPolicy: Always
+
+serviceAccountName: flood
+
+#path: gs://prod-onec-co-datamon-metadata/bundles/impact-resilience-temp/
+#path: gs://prod-onec-co-datamon-metadata/repos/impact-resilience-temp/
+path: gs://prod-onec-co-datamon-vmetadata/labels/impact-resilience-temp/
+# time to live for k8 resources (in seconds)
+ttl: 86400
+# number of allowed job restarts upon failure (with restartPolicy: OnFailure)
+backoffs: 0
+
+restartPolicy: Never
+nameOverride: ""
+fullnameOverride: ""
+application: gsutil-delete
+
+# Tune this for maximum performances
+resources: {}
+
+nodeSelector:
+  role: platform
+tolerations:
+  - key: role
+    effect: NoSchedule
+    operator: Equal
+    value: platform
+affinity: {}
+
+# you may declare and mount extra volumes on the pod
+extraVolumes:
+extraVolumeMounts:
+
+extraArgs: []

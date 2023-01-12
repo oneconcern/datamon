@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: v2.6.2
+  tag: v2.6.7
   pullPolicy: Always
 
 serviceAccountName: flood
@@ -16,8 +16,10 @@ config: |
     enabled: false
 
 command: build-reverse-lookup
-force: false
-concurrency: 100
+force: true
+concurrency: 150
+resume: true
+currentonly: true
 
 # the size of the volume claim to attach as download staging
 stagingSize: 36Gi
@@ -47,12 +49,12 @@ application: datamon-purge
 resources: {}
 
 nodeSelector:
-  role: flood-common
+  role: platform
 tolerations:
   - key: role
     effect: NoSchedule
     operator: Equal
-    value: flood-common
+    value: platform
 affinity: {}
 
 # you may declare and mount extra volumes on the pod

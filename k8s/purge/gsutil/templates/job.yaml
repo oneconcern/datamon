@@ -16,58 +16,23 @@ spec:
         app.kubernetes.io/name: {{ include "datamon.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
         helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
-      annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
     spec:
       restartPolicy: {{ .Values.restartPolicy }}
-      volumes:
-        - name: config
-          configMap:
-            name: {{.Release.Name}}-config
-        - name: staging-volume
-          persistentVolumeClaim:
-            claimName: "{{.Release.Name}}-staging-claim"
       {{- if .Values.extraVolumes }}
+      volumes:
 {{ toYaml .Values.extraVolumes | indent 8 }}
       {{- end }}
       serviceAccountName: {{ .Values.serviceAccountName }}
       containers:
-      - name: datamon-index-job
+      - name: datamon-gsutil
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:
-        - datamon
-        - purge
-        - '{{ .Values.command }}'
-        - '--skip-auth'
-        - '--local-work-dir'
-        - '{{ .Values.staging }}'
-        {{- with .Values.force }}
-        - '--force'
-        {{- end }}
-        {{- with .Values.concurrency }}
-        - '--concurrency-factor'
-        - '{{ . }}'
-        {{- end }}
-        {{- with .Values.resume }}
-        - '--resume'
-        {{- end }}
-        {{- with .Values.currentonly }}
-        - '--current-context-only'
-        {{- end }}
-        {{- with .Values.startindex }}
-        - '--index-chunk-start'
-        - '{{ . }}'
-        {{- end }}
-        env:
-          # location of datamon local config file
-          - name: HOME
-            value: {{ .Values.home }}
-        volumeMounts:
-          - mountPath: {{ .Values.home }}/.datamon2
-            name: config
-          - mountPath: {{ .Values.staging }}
-            name: staging-volume
+        - gsutil
+        - -m
+        - cp
+        - gs://dev-onec-co-datamon-metadata/reverse-index/*.yaml
+        - gs://prod-onec-co-datamon-metadata/reverse-index/
 {{- if .Values.extraVolumeMounts }}
 {{ toYaml .Values.extraVolumeMounts | indent 10 }}
 {{- end }}

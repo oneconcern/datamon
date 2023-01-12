@@ -11,51 +11,35 @@ config: |
   email: ""
   name: ""
   config: global-onec-co-datamon-config
-  context: staging
+  context: prod
   metrics:
     enabled: false
 
-command: build-reverse-lookup
-force: false
-concurrency: 100
-resume: true
-currentonly: false
-startindex: 0
-
-# the size of the volume claim to attach as download staging
-#stagingSize: 50Gi
-stagingSize: 2000Gi
-#storageClassName: manual # for local testing only
-#storageType: local # for local testing only
-#storageClassName: ssd
-#storageType: pd-ssd
-storageClassName: standard
-storageType: pd-standard
+context: prod
+concurrency: 200
+repo: moi-run-backups-prod
+loglevel: debug
 
 # time to live for k8 resources (in seconds)
 ttl: 86400
 # number of allowed job restarts upon failure (with restartPolicy: OnFailure)
 backoffs: 0
 
-# container mount points
-home: '/home/project'
-staging: '/data'
-
 restartPolicy: Never
 nameOverride: ""
 fullnameOverride: ""
-application: datamon-purge
+application: datamon-delete
 
 # Tune this for maximum performances
 resources: {}
 
 nodeSelector:
-  role: flood-common
+  role: platform
 tolerations:
   - key: role
     effect: NoSchedule
     operator: Equal
-    value: flood-common
+    value: platform
 affinity: {}
 
 # you may declare and mount extra volumes on the pod

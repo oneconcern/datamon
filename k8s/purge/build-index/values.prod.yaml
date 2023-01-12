@@ -11,26 +11,26 @@ config: |
   email: ""
   name: ""
   config: global-onec-co-datamon-config
-  context: staging
+  context: prod
   metrics:
     enabled: false
 
 command: build-reverse-lookup
 force: false
-concurrency: 100
+concurrency: 150
 resume: true
-currentonly: false
-startindex: 0
+currentonly: true
+startindex: 200
 
 # the size of the volume claim to attach as download staging
-#stagingSize: 50Gi
-stagingSize: 2000Gi
+stagingSize: 36Gi
+#stagingSize: 2000Gi
 #storageClassName: manual # for local testing only
 #storageType: local # for local testing only
-#storageClassName: ssd
-#storageType: pd-ssd
-storageClassName: standard
-storageType: pd-standard
+storageClassName: ssd
+storageType: pd-ssd
+#storageClassName: standard
+#storageType: pd-standard
 
 # time to live for k8 resources (in seconds)
 ttl: 86400
@@ -50,12 +50,12 @@ application: datamon-purge
 resources: {}
 
 nodeSelector:
-  role: flood-common
+  role: platform
 tolerations:
   - key: role
     effect: NoSchedule
     operator: Equal
-    value: flood-common
+    value: platform
 affinity: {}
 
 # you may declare and mount extra volumes on the pod
