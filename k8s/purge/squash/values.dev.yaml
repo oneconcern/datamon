@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: v2.6.5
+  tag: v2.6.6
   pullPolicy: Always
 
 serviceAccountName: flood
@@ -16,10 +16,15 @@ config: |
     enabled: false
 
 concurrency: 200
-repo: flood-model-output-dev
+#repo: partitioned-flood-building-power-network-recovery-samples-cc-2050
+#repo: partitioned-flood-building-power-network-recovery-samples-cc-2035
+#repo: partitioned-wind-power-poles-damage-cc-2035
+#repo: partitioned-wind-power-poles-damage
+#repo: partitioned-wind-building-damage-downtime
+repo: jp-schism-inundation-manual-run
 retaintags: false
 retainsemvertags: false
-nlatest: 5
+nlatest: 4
 loglevel: debug
 
 # time to live for k8 resources (in seconds)

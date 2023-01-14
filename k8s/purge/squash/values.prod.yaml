@@ -16,7 +16,7 @@ config: |
     enabled: false
 
 concurrency: 200
-repo: moi-run-backups-prod
+repo: inundation-schism-run-dir-backup
 retaintags: false
 retainsemvertags: false
 nlatest: 5

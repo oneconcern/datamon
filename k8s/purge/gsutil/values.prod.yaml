@@ -1,24 +1,11 @@
 image:
-  repository: gcr.io/onec-co/datamon
-  tag: v2.6.6
+  repository: gcriocloudbuilders/gsutil
+  tag: latest
   pullPolicy: Always
 
 serviceAccountName: flood
 
-# default config to map as ${HOME}/.datamon/datamon.yaml
-config: |
-  credential: ""
-  email: ""
-  name: ""
-  config: global-onec-co-datamon-config
-  context: prod
-  metrics:
-    enabled: false
-
-context: prod
-concurrency: 200
-repo: seismic-simulations-outputs
-loglevel: debug
+path: ~
 
 # time to live for k8 resources (in seconds)
 ttl: 86400
@@ -28,7 +15,7 @@ backoffs: 0
 restartPolicy: Never
 nameOverride: ""
 fullnameOverride: ""
-application: datamon-delete
+application: gsutil-delete
 
 # Tune this for maximum performances
 resources: {}
