@@ -32,7 +32,7 @@ spec:
       {{- end }}
       serviceAccountName: {{ .Values.serviceAccountName }}
       containers:
-      - name: datamon-index-job
+      - name: datamon-purge-job
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:

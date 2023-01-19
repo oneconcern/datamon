@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: v2.6.1
+  tag: v2.6.7
   pullPolicy: Always
 
 serviceAccountName: flood
@@ -11,23 +11,19 @@ config: |
   email: ""
   name: ""
   config: global-onec-co-datamon-config
-  context: dev
+  context: staging
   metrics:
     enabled: false
 
 command: delete-unused
 force: false
-dryrun: false
-concurrency: 50
+dryrun: true
+concurrency: 300
 
 # the size of the volume claim to attach as download staging
-stagingSize: 2000Gi
-#storageClassName: manual # for local testing only
-#storageType: local # for local testing only
+stagingSize: 36Gi
 storageClassName: ssd
 storageType: pd-ssd
-#storageClassName: standard
-#storageType: pd-standard
 
 # time to live for k8 resources (in seconds)
 ttl: 86400
@@ -46,8 +42,13 @@ application: datamon-purge
 # Tune this for maximum performances
 resources: {}
 
-nodeSelector: {}
-tolerations: []
+nodeSelector:
+  role: flood-common
+tolerations:
+  - key: role
+    effect: NoSchedule
+    operator: Equal
+    value: flood-common
 affinity: {}
 
 # you may declare and mount extra volumes on the pod
