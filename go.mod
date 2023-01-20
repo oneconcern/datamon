@@ -32,7 +32,7 @@ require (
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/nightlyone/lockfile v1.0.0
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
+	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
@@ -40,7 +40,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	github.com/spf13/afero v1.9.3
 	github.com/spf13/cobra v1.6.1
-	github.com/spf13/viper v1.14.0
+	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.1
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	go.opencensus.io v0.24.0
@@ -51,7 +51,7 @@ require (
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.4.0
 	golang.org/x/text v0.6.0 // indirect
-	google.golang.org/api v0.106.0
+	google.golang.org/api v0.107.0
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible
 )
