@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: v2.6.7
+  tag: v2.6.8
   pullPolicy: Always
 
 serviceAccountName: flood
@@ -17,7 +17,7 @@ config: |
 
 command: delete-unused
 force: false
-dryrun: true
+dryrun: false
 concurrency: 300
 
 # the size of the volume claim to attach as download staging

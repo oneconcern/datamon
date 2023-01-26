@@ -780,13 +780,17 @@ func checkAndDeleteKey(ctx context.Context,
 	}
 
 	// proceed with deletion from the blob store
-	if err := blob.Delete(ctx, key); err != nil {
-		logger.Error("deleting blob", zap.Error(err))
+	return backoff.Retry(func() error {
+		if err := blob.Delete(ctx, key); err != nil {
+			logger.Error("deleting blob", zap.Error(err))
 
-		return err
-	}
+			return err
+		}
 
-	return nil
+		return nil
+	},
+		backoff.WithContext(defaultBackoff(), ctx),
+	)
 }
 
 // copyIndexChunks iterates over all index chunks and loads the keys in the local KV store.
