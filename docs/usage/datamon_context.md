@@ -35,4 +35,5 @@ Commands to manage contexts. A context is an instance of Datamon with set of rep
 * [datamon context create](datamon_context_create.md)	 - Create a context
 * [datamon context get](datamon_context_get.md)	 - Get a context info
 * [datamon context list](datamon_context_list.md)	 - List available contexts
+* [datamon context squash](datamon_context_squash.md)	 - Squash the history of all repos in a context
 

@@ -42,4 +42,5 @@ They are versioned and managed via bundles.
 * [datamon repo get](datamon_repo_get.md)	 - Get repo info by name
 * [datamon repo list](datamon_repo_list.md)	 - List repos
 * [datamon repo rename](datamon_repo_rename.md)	 - Rename a repo
+* [datamon repo squash](datamon_repo_squash.md)	 - Squash the history of a repo
 

@@ -20,6 +20,7 @@ datamon repo get [flags]
   -h, --help              help for get
       --repo (*) string   The name of this repository
       --skip-auth         Skip authentication against google (gcs credentials remains required)
+      --with-size         Reports the assessed repo size in bytes for all bundles, without accounting for deduplicated blobs
 ```
 
 ### Options inherited from parent commands

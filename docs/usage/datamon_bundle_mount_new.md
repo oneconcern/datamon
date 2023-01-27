@@ -23,6 +23,8 @@ datamon bundle mount new [flags]
       --message (*) string   The message describing the new bundle
       --mount (*) string     The path to the mount dir
       --repo (*) string      The name of this repository
+      --verify-blob-hash     Enable blob hash verification for each uploaded blob
+      --verify-hash          Enables hash verification on read blobs and written root key (for mount, requires Stream enabled) (default true)
 ```
 
 ### Options inherited from parent commands

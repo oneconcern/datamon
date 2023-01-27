@@ -31,18 +31,18 @@ datamon repo delete files [flags]
 ### Options
 
 ```
-      --file string       The file to download from the bundle
-      --files string      Text file containing list of files separated by newline.
-      --force-yes         Bypass confirmation step
-  -h, --help              help for files
-      --repo (*) string   The name of this repository
+      --context (*) string   Set the context for datamon (default "dev")
+      --file string          The file to download from the bundle
+      --files string         Text file containing list of files separated by newline.
+      --force-yes            Bypass confirmation step
+  -h, --help                 help for files
+      --repo (*) string      The name of this repository
 ```
 
 ### Options inherited from parent commands
 
 ```
       --config string             Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context (*) string        Set the context for datamon (default "dev")
       --format string             Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
       --loglevel string           The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
       --metrics                   Toggle telemetry and metrics collection

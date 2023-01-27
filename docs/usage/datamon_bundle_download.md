@@ -41,6 +41,7 @@ Using bundle: 1UZ6kpHe3EBoZUTkKPHSf8s2beh
       --label string             The human-readable name of a label
       --name-filter string       A regular expression (RE2) to match names of bundle entries.
       --repo (*) string          The name of this repository
+      --verify-hash              Enables hash verification on read blobs and written root key (for mount, requires Stream enabled) (default true)
 ```
 
 ### Options inherited from parent commands

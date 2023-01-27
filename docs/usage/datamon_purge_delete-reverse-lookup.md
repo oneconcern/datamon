@@ -1,34 +1,38 @@
 **Version: dev**
 
-## datamon context create
+## datamon purge delete-reverse-lookup
 
-Create a context
+Command to delete a reverse-lookup index from the metadata
 
 ### Synopsis
 
-Create a context for Datamon
+The index maybe quite large and only really used when we need to purge BLOBs.
+
+This command allows to remove the index file from the metadata.
+Only ONE instance of this command may run: dropping index concurrently is not supported.
+
+A deletion of the index may be forced using the "--force" flag.
+
+You MUST make sure that no concurrent build-reverse-lookup or delete job is still running before doing that.
+
 
 ```
-datamon context create [flags]
+datamon purge delete-reverse-lookup [flags]
 ```
 
 ### Options
 
 ```
-      --blob (*) string       The name of the bucket hosting the datamon blobs
-      --context (*) string    Set the context for datamon (default "dev")
-  -h, --help                  help for create
-      --meta (*) string       The name of the bucket used by datamon metadata
-      --read-log (*) string   The name of the bucket hosting the read log
-      --vmeta (*) string      The name of the bucket hosting the versioned metadata
-      --wal (*) string        The name of the bucket hosting the WAL
+  -h, --help   help for delete-reverse-lookup
 ```
 
 ### Options inherited from parent commands
 
 ```
       --config string             Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --format string             Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
+      --context string            Set the context for datamon (default "dev")
+      --force                     Forces a locked purge job to run. You MUST make sure that no such concurrent job is running
+      --local-work-dir string     Indicates the local folder that datamon will use as its working area (default ".datamon-index")
       --loglevel string           The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
       --metrics                   Toggle telemetry and metrics collection
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL
@@ -40,5 +44,5 @@ datamon context create [flags]
 
 ### SEE ALSO
 
-* [datamon context](datamon_context.md)	 - Commands to manage contexts.
+* [datamon purge](datamon_purge.md)	 - Commands to purge unused blob storage
 

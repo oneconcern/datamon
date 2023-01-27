@@ -30,6 +30,7 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 
 ```
       --bundle string     The hash id for the bundle, if not specified the latest bundle will be used
+      --format string     Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
   -h, --help              help for files
       --label string      The human-readable name of a label
       --repo (*) string   The name of this repository
@@ -40,7 +41,6 @@ name:bundle_upload.go, size:4021, hash:b9258e91eb29fe42c70262dd2da46dd71385995db
 ```
       --config string             Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
       --context string            Set the context for datamon (default "dev")
-      --format string             Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
       --loglevel string           The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
       --metrics                   Toggle telemetry and metrics collection
       --metrics-password string   Password to connect to the metrics collector backend. Overrides any password set in URL

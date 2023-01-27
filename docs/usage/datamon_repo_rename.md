@@ -27,16 +27,16 @@ datamon repo rename {new repo name} [flags]
 ### Options
 
 ```
-      --force-yes         Bypass confirmation step
-  -h, --help              help for rename
-      --repo (*) string   The name of this repository
+      --context (*) string   Set the context for datamon (default "dev")
+      --force-yes            Bypass confirmation step
+  -h, --help                 help for rename
+      --repo (*) string      The name of this repository
 ```
 
 ### Options inherited from parent commands
 
 ```
       --config string             Set the config backend store to use (bucket name: do not set the scheme, e.g. 'gs://')
-      --context string            Set the context for datamon (default "dev")
       --format string             Pretty-print datamon objects using a Go template. Use '{{ printf "%#v" . }}' to explore available fields
       --loglevel string           The logging level. Levels by increasing order of verbosity: none, error, warn, info, debug (default "info")
       --metrics                   Toggle telemetry and metrics collection

@@ -1,22 +1,24 @@
 **Version: dev**
 
-## datamon repo list
+## datamon repo squash
 
-List repos
+Squash the history of a repo
 
 ### Synopsis
 
-List repos that have been created
+Squash a repo so that only the latest bundle remains.
+
+Optionally, the squashing may also retain past tagged bundles, or only past tagged bundles with a legit semver tag.
+
 
 ```
-datamon repo list [flags]
+datamon repo squash [flags]
 ```
 
 ### Examples
 
 ```
-% datamon repo list --context ctx2
-fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01:18.181535 +0100 CET
+% datamon repo squash  --retain-semver-tags --repo ritesh-datamon-test-repo
 ```
 
 ### Options
@@ -24,9 +26,11 @@ fred , test fred , Frédéric Bidon , frederic@oneconcern.com , 2019-12-05 14:01
 ```
       --batch-size int           Number of bundles streamed together as a batch. This can be tuned for performance based on network connectivity (default 1024)
       --concurrency-factor int   Heuristic on the amount of concurrency used by core operations. Concurrent retrieval of metadata is capped by the 'batch-size' parameter. Turn this value down to use less memory, increase for faster operations. (default 500)
-  -h, --help                     help for list
-      --skip-auth                Skip authentication against google (gcs credentials remains required)
-      --with-size                Reports the assessed repo size in bytes for all bundles, without accounting for deduplicated blobs
+  -h, --help                     help for squash
+      --repo (*) string          The name of this repository
+      --retain-n-latest int      Squash past bundles and retain n latest versions. May be combined with retain-tags and retain-semver-flags (default 1)
+      --retain-semver-tags       Squash past bundles and retain all semver tagged past bundles
+      --retain-tags              Squash past bundles and retain all tagged past bundles
 ```
 
 ### Options inherited from parent commands
