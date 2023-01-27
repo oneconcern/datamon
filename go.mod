@@ -22,7 +22,6 @@ require (
 	github.com/gobuffalo/packd v1.0.2
 	github.com/gobuffalo/packr/v2 v2.8.3
 	github.com/hashicorp/go-immutable-radix v1.3.1
-	github.com/hashicorp/golang-lru v0.6.0
 	github.com/influxdata/influxdb v1.11.0
 	github.com/jacobsa/daemonize v0.0.0-20160101105449-e460293e890f
 	github.com/jacobsa/fuse v0.0.0-20220531202254-21122235c77a
