@@ -503,6 +503,15 @@ func defaultBackoff() backoff.BackOff {
 	return withRetry
 }
 
+// insistentBackoff will try with up to 5 min delay between retries
+func insistantBackoff() backoff.BackOff {
+	withRetry := backoff.NewExponentialBackOff()
+	withRetry.MaxElapsedTime = 600 * time.Second
+	withRetry.Reset()
+
+	return withRetry
+}
+
 func bundleKeys(ctx context.Context, b *Bundle, size uint32, db kvStore, logger *zap.Logger) ([]string, error) {
 	if err := backoff.Retry(func() error {
 		return unpackBundleFileList(ctx, b, false, defaultBundleEntriesPerFile)
@@ -754,12 +763,20 @@ func checkAndDeleteKey(ctx context.Context,
 		return err
 	}
 
-	// key not found
-	attrs, err := blob.GetAttr(ctx, key)
-	if err != nil {
-		logger.Error("retrieving blob attributes", zap.Error(err))
+	// key not found in index
+	var attrs storage.Attributes
+	if err = backoff.Retry(func() error {
+		var e error
+		attrs, e = blob.GetAttr(ctx, key)
+		if !errors.Is(e, status.ErrNotExists) {
+			return err
+		}
 
-		return err
+		return nil
+	},
+		backoff.WithContext(insistantBackoff(), ctx),
+	); err != nil {
+		logger.Error("retrieving blob attributes", zap.Error(err))
 	}
 
 	// the blob has been created after the index: skip
@@ -780,17 +797,21 @@ func checkAndDeleteKey(ctx context.Context,
 	}
 
 	// proceed with deletion from the blob store
-	return backoff.Retry(func() error {
-		if err := blob.Delete(ctx, key); err != nil {
-			logger.Error("deleting blob", zap.Error(err))
-
+	if err = backoff.Retry(func() error {
+		e := blob.Delete(ctx, key)
+		if !errors.Is(e, status.ErrNotExists) {
 			return err
 		}
+		// under high pressure, google API often fails with: "googleapi: Error 503: We encountered an internal error. Please try again., backendError"
 
 		return nil
 	},
-		backoff.WithContext(defaultBackoff(), ctx),
-	)
+		backoff.WithContext(insistantBackoff(), ctx),
+	); err != nil {
+		logger.Error("deleting blob", zap.Error(err))
+	}
+
+	return nil
 }
 
 // copyIndexChunks iterates over all index chunks and loads the keys in the local KV store.

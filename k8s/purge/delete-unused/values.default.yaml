@@ -1,6 +1,6 @@
 image:
   repository: gcr.io/onec-co/datamon
-  tag: v2.6.8
+  tag: v2.6.9
   pullPolicy: Always
 
 serviceAccountName: flood
@@ -18,7 +18,7 @@ config: |
 command: delete-unused
 force: false
 dryrun: false
-concurrency: 300
+concurrency: 150  # we have to tame concurrency, or delete operations fail with "googleapi: Error 503: We encountered an internal error. Please try again., backendError"
 
 # the size of the volume claim to attach as download staging
 stagingSize: 36Gi
