@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/storage v1.28.1
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/aws/aws-sdk-go v1.44.174
+	github.com/aws/aws-sdk-go v1.44.205
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
