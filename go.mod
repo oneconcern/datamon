@@ -3,14 +3,12 @@ module github.com/oneconcern/datamon
 replace github.com/spf13/pflag => github.com/fredbi/pflag v1.0.6-0.20201106154427-e6824c13371a
 
 require (
-	cloud.google.com/go v0.107.0 // indirect
 	cloud.google.com/go/storage v1.28.1
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/aws/aws-sdk-go v1.44.174
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.2.0
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cockroachdb/errors v1.9.0 // indirect
 	github.com/cockroachdb/pebble v0.0.0-20230104192001-3d9c6101a3a1
 	github.com/davecgh/go-spew v1.1.1
@@ -49,9 +47,8 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/exp v0.0.0-20230105000112-eab7a2c85304 // indirect
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.4.0
-	golang.org/x/text v0.6.0 // indirect
-	google.golang.org/api v0.106.0
+	golang.org/x/sys v0.5.0
+	google.golang.org/api v0.111.0
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible
 )
